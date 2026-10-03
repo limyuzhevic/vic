@@ -66,8 +66,10 @@ struct Brain::Impl {
     size_t totalSpikesTotal;
     
     // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Note: These pointers refer to neurons within the brain's regions
+    // Ownership is managed by the region's population
+    std::vector<const Neuron*> sensoryNeurons;
+    std::vector<const Neuron*> motorNeurons;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle

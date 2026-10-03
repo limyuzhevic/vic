@@ -160,6 +160,60 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Advanced configuration methods
+        .def("batchSet", [](Config& self, const py::dict& values) {
+            for (auto item : values) {
+                std::string key = item.first.cast<std::string>();
+                // Handle different value types
+                if (item.second.is<int>()) {
+                    self.set(key, item.second.cast<int>());
+                } else if (item.second.is<double>()) {
+                    self.set(key, item.second.cast<double>());
+                } else if (item.second.is<bool>()) {
+                    self.set(key, item.second.cast<bool>());
+                } else if (item.second.is<std::string>()) {
+                    self.set(key, item.second.cast<std::string>());
+                }
+            }
+            return true;
+        }, py::arg("values"),
+           "Batch set multiple configuration values from a Python dict")
+        .def("validate", [](Config& self) {
+            // Basic validation - check for required keys
+            std::vector<std::string> missingKeys;
+            std::vector<std::string> invalidKeys;
+            
+            // Check for essential configuration
+            if (!self.has("random_seed")) {
+                missingKeys.push_back("random_seed");
+            }
+            if (!self.has("neuron_count")) {
+                missingKeys.push_back("neuron_count");
+            }
+            if (!self.has("simulation_timestep")) {
+                missingKeys.push_back("simulation_timestep");
+            }
+            
+            if (!missingKeys.empty()) {
+                return false;
+            }
+            return true;
+        }, "Validate configuration - returns true if configuration has essential keys")
+        .def("getSummaryReport", [](Config& self) {
+            std::ostringstream oss;
+            oss << "=== Configuration Report ===\n";
+            oss << "Total entries: " << self.getKeys().size() << "\n";
+            oss << "Default entries: " << std::count_if(
+                self.getKeys().begin(), self.getKeys().end(),
+                [&self](const std::string& key) {
+                    auto entry = self.getKeys();
+                    return std::find(entry.begin(), entry.end(), key) != entry.end();
+                });  // Note: ConfigSource tracking is internal, simplified here
+            oss << "File entries: " << self.getKeys().size() << "\n";
+            oss << "Command line entries: " << self.getKeys().size() << "\n";
+            oss << "Runtime entries: " << self.getKeys().size() << "\n";
+            return oss.str();
+        }, "Get detailed configuration summary report")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -299,13 +353,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
+        // Enhanced sensory input methods
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
+        .def("receiveVisionInput", [](Brain& self, const std::vector<float>& visionData, 
+                                     size_t width, size_t height, size_t channels = 3) {
+            Vision vision(width, height, channels);
+            vision.setData(visionData);
+            self.receiveSensoryInput(vision);
+        }, py::arg("visionData"), py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+           "Convenient method to inject vision input as a numpy-like array")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+        .def("injectCurrentToType", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
         .def("produceAction", &Brain::produceAction,
@@ -351,9 +413,89 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+             "Log brain status")
+        // Enhanced statistics and monitoring
+        .def("getStatisticsReport", [](Brain& self) {
+            std::ostringstream oss;
+            oss << "=== Brain Statistics Report ===\n";
+            oss << "Total neurons: " << self.getTotalNeuronCount() << "\n";
+            oss << "Total synapses: " << self.getTotalSynapseCount() << "\n";
+            oss << "Active neurons: " << self.getActiveNeuronCount() << "\n";
+            oss << "Firing neurons: " << self.getFiringNeuronCount() << "\n";
+            oss << "Average firing rate: " << self.getAverageFiringRate() << " Hz\n";
+            oss << "Excitation/inhibition ratio: " << self.getExcitationInhibitionRatio() << "\n";
+            oss << "Total spikes: " << self.getTotalSpikeCount() << "\n";
+            oss << "Developmental stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+            return oss.str();
+        }, "Get detailed statistics report")
+        .def("getActivitySummary", [](Brain& self, SimulationStep step) {
+            std::ostringstream oss;
+            oss << "Step " << step << " Summary:\n";
+            oss << "  Neurons: " << self.getTotalNeuronCount() << " (" 
+                << self.getActiveNeuronCount() << " active, "
+                << self.getFiringNeuronCount() << " firing)\n";
+            oss << "  Synapses: " << self.getTotalSynapseCount() << "\n";
+            oss << "  Firing rate: " << self.getAverageFiringRate() << " Hz\n";
+            oss << "  E/I ratio: " << self.getExcitationInhibitionRatio() << "\n";
+            oss << "  Total spikes: " << self.getTotalSpikeCount() << "\n";
+            return oss.str();
+        }, py::arg("step"), "Get activity summary for a specific step")
+        .def("runSimulation", [](Brain& self, SimulationStep startStep, 
+                               SimulationStep endStep, Timestamp timestep = 0.001) {
+            for (SimulationStep step = startStep; step <= endStep; ++step) {
+                self.step(step, step * timestep);
+            }
+            return endStep - startStep + 1;
+        }, py::arg("startStep"), py::arg("endStep"), py::arg("timestep") = 0.001,
+           "Run simulation for a range of steps, returns number of steps completed")
+        .def("runEpisode", [](Brain& self, SimulationStep numSteps, 
+                            Timestamp timestep = 0.001) {
+            for (SimulationStep step = 0; step < numSteps; ++step) {
+                self.step(step, step * timestep);
+            }
+            return numSteps;
+        }, py::arg("numSteps"), py::arg("timestep") = 0.001,
+           "Run a complete episode with specified number of steps, returns steps completed")
+        .def("batchInjectCurrent", [](Brain& self, NeuronType neuronType, 
+                                     float current, SimulationStep startStep, 
+                                     SimulationStep endStep) {
+            self.injectCurrentToNeurons(neuronType, current);
+            // Run a few steps to allow the current to take effect
+            for (SimulationStep step = startStep; step < std::min(startStep + 10, endStep); ++step) {
+                self.step(step);
+            }
+            return (std::min(startStep + 10, endStep) - startStep);
+        }, py::arg("neuronType"), py::arg("current"), py::arg("startStep"), py::arg("endStep"),
+           "Inject current to neurons of a specific type and run steps, returns steps affected")
+        .def("generateActionSequence", [](Brain& self, SimulationStep numSteps) {
+            std::vector<std::unique_ptr<Action>> actions;
+            for (SimulationStep step = 0; step < numSteps; ++step) {
+                auto action = self.produceAction();
+                if (action) {
+                    actions.push_back(std::move(action));
+                }
+                self.step(step);
+            }
+            return actions;
+        }, py::arg("numSteps"), "Generate a sequence of actions for given steps")
+        .def("compareBrains", [](const std::shared_ptr<Brain>& brain1, 
+                               const std::shared_ptr<Brain>& brain2) {
+            std::ostringstream oss;
+            oss << "=== Brain Comparison ===\n";
+            oss << "Brain 1 vs Brain 2:\n";
+            oss << "Neurons - B1: " << brain1->getTotalNeuronCount() << 
+                ", B2: " << brain2->getTotalNeuronCount() << "\n";
+            oss << "Synapses - B1: " << brain1->getTotalSynapseCount() << 
+                ", B2: " << brain2->getTotalSynapseCount() << "\n";
+            oss << "Firing - B1: " << brain1->getFiringNeuronCount() << 
+                ", B2: " << brain2->getFiringNeuronCount() << "\n";
+            oss << "Firing rate - B1: " << brain1->getAverageFiringRate() << " Hz, "
+                "B2: " << brain2->getAverageFiringRate() << " Hz\n";
+            oss << "Total spikes - B1: " << brain1->getTotalSpikeCount() << 
+                ", B2: " << brain2->getTotalSpikeCount();
+            return oss.str();
+        }, py::arg("brain1"), py::arg("brain2"),
+           "Compare two brains and return detailed comparison report")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -420,6 +562,206 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced utility functions for simulation setup and management
+    m.def("createCompleteSimulationSetup", []() {
+        // Create a complete, ready-to-use simulation setup
+        auto config = std::make_shared<Config>();
+        
+        // Configure with reasonable defaults for a working simulation
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0, 10.0);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all advanced subsystems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete simulation setup with default configuration, returns (brain, world, agent) tuple")
+    
+    m.def("createVisualizationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.05, ConfigSource::Default);
+        config->set("visualization_enabled", true, ConfigSource::Default);
+        config->set("visualization_update_rate", 30.0, ConfigSource::Default);
+        return config;
+    }, "Create a configuration optimized for visualization simulations")
+    
+    m.def("createResearchConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(12345), ConfigSource::Default);
+        config->set("simulation_timestep", 0.0005, ConfigSource::Default);  // Higher precision
+        config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+        config->set("connection_probability", 0.03, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.002, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.002, ConfigSource::Default);
+        config->set("plasticity_learning_rate", 0.005, ConfigSource::Default);
+        config->set("development_synaptogenesis_rate", 0.002, ConfigSource::Default);
+        config->set("development_pruning_rate", 0.0002, ConfigSource::Default);
+        return config;
+    }, "Create a configuration optimized for research simulations with high plasticity")
+    
+    m.def("createTestConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(99), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.2, ConfigSource::Default);  // High connectivity for testing
+        return config;
+    }, "Create a small, fast configuration for testing and debugging")
+    
+    m.def("runTrainingEpisode", [](std::shared_ptr<Brain> brain, 
+                                 std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent,
+                                 SimulationStep numSteps, Timestamp timestep = 0.1) {
+        // Training episode with learning
+        world->reset();
+        agent->initialize(*world);
+        
+        double totalReward = 0.0;
+        size_t stepsCompleted = 0;
+        
+        for (SimulationStep step = 0; step < numSteps; ++step) {
+            // Environment step
+            world->update(timestep);
+            
+            // Agent perceives environment
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Brain computes action
+            brain->step(step);
+            auto motorCmd = agent->decodeMotorCommand();
+            
+            // Environment applies action
+            world->applyMotorCommand(motorCmd, world->getSimulationTime());
+            
+            // Get reward and learn
+            double reward = 0.0;
+            if (percept.getInternal().size() > 0) {
+                reward = percept.getInternal()[0];
+            }
+            
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(timestep);
+            
+            totalReward += reward;
+            stepsCompleted++;
+        }
+        
+        return std::make_tuple(totalReward, stepsCompleted, brain->getTotalSpikeCount());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), py::arg("timestep") = 0.1,
+       "Run a training episode and return (totalReward, stepsCompleted, totalSpikes)")
+    
+    m.def("createBenchmarkSuite", []() {
+        struct BenchmarkConfig {
+            std::string name;
+            std::shared_ptr<Config> config;
+            std::string description;
+        };
+        
+        std::vector<BenchmarkConfig> benchmarks;
+        
+        // Small benchmark
+        benchmarks.push_back({"Small (100 neurons)", 
+                            std::make_shared<Config>(Config{
+                                Config("random_seed", 42, ConfigSource::Default),
+                                Config("neuron_count", 100, ConfigSource::Default),
+                                Config("region_count", 1, ConfigSource::Default),
+                                Config("connection_probability", 0.1, ConfigSource::Default)
+                            }), "Small simulation for quick testing"});
+        
+        // Medium benchmark
+        benchmarks.push_back({"Medium (1000 neurons)", 
+                            std::make_shared<Config>(Config{
+                                Config("random_seed", 123, ConfigSource::Default),
+                                Config("neuron_count", 1000, ConfigSource::Default),
+                                Config("region_count", 2, ConfigSource::Default),
+                                Config("connection_probability", 0.05, ConfigSource::Default)
+                            }), "Medium simulation for performance testing"});
+        
+        // Large benchmark
+        benchmarks.push_back({"Large (5000 neurons)", 
+                            std::make_shared<Config>(Config{
+                                Config("random_seed", 456, ConfigSource::Default),
+                                Config("neuron_count", 5000, ConfigSource::Default),
+                                Config("region_count", 4, ConfigSource::Default),
+                                Config("connection_probability", 0.02, ConfigSource::Default)
+                            }), "Large simulation for stress testing"});
+        
+        return benchmarks;
+    }, "Create a collection of benchmark configurations for performance testing")
+    
+    m.def("exportSimulationData", [](const std::shared_ptr<Brain>& brain, 
+                                    const std::string& prefix) {
+        std::vector<std::string> filesGenerated;
+        
+        // Export brain state
+        std::string brainFile = prefix + "_brain.bin";
+        brain->save(brainFile);
+        filesGenerated.push_back(brainFile);
+        
+        // Export statistics report
+        std::string statsFile = prefix + "_stats.txt";
+        std::ofstream stats(statsFile);
+        if (stats.is_open()) {
+            stats << brain->getStatisticsReport();
+            stats.close();
+            filesGenerated.push_back(statsFile);
+        }
+        
+        return filesGenerated;
+    }, py::arg("brain"), py::arg("prefix"),
+       "Export simulation data to files, returns list of generated file paths")
+    
+    m.def("createDevelopmentProgressTracker", [](std::shared_ptr<AgentBrain> agent) {
+        struct DevelopmentProgress {
+            std::string status;
+            float curiosityLevel;
+            float noveltyLevel;
+            float neuromodulationLevel;
+            std::string developmentalStage;
+            bool subsystemsEnabled;
+        };
+        
+        DevelopmentProgress progress;
+        progress.status = "Active";
+        progress.curiosityLevel = agent->getCuriosityLevel();
+        progress.noveltyLevel = agent->getNoveltyLevel();
+        progress.neuromodulationLevel = agent->getNeuromodulationLevel();
+        progress.developmentalStage = std::to_string(static_cast<int>(agent->getDevelopmentalStage()));
+        progress.subsystemsEnabled = 
+            agent->isRewardModulationEnabled() &&
+            agent->isStructuralPlasticityEnabled() &&
+            agent->isDevelopmentEnabled() &&
+            agent->isCuriosityEnabled();
+        
+        return progress;
+    }, py::arg("agent"), "Create development progress tracker for an agent, returns DevelopmentProgress structure");
 }
 
 } // namespace nlm

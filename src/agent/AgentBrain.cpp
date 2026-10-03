@@ -27,32 +27,40 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    // Use const getter to access neurons safely
+                    const auto& neurons = pop->getNeurons();
+                    for (size_t i = 0; i < neurons.size(); ++i) {
+                        Neuron* n = neurons[i];
                         // Distribute motor neurons to different action groups
+                        // Cast to const for type safety - neurons are owned by population
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 0: motorForward_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 1: motorBackward_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 2: motorTurnLeft_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 3: motorTurnRight_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 4: motorInteract_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 5: motorWait_.push_back(const_cast<const Neuron*>(n)); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    // Use const getter to access neurons safely
+                    const auto& neurons = pop->getNeurons();
+                    for (size_t i = 0; i < neurons.size(); ++i) {
+                        Neuron* n = neurons[i];
                         // Distribute sensory neurons
+                        // Cast to const for type safety - neurons are owned by population
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                            case 0: sensoryVision_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 1: sensoryTouch_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 2: sensoryInternal_.push_back(const_cast<const Neuron*>(n)); break;
+                            case 3: sensoryProprioception_.push_back(const_cast<const Neuron*>(n)); break;
                         }
                     }
                 }
@@ -164,10 +172,12 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+    auto calcActivity = [](const std::vector<const Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
-        for (Neuron* n : neurons) {
+        for (const Neuron* n : neurons) {
+            // Safety check: ensure neuron pointer is valid
+            if (!n) continue;
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }

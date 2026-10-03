@@ -8,6 +8,10 @@
 
 namespace nlm {
 
+#include <unordered_set>
+#include <unordered_map>
+#include <functional>
+
 // Forward declarations
 class Config;
 
@@ -90,14 +94,15 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validation methods
+    void validate(const std::unordered_set<std::string>& requiredKeys,
+                 const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& validators);
+    bool validateAndFix(std::unordered_set<std::string>& outMissingKeys,
+                       std::vector<std::string>& outWarnings);
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
+    // Utility methods
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };

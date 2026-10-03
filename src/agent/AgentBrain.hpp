@@ -78,19 +78,19 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups - const pointers for type safety
+    std::vector<const Neuron*> motorForward_;
+    std::vector<const Neuron*> motorBackward_;
+    std::vector<const Neuron*> motorTurnLeft_;
+    std::vector<const Neuron*> motorTurnRight_;
+    std::vector<const Neuron*> motorInteract_;
+    std::vector<const Neuron*> motorWait_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron groups - const pointers for type safety
+    std::vector<const Neuron*> sensoryVision_;
+    std::vector<const Neuron*> sensoryTouch_;
+    std::vector<const Neuron*> sensoryInternal_;
+    std::vector<const Neuron*> sensoryProprioception_;
     
     // Neuromodulation state
     float dopamineLevel_;
