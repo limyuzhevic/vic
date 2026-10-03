@@ -287,7 +287,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Advanced world operations
+        .def("setLighting", &SimpleWorld::setLighting, py::arg("brightness"), py::arg("contrast"))
+        .def("addResource", &SimpleWorld::addResource, py::arg("x"), py::arg("y"), py::arg("value"), py::arg("radius") = 0.5f)
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"))
+        .def("getAllObjects", &SimpleWorld::getAllObjects)
+        .def("clearObjects", &SimpleWorld::clearObjects)
+        .def("setTemperature", &SimpleWorld::setTemperature, py::arg("temp"))
+        .def("getTemperature", &SimpleWorld::getTemperature)
+        .def("enableDynamicEnvironment", &SimpleWorld::enableDynamicEnvironment, py::arg("enable"))
+        .def("enableWeatherSimulation", &SimpleWorld::enableWeatherSimulation, py::arg("enable"))
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
