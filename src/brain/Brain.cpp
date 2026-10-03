@@ -50,6 +50,12 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // Additional neuromodulators (currently placeholders)
+    // TODO: Implement full serotonin, norepinephrine, acetylcholine systems
+    std::unique_ptr<void> cholinergic;   // Acetylcholine placeholder
+    std::unique_ptr<void> noradrenergic; // Norepinephrine placeholder
+    std::unique_ptr<void> serotonergic;  // Serotonin placeholder
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -106,29 +112,22 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
+        // Initialize working memory - this was missing!
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+        workingMemory->initialize(this);
+        workingMemory->setCapacity(500); // Reasonable capacity for brain
+        
+        // Initialize episodic memory - this was missing!
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        episodicMemory->initialize(this);
+        episodicMemory->setMaxEpisodes(10000);
+        episodicMemory->enableReplay(true);
+        
+        // Initialize associative memory - this was missing!
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        associativeMemory->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -231,13 +230,17 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+        // Initialize working memory - this was missing!
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
+    
+    NLM_LOG_INFO("Working memory initialized with capacity: " + std::to_string(pImpl->workingMemory->getCapacity()));
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
+    
+    NLM_LOG_INFO("Episodic memory initialized with capacity: " + std::to_string(pImpl->episodicMemory->getMaxEpisodes()));
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -255,9 +258,16 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize neuromodulation - using only dopamine, curiosity, and novelty
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // Initialize dopamine (this is the only neuromodulator currently fully implemented)
+    pImpl->dopamine->initialize(this);
+    
+    // Configure other neuromodulators as placeholders
+    // TODO: Implement full serotonin, norepinephrine, acetylcholine neuromodulation
+    // These are needed for attention, arousal, learning, and motivation
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
