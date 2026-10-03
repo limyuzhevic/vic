@@ -42,6 +42,32 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+## Where to Find More Help
+
+This is the **Easy Usage Guide**. For **complete API documentation** and **advanced examples**, see:
+
+### 📖 Complete Python API Documentation
+- **File**: `python/README.md` (This file)
+- **Location**: In the `python/` directory
+- **Content**: Comprehensive API reference, advanced examples, and troubleshooting
+
+### 🚀 Advanced Usage Guide
+- **File**: `HOW_TO_USE.md`
+- **Content**: Technical details, configuration options, and advanced usage patterns
+
+### 📚 Architecture Documentation
+- **Folder**: `docs/`
+- **Files**: ARCHITECTURE.md, SCIENCE.md, ROADMAP.md
+
+## Next Steps
+
+1. **Read this guide** - Understand the basics
+2. **Check the advanced guide** - `HOW_TO_USE.md` for technical details
+3. **Read the complete API docs** - `python/README.md` for comprehensive reference
+4. **Explore the source code** - Learn how to extend and customize NLM
+
+The Easy Usage Guide provides the ** essentials** to get started quickly. The other files provide ** complete documentation** for all use cases, from simple examples to complex research experiments.
+
 ### Example 2: Brain in a Simple World
 
 ```python

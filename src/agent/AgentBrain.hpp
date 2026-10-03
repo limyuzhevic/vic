@@ -6,6 +6,15 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
+#include <unordered_map>
+#include <functional>
+
+// Include expert brain headers if available
+#ifdef HAVE_EXPERTBRAIN_HPP
+#include "ExpertBrain.hpp"
+#include "ExpertBrainController.hpp"
+#endif
 
 namespace nlm {
 
@@ -58,16 +67,38 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Expert brain integration (Phase 2.1+ Expert Features)
+#ifdef HAVE_EXPERTBRAIN_HPP
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Enable expert mode with advanced features
+    bool enableExpertMode(bool enable);
+    bool isExpertModeEnabled() const;
+    
+    // Access expert controller
+    ExpertBrainController& getExpertController();
+    const ExpertBrainController& getExpertController() const;
+    
+    // Execute expert operations
+    bool executeExpertOperation(const std::string& operationName,
+                               const std::function<bool()>& operation,
+                               const std::string& category = "default");
+    
+    // Checkpoint management
+    bool createExpertCheckpoint(const std::string& name,
+                               const std::unordered_map<std::string, std::string>& metadata = {});
+    bool restoreExpertCheckpoint(const std::string& name);
+    
+    // Brain state management
+    std::string getExpertBrainStatus() const;
+    
+    // Expert optimization
+    bool applyExpertOptimization(const std::string& optimizationName,
+                                const std::unordered_map<std::string, float>& params);
+    
+    // Data export/import
+    bool exportExpertData(const std::string& filepath, ExportFormat format = ExportFormat::JSON);
+    bool importExpertData(const std::string& filepath, ImportFormat format = ImportFormat::JSON);
+#endif
     
 private:
     // Motor decoding: convert neural activity to motor command

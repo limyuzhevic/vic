@@ -6,26 +6,60 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Build type options
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Build options
+option(BUILD_TESTS "Build test executables" ON)
+option(BUILD_EXAMPLES "Build demo executables" ON)
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+option(BUILD_DOCUMENTATION "Build documentation" OFF)
+option(ENABLE_DEBUG_LOGS "Enable debug logging output" OFF)
+option(ENABLE_PERFORMANCE_COUNTERS "Enable performance counters" ON)
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
+option(INSTALL_PROJECT "Generate installation rules" ON)
+
+# Advanced configuration options
+option(ENABLE_ADVANCED_CONFIG "Enable advanced configuration features" ON)
+option(ENABLE_RUNTIME_CONFIG "Enable runtime configuration changes" ON)
+option(ENABLE_CONFIG_VALIDATION "Enable configuration validation" ON)
+option(ENABLE_CONFIG_TEMPLATES "Enable configuration templates" ON)
+
+# Performance optimization flags
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    if(MSVC)
+        add_compile_options(/O2 /fp:fast /arch:AVX2)
+    else()
+        add_compile_options(-O3 -march=native -mtune=native -flto)
+        add_link_options(-flto)
+    endif()
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(NOT ENABLE_DEBUG_LOGS)
+        add_compile_options(-DNDEBUG)
+    endif()
+endif()
 
 # Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigExtended.cpp
+    src/core/Config/ValidationSystem.cpp
+    src/core/Config/SchemaValidator.cpp
+    src/core/Config/RuntimeConfig.cpp
+    src/core/Config/ConfigurationManager.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -87,6 +121,10 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+if(BUILD_SHARED_LIBS)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
@@ -139,13 +177,61 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+if(BUILD_EXAMPLES)
+    # Phase 3 demo executable
+    add_executable(nlm_phase3_demo
+        src/experiments/Phase3Demo.cpp
+    )
+    target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+    # Phase 4 demo executable
+    add_executable(nlm_phase4_demo
+        src/experiments/Phase4Demo.cpp
+    )
+    target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+    # Phase 6 demo executable (comprehensive integration test)
+    add_executable(nlm_phase6_demo
+        src/experiments/Phase6Demo.cpp
+    )
+    target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+endif()
+
+if(ENABLE_PERFORMANCE_COUNTERS)
+    target_compile_definitions(nlm_core PUBLIC NLM_PERFORMANCE_ENABLED)
+    target_compile_definitions(nlm)
+    target_compile_definitions(nlm_phase3_demo)
+    target_compile_definitions(nlm_phase4_demo)
+    target_compile_definitions(nlm_phase6_demo)
+endif()
+
+if(ENABLE_DEBUG_LOGS)
+    target_compile_definitions(nlm_core PUBLIC NLM_DEBUG_ENABLED)
+    target_compile_definitions(nlm)
+    target_compile_definitions(nlm_phase3_demo)
+    target_compile_definitions(nlm_phase4_demo)
+    target_compile_definitions(nlm_phase6_demo)
+endif()
+
+if(INSTALL_PROJECT)
+    install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+    
+    install(DIRECTORY src/
+        DESTINATION include/nlm
+        FILES_MATCHING PATTERN "*.hpp"
+    )
+    
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/python/bindings.cpp
+        DESTINATION include/nlm/python
+    )
+endif()

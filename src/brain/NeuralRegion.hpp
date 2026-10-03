@@ -53,6 +53,10 @@ public:
     std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
     std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
     
+    // OPTIMIZATION: Helper methods for cache-efficient spike processing
+    const std::unordered_map<NeuronId, std::vector<SynapseId>>& getOutgoingSynapsesMap() const;
+    const std::unordered_map<NeuronId, std::vector<SynapseId>>& getIncomingSynapsesMap() const;
+    
     // Statistics
     size_t getTotalNeuronCount() const;
     size_t getActiveNeuronCount() const;
@@ -71,9 +75,9 @@ public:
     
     // Initialize connectivity
     void initializeRandomConnectivity(class RandomGenerator& rng, 
-                                      float connectionProbability,
-                                      float meanWeight,
-                                      float weightVariance);
+                                       float connectionProbability,
+                                       float meanWeight,
+                                       float weightVariance);
     
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();

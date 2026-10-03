@@ -2,6 +2,15 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <functional>
+#include <string>
+
+// Include expert brain headers if available
+#ifdef HAVE_EXPERTBRAIN_HPP
+#include "ExpertBrain.hpp"
+#include "ExpertBrainController.hpp"
+#endif
 
 namespace nlm {
 
@@ -19,46 +28,44 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , expertModeEnabled_(false)
+#ifdef HAVE_EXPERTBRAIN_HPP
+    , expertBrain_(nullptr)
+    , expertController_(nullptr)
+#endif
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
+    void AgentBrain::initializeExpertBrain() {
+#ifdef HAVE_EXPERTBRAIN_HPP
+    if (expertModeEnabled_ && brain_) {
+        try {
+            // Create expert brain configuration
+            ExpertBrain::ExpertConfig expertConfig;
+            expertConfig.enable_direct_neuron_access = true;
+            expertConfig.enable_advanced_synaptic_config = true;
+            expertConfig.enable_region_optimization = true;
+            expertConfig.enable_population_control = true;
+            expertConfig.enable_performance_monitoring = true;
+            expertConfig.enable_safety_checks = true;
+            
+            // Create expert brain instance
+            expertBrain_ = std::make_unique<ExpertBrain>(brain_, expertConfig);
+            
+            // Create expert controller
+            ExpertBrainController::ControllerConfig controllerConfig;
+            controllerConfig.enable_expert_mode = true;
+            controllerConfig.enable_profiling = true;
+            controllerConfig.enable_safety_monitoring = true;
+            
+            expertController_ = std::make_unique<ExpertBrainController>(brain_, controllerConfig);
+            
+            NLM_LOG_INFO("Expert brain successfully initialized");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize expert brain: " + std::string(e.what()));
+            expertModeEnabled_ = false;
         }
     }
+#endif
+}
 }
 
 AgentBrain::~AgentBrain() = default;
@@ -346,5 +353,113 @@ void AgentBrain::reset() {
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
+
+#ifdef HAVE_EXPERTBRAIN_HPP
+
+// Expert brain integration methods
+bool AgentBrain::enableExpertMode(bool enable) {
+    if (enable && !expertModeEnabled_) {
+        expertModeEnabled_ = true;
+        initializeExpertBrain();
+        NLM_LOG_INFO("Expert mode enabled");
+    } else if (!enable && expertModeEnabled_) {
+        expertModeEnabled_ = false;
+        // Cleanup expert brain resources
+        expertBrain_.reset();
+        expertController_.reset();
+        NLM_LOG_INFO("Expert mode disabled");
+    }
+    return expertModeEnabled_;
+}
+
+bool AgentBrain::isExpertModeEnabled() const {
+    return expertModeEnabled_;
+}
+
+ExpertBrainController& AgentBrain::getExpertController() {
+    if (!expertController_) {
+        NLM_LOG_ERROR("Expert controller not initialized. Enable expert mode first.");
+        static ExpertBrainController dummy(nullptr);
+        return dummy;
+    }
+    return *expertController_;
+}
+
+const ExpertBrainController& AgentBrain::getExpertController() const {
+    if (!expertController_) {
+        NLM_LOG_ERROR("Expert controller not initialized. Enable expert mode first.");
+        static ExpertBrainController dummy(nullptr);
+        return dummy;
+    }
+    return *expertController_;
+}
+
+bool AgentBrain::executeExpertOperation(const std::string& operationName,
+                                       const std::function<bool()>& operation,
+                                       const std::string& category) {
+    if (!expertModeEnabled_ || !expertController_) {
+        NLM_LOG_ERROR("Expert mode not enabled or expert controller not available");
+        return false;
+    }
+    
+    return expertController_->executeOperation(operationName, operation, category);
+}
+
+bool AgentBrain::createExpertCheckpoint(const std::string& name,
+                                       const std::unordered_map<std::string, std::string>& metadata) {
+    if (!expertModeEnabled_ || !expertController_) {
+        NLM_LOG_ERROR("Expert mode not enabled or expert controller not available");
+        return false;
+    }
+    
+    return expertController_->createCheckpoint(name, metadata);
+}
+
+bool AgentBrain::restoreExpertCheckpoint(const std::string& name) {
+    if (!expertModeEnabled_ || !expertController_) {
+        NLM_LOG_ERROR("Expert mode not enabled or expert controller not available");
+        return false;
+    }
+    
+    return expertController_->restoreCheckpoint(name);
+}
+
+std::string AgentBrain::getExpertBrainStatus() const {
+    if (!expertModeEnabled_ || !expertBrain_) {
+        return "Expert brain not available";
+    }
+    
+    return expertBrain_->generateBrainReport();
+}
+
+bool AgentBrain::applyExpertOptimization(const std::string& optimizationName,
+                                        const std::unordered_map<std::string, float>& params) {
+    if (!expertModeEnabled_ || !expertBrain_) {
+        NLM_LOG_ERROR("Expert mode not enabled or expert brain not available");
+        return false;
+    }
+    
+    return expertBrain_->configureOptimization(optimizationName, params);
+}
+
+bool AgentBrain::exportExpertData(const std::string& filepath, ExportFormat format) {
+    if (!expertModeEnabled_ || !expertBrain_) {
+        NLM_LOG_ERROR("Expert mode not enabled or expert brain not available");
+        return false;
+    }
+    
+    return expertBrain_->exportBrainState(filepath, format);
+}
+
+bool AgentBrain::importExpertData(const std::string& filepath, ImportFormat format) {
+    if (!expertModeEnabled_ || !expertBrain_) {
+        NLM_LOG_ERROR("Expert mode not enabled or expert brain not available");
+        return false;
+    }
+    
+    return expertBrain_->importBrainState(filepath, format);
+}
+
+#endif // HAVE_EXPERTBRAIN_HPP
 
 } // namespace nlm

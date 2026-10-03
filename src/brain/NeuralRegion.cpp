@@ -313,4 +313,13 @@ std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     return result;
 }
 
+// OPTIMIZATION: Add helper methods for cache-efficient spike processing
+const std::unordered_map<NeuronId, std::vector<SynapseId>>& NeuralRegion::getOutgoingSynapsesMap() const {
+    return pImpl->outgoingSynapses;
+}
+
+const std::unordered_map<NeuronId, std::vector<SynapseId>>& NeuralRegion::getIncomingSynapsesMap() const {
+    return pImpl->incomingSynapses;
+}
+
 } // namespace nlm
