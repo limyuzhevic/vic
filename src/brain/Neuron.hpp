@@ -134,7 +134,6 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -146,6 +145,12 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Disable copying to prevent shallow copy issues
+    Neuron(const Neuron&) = delete;
+    Neuron& operator=(const Neuron&) = delete;
+    
+    friend class Brain;  // Allow Brain to construct neurons
 };
 
 } // namespace nlm

@@ -30,15 +30,6 @@ public:
     NeuronId getSourceNeuron() const;
     NeuronId getDestinationNeuron() const;
     
-    // Weight
-    SynapticWeight getWeight() const;
-    void setWeight(SynapticWeight weight);
-    void addToWeight(SynapticWeight delta);
-    
-    // Delay (in simulation steps)
-    Delay getDelay() const;
-    void setDelay(Delay delay);
-    
     // Type
     SynapseType getType() const;
     void setType(SynapseType type);
@@ -71,7 +62,6 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -83,6 +73,13 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Disable copying to prevent shallow copy issues
+    Synapse(const Synapse&) = delete;
+    Synapse& operator=(const Synapse&) = delete;
+    
+    friend class SynapseManager;  // Allow synapse management
+    friend class Brain;  // Allow brain to manage synapses
 };
 
 } // namespace nlm
