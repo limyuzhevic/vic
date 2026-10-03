@@ -19,8 +19,206 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced configuration file parser supporting multiple formats
+    // Supports: key=value (legacy), JSON, and YAML formats
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Try to detect file format
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                         std::istreambuf_iterator<char>());
+    
+    if (content.find('{') != std::string::npos) {
+        // JSON format
+        return loadFromJSON(content);
+    } else if (content.find("---") != std::string::npos || 
+               content.find(":") != std::string::npos && content.find(" ") != std::string::npos) {
+        // Likely YAML format
+        return loadFromYAML(content);
+    } else {
+        // Legacy key=value format
+        return loadFromLegacyFormat(content);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& jsonContent) {
+    // Enhanced JSON parser for configuration files
+    // Simplified implementation supporting basic JSON types
+    
+    // Find opening brace
+    size_t start = jsonContent.find('{');
+    if (start == std::string::npos) return false;
+    
+    // Simple JSON parsing - extract key-value pairs
+    // This is a simplified implementation for demonstration
+    
+    std::string::size_type pos = start + 1;
+    while (pos < jsonContent.size()) {
+        // Skip whitespace
+        while (pos < jsonContent.size() && 
+               std::isspace(jsonContent[pos])) pos++;
+        
+        if (pos >= jsonContent.size()) break;
+        
+        // Find key
+        if (jsonContent[pos] != '\"') break; // Expected quoted key
+        
+        size_t keyEnd = jsonContent.find('\"', pos + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = jsonContent.substr(pos + 1, keyEnd - pos - 1);
+        pos = keyEnd + 1;
+        
+        // Skip whitespace and colon
+        while (pos < jsonContent.size() && 
+               std::isspace(jsonContent[pos])) pos++;
+        
+        if (pos >= jsonContent.size() || jsonContent[pos] != ':') break;
+        pos++;
+        
+        // Skip whitespace after colon
+        while (pos < jsonContent.size() && 
+               std::isspace(jsonContent[pos])) pos++;
+        
+        // Parse value based on type
+        if (pos < jsonContent.size() && jsonContent[pos] == '\"') {
+            // String value
+            size_t valueEnd = jsonContent.find('\"', pos + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string value = jsonContent.substr(pos + 1, valueEnd - pos - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (pos < jsonContent.size() && jsonContent[pos] == 't') {
+            // Boolean true
+            if (jsonContent.compare(pos, 4, "true") == 0) {
+                set(key, true, ConfigSource::File);
+                pos += 4;
+            }
+        } else if (pos < jsonContent.size() && jsonContent[pos] == 'f') {
+            // Boolean false
+            if (jsonContent.compare(pos, 5, "false") == 0) {
+                set(key, false, ConfigSource::File);
+                pos += 5;
+            }
+        } else {
+            // Numeric value (float or integer)
+            size_t valueEnd = jsonContent.find_first_of(",}", pos);
+            if (valueEnd == std::string::npos) break;
+            std::string valueStr = jsonContent.substr(pos, valueEnd - pos);
+            
+            // Try to parse as integer first, then float
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    double value = std::stod(valueStr);
+                    set(key, value, ConfigSource::File);
+                } else {
+                    int64_t value = std::stoll(valueStr);
+                    set(key, value, ConfigSource::File);
+                }
+            } catch (...) {
+                // Skip unparsable values
+            }
+            
+            pos = valueEnd;
+        }
+        
+        // Skip whitespace and comma
+        while (pos < jsonContent.size() && 
+               std::isspace(jsonContent[pos])) pos++;
+        
+        if (pos < jsonContent.size() && jsonContent[pos] == ',') {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAML(const std::string& yamlContent) {
+    // Enhanced YAML parser for configuration files
+    // Simplified implementation supporting basic YAML structure
+    
+    std::istringstream stream(yamlContent);
+    std::string line;
+    std::string currentSection;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        if (line == "---" || line.find("section:") != std::string::npos) {
+            // Section header
+            currentSection = "";
+            continue;
+        }
+        
+        // Parse key: value pairs
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Add section prefix if needed
+            if (!currentSection.empty()) {
+                key = currentSection + "." + key;
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromLegacyFormat(const std::string& content) {
+    // Original legacy key=value format parser
+    std::istringstream stream(content);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
     
     std::ifstream file(filepath);
     if (!file.is_open()) {

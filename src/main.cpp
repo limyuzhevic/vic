@@ -173,32 +173,53 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         return;
     }
     
-    // Get initial spike count
+    // Inject strong current into first 10 neurons
+    injectCurrentIntoNeurons(neurons, 10, 50.0f);
+    
+    // Run simulation steps
+    size_t spikes = runSimulationSteps(brain, 50);
+    
+    // Display results
+    displayConnectivityResults(spikes, neurons);
+}
+
+// Helper function to inject current into specific neurons
+void injectCurrentIntoNeurons(const std::vector<Neuron*>& neurons, 
+                               size_t count, float current) {
+    for (size_t i = 0; i < std::min(count, neurons.size()); ++i) {
+        neurons[i]->injectCurrent(current);
+    }
+}
+
+// Helper function to run simulation steps and count spikes
+size_t runSimulationSteps(std::shared_ptr<Brain> brain, size_t steps) {
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
-    }
-    
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
+    for (SimulationStep step = 0; step < steps; ++step) {
         brain->step(step, step * 0.001);
     }
     
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+    return brain->getTotalSpikeCount() - initialSpikes;
+}
+
+// Helper function to display connectivity test results
+void displayConnectivityResults(size_t spikes, const std::vector<Neuron*>& neurons) {
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
-        }
+        displayNeuronParameters(neurons, 3);
+    }
+}
+
+// Helper function to display neuron parameters for debugging
+void displayNeuronParameters(const std::vector<Neuron*>& neurons, size_t count) {
+    for (size_t i = 0; i < std::min(count, neurons.size()); ++i) {
+        NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                    " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                    " thresh=" + std::to_string(neurons[i]->getThreshold()));
     }
 }
 
@@ -212,37 +233,58 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.recordInitialState();
     
     // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
-    }
+    enablePlasticityOnSynapses(brain, true, true, false);
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
-        }
-        
-        brain->step(step, step * 0.001);
-        
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
-        }
-    }
+    runPlasticitySimulation(brain, 1000);
     
     // Record final state
     experiment.recordFinalState();
     
     // Compute and display statistics
     experiment.computeStatistics();
+}
+
+// Helper function to enable plasticity on synapses
+void enablePlasticityOnSynapses(std::shared_ptr<Brain> brain, 
+                                bool hebbian, bool stdp, bool rewardModulated) {
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(hebbian, stdp, rewardModulated);
+        }
+    }
+}
+
+// Helper function to run plasticity simulation
+void runPlasticitySimulation(std::shared_ptr<Brain> brain, size_t steps) {
+    for (SimulationStep step = 0; step < steps; ++step) {
+        // Create input pattern - inject current into sensory neurons
+        injectCurrentToNeurons(brain, NeuronType::Sensory, 30.0f);
+        
+        brain->step(step, step * 0.001);
+        
+        // Log progress every 100 steps
+        if (step % 100 == 0) {
+            logPlasticityProgress(step, brain);
+        }
+    }
+}
+
+// Helper function to inject current to neurons of specific type
+void injectCurrentToNeurons(std::shared_ptr<Brain> brain, NeuronType type, float current) {
+    for (size_t i = 0; i < brain->getTotalNeuronCount() / 4 && i < 20; ++i) {
+        brain->injectCurrentToNeurons(type, current);
+    }
+}
+
+// Helper function to log plasticity simulation progress
+void logPlasticityProgress(SimulationStep step, std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                 " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                 " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
@@ -252,7 +294,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
     
-    // Get first few synapses
+    // Get first few synapses and record their initial weights
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
         NLM_LOG_INFO("  Not enough synapses for STDP test");
@@ -262,19 +304,42 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
     // Record initial weights
+    std::vector<float> beforeWeights = recordInitialWeights(synapses, 5);
+    
+    // Create correlated activity: fire pre then post to trigger LTP
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    
+    createCorrelatedSpikingActivity(brain, region, 50);
+    
+    // Record after weights and display results
+    NLM_LOG_INFO("  After correlated activity:");
+    std::vector<float> afterWeights = recordAfterWeights(synapses, 5, beforeWeights);
+    
+    // Analyze weight changes
+    analyzeStdpResults(beforeWeights, afterWeights);
+}
+
+// Helper function to record initial weights of synapses
+std::vector<float> recordInitialWeights(const std::vector<Synapse*>& synapses, size_t count) {
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
+    beforeWeights.reserve(count);
+    
+    for (size_t i = 0; i < count; ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
                     " before: " + std::to_string(beforeWeights[i]));
     }
     
-    // Create correlated activity: fire pre then post to trigger LTP
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-    
-    for (int trial = 0; trial < 50; ++trial) {
+    return beforeWeights;
+}
+
+// Helper function to create correlated spiking activity for STDP testing
+void createCorrelatedSpikingActivity(std::shared_ptr<Brain> brain, 
+                                     const NeuralRegion* region, 
+                                     size_t trials) {
+    for (int trial = 0; trial < trials; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
@@ -295,20 +360,33 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
         }
     }
+}
+
+// Helper function to record and display synapse weights after activity
+std::vector<float> recordAfterWeights(const std::vector<Synapse*>& synapses, 
+                                       size_t count, 
+                                       const std::vector<float>& beforeWeights) {
+    std::vector<float> afterWeights;
+    afterWeights.reserve(count);
     
-    // Record after weights
-    NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < count; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
+        afterWeights.push_back(synapses[i]->getWeight());
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
+                    " after: " + std::to_string(afterWeights[i]) +
                     " (Δ=" + std::to_string(delta) + ")");
     }
     
+    return afterWeights;
+}
+
+// Helper function to analyze and report STDP results
+void analyzeStdpResults(const std::vector<float>& beforeWeights, 
+                       const std::vector<float>& afterWeights) {
     // Check if weights increased (LTP)
     float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+    for (size_t i = 0; i < beforeWeights.size(); ++i) {
+        totalDelta += afterWeights[i] - beforeWeights[i];
     }
     
     NLM_LOG_INFO("");

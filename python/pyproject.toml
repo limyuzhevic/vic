@@ -1,0 +1,164 @@
+# NLM Python Project Configuration
+# Modern Python packaging with scikit-build-core
+
+[build-system]
+requires = ["scikit-build-core", "pybind11>=2.11.0", "cmake>=3.16", "python>=3.8"]
+build-backend = "scikit_build_core.pymod"
+
+[project]
+name = "nlm"
+version = "0.1.0"
+description = "Neural Learning Machine - Python bindings for brain simulation"
+readme = "python/README.md"
+authors = [
+    {name = "NLM Research Team", email = "research@nlm.org"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = [
+    "neuroscience",
+    "brain-simulation",
+    "neural-networks",
+    "spiking-neural-networks",
+    "machine-learning",
+    "computational-neuroscience",
+]
+dependencies = [
+    "numpy>=1.21.0",
+    "scipy>=1.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.12.0",
+    "mypy>=0.910",
+    "black>=21.0",
+    "isort>=5.0",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=0.5",
+]
+examples = [
+    "matplotlib>=3.3.0",
+    "jupyter>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/yourusername/nlm"
+"Bug Tracker" = "https://github.com/yourusername/nlm/issues"
+"Source Code" = "https://github.com/yourusername/nlm"
+
+[tool.scikit-build-core]
+minimum-version = "0.4.0"
+project-name = "nlm"
+single-version = true
+build-type = "Release"
+
+cmake.minimum-version = "3.16"
+cmake.args = [
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
+    "-DNLM_ENABLE_TESTS=OFF",
+    "-DNLM_ENABLE_EXAMPLES=OFF",
+]
+cmake.define = {
+    "PYTHON_EXECUTABLE" = {type = "STRING", value = ""},
+    "PYBIND11_PYTHON_VERSION" = {type = "STRING", value = ""},
+}
+
+[tool.scikit-build-core.metadata]
+python-packages = ["nlm"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    ".*build/",
+    ".*\.egg-info/",
+    ".*__pycache__/",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | examples
+)/
+'''
+
+[tool.isort]
+skip_gitignore = true
+profile = "black"
+force_single_line = true
+force_sort_within_sections = true
+known_first_party = ["nlm"]
+known_third_party = ["numpy", "scipy"]
+sections = ["FUTURE", "STDLIB", "THIRD_PARTY", "FIRST_PARTY", "LOCALFOLDER"]
+
+[tool.coverage.run]
+source = ["nlm"]
+omit = [
+    "*/test_*",
+    "*/tests/*",
+    "*/setup.py",
+    "*/conftest.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if typing.TYPE_CHECKING:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "python/tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=nlm",
+    "--cov-report=term-missing",
+]
+
+[tool.distutils]
+packages = ["nlm"]

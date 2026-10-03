@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -148,10 +149,12 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    // Enhanced spike history management using circular buffer logic
+    if (pImpl->spikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Remove oldest spike to maintain maximum history size
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    pImpl->spikeHistory.push_back(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
@@ -170,7 +173,15 @@ NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
     return pImpl->plasticityFlags;
 }
 
@@ -188,7 +199,98 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+FiringState Neuron::getFiringState() const {
+    return pImpl->state.firingState;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+MembranePotential Neuron::getLeakConductance() const {
+    return pImpl->state.leakConductance;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
+}
+
+uint32_t Neuron::getRefractoryRemaining() const {
+    return pImpl->state.refractoryRemaining;
+}
+
+MembranePotential Neuron::getAdaptationVariable() const {
+    return pImpl->state.adaptationVariable;
+}
+
+float Neuron::getAverageFiringRate() const {
+    // Calculate average firing rate from spike history
+    if (pImpl->spikeHistory.empty()) return 0.0f;
+    
+    float totalTime = static_cast<float>(pImpl->spikeHistory.back() - 
+                                          pImpl->spikeHistory.front());
+    if (totalTime <= 0.0f) return static_cast<float>(pImpl->spikeHistory.size());
+    
+    return static_cast<float>(pImpl->spikeHistory.size()) / totalTime;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+bool Neuron::hasIncomingSynapses() const {
+    return !pImpl->incomingSynapses.empty();
+}
+
+bool Neuron::hasOutgoingSynapses() const {
+    return !pImpl->outgoingSynapses.empty();
+}
+
+bool Neuron::hasSpikeHistory() const {
+    return !pImpl->spikeHistory.empty();
+}
+
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
