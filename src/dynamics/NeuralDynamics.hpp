@@ -7,18 +7,18 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// PLACEHOLDER - Phase 6 will implement adaptive neural dynamics with neuromodulation
 
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // TODO PHASE 6: Implement adaptive integrate-and-fire with homeostatic regulation
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // TODO PHASE 6: Implement dynamic synaptic conductance with plasticity
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
@@ -53,10 +53,10 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// TODO PHASE 6: Implement detailed ion channel dynamics with neuromodulation
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
+    // PLACEHOLDER - Phase 6 will implement HH dynamics with adaptive properties
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
@@ -64,11 +64,11 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitation model)
+// TODO PHASE 6: Implement excitable system dynamics with adaptation
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
+    // PLACEHOLDER - Phase 6 will implement FHN dynamics with neuromodulation
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}

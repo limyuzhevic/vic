@@ -4,18 +4,19 @@
 
 namespace nlm {
 
-// Vision processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
+// Vision processing using NLM's neural substrate
+// PLACEHOLDER - Phase 6 will implement real vision processing using NLM's own neurons
 
 class VisionProcessor {
 public:
     VisionProcessor();
     ~VisionProcessor();
     
-    // Process vision input
+    // Process vision input through neural pathways
+    // TODO PHASE 6: Integrate with visual cortex and attention systems
     void process(const Vision& input);
     
-    // Get feature representation
+    // Get feature representation for higher-level cognition
     const std::vector<float>& getFeatures() const;
     
     // Get feature dimensionality

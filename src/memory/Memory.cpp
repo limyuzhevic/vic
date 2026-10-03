@@ -16,7 +16,8 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // TODO PHASE 6: Implement spike-timing based synaptic consolidation and replay
+    // Use neural spikes to strengthen/ weaken memory traces
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -108,7 +109,9 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // TODO PHASE 6: Implement synaptic replay-based consolidation
+    // Replay important episodes during sleep/rest cycles to strengthen connections
+    pImpl->episodes.clear();
 }
 
 // Semantic Memory Implementation

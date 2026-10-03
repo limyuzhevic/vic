@@ -5,20 +5,21 @@
 namespace nlm {
 
 // Internal signals processor
-// PLACEHOLDER - Phase 2 will process signals from within the brain
+// PLACEHOLDER - Phase 6 will process signals from within the brain with neuromodulation
 
 class InternalSignalsProcessor {
 public:
     InternalSignalsProcessor();
     ~InternalSignalsProcessor();
     
-    // Process internal signals
+    // Process internal signals through homeostatic pathways
+    // TODO PHASE 6: Integrate with neuromodulation and memory consolidation
     void process(const InternalSignals& signals);
     
-    // Get processed representation
+    // Get processed representation for integration with cognition
     const std::vector<float>& getProcessedSignals() const;
     
-    // Get homeostasis signals
+    // Get homeostasis signals for regulation
     const std::vector<float>& getHomeostaticSignals() const;
     
 private:

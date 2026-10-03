@@ -15,7 +15,7 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // TODO PHASE 6: Implement synaptic consolidation and replay mechanisms
     void store(NeuronId neuron, float value);
     
     // Retrieve item

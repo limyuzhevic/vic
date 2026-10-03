@@ -71,7 +71,7 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // TODO PHASE 6: Implement STDP and neuromodulation effects on synaptic efficacy
     void step(Timestamp currentTime);
     
     // Reset to initial state

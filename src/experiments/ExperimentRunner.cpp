@@ -113,7 +113,9 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
+    // TODO PHASE 6: Implement comprehensive experiment results saving
+    // Save: metrics, brain state, sensory history, reward history
+    // Format: JSON with structured experiment metadata
     return false;
 }
 
