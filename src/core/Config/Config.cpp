@@ -41,12 +41,18 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
+    // Remove quotes if present (improved safety)
+    if (value.size() >= 2 && 
+        ((value.front() == '"' && value.back() == '"') ||
+         (value.front() == '\'' && value.back() == '\''))) {
+        // Use safe substring extraction
+        if (value.size() >= 3) {  // Ensure we don't remove all characters
+            value = value.substr(1, value.size() - 2);
+        } else {
+            // Empty string after quote removal
+            value.clear();
+        }
+    }
             
             set(key, value, ConfigSource::File);
         }
@@ -62,7 +68,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {
+                // Ensure we don't extract negative length for key
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);

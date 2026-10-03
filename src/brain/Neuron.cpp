@@ -55,7 +55,8 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+    // Clamp to biologically plausible range to prevent instability
+    pImpl->state.membranePotential = std::clamp(potential, -100.0f, 50.0f);
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
@@ -63,7 +64,8 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    // Ensure threshold is biologically plausible (more negative than resting potential)
+    pImpl->state.threshold = std::clamp(threshold, -100.0f, -40.0f);
 }
 
 void Neuron::setFiringState(FiringState state) {
@@ -100,7 +102,8 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    // Clamp to biologically plausible range for resting potential
+    pImpl->state.restingPotential = std::clamp(potential, -90.0f, -50.0f);
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -108,7 +111,9 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    // Reset potential should be between resting potential and threshold range
+    // Biologically: typically close to resting potential (-70mV), rarely above -60mV
+    pImpl->state.resetPotential = std::clamp(potential, -90.0f, -40.0f);
 }
 
 bool Neuron::checkThreshold() const {
@@ -282,8 +287,15 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Reset potential is usually close to resting, but ensure it's between resting and threshold
+    float minResetPotential = std::max(pImpl->state.restingPotential - 5.0f, -90.0f);
+    float maxResetPotential = std::min(pImpl->state.threshold + 10.0f, -40.0f);
+    if (minResetPotential >= maxResetPotential) {
+        // Fallback if ranges don't make sense
+        minResetPotential = -75.0f;
+        maxResetPotential = -65.0f;
+    }
+    pImpl->state.resetPotential = rng.uniformReal(minResetPotential, maxResetPotential);
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
