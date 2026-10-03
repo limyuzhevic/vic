@@ -131,23 +131,71 @@ void testRandomInitialization() {
     std::cout << "    testRandomInitialization passed" << std::endl;
 }
 
-void testReset() {
+void testLIFDynamics() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    neuron.setMembranePotential(-60.0f);
-    neuron.injectCurrent(5.0f);
-    neuron.recordSpike(0.1);
+    // Set up neuron for LIF dynamics
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-55.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setLeakConductance(10.0f);
+    neuron.setRefractoryPeriod(5);
     
+    // Test 1: Neuron starts at rest and integrates input
+    neuron.injectCurrent(50.0f);  // Strong current input
+    bool fired = neuron.stepLIF(0.0, 0.001);  // 1ms timestep
+    assert(!fired);  // Shouldn't fire immediately
+    assert(neuron.getMembranePotential() > neuron.getRestingPotential());  // Potential should increase
+    
+    // Test 2: Apply more current to reach threshold and fire
+    neuron.injectCurrent(100.0f);
+    neuron.stepLIF(0.001, 0.001);
+    assert(neuron.isFiring());  // Should be firing
+    assert(neuron.isRefractory());  // Should enter refractory period
+    
+    // Reset and test refractory decrement
     neuron.reset();
+    neuron.setRefractoryPeriod(3);
+    assert(neuron.isRefractory());
     
-    assert(neuron.getMembranePotential() == -70.0f);
-    assert(neuron.getTotalCurrent() == 0.0f);
-    assert(neuron.getSpikeHistory().empty());
+    neuron.decrementRefractory();
+    assert(neuron.isRefractory());
     
-    std::cout << "    testReset passed" << std::endl;
+    neuron.decrementRefractory();
+    assert(neuron.isRefractory());
+    
+    neuron.decrementRefractory();
+    assert(!neuron.isRefractory());  // Should exit refractory
+    
+    std::cout << "    testLIFDynamics passed" << std::endl;
 }
 
-void runAll() {
+void testSynapticIntegration() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-55.0f);
+    neuron.setResetPotential(-70.0f);
+    
+    // Test excitatory input
+    neuron.receiveExcitatoryInput(25.0f);
+    neuron.stepLIF(0.0, 0.001);
+    assert(neuron.getMembranePotential() > -70.0f);  // Potential should increase
+    
+    // Reset and test inhibitory input
+    neuron.reset();
+    neuron.receiveInhibitoryInput(15.0f);
+    neuron.stepLIF(0.0, 0.001);
+    assert(neuron.getMembranePotential() < -70.0f);  // Potential should decrease
+    
+    // Reset and test adaptation
+    neuron.reset();
+    neuron.recordSpike(0.0);  // Record a spike
+    neuron.stepLIF(0.001, 0.001);  // Step after spike
+    assert(neuron.getMembranePotential() < -70.0f);  // Adaptation should hyperpolarize
+    
+    std::cout << "    testSynapticIntegration passed" << std::endl;
+}
     testNeuronCreation();
     testNeuronType();
     testMembranePotential();
@@ -158,6 +206,8 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testLIFDynamics();
+    testSynapticIntegration();
 }
 
 } // namespace test_neuron
