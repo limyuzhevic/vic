@@ -40,9 +40,12 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
+    # Memory
     ${NLM_SOURCE_DIR}/memory/Memory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
+    # Integration (Phase 6)
+    ${NLM_SOURCE_DIR}/integration/IntegrationSystem.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
     ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
     ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp

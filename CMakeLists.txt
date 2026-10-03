@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Integration (Phase 6)
+    src/integration/IntegrationSystem.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -138,6 +140,12 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 integration executable
+add_executable(nlm_phase6_integration
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_link_libraries(nlm_phase6_integration PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
