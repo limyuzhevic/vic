@@ -2,17 +2,20 @@
 
 namespace nlm {
 
+// Implementation details for EnvironmentState
+// Implementation details for EnvironmentState
+// Implementation details for EnvironmentState
 struct EnvironmentState::Impl {
     bool terminal;
     
-    Impl() : terminal(false) {}
+    Impl(nullptr) : terminal(false) {}
 };
 
-EnvironmentState::EnvironmentState() : pImpl(new Impl) {}
+EnvironmentState::EnvironmentState(nullptr) : pImpl(new Impl) {}
 
-EnvironmentState::~EnvironmentState() = default;
+EnvironmentState::~EnvironmentState(nullptr) = default;
 
-bool EnvironmentState::is_terminal() const {
+bool EnvironmentState::is_terminal(nullptr) const {
     return pImpl->terminal;
 }
 
@@ -20,8 +23,11 @@ void EnvironmentState::set_terminal(bool terminal) {
     pImpl->terminal = terminal;
 }
 
-Environment::Environment() : state_(nullptr), lastReward_(0.0f), done_(false) {}
+Environment::Environment(nullptr) : state_(nullptr), lastReward_(0.0f), done_(false) {}
 
+// Implementation details for GridWorldEnvironment
+// Implementation details for GridWorldEnvironment
+// Implementation details for GridWorldEnvironment
 struct GridWorldEnvironment::Impl {
     int width;
     int height;
@@ -41,9 +47,9 @@ struct GridWorldEnvironment::Impl {
 GridWorldEnvironment::GridWorldEnvironment(int width, int height) 
     : pImpl(new Impl(width, height)) {}
 
-GridWorldEnvironment::~GridWorldEnvironment() = default;
+GridWorldEnvironment::~GridWorldEnvironment(nullptr) = default;
 
-std::unique_ptr<SensoryInput> GridWorldEnvironment::reset() {
+std::unique_ptr<SensoryInput> GridWorldEnvironment::reset(nullptr) {
     pImpl->agentX = 0;
     pImpl->agentY = 0;
     pImpl->steps = 0;
@@ -61,13 +67,13 @@ std::unique_ptr<SensoryInput> GridWorldEnvironment::reset() {
 
 std::unique_ptr<SensoryInput> GridWorldEnvironment::step(const Action& action) {
     if (pImpl->done) {
-        return reset();
+        return reset(nullptr);
     }
     
     ++pImpl->steps;
     
     // Move agent based on action
-    switch (action.getType()) {
+    switch (action.getType(nullptr)) {
         case ActionType::MoveForward:
             pImpl->agentY = std::min(pImpl->height - 1, pImpl->agentY + 1);
             break;
@@ -111,27 +117,27 @@ std::unique_ptr<SensoryInput> GridWorldEnvironment::step(const Action& action) {
     return observation;
 }
 
-const EnvironmentState& GridWorldEnvironment::getState() const {
+const EnvironmentState& GridWorldEnvironment::getState(nullptr) const {
     return pImpl->state;
 }
 
-float GridWorldEnvironment::getLastReward() const {
+float GridWorldEnvironment::getLastReward(nullptr) const {
     return lastReward_;
 }
 
-bool GridWorldEnvironment::isDone() const {
+bool GridWorldEnvironment::isDone(nullptr) const {
     return done_;
 }
 
-const char* GridWorldEnvironment::getName() const {
+const char* GridWorldEnvironment::getName(nullptr) const {
     return "GridWorld";
 }
 
-size_t GridWorldEnvironment::getActionSpaceSize() const {
+size_t GridWorldEnvironment::getActionSpaceSize(nullptr) const {
     return 4;  // 4 movement actions
 }
 
-size_t GridWorldEnvironment::getObservationSpaceSize() const {
+size_t GridWorldEnvironment::getObservationSpaceSize(nullptr) const {
     return 4;  // agent_x, agent_y, goal_x, goal_y
 }
 

@@ -45,7 +45,7 @@ struct alignas(16) QueuedSpikeEvent {
     uint8_t isExcitatory;
     uint8_t padding[7];  // Pad to 16 bytes for cache alignment
     
-    QueuedSpikeEvent() : sourceNeuron(0), destNeuron(0), synapseId(0), 
+    QueuedSpikeEvent(nullptr) : sourceNeuron(0), destNeuron(0), synapseId(0), 
                          weight(0.0f), isExcitatory(1), padding{} {}
     
     QueuedSpikeEvent(uint64_t src, uint64_t dst, uint64_t syn, float w, bool exc)
@@ -62,7 +62,7 @@ struct alignas(16) QueuedSpikeEvent {
 class SpikeRingBuffer {
 public:
     explicit SpikeRingBuffer(size_t capacity = SPIKE_QUEUE_CAPACITY);
-    ~SpikeRingBuffer();
+    ~SpikeRingBuffer(nullptr);
     
     // Disable copying
     SpikeRingBuffer(const SpikeRingBuffer&) = delete;
@@ -78,32 +78,32 @@ public:
      * Pop a spike event from the queue
      * @return event if available, empty optional if queue is empty
      */
-    std::optional<QueuedSpikeEvent> pop();
+    std::optional<QueuedSpikeEvent> pop(nullptr);
     
     /**
      * Check if queue is empty
      */
-    bool empty() const;
+    bool empty(nullptr) const;
     
     /**
      * Check if queue is full
      */
-    bool full() const;
+    bool full(nullptr) const;
     
     /**
      * Get number of events in queue
      */
-    size_t size() const;
+    size_t size(nullptr) const;
     
     /**
      * Get queue capacity
      */
-    size_t capacity() const { return capacity_; }
+    size_t capacity(nullptr) const { return capacity_; }
     
     /**
      * Clear all events
      */
-    void clear();
+    void clear(nullptr);
     
 private:
     const size_t capacity_;
@@ -132,7 +132,7 @@ class DelayedSpikeQueue {
 public:
     DelayedSpikeQueue(size_t numBuckets = DELAYED_SPIKE_BUCKETS, 
                       size_t maxDelaySteps = MAX_DELAY_STEPS);
-    ~DelayedSpikeQueue();
+    ~DelayedSpikeQueue(nullptr);
     
     // Disable copying
     DelayedSpikeQueue(const DelayedSpikeQueue&) = delete;
@@ -153,7 +153,7 @@ public:
     /**
      * Get count of pending delayed spikes
      */
-    size_t pendingCount() const;
+    size_t pendingCount(nullptr) const;
     
     /**
      * Get count of spikes in a specific bucket
@@ -163,7 +163,7 @@ public:
     /**
      * Clear all pending spikes
      */
-    void clear();
+    void clear(nullptr);
     
     /**
      * Advance time bucket (call at end of simulation step)
@@ -181,10 +181,10 @@ private:
         std::atomic<size_t> readIndex;
         std::atomic<size_t> writeIndex;
         
-        SpikeBucket() : count(0), readIndex(0), writeIndex(0) {
+        SpikeBucket(nullptr) : count(0), readIndex(0), writeIndex(0) {
             // Zero the events array
             for (auto& e : events) {
-                new (&e) QueuedSpikeEvent();
+                new (&e) QueuedSpikeEvent(nullptr);
             }
         }
         
@@ -198,7 +198,7 @@ private:
             return true;
         }
         
-        std::vector<QueuedSpikeEvent> drain() {
+        std::vector<QueuedSpikeEvent> drain(nullptr) {
             std::vector<QueuedSpikeEvent> result;
             size_t cnt = count.load(std::memory_order_acquire);
             result.reserve(cnt);
@@ -210,7 +210,7 @@ private:
             return result;
         }
         
-        size_t size() const { return count.load(std::memory_order_acquire); }
+        size_t size(nullptr) const { return count.load(std::memory_order_acquire); }
     };
     
     size_t numBuckets_;
@@ -246,7 +246,7 @@ public:
         }
     };
     
-    PriorityEventQueue();
+    PriorityEventQueue(nullptr);
     
     /**
      * Push a priority event
@@ -256,7 +256,7 @@ public:
     /**
      * Pop the highest priority event
      */
-    std::optional<PriorityEvent> pop();
+    std::optional<PriorityEvent> pop(nullptr);
     
     /**
      * Get all events due before a timestamp
@@ -266,17 +266,17 @@ public:
     /**
      * Check if empty
      */
-    bool empty() const { return events_.empty(); }
+    bool empty(nullptr) const { return events_.empty(nullptr); }
     
     /**
      * Clear all events
      */
-    void clear() { events_.clear(); }
+    void clear(nullptr) { events_.clear(nullptr); }
     
     /**
      * Get count
      */
-    size_t size() const { return events_.size(); }
+    size_t size(nullptr) const { return events_.size(nullptr); }
 
 private:
     std::vector<PriorityEvent> events_;
@@ -295,7 +295,7 @@ inline SpikeRingBuffer::SpikeRingBuffer(size_t capacity)
     assert((capacity & (capacity - 1)) == 0 && "SpikeRingBuffer capacity must be power of 2");
 }
 
-inline SpikeRingBuffer::~SpikeRingBuffer() = default;
+inline SpikeRingBuffer::~SpikeRingBuffer(nullptr) = default;
 
 inline bool SpikeRingBuffer::push(const QueuedSpikeEvent& event) {
     size_t tail = tail_.load(std::memory_order_relaxed);
@@ -310,7 +310,7 @@ inline bool SpikeRingBuffer::push(const QueuedSpikeEvent& event) {
     return true;
 }
 
-inline std::optional<QueuedSpikeEvent> SpikeRingBuffer::pop() {
+inline std::optional<QueuedSpikeEvent> SpikeRingBuffer::pop(nullptr) {
     size_t head = head_.load(std::memory_order_relaxed);
     
     if (head == tail_.load(std::memory_order_acquire)) {
@@ -322,22 +322,22 @@ inline std::optional<QueuedSpikeEvent> SpikeRingBuffer::pop() {
     return event;
 }
 
-inline bool SpikeRingBuffer::empty() const {
+inline bool SpikeRingBuffer::empty(nullptr) const {
     return head_.load(std::memory_order_acquire) == tail_.load(std::memory_order_acquire);
 }
 
-inline bool SpikeRingBuffer::full() const {
+inline bool SpikeRingBuffer::full(nullptr) const {
     size_t nextTail = (tail_.load(std::memory_order_acquire) + 1) & mask_;
     return nextTail == head_.load(std::memory_order_acquire);
 }
 
-inline size_t SpikeRingBuffer::size() const {
+inline size_t SpikeRingBuffer::size(nullptr) const {
     size_t head = head_.load(std::memory_order_acquire);
     size_t tail = tail_.load(std::memory_order_acquire);
     return (tail - head) & mask_;
 }
 
-inline void SpikeRingBuffer::clear() {
+inline void SpikeRingBuffer::clear(nullptr) {
     head_.store(0, std::memory_order_release);
     tail_.store(0, std::memory_order_release);
 }
@@ -353,7 +353,7 @@ inline DelayedSpikeQueue::DelayedSpikeQueue(size_t numBuckets, size_t maxDelaySt
     assert(numBuckets >= maxDelaySteps && "numBuckets must be >= maxDelaySteps");
 }
 
-inline DelayedSpikeQueue::~DelayedSpikeQueue() = default;
+inline DelayedSpikeQueue::~DelayedSpikeQueue(nullptr) = default;
 
 inline void DelayedSpikeQueue::schedule(uint64_t sourceNeuron, uint64_t destNeuron, 
                                         uint64_t synapseId, float weight, 
@@ -375,8 +375,8 @@ inline std::vector<QueuedSpikeEvent> DelayedSpikeQueue::getDueSpikes(uint64_t cu
     // Process all buckets up to current step
     while (oldestStep_ <= currentStep) {
         size_t bucketIdx = oldestStep_ % numBuckets_;
-        auto spikes = buckets_[bucketIdx].drain();
-        result.insert(result.end(), spikes.begin(), spikes.end());
+        auto spikes = buckets_[bucketIdx].drain(nullptr);
+        result.insert(result.end(nullptr), spikes.begin(nullptr), spikes.end(nullptr));
         pendingCounts_[bucketIdx].store(0, std::memory_order_relaxed);
         ++oldestStep_;
     }
@@ -384,7 +384,7 @@ inline std::vector<QueuedSpikeEvent> DelayedSpikeQueue::getDueSpikes(uint64_t cu
     return result;
 }
 
-inline size_t DelayedSpikeQueue::pendingCount() const {
+inline size_t DelayedSpikeQueue::pendingCount(nullptr) const {
     size_t total = 0;
     for (size_t c : pendingCounts_) {
         total += c;
@@ -393,14 +393,14 @@ inline size_t DelayedSpikeQueue::pendingCount() const {
 }
 
 inline size_t DelayedSpikeQueue::bucketSize(uint64_t step) const {
-    return buckets_[step % numBuckets_].size();
+    return buckets_[step % numBuckets_].size(nullptr);
 }
 
-inline void DelayedSpikeQueue::clear() {
+inline void DelayedSpikeQueue::clear(nullptr) {
     for (auto& bucket : buckets_) {
-        bucket = SpikeBucket();  // Reset bucket to default state
+        bucket = SpikeBucket(nullptr);  // Reset bucket to default state
     }
-    std::fill(pendingCounts_.begin(), pendingCounts_.end(), 0);
+    std::fill(pendingCounts_.begin(nullptr), pendingCounts_.end(nullptr), 0);
     oldestStep_ = currentStep_;
 }
 
@@ -408,7 +408,7 @@ inline void DelayedSpikeQueue::advanceTime(uint64_t currentStep) {
     // Advance the oldest step marker
     while (oldestStep_ <= currentStep && oldestStep_ <= currentStep - numBuckets_) {
         size_t bucketIdx = oldestStep_ % numBuckets_;
-        buckets_[bucketIdx] = SpikeBucket();  // Reset bucket
+        buckets_[bucketIdx] = SpikeBucket(nullptr);  // Reset bucket
         pendingCounts_[bucketIdx].store(0, std::memory_order_relaxed);
         ++oldestStep_;
     }

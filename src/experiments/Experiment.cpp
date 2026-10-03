@@ -2,6 +2,9 @@
 
 namespace nlm {
 
+// Implementation details for Experiment
+// Implementation details for Experiment
+// Implementation details for Experiment
 struct Experiment::Impl {
     std::string name;
     uint64_t seed;
@@ -12,18 +15,18 @@ struct Experiment::Impl {
     SimulationStep endStep;
     std::vector<std::string> notes;
     
-    Impl() : seed(0), startStep(0), endStep(0) {}
+    Impl(nullptr) : seed(0), startStep(0), endStep(0) {}
 };
 
-Experiment::Experiment() : pImpl(new Impl) {}
+Experiment::Experiment(nullptr) : pImpl(new Impl) {}
 
 Experiment::Experiment(const std::string& name) : pImpl(new Impl) {
     pImpl->name = name;
 }
 
-Experiment::~Experiment() = default;
+Experiment::~Experiment(nullptr) = default;
 
-const std::string& Experiment::getName() const {
+const std::string& Experiment::getName(nullptr) const {
     return pImpl->name;
 }
 
@@ -31,7 +34,7 @@ void Experiment::setName(const std::string& name) {
     pImpl->name = name;
 }
 
-uint64_t Experiment::getSeed() const {
+uint64_t Experiment::getSeed(nullptr) const {
     return pImpl->seed;
 }
 
@@ -76,7 +79,7 @@ void Experiment::recordMetric(const std::string& name, int value) {
     recordMetric(name, static_cast<double>(value));
 }
 
-const std::vector<std::pair<std::string, double>>& Experiment::getMetrics() const {
+const std::vector<std::pair<std::string, double>>& Experiment::getMetrics(nullptr) const {
     return pImpl->metrics;
 }
 
@@ -109,11 +112,11 @@ void Experiment::recordStep(SimulationStep step, size_t neuronCount, size_t syna
     pImpl->stepData.push_back(data);
 }
 
-const std::vector<Experiment::StepData>& Experiment::getStepData() const {
+const std::vector<Experiment::StepData>& Experiment::getStepData(nullptr) const {
     return pImpl->stepData;
 }
 
-SimulationStep Experiment::getStartStep() const {
+SimulationStep Experiment::getStartStep(nullptr) const {
     return pImpl->startStep;
 }
 
@@ -121,7 +124,7 @@ void Experiment::setStartStep(SimulationStep step) {
     pImpl->startStep = step;
 }
 
-SimulationStep Experiment::getEndStep() const {
+SimulationStep Experiment::getEndStep(nullptr) const {
     return pImpl->endStep;
 }
 
@@ -133,7 +136,7 @@ void Experiment::addNote(const std::string& note) {
     pImpl->notes.push_back(note);
 }
 
-const std::vector<std::string>& Experiment::getNotes() const {
+const std::vector<std::string>& Experiment::getNotes(nullptr) const {
     return pImpl->notes;
 }
 

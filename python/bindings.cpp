@@ -20,7 +20,7 @@ namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
+    m.doc(nullptr) = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
@@ -80,7 +80,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Sensory", NeuronType::Sensory)
         .value("Motor", NeuronType::Motor)
         .value("Internal", NeuronType::Internal)
-        .export_values();
+        .export_values(nullptr);
 
     py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
         .value("Excitatory", SynapseType::Excitatory)
@@ -88,7 +88,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Modulatory", SynapseType::Modulatory)
         .value("Electrical", SynapseType::Electrical)
         .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+        .export_values(nullptr);
 
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
         .value("Initial", DevelopmentalStage::Initial)
@@ -96,14 +96,14 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Maturation", DevelopmentalStage::Maturation)
         .value("Adult", DevelopmentalStage::Adult)
         .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+        .export_values(nullptr);
 
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
         .value("Refractory", FiringState::Refractory)
         .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+        .export_values(nullptr);
 
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
@@ -121,7 +121,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Rest", ActionType::Rest)
         .value("Wait", ActionType::Wait)
         .value("Custom", ActionType::Custom)
-        .export_values();
+        .export_values(nullptr);
 
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
@@ -132,7 +132,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("LookRight", MotorCommand::LookRight)
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
-        .export_values();
+        .export_values(nullptr);
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
@@ -140,7 +140,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Hazard", WorldObjectType::Hazard)
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
-        .export_values();
+        .export_values(nullptr);
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -161,7 +161,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
+            return "<Config: " + cfg.summary(nullptr) + ">";
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")

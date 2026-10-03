@@ -15,11 +15,15 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Find nlohmann/json library
+find_package(nlohmann_json 3.11.2 REQUIRED)
+include(${NLOHMANN_JSON_INCLUDE_DIR})
 
 # Core library
 add_library(nlm_core STATIC

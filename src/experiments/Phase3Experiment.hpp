@@ -10,7 +10,7 @@ namespace nlm {
 class ExperimentLogger {
 public:
     ExperimentLogger(const std::string& filename);
-    ~ExperimentLogger();
+    ~ExperimentLogger(nullptr);
     
     void log(const std::string& message);
     void logEpisodeStart(int episode);
@@ -19,9 +19,9 @@ public:
                  float energy, const std::string& action);
     void logDevelopment(float age, const std::string& stage);
     void logSynapticStats(size_t totalSynapses, float avgWeight, float maxWeight);
-    void logPhase3Header();
+    void logPhase3Header(nullptr);
     
-    void flush();
+    void flush(nullptr);
     
 private:
     struct Impl;
@@ -58,9 +58,9 @@ struct ExperimentMetrics {
     int interactCount;
     int waitCount;
     
-    ExperimentMetrics();
-    void reset();
-    std::string toCSV() const;
+    ExperimentMetrics(nullptr);
+    void reset(nullptr);
+    std::string toCSV(nullptr) const;
 };
 
 } // namespace nlm

@@ -6,20 +6,23 @@
 
 namespace nlm {
 
+// Implementation details for ExperimentLogger
+// Implementation details for ExperimentLogger
+// Implementation details for ExperimentLogger
 struct ExperimentLogger::Impl {
     std::ofstream file;
     bool isOpen;
     
     Impl(const std::string& filename) : isOpen(false) {
         file.open(filename);
-        if (file.is_open()) {
+        if (file.is_open(nullptr)) {
             isOpen = true;
         }
     }
     
-    ~Impl() {
-        if (file.is_open()) {
-            file.close();
+    ~Impl(nullptr) {
+        if (file.is_open(nullptr)) {
+            file.close(nullptr);
         }
     }
 };
@@ -27,7 +30,7 @@ struct ExperimentLogger::Impl {
 ExperimentLogger::ExperimentLogger(const std::string& filename) 
     : pImpl(new Impl(filename)) {}
 
-ExperimentLogger::~ExperimentLogger() = default;
+ExperimentLogger::~ExperimentLogger(nullptr) = default;
 
 void ExperimentLogger::log(const std::string& message) {
     if (pImpl->isOpen) {
@@ -36,7 +39,7 @@ void ExperimentLogger::log(const std::string& message) {
     std::cout << message << std::endl;
 }
 
-void ExperimentLogger::logPhase3Header() {
+void ExperimentLogger::logPhase3Header(nullptr) {
     std::string header = R"(
 ========================================
 NLM PHASE 3 - WORLD INTERACTION DEMO
@@ -56,7 +59,7 @@ void ExperimentLogger::logEpisodeEnd(int episode, float totalReward, int steps, 
         << "  Total Reward: " << totalReward << "\n"
         << "  Final Novelty: " << finalNovelty << "\n"
         << "-------------------------------------";
-    log(oss.str());
+    log(oss.str(nullptr));
 }
 
 void ExperimentLogger::logStep(int step, float reward, float neuromod, float curiosity, 
@@ -65,7 +68,7 @@ void ExperimentLogger::logStep(int step, float reward, float neuromod, float cur
     oss << "Step " << step << ": reward=" << reward 
         << ", neuromod=" << neuromod << ", curiosity=" << curiosity
         << ", energy=" << energy << ", action=" << action;
-    log(oss.str());
+    log(oss.str(nullptr));
 }
 
 void ExperimentLogger::logDevelopment(float age, const std::string& stage) {
@@ -76,20 +79,20 @@ void ExperimentLogger::logSynapticStats(size_t totalSynapses, float avgWeight, f
     std::ostringstream oss;
     oss << "Synapses: " << totalSynapses << ", avgWeight=" << avgWeight 
         << ", maxWeight=" << maxWeight;
-    log(oss.str());
+    log(oss.str(nullptr));
 }
 
-void ExperimentLogger::flush() {
+void ExperimentLogger::flush(nullptr) {
     if (pImpl->isOpen) {
-        pImpl->file.flush();
+        pImpl->file.flush(nullptr);
     }
 }
 
-ExperimentMetrics::ExperimentMetrics() {
-    reset();
+ExperimentMetrics::ExperimentMetrics(nullptr) {
+    reset(nullptr);
 }
 
-void ExperimentMetrics::reset() {
+void ExperimentMetrics::reset(nullptr) {
     episode = 0;
     steps = 0;
     totalReward = 0.0f;
@@ -112,7 +115,7 @@ void ExperimentMetrics::reset() {
     waitCount = 0;
 }
 
-std::string ExperimentMetrics::toCSV() const {
+std::string ExperimentMetrics::toCSV(nullptr) const {
     std::ostringstream oss;
     oss << episode << ","
         << steps << ","
@@ -134,7 +137,7 @@ std::string ExperimentMetrics::toCSV() const {
         << turnRightCount << ","
         << interactCount << ","
         << waitCount;
-    return oss.str();
+    return oss.str(nullptr);
 }
 
 } // namespace nlm

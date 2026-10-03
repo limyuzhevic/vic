@@ -29,24 +29,24 @@ enum class ActionType {
 // Action representation
 class Action {
 public:
-    Action();
+    Action(nullptr);
     Action(ActionType type);
     Action(ActionType type, const std::vector<float>& parameters);
-    ~Action();
+    ~Action(nullptr);
     
     // Action type
-    ActionType getType() const;
+    ActionType getType(nullptr) const;
     void setType(ActionType type);
     
     // Action parameters
-    const std::vector<float>& getParameters() const;
+    const std::vector<float>& getParameters(nullptr) const;
     void setParameters(const std::vector<float>& params);
     
     // Get action name
-    std::string getName() const;
+    std::string getName(nullptr) const;
     
     // Clone
-    std::unique_ptr<Action> clone() const;
+    std::unique_ptr<Action> clone(nullptr) const;
     
 private:
     ActionType type_;

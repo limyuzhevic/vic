@@ -12,7 +12,7 @@ public:
     // Create with specific timestep
     explicit SimulationClock(TimestepDuration timestep = 0.001); // 1ms default
     
-    ~SimulationClock();
+    ~SimulationClock(nullptr);
     
     // Disable copying, enable moving
     SimulationClock(const SimulationClock&) = delete;
@@ -21,23 +21,23 @@ public:
     SimulationClock& operator=(SimulationClock&&) noexcept;
     
     // Time operations
-    void reset();
-    void advance();
+    void reset(nullptr);
+    void advance(nullptr);
     
     // Step counter
-    SimulationStep getStep() const;
+    SimulationStep getStep(nullptr) const;
     void setStep(SimulationStep step);
     
     // Current simulation time
-    Timestamp getTime() const;
+    Timestamp getTime(nullptr) const;
     void setTime(Timestamp time);
     
     // Timestep
-    TimestepDuration getTimestep() const;
+    TimestepDuration getTimestep(nullptr) const;
     void setTimestep(TimestepDuration dt);
     
     // Convenience queries
-    bool isFirstStep() const;
+    bool isFirstStep(nullptr) const;
     bool isLastStep(SimulationStep totalSteps) const;
     
     // Step to time conversion
@@ -51,8 +51,8 @@ public:
     Timestamp timeAtFutureStep(SimulationStep stepsAhead) const;
     
     // Real-time wall clock comparison (for real-time mode)
-    double getRealTimeElapsed() const;
-    void setRealTimeStart();
+    double getRealTimeElapsed(nullptr) const;
+    void setRealTimeStart(nullptr);
     
 private:
     struct Impl;

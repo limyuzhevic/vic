@@ -41,7 +41,7 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
-    EpisodicMemoryItem()
+    EpisodicMemoryItem(nullptr)
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
@@ -60,8 +60,8 @@ struct EpisodicMemoryItem {
 
 class NeuralEpisodicMemory {
 public:
-    NeuralEpisodicMemory();
-    ~NeuralEpisodicMemory();
+    NeuralEpisodicMemory(nullptr);
+    ~NeuralEpisodicMemory(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -100,23 +100,23 @@ public:
     const EpisodicMemoryItem* getEpisode(size_t index) const;
 
     // Get total number of episodes
-    size_t getEpisodeCount() const { return episodes_.size(); }
+    size_t getEpisodeCount(nullptr) const { return episodes_.size(nullptr); }
 
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
 
     // Get average reward from episodes
-    float getAverageReward() const;
+    float getAverageReward(nullptr) const;
 
     // Clear old episodes
     void consolidate(float relevanceThreshold);
 
     // Clear all episodes
-    void clear();
+    void clear(nullptr);
 
     // Enable/disable replay
     void enableReplay(bool enable) { replayEnabled_ = enable; }
-    bool isReplayEnabled() const { return replayEnabled_; }
+    bool isReplayEnabled(nullptr) const { return replayEnabled_; }
 
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
@@ -156,8 +156,8 @@ private:
 
 class NeuralAssociativeMemory {
 public:
-    NeuralAssociativeMemory();
-    ~NeuralAssociativeMemory();
+    NeuralAssociativeMemory(nullptr);
+    ~NeuralAssociativeMemory(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -190,10 +190,10 @@ public:
                                                      size_t steps = 2) const;
 
     // Clear associations
-    void clear();
+    void clear(nullptr);
 
     // Get number of associations
-    size_t getAssociationCount() const { return associations_.size(); }
+    size_t getAssociationCount(nullptr) const { return associations_.size(nullptr); }
 
 private:
     // Find pattern neuron or create one

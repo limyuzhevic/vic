@@ -52,7 +52,7 @@ struct ScaleLevel {
     std::string hardwareTarget;  // "single_core", "multi_core", "gpu"
     std::string notes;
     
-    static std::vector<ScaleLevel> getStandardLevels();
+    static std::vector<ScaleLevel> getStandardLevels(nullptr);
 };
 
 /**
@@ -101,10 +101,10 @@ struct BenchmarkMetrics {
     float learningAccuracy;
     float memoryRetention;
     
-    BenchmarkMetrics();
+    BenchmarkMetrics(nullptr);
     
-    std::string toCSV() const;
-    std::string toJSON() const;
+    std::string toCSV(nullptr) const;
+    std::string toJSON(nullptr) const;
 };
 
 /**
@@ -134,9 +134,9 @@ struct BenchmarkRun {
     time_t startTime;
     time_t endTime;
     
-    BenchmarkRun();
+    BenchmarkRun(nullptr);
     
-    std::string toJSON() const;
+    std::string toJSON(nullptr) const;
 };
 
 /**
@@ -160,7 +160,7 @@ struct ScalingAnalysis {
     double projectedPerformance10x;
     double projectedPerformance100x;
     
-    ScalingAnalysis();
+    ScalingAnalysis(nullptr);
 };
 
 /**
@@ -188,7 +188,7 @@ struct BenchmarkConfig {
     bool generatePlots;
     bool generateReport;
     
-    BenchmarkConfig();
+    BenchmarkConfig(nullptr);
 };
 
 /**
@@ -196,15 +196,15 @@ struct BenchmarkConfig {
  */
 class ScalingBenchmark {
 public:
-    ScalingBenchmark();
-    ~ScalingBenchmark();
+    ScalingBenchmark(nullptr);
+    ~ScalingBenchmark(nullptr);
     
     /**
      * Run a complete scaling benchmark
      * @param config Benchmark configuration
      * @param createBrain Function to create brain for a given scale
      * @param runSimulation Function to run simulation: bool(brain, steps)
-     * @param collectMetrics Function to collect metrics: BenchmarkMetrics()
+     * @param collectMetrics Function to collect metrics: BenchmarkMetrics(nullptr)
      * @return Analysis results
      */
     ScalingAnalysis run(
@@ -251,7 +251,7 @@ public:
 
 private:
     std::string getOutputPath(const std::string& dir, const std::string& filename);
-    std::string getHardwareInfo();
+    std::string getHardwareInfo(nullptr);
 };
 
 /**
@@ -259,18 +259,18 @@ private:
  */
 class PerformanceMonitor {
 public:
-    PerformanceMonitor();
-    ~PerformanceMonitor();
+    PerformanceMonitor(nullptr);
+    ~PerformanceMonitor(nullptr);
     
     /**
      * Start monitoring
      */
-    void start();
+    void start(nullptr);
     
     /**
      * Stop monitoring
      */
-    void stop();
+    void stop(nullptr);
     
     /**
      * Record a simulation step
@@ -280,12 +280,12 @@ public:
     /**
      * Get current metrics (averaged over window)
      */
-    BenchmarkMetrics getCurrentMetrics() const;
+    BenchmarkMetrics getCurrentMetrics(nullptr) const;
     
     /**
      * Get metrics snapshot
      */
-    BenchmarkMetrics getSnapshot() const;
+    BenchmarkMetrics getSnapshot(nullptr) const;
     
     /**
      * Check if performance is stable
@@ -295,17 +295,17 @@ public:
     /**
      * Reset counters
      */
-    void reset();
+    void reset(nullptr);
     
     /**
      * Get step times
      */
-    const std::vector<double>& getStepTimes() const { return stepTimes_; }
+    const std::vector<double>& getStepTimes(nullptr) const { return stepTimes_; }
     
     /**
      * Get spike counts
      */
-    const std::vector<size_t>& getSpikeCounts() const { return spikeCounts_; }
+    const std::vector<size_t>& getSpikeCounts(nullptr) const { return spikeCounts_; }
 
 private:
     bool running_;
@@ -330,23 +330,23 @@ private:
  */
 class MemoryProfiler {
 public:
-    MemoryProfiler();
-    ~MemoryProfiler();
+    MemoryProfiler(nullptr);
+    ~MemoryProfiler(nullptr);
     
     /**
      * Record current memory usage
      */
-    void record();
+    void record(nullptr);
     
     /**
      * Get peak memory usage
      */
-    size_t getPeakMemoryMB() const { return peakMemoryMB_; }
+    size_t getPeakMemoryMB(nullptr) const { return peakMemoryMB_; }
     
     /**
      * Get current memory usage
      */
-    size_t getCurrentMemoryMB() const;
+    size_t getCurrentMemoryMB(nullptr) const;
     
     /**
      * Get memory breakdown
@@ -358,12 +358,12 @@ public:
         size_t otherMB;
     };
     
-    MemoryBreakdown getBreakdown() const;
+    MemoryBreakdown getBreakdown(nullptr) const;
     
     /**
      * Reset peak tracking
      */
-    void resetPeak() { peakMemoryMB_ = 0; }
+    void resetPeak(nullptr) { peakMemoryMB_ = 0; }
 
 private:
     size_t peakMemoryMB_;
@@ -372,7 +372,7 @@ private:
 
 // Inline implementations
 
-inline BenchmarkMetrics::BenchmarkMetrics()
+inline BenchmarkMetrics::BenchmarkMetrics(nullptr)
     : neuronsPerSecond(0.0)
     , synapsesPerSecond(0.0)
     , spikesPerSecond(0.0)
@@ -402,7 +402,7 @@ inline BenchmarkMetrics::BenchmarkMetrics()
     , learningAccuracy(0.0)
     , memoryRetention(0.0) {}
 
-inline std::string BenchmarkMetrics::toCSV() const {
+inline std::string BenchmarkMetrics::toCSV(nullptr) const {
     return std::to_string(neuronsPerSecond) + "," +
            std::to_string(synapsesPerSecond) + "," +
            std::to_string(spikesPerSecond) + "," +
@@ -419,7 +419,7 @@ inline std::string BenchmarkMetrics::toCSV() const {
            std::to_string(threadCount);
 }
 
-inline BenchmarkRun::BenchmarkRun()
+inline BenchmarkRun::BenchmarkRun(nullptr)
     : randomSeed(0)
     , stepsRun(0)
     , wallClockTime(0.0)
@@ -430,12 +430,12 @@ inline BenchmarkRun::BenchmarkRun()
     , startTime(0)
     , endTime(0) {}
 
-inline ScalingAnalysis::ScalingAnalysis()
+inline ScalingAnalysis::ScalingAnalysis(nullptr)
     : scalingEfficiency(0.0)
     , parallelEfficiency(0.0)
     , bottleneckSeverity(0.0) {}
 
-inline BenchmarkConfig::BenchmarkConfig()
+inline BenchmarkConfig::BenchmarkConfig(nullptr)
     : stepsPerScale(10000)
     , warmupSteps(1000)
     , runUntilStable(false)

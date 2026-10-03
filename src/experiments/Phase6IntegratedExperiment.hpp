@@ -52,7 +52,7 @@ struct Phase6IntegrationResult {
     time_t endTime;
     double totalWallClockTime;
     
-    Phase6IntegrationResult()
+    Phase6IntegrationResult(nullptr)
         : memoryWorkingMemoryIntegrated(false)
         , memoryEpisodicMemoryIntegrated(false)
         , neuromodulationIntegrated(false)
@@ -85,7 +85,7 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
-    Phase6Config()
+    Phase6Config(nullptr)
         : maxSteps(10000)
         , neuronCount(1000)
         , regionCount(1)
@@ -101,8 +101,8 @@ struct Phase6Config {
  */
 class Phase6IntegratedExperiment {
 public:
-    Phase6IntegratedExperiment();
-    ~Phase6IntegratedExperiment();
+    Phase6IntegratedExperiment(nullptr);
+    ~Phase6IntegratedExperiment(nullptr);
     
     /**
      * Run the complete integration test
@@ -112,27 +112,27 @@ public:
     /**
      * Run a simple integration verification
      */
-    bool verifyIntegration();
+    bool verifyIntegration(nullptr);
     
     /**
      * Test memory integration
      */
-    bool testMemoryIntegration();
+    bool testMemoryIntegration(nullptr);
     
     /**
      * Test neuromodulation integration
      */
-    bool testNeuromodulationIntegration();
+    bool testNeuromodulationIntegration(nullptr);
     
     /**
      * Test checkpoint save/load
      */
-    bool testCheckpointing();
+    bool testCheckpointing(nullptr);
     
     /**
      * Test replay system
      */
-    bool testReplay();
+    bool testReplay(nullptr);
 };
 
 } // namespace nlm

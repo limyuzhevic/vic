@@ -11,37 +11,37 @@ namespace nlm {
 
 class Neuromodulator {
 public:
-    virtual ~Neuromodulator() = default;
+    virtual ~Neuromodulator(nullptr) = default;
     
     // Get modulator name
-    virtual const char* getName() const = 0;
+    virtual const char* getName(nullptr) const = 0;
     
     // Get current concentration/level
-    virtual float getLevel() const = 0;
+    virtual float getLevel(nullptr) const = 0;
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
-    virtual float getPlasticityFactor() const = 0;
+    // TODO: PHASE 2 - Implement real modulation
+    virtual float getPlasticityFactor(nullptr) const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
 protected:
-    Neuromodulator() = default;
+    Neuromodulator(nullptr) = default;
 };
 
 // Dopamine: Reward and reinforcement learning signal
 // PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
-    Dopamine();
-    ~Dopamine() override;
+    Dopamine(nullptr);
+    ~Dopamine(nullptr) override;
     
-    const char* getName() const override;
-    float getLevel() const override;
+    const char* getName(nullptr) const override;
+    float getLevel(nullptr) const override;
     void setLevel(float level) override;
-    float getPlasticityFactor() const override;
+    float getPlasticityFactor(nullptr) const override;
     void update(TimestepDuration dt) override;
     
     // Reward signaling
@@ -57,10 +57,10 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
+    const char* getName(nullptr) const override { return "ACh"; }
+    float getLevel(nullptr) const override { return 0.0f; }
     void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
+    float getPlasticityFactor(nullptr) const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
 
@@ -68,10 +68,10 @@ public:
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
+    const char* getName(nullptr) const override { return "NE"; }
+    float getLevel(nullptr) const override { return 0.0f; }
     void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
+    float getPlasticityFactor(nullptr) const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
 
@@ -79,10 +79,10 @@ public:
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
+    const char* getName(nullptr) const override { return "5-HT"; }
+    float getLevel(nullptr) const override { return 0.0f; }
     void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
+    float getPlasticityFactor(nullptr) const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
 };
 

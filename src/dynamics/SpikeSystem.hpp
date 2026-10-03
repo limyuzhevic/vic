@@ -17,7 +17,7 @@ struct DetailedSpikeEvent {
     RegionId regionId;
     PopulationId populationId;
     
-    DetailedSpikeEvent() : source(), timestamp(0.0), step(0), regionId(), populationId() {}
+    DetailedSpikeEvent(nullptr) : source(nullptr), timestamp(0.0), step(0), regionId(nullptr), populationId(nullptr) {}
     DetailedSpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s, RegionId rid, PopulationId pid)
         : source(nid), timestamp(ts), step(s), regionId(rid), populationId(pid) {}
 };
@@ -26,8 +26,8 @@ struct DetailedSpikeEvent {
 // Handles spike event processing and delayed synaptic transmission
 class SpikeSystem {
 public:
-    SpikeSystem();
-    ~SpikeSystem();
+    SpikeSystem(nullptr);
+    ~SpikeSystem(nullptr);
     
     // Disable copying, enable moving
     SpikeSystem(const SpikeSystem&) = delete;
@@ -57,20 +57,20 @@ public:
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
     // Get spike history
-    const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
-    void clearHistory();
+    const std::vector<DetailedSpikeEvent>& getSpikeHistory(nullptr) const;
+    void clearHistory(nullptr);
     
     // Get spike count
-    size_t getSpikeCount() const;
-    size_t getPendingSpikeCount() const;
-    size_t getPendingDelayedCount() const;
+    size_t getSpikeCount(nullptr) const;
+    size_t getPendingSpikeCount(nullptr) const;
+    size_t getPendingDelayedCount(nullptr) const;
     
     // Statistics
-    float getAverageSpikeRate() const;
+    float getAverageSpikeRate(nullptr) const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
     // Reset
-    void reset();
+    void reset(nullptr);
     
 private:
     struct Impl;

@@ -2,7 +2,7 @@
 
 namespace nlm {
 
-SensoryPercept::SensoryPercept()
+SensoryPercept::SensoryPercept(nullptr)
     : visionWidth_(16)
     , visionHeight_(16)
     , timestamp_(0.0)
@@ -14,23 +14,23 @@ SensoryPercept::SensoryPercept()
     audio_.resize(0, 0.0f);
 }
 
-std::vector<float> SensoryPercept::getAllSignals() const {
+std::vector<float> SensoryPercept::getAllSignals(nullptr) const {
     std::vector<float> all;
     
     // Vision (flattened)
-    all.insert(all.end(), vision_.begin(), vision_.end());
+    all.insert(all.end(nullptr), vision_.begin(nullptr), vision_.end(nullptr));
     
     // Touch
-    all.insert(all.end(), touch_.begin(), touch_.end());
+    all.insert(all.end(nullptr), touch_.begin(nullptr), touch_.end(nullptr));
     
     // Internal
-    all.insert(all.end(), internal_.begin(), internal_.end());
+    all.insert(all.end(nullptr), internal_.begin(nullptr), internal_.end(nullptr));
     
     // Proprioception
-    all.insert(all.end(), proprioception_.begin(), proprioception_.end());
+    all.insert(all.end(nullptr), proprioception_.begin(nullptr), proprioception_.end(nullptr));
     
     // Audio
-    all.insert(all.end(), audio_.begin(), audio_.end());
+    all.insert(all.end(nullptr), audio_.begin(nullptr), audio_.end(nullptr));
     
     return all;
 }

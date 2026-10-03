@@ -11,22 +11,22 @@ namespace nlm {
 
 class MotorSystem {
 public:
-    MotorSystem();
-    ~MotorSystem();
+    MotorSystem(nullptr);
+    ~MotorSystem(nullptr);
     
     // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
+    // TODO: PHASE 2 - Implement real action selection
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
     // Get available actions
-    const std::vector<ActionType>& getAvailableActions() const;
+    const std::vector<ActionType>& getAvailableActions(nullptr) const;
     
     // Set action preferences (for exploration)
     void setActionPreference(ActionType action, float preference);
     
     // Get action history
-    const std::vector<const Action*>& getActionHistory() const;
-    void clearHistory();
+    const std::vector<const Action*>& getActionHistory(nullptr) const;
+    void clearHistory(nullptr);
     
 private:
     struct Impl;

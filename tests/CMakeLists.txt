@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Test configuration
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_include_directories(nlm_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${NLOHMANN_JSON_INCLUDE_DIR}
+)
 
 # Create test executable
 add_executable(nlm_test
