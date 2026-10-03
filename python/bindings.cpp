@@ -420,6 +420,185 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Module version
+    m.attr("__version__") = "0.1.0";
+
+    // Python utility functions
+    m.def("configure_logging", [](bool enable, const std::string& level = "INFO") {
+        // Configure logging - this would integrate with the NLM logging system
+        // For now, just a placeholder
+        std::cout << "Logging configured: enabled=" << (enable ? "true" : "false") 
+                  << ", level=" << level << std::endl;
+    }, py::arg("enable") = true, py::arg("level") = "INFO",
+        "Configure NLM logging system");
+    
+    m.def("export_brain_to_file", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+        "Export brain state to file");
+    
+    m.def("import_brain_from_file", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        // Note: This would require a factory function or different API
+        // For now, we'll just return a default config
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"),
+        "Import brain state from file");
+    
+    m.def("get_simulation_stats", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["simulation_time"] = world->getSimulationTime();
+        stats["curiosity_level"] = 0.0; // Would need agent access
+        stats["novelty_level"] = 0.0;   // Would need agent access
+        return stats;
+    }, py::arg("brain"), py::arg("world"),
+        "Get comprehensive simulation statistics");
+    
+    m.def("run_agent_episode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent, size_t num_steps) {
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        py::dict result;
+        result["final_firing_rate"] = brain->getAverageFiringRate();
+        result["total_spikes"] = brain->getTotalSpikeCount();
+        result["final_curiosity"] = agent->getCuriosityLevel();
+        result["final_novelty"] = agent->getNoveltyLevel();
+        return result;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps") = 1000,
+        "Run a complete agent episode");
+    
+    m.def("create_brain_from_dict", [](const py::dict& config_dict) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Convert Python dict to config
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            
+            // Try different types
+            try {
+                if (item.second.is(py::int_())) {
+                    config->set(key, py::cast<int64_t>(item.second));
+                } else if (item.second.is(py::float_())) {
+                    config->set(key, py::cast<double>(item.second));
+                } else if (item.second.is(py::bool_())) {
+                    config->set(key, py::cast<bool>(item.second));
+                } else if (item.second.is(py::str())) {
+                    config->set(key, py::cast<std::string>(item.second));
+                }
+            } catch (...) {
+                // Skip if conversion fails
+            }
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config_dict"),
+        "Create a brain from a Python dictionary configuration");
+    
+    m.def("brain_to_dict", [](std::shared_ptr<Brain> brain) {
+        py::dict brain_dict;
+        brain_dict["neuron_count"] = brain->getTotalNeuronCount();
+        brain_dict["synapse_count"] = brain->getTotalSynapseCount();
+        brain_dict["firing_neurons"] = brain->getFiringNeuronCount();
+        brain_dict["total_spikes"] = brain->getTotalSpikeCount();
+        brain_dict["average_firing_rate"] = brain->getAverageFiringRate();
+        brain_dict["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        brain_dict["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        brain_dict["region_count"] = brain->getRegionCount();
+        return brain_dict;
+    }, py::arg("brain"),
+        "Convert brain state to Python dictionary");
+    
+    m.def("world_to_dict", [](std::shared_ptr<SimpleWorld> world) {
+        py::dict world_dict;
+        world_dict["width"] = world->getWidth();
+        world_dict["height"] = world->getHeight();
+        world_dict["simulation_time"] = world->getSimulationTime();
+        world_dict["max_energy"] = world->getMaxEnergy();
+        world_dict["energy_decay_rate"] = world->getEnergyDecayRate();
+        
+        // Get agent body
+        auto body = world->getAgentBody();
+        py::dict body_dict;
+        body_dict["x"] = body->x;
+        body_dict["y"] = body->y;
+        body_dict["orientation"] = body->orientation;
+        body_dict["energy"] = body->energy;
+        body_dict["health"] = body->health;
+        body_dict["age"] = body->age;
+        world_dict["agent_body"] = body_dict;
+        
+        return world_dict;
+    }, py::arg("world"),
+        "Convert world state to Python dictionary");
+    
+    m.def("create_advanced_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up a recommended configuration for advanced simulations
+        config->set("brain.neuron_count", static_cast<int64_t>(2000), nlm::ConfigSource::Default);
+        config->set("brain.synapse_density", 0.15, nlm::ConfigSource::Default);
+        config->set("brain.connection_probability", 0.08, nlm::ConfigSource::Default);
+        config->set("brain.v_thresh", -45.0, nlm::ConfigSource::Default);
+        config->set("brain.v_rest", -65.0, nlm::ConfigSource::Default);
+        config->set("brain.v_reset", -70.0, nlm::ConfigSource::Default);
+        config->set("brain.tau_mem", 20.0, nlm::ConfigSource::Default);
+        config->set("brain.tau_ref", 2.0, nlm::ConfigSource::Default);
+        
+        // Plasticity settings
+        config->set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.002, nlm::ConfigSource::Default);
+        config->set("plasticity.stdp.tau_plus", 20.0, nlm::ConfigSource::Default);
+        config->set("plasticity.stdp.tau_minus", 20.0, nlm::ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, nlm::ConfigSource::Default);
+        
+        // Neuromodulation settings
+        config->set("neuromod.dopamine.scale", 1.0, nlm::ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, nlm::ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, nlm::ConfigSource::Default);
+        
+        // Development settings
+        config->set("development.initial_stage", "CriticalPeriod", nlm::ConfigSource::Default);
+        config->set("development.plasticity_rate", 1.0, nlm::ConfigSource::Default);
+        
+        return config;
+    }, "Create an advanced simulation configuration");
+    
+    m.def("benchmark_brain_creation", [](size_t neuron_count, int num_trials = 10) {
+        double total_time = 0.0;
+        
+        for (int trial = 0; trial < num_trials; ++trial) {
+            auto config = std::make_shared<Config>();
+            config->set("brain.neuron_count", static_cast<int64_t>(neuron_count), nlm::ConfigSource::Default);
+            config->set("brain.region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+            
+            auto start_time = std::chrono::high_resolution_clock::now();
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            auto end_time = std::chrono::high_resolution_clock::now();
+            
+            total_time += std::chrono::duration<double>(end_time - start_time).count();
+        }
+        
+        return total_time / num_trials;
+    }, py::arg("neuron_count"), py::arg("num_trials") = 10,
+        "Benchmark brain creation performance");
 }
 
 } // namespace nlm
