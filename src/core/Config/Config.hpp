@@ -5,11 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include "../Logger/Logger.hpp"
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -28,19 +28,8 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Environment,
     Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
 };
 
 // Main configuration class
@@ -55,7 +44,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -103,3 +92,4 @@ private:
 };
 
 } // namespace nlm
+
