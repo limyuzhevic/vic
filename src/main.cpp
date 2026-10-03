@@ -340,25 +340,45 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    std::string configFormat = "auto"; // "auto", "key=value", "json", "yaml"
     std::string configFile = "configs/default.cfg";
+    
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+        std::string arg = argv[i];
+        if (arg == "--config-format") {
+            if (i + 1 < argc) {
+                configFormat = argv[++i];
+            }
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.find("=") != std::string::npos && arg.substr(0, 6) == "--config") {
+            configFile = arg.substr(arg.find("=") + 1);
+        } else if (arg.find("=") != std::string::npos && arg.substr(0, 16) == "--config-format") {
+            configFormat = arg.substr(arg.find("=") + 1);
         }
     }
     
+    // Convert configFormat string to enum
+    ConfigFileFormat formatEnum = ConfigFileFormat::AutoDetect;
+    std::string formatLower = toLower(configFormat);
+    if (formatLower == "key=value" || formatLower == "kv") {
+        formatEnum = ConfigFileFormat::KeyValue;
+    } else if (formatLower == "json") {
+        formatEnum = ConfigFileFormat::JSON;
+    } else if (formatLower == "yaml" || formatLower == "yml") {
+        formatEnum = ConfigFileFormat::YAML;
+    } else if (formatLower != "auto") {
+        NLM_LOG_WARN("Unknown config format: " + configFormat + ". Using auto detection.");
+    }
+    
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    if (config->loadFromFile(configFile, formatEnum)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        if (configFormat != "auto") {
+            NLM_LOG_INFO("Format: " + configFormat);
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }

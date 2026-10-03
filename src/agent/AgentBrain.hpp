@@ -1,11 +1,7 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../core/Types/Types.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 
 namespace nlm {
 
@@ -52,8 +48,15 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
+    // Get prediction system
+    PredictionSystem* getPredictionSystem() { return predictionSystem_.get(); }
+    void setPredictionSystem(std::unique_ptr<PredictionSystem> system) { predictionSystem_ = std::move(system); }
+    
+    // Get prediction (to be computed by prediction system)
+    const SensoryInput* getPrediction() const { return prediction_.get(); }
+    
+    // Set prediction error directly (for reward prediction errors)
+    void setPredictionError(float error) { predictionError_ = error; }
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
@@ -69,6 +72,19 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // NeuralPlanner access
+    NeuralPlanner* getNeuralPlanner() { return neuralPlanner_.get(); }
+    
+    // Planning methods
+    void initializePlanning();
+    std::vector<ActionType> getCurrentPlan() const;
+    
+    // Episodic memory access
+    std::string getEpisodicMemoryContents() const;
+    
+    // Get episodic memory instance
+    NeuralEpisodicMemory* getEpisodicMemory() { return episodicMemory_.get(); }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,7 +92,15 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Convert ActionType to MotorCommand
+    MotorCommand convertActionToMotorCommand(ActionType action) const;
+    
     std::shared_ptr<Brain> brain_;
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory_;
+    
+    // Prediction state
+    std::unique_ptr<SensoryInput> prediction_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -98,6 +122,7 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    std::unique_ptr<PredictionSystem> predictionSystem_;
     
     // Development state
     double developmentalAge_;

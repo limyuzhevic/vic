@@ -31,6 +31,14 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration file format
+enum class ConfigFileFormat {
+    AutoDetect,
+    KeyValue,
+    JSON,
+    YAML
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -55,8 +63,8 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from file (multiple formats supported)
+    bool loadFromFile(const std::string& filepath, ConfigFileFormat format = ConfigFileFormat::AutoDetect);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
