@@ -71,6 +71,84 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### NEW: Advanced Usage Examples
+
+### Example 3: Using the New Factory Functions (RECOMMENDED)
+
+```python
+import pynlm
+
+# Create a complete setup with validation (NEW!)
+setup = pynlm.createCompleteSetupWithValidation()
+brain = setup['brain']
+world = setup['world']
+agent = setup['agent']
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+print(f"World size: {world.getWidth()}x{world.getHeight()}")
+
+# Run simulation with validation and error checking
+pynlm.runCompleteSimulationWithValidation(brain, world, agent, 500)
+```
+
+### Example 4: Performance Profiling
+
+```python
+import pynlm
+
+# Create setup and run with performance monitoring
+setup = pynlm.createCompleteSetupWithValidation()
+brain = setup['brain']
+world = setup['world']
+agent = setup['agent']
+
+print("Running simulation with performance profiling...")
+spikes = pynlm.createPerformanceProfile(brain, world, agent, 1000)
+print(f"Simulation completed! Generated {spikes} total spikes")
+```
+
+### Example 5: Configuration Presets
+
+```python
+import pynlm
+
+# Create brains with different configurations
+print("Testing different brain sizes...")
+
+# Small brain for quick testing
+small_config = pynlm.createConfigurationPreset("small")
+small_brain = pynlm.createBrainWithValidation(small_config)
+print(f"Small brain: {small_brain.getTotalNeuronCount()} neurons")
+
+# Medium brain for standard experiments
+medium_config = pynlm.createConfigurationPreset("medium")
+medium_brain = pynlm.createBrainWithValidation(medium_config)
+print(f"Medium brain: {medium_brain.getTotalNeuronCount()} neurons")
+
+# Large brain for complex simulations
+large_config = pynlm.createConfigurationPreset("large")
+large_brain = pynlm.createBrainWithValidation(large_config)
+print(f"Large brain: {large_brain.getTotalNeuronCount()} neurons")
+```
+
+### Example 6: Custom Experiments
+
+```python
+import pynlm
+
+# Create a custom experiment
+setup = pynlm.createCompleteSetupWithValidation()
+results = pynlm.createCustomExperiment(
+    "Curiosity Development Test",
+    setup['brain'], setup['world'], setup['agent'], 2000
+)
+
+print(f"Experiment: {results['name']}")
+print(f"Duration: {results['duration']:.2f}s")
+print(f"Final spike count: {results['final_spike_count']}")
+print(f"Final developmental stage: {results['final_developmental_stage']}")
+```
+
 ---
 
 ## Simple Analogy
@@ -143,7 +221,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (NEW!)
 
 ```python
 # These are all optional:
@@ -151,6 +229,11 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# NEW: Get comprehensive brain info
+info = pynlm.getBrainInfo(brain)
+for key, value in info.items():
+    print(f"{key}: {value}")
 ```
 
 ---
@@ -221,7 +304,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (NEW!)
 
 ```python
 import pynlm
@@ -285,6 +368,10 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"I'm getting errors"**
+- Use the new validation functions like `createBrainWithValidation()`
+- Check that all required components are provided
+
 ---
 
 ## Next Steps
@@ -293,5 +380,13 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the advanced features like performance profiling and batch experiments
 
-That's it! You're now ready to use NLM.
+**NEW ADVANCED FEATURES TO EXPLORE:**
+- Performance profiling with `createPerformanceProfile()`
+- Custom experiments with `createCustomExperiment()`
+- Configuration presets with `createConfigurationPreset()`
+- Batch experiment running with `batchRunExperiments()`
+- Comprehensive brain info with `getBrainInfo()`
+
+That's it! You're now ready to use NLM with both the basic and advanced features.

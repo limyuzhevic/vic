@@ -39,6 +39,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -51,6 +54,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const SynapseId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
@@ -63,6 +69,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const RegionId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
@@ -400,26 +409,285 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Add more comprehensive error handling and validation
+    m.def("createBrainWithValidation", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null. Use createDefaultConfig() or createSimpleBrain() instead.");
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create and initialize a brain with validation. The brain will be automatically initialized.\n         \n         Args:\n             config: Configuration object\n             \n         Raises:\n             std::invalid_argument: If config is null\n         \n         Example:\n             >>> import pynlm\n             >>> config = pynlm.createDefaultConfig()\n             >>> brain = pynlm.createBrainWithValidation(config)\n             >>> print(f\"Created brain with {brain.getTotalNeuronCount()} neurons\")\n         ");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createCompleteSetupWithValidation", []() {
+        py::dict result;
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        // Configure with reasonable defaults
+        brain->initialize();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        agent->initialize(*world);
+        
+        result["config"] = config;
+        result["brain"] = brain;
+        result["world"] = world;
+        result["agent"] = agent;
+        
+        return result;
+    }, "Create a complete simulation setup with validation and sensible defaults.\n         \n         Returns:\n             dict: Dictionary containing 'config', 'brain', 'world', and 'agent' keys\n         \n         Example:\n             >>> import pynlm\n             >>> setup = pynlm.createCompleteSetupWithValidation()\n             >>> brain = setup['brain']\n             >>> world = setup['world']\n             >>> agent = setup['agent']\n             >>> print(f\"Ready to run simulation with {brain.getTotalNeuronCount()} neurons\")\n         ");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("runCompleteSimulationWithValidation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int steps) {
+        // Enhanced validation
+        if (!brain) throw std::invalid_argument("Brain cannot be null");
+        if (!world) throw std::invalid_argument("World cannot be null");
+        if (!agent) throw std::invalid_argument("Agent cannot be null");
+        
+        if (steps <= 0) throw std::invalid_argument("Number of steps must be positive");
+        if (steps > 1000000) throw std::invalid_argument("Number of steps too large (max 1,000,000)");
+        
+        // Initialize if not already initialized
+        if (brain->getTotalNeuronCount() == 0) {
+            brain->initialize();
+        }
+        if (world->getSimulationTime() != 0.0) {
+            world->reset();
+        }
+        agent->initialize(*world);
+        
+        // Run simulation with better error handling
+        for (int i = 0; i < steps; ++i) {
+            try {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(i);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Error during simulation step " + std::to_string(i) + ": " + std::string(e.what()));
+            }
+        }
+    }, "Run a complete simulation with validation and error checking.\n         \n         Args:\n             brain: The neural brain instance\n             world: The world simulation instance  \n             agent: The agent brain interface\n             steps: Number of simulation steps to run\n             \n         Raises:\n             std::invalid_argument: If any component is null or steps is invalid\n             std::runtime_error: If an error occurs during simulation\n         \n         Example:\n             >>> import pynlm\n             >>> setup = pynlm.createCompleteSetupWithValidation()\n             >>> pynlm.runCompleteSimulationWithValidation(\n             ...     setup['brain'], setup['world'], setup['agent'], 1000)\n             >>> print(f\"Simulation completed successfully!\")\n         ",
+         py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"));
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createQuickTestBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a small test brain for quick testing and development.\n         \n         Returns:\n             Brain: A small brain with 100 neurons for fast testing\n         \n         Example:\n             >>> import pynlm\n             >>> brain = pynlm.createQuickTestBrain()\n             >>> for i in range(100):\n             ...     brain.step(i)\n             >>> print(f\"Test completed: {brain.getTotalSpikeCount()} spikes\")\n         ");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createWorldForTesting", [](int size) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(size, size, size/2, size/2);
+        world->reset();
+        return world;
+    }, "Create a world for testing with square dimensions.\n         \n         Args:\n             size: Width and height of the world, also determines vision range\n         \n         Returns:\n             SimpleWorld: Configured world for testing\n         \n         Example:\n             >>> import pynlm\n             >>> world = pynlm.createWorldForTesting(10)\n             >>> print(f\"Created {world.getWidth()}x{world.getHeight()} world\")\n         ",
+         py::arg("size"));
+
+    m.def("getBrainInfo", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::invalid_argument("Brain cannot be null");
+        
+        py::dict info;
+        info["total_neurons"] = brain->getTotalNeuronCount();
+        info["total_synapses"] = brain->getTotalSynapseCount();
+        info["firing_neurons"] = brain->getFiringNeuronCount();
+        info["active_neurons"] = brain->getActiveNeuronCount();
+        info["total_spikes"] = brain->getTotalSpikeCount();
+        info["avg_firing_rate"] = brain->getAverageFiringRate();
+        info["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        info["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return info;
+    }, "Get comprehensive information about a brain instance.\n         \n         Args:\n             brain: The brain instance to get information from\n             \n         Returns:\n             dict: Dictionary containing brain statistics and information\n         \n         Example:\n             >>> import pynlm\n             >>> brain = pynlm.createQuickTestBrain()\n             >>> info = pynlm.getBrainInfo(brain)\n             >>> for key, value in info.items():\n             ...     print(f\"{key}: {value}\")\n         ",
+         py::arg("brain"));
+
+    m.def("createPerformanceProfile", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int steps, bool enableProfiling = true) {
+        if (!enableProfiling) {
+            return brain->getTotalSpikeCount();
+        }
+        
+        // Enhanced performance monitoring
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        if (brain->getTotalNeuronCount() == 0) {
+            brain->initialize();
+        }
+        if (world->getSimulationTime() != 0.0) {
+            world->reset();
+        }
+        agent->initialize(*world);
+        
+        size_t totalSpikes = 0;
+        double maxTimePerStep = 0.0;
+        
+        for (int i = 0; i < steps; ++i) {
+            auto stepStart = std::chrono::high_resolution_clock::now();
+            
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            totalSpikes += brain->getTotalSpikeCount();
+            
+            auto stepEnd = std::chrono::high_resolution_clock::now();
+            auto stepDuration = std::chrono::duration<double>(stepEnd - stepStart).count();
+            maxTimePerStep = std::max(maxTimePerStep, stepDuration);
+            
+            // Optional: Progress callback (can be implemented for long simulations)
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+        
+        // Log performance summary
+        std::cout << "=== Performance Profile ===" << std::endl;
+        std::cout << "Total simulation time: " << totalTime << "s" << std::endl;
+        std::cout << "Steps per second: " << (steps / totalTime) << std::endl;
+        std::cout << "Max time per step: " << maxTimePerStep << "s" << std::endl;
+        std::cout << "Total spikes generated: " << totalSpikes << std::endl;
+        std::cout << "Average spikes per second: " << (totalSpikes / totalTime) << std::endl;
+        
+        return totalSpikes;
+    }, "Run a simulation with performance profiling and monitoring.\n         \n         Args:\n             brain: The neural brain instance\n             world: The world simulation instance  \n             agent: The agent brain interface\n             steps: Number of simulation steps to run\n             enableProfiling: Enable detailed performance logging\n             \n         Returns:\n             int: Total number of spikes generated during simulation\n         \n         Example:\n             >>> import pynlm\n             >>> setup = pynlm.createCompleteSetupWithValidation()\n             >>> spikes = pynlm.createPerformanceProfile(\n             ...     setup['brain'], setup['world'], setup['agent'], 5000)\n             >>> print(f\"Simulation generated {spikes} total spikes\")\n         ",
+         py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), py::arg("enableProfiling") = true);
+
+    m.def("createCustomExperiment", [](std::string experimentName, std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int steps) {
+        // Custom experiment runner with metadata
+        py::dict experimentData;
+        
+        experimentData["name"] = experimentName;
+        experimentData["start_time"] = std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        experimentData["steps"] = steps;
+        
+        // Run the experiment
+        if (brain->getTotalNeuronCount() == 0) {
+            brain->initialize();
+        }
+        if (world->getSimulationTime() != 0.0) {
+            world->reset();
+        }
+        agent->initialize(*world);
+        
+        for (int i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        experimentData["end_time"] = std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        experimentData["duration"] = experimentData["end_time"].cast<double>() - experimentData["start_time"].cast<double>();
+        experimentData["final_spike_count"] = brain->getTotalSpikeCount();
+        experimentData["final_firing_neurons"] = brain->getFiringNeuronCount();
+        experimentData["final_developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return experimentData;
+    }, "Run a custom experiment with metadata collection.\n         \n         Args:\n             experimentName: Name/identifier for the experiment\n             brain: The neural brain instance\n             world: The world simulation instance  \n             agent: The agent brain interface\n             steps: Number of simulation steps to run\n             \n         Returns:\n             dict: Dictionary containing experiment metadata and results\n         \n         Example:\n             >>> import pynlm\n             >>> setup = pynlm.createCompleteSetupWithValidation()\n             >>> results = pynlm.createCustomExperiment(\"Curiosity Test\", \n             ...     setup['brain'], setup['world'], setup['agent'], 3000)\n             >>> print(f\"Experiment {results['name']} completed in {results['duration']:.2f}s\")\n         ",
+         py::arg("experimentName"), py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"));
+
+    m.def("createConfigurationPreset", [](std::string presetName) {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "small") {
+            // Small brain for quick testing
+            config->set("brain.neuron_count", 100);
+            config->set("brain.synapse_density", 0.05);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("development.enable", false);
+        } else if (presetName == "medium") {
+            // Medium-sized brain for standard experiments
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("development.enable", true);
+            config->set("development.critical_period_start", 0.0);
+        } else if (presetName == "large") {
+            // Large brain for complex simulations
+            config->set("brain.neuron_count", 5000);
+            config->set("brain.synapse_density", 0.15);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.0005);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("development.enable", true);
+            config->set("development.critical_period_start", 100.0);
+            config->set("development.maturation_rate", 0.005);
+            config->set("performance.memory_pool_size", 4096);
+        } else {
+            throw std::invalid_argument("Unknown preset name: " + presetName + ". Available: 'small', 'medium', 'large'");
+        }
+        
+        return config;
+    }, "Create a configuration preset with predefined parameters.\n         \n         Args:\n             presetName: Name of the preset ('small', 'medium', or 'large')\n             \n         Returns:\n             Config: Configuration object with preset parameters\n         \n         Example:\n             >>> import pynlm\n             >>> config = pynlm.createConfigurationPreset(\"medium\")\n             >>> brain = pynlm.createBrainWithValidation(config)\n             >>> print(f\"Created medium brain with {brain.getTotalNeuronCount()} neurons\")\n         ",
+         py::arg("presetName"));
+
+    m.def("batchRunExperiments", [](std::vector<std::string> experimentNames, std::vector<std::shared_ptr<Brain>> brains, std::vector<std::shared_ptr<SimpleWorld>> worlds, std::vector<std::shared_ptr<AgentBrain>> agents, int stepsPerExperiment) {
+        if (experimentNames.size() != brains.size() || brains.size() != worlds.size() || worlds.size() != agents.size()) {
+            throw std::invalid_argument("All experiment vectors must have the same length");
+        }
+        
+        std::vector<py::dict> results;
+        
+        for (size_t i = 0; i < experimentNames.size(); ++i) {
+            py::dict result;
+            result["name"] = experimentNames[i];
+            
+            try {
+                auto startTime = std::chrono::high_resolution_clock::now();
+                
+                if (brains[i]->getTotalNeuronCount() == 0) {
+                    brains[i]->initialize();
+                }
+                if (worlds[i]->getSimulationTime() != 0.0) {
+                    worlds[i]->reset();
+                }
+                agents[i]->initialize(*worlds[i]);
+                
+                for (int step = 0; step < stepsPerExperiment; ++step) {
+                    worlds[i]->update(0.1);
+                    auto percept = worlds[i]->getSensoryPercept();
+                    agents[i]->processSensoryInput(percept);
+                    brains[i]->step(step);
+                    auto action = agents[i]->decodeMotorCommand();
+                    worlds[i]->applyMotorCommand(action, worlds[i]->getSimulationTime());
+                }
+                
+                auto endTime = std::chrono::high_resolution_clock::now();
+                double duration = std::chrono::duration<double>(endTime - startTime).count();
+                
+                result["success"] = true;
+                result["duration"] = duration;
+                result["final_spike_count"] = brains[i]->getTotalSpikeCount();
+                result["final_firing_neurons"] = brains[i]->getFiringNeuronCount();
+                result["error_message"] = "";
+                
+            } catch (const std::exception& e) {
+                result["success"] = false;
+                result["duration"] = 0.0;
+                result["final_spike_count"] = 0;
+                result["final_firing_neurons"] = 0;
+                result["error_message"] = std::string(e.what());
+            }
+            
+            results.push_back(result);
+        }
+        
+        return results;
+    }, "Run multiple experiments in batch with consistent error handling.\n         \n         Args:\n             experimentNames: List of experiment names/identifiers\n             brains: List of brain instances (one per experiment)\n             worlds: List of world instances (one per experiment)\n             agents: List of agent instances (one per experiment)\n             stepsPerExperiment: Number of steps for each experiment\n             \n         Returns:\n             list: List of result dictionaries for each experiment\n         \n         Example:\n             >>> import pynlm\n             >>> import pynlm\n             >>> brains = [pynlm.createQuickTestBrain() for _ in range(3)]\n             >>> worlds = [pynlm.createWorldForTesting(10) for _ in range(3)]\n             >>> agents = [pynlm.createAgent(brain, world) for brain, world in zip(brains, worlds)]\n             >>> experiments = [\"Test A\", \"Test B\", \"Test C\"]\n             >>> results = pynlm.batchRunExperiments(experiments, brains, worlds, agents, 1000)\n             >>> for result in results:\n             ...     print(f\"{result['name']}: {'SUCCESS' if result['success'] else 'FAILED'} in {result['duration']:.2f}s\")\n         ",
+         py::arg("experimentNames"), py::arg("brains"), py::arg("worlds"), py::arg("agents"), py::arg("stepsPerExperiment"));
 
 } // namespace nlm

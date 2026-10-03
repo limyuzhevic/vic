@@ -8,9 +8,85 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::string> keyAliases;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default configuration values
+    initializeDefaults();
+}
+
+Config::~Config() = default;
+
+void Config::initializeDefaults() {
+    // Common default configuration values for NLM brain simulation
+    set("brain.neuron_count", 1000, ConfigSource::Default);
+    set("brain.synapse_density", 0.1, ConfigSource::Default);
+    set("brain.connection_probability", 0.05, ConfigSource::Default);
+    set("brain.initial_weight_mean", 0.5, ConfigSource::Default);
+    set("brain.initial_weight_std", 0.1, ConfigSource::Default);
+    set("brain.v_thresh", -50.0, ConfigSource::Default);
+    set("brain.v_rest", -70.0, ConfigSource::Default);
+    set("brain.v_reset", -75.0, ConfigSource::Default);
+    set("brain.tau_mem", 20.0, ConfigSource::Default);
+    set("brain.tau_ref", 2.0, ConfigSource::Default);
+    
+    // Plasticity defaults
+    set("plasticity.stdp.enable", true, ConfigSource::Default);
+    set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Default);
+    set("plasticity.stdp.tau_plus", 20.0, ConfigSource::Default);
+    set("plasticity.stdp.tau_minus", 20.0, ConfigSource::Default);
+    set("plasticity.hebbian.enable", true, ConfigSource::Default);
+    set("plasticity.structural.enable", true, ConfigSource::Default);
+    
+    // Neuromodulation defaults
+    set("neuromod.dopamine.scale", 1.0, ConfigSource::Default);
+    set("neuromod.curiosity.enable", true, ConfigSource::Default);
+    set("neuromod.novelty.enable", true, ConfigSource::Default);
+    
+    // Development defaults
+    set("development.enable", true, ConfigSource::Default);
+    set("development.critical_period_start", 0.0, ConfigSource::Default);
+    set("development.maturation_rate", 0.01, ConfigSource::Default);
+    
+    // Performance defaults
+    set("performance.memory_pool_size", 1024, ConfigSource::Default);
+    set("performance.event_queue_size", 4096, ConfigSource::Default);
+}
+    // Common default configuration values for NLM brain simulation
+    set("brain.neuron_count", 1000, ConfigSource::Default);
+    set("brain.synapse_density", 0.1, ConfigSource::Default);
+    set("brain.connection_probability", 0.05, ConfigSource::Default);
+    set("brain.initial_weight_mean", 0.5, ConfigSource::Default);
+    set("brain.initial_weight_std", 0.1, ConfigSource::Default);
+    set("brain.v_thresh", -50.0, ConfigSource::Default);
+    set("brain.v_rest", -70.0, ConfigSource::Default);
+    set("brain.v_reset", -75.0, ConfigSource::Default);
+    set("brain.tau_mem", 20.0, ConfigSource::Default);
+    set("brain.tau_ref", 2.0, ConfigSource::Default);
+    
+    // Plasticity defaults
+    set("plasticity.stdp.enable", true, ConfigSource::Default);
+    set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Default);
+    set("plasticity.stdp.tau_plus", 20.0, ConfigSource::Default);
+    set("plasticity.stdp.tau_minus", 20.0, ConfigSource::Default);
+    set("plasticity.hebbian.enable", true, ConfigSource::Default);
+    set("plasticity.structural.enable", true, ConfigSource::Default);
+    
+    // Neuromodulation defaults
+    set("neuromod.dopamine.scale", 1.0, ConfigSource::Default);
+    set("neuromod.curiosity.enable", true, ConfigSource::Default);
+    set("neuromod.novelty.enable", true, ConfigSource::Default);
+    
+    // Development defaults
+    set("development.enable", true, ConfigSource::Default);
+    set("development.critical_period_start", 0.0, ConfigSource::Default);
+    set("development.maturation_rate", 0.01, ConfigSource::Default);
+    
+    // Performance defaults
+    set("performance.memory_pool_size", 1024, ConfigSource::Default);
+    set("performance.event_queue_size", 4096, ConfigSource::Default);
+}
 
 Config::~Config() = default;
 
@@ -19,16 +95,15 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +123,40 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to determine type and set appropriately
+            if (value.find('.') != std::string::npos) {
+                // Try double first
+                try {
+                    double doubleVal = std::stod(value);
+                    set(key, doubleVal, ConfigSource::File);
+                    continue;
+                } catch (...) {}
+            }
+            
+            try {
+                // Try int first
+                size_t posEnd;
+                int intVal = std::stoi(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {}
+            
+            try {
+                // Try bool
+                if (value == "true" || value == "false") {
+                    bool boolVal = (value == "true");
+                    set(key, boolVal, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {}
+            
+            // Fall back to string
             set(key, value, ConfigSource::File);
+        } else {
+            // Malformed line - log warning but continue
+            // TODO: Add proper logging
         }
     }
     
@@ -79,17 +187,43 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        
+        // Convert configuration entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            std::visit([&jsonData, &entry](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonData[entry.key] = arg;
+                }
+            }, entry.value);
+        }
+        
+        file << jsonData.dump(2); // Pretty print with 2-space indentation
+        return true;
+    } catch (const std::exception& e) {
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -177,6 +311,27 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }

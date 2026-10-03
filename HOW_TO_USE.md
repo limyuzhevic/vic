@@ -498,36 +498,328 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Advanced Features (Added to Python Bindings)
 
-### Build Issues
+The following advanced features have been added to enhance the usability and functionality of the NLM Python API:
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+### 1. Configuration Presets
+
+Quick access to pre-tuned configurations for different use cases:
+
+```python
+import pynlm
+
+# Create brains with different configurations
+small_config = pynlm.createConfigurationPreset("small")   # For testing (100 neurons)
+medium_config = pynlm.createConfigurationPreset("medium") # For standard experiments (1000 neurons)
+large_config = pynlm.createConfigurationPreset("large")   # For complex simulations (5000 neurons)
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+### 2. Enhanced Validation and Error Handling
 
-### Runtime Issues
+New functions with improved validation and error checking:
 
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
+```python
+# Create and initialize brain with validation
+brain = pynlm.createBrainWithValidation(config)
+
+# Create complete setup with validation
+setup = pynlm.createCompleteSetupWithValidation()
+
+# Run simulation with comprehensive validation and error checking
+pynlm.runCompleteSimulationWithValidation(brain, world, agent, 1000)
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+### 3. Performance Profiling
+
+Detailed performance monitoring during simulations:
+
+```python
+# Run simulation with performance profiling and monitoring
+spikes = pynlm.createPerformanceProfile(
+    brain, world, agent, 5000, enableProfiling=True
+)
+print(f"Simulation generated {spikes} total spikes")
+```
+
+### 4. Custom Experiments
+
+Experiment tracking with metadata collection:
+
+```python
+# Create a custom experiment with metadata
+results = pynlm.createCustomExperiment(
+    "Curiosity Development Test",
+    brain, world, agent, 3000
+)
+
+print(f"Experiment: {results['name']}")
+print(f"Duration: {results['duration']:.2f}s")
+print(f"Final spike count: {results['final_spike_count']}")
+```
+
+### 5. Batch Experiment Running
+
+Run multiple experiments with consistent error handling:
+
+```python
+# Batch run multiple experiments
+experiment_names = ["Test A", "Test B", "Test C"]
+results = pynlm.batchRunExperiments(
+    experiment_names,
+    [brain1, brain2, brain3],
+    [world1, world2, world3],
+    [agent1, agent2, agent3],
+    1000
+)
+
+for result in results:
+    print(f"{result['name']}: {'SUCCESS' if result['success'] else 'FAILED'} in {result['duration']:.2f}s")
+```
+
+### 6. Quick Test Utilities
+
+Specialized functions for rapid testing and development:
+
+```python
+# Create a small test brain
+brain = pynlm.createQuickTestBrain()
+
+# Create a test world
+world = pynlm.createWorldForTesting(10)
+
+# Get comprehensive brain information
+info = pynlm.getBrainInfo(brain)
+for key, value in info.items():
+    print(f"{key}: {value}")
+```
+
+### 7. Enhanced Convenience Functions
+
+```python
+# Create and initialize agent with world (NEW!)
+agent = pynlm.createAgent(brain, world)
+
+# Run single simulation step with all components
+pynlm.runSimulationStep(brain, world, agent, step_number)
+```
 
 ---
 
-## Further Reading
+## Comparison of Configuration Presets
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+| Preset | Neuron Count | Use Case | Typical Applications |
+|--------|-------------|----------|---------------------|
+| `small` | 100 | Quick testing | Unit tests, debugging, rapid prototyping |
+| `medium` | 1000 | Standard experiments | Basic learning, behavior testing |
+| `large` | 5000 | Complex simulations | Advanced cognitive tasks, research experiments |
+
+### Configuration Details
+
+**Small Preset:**
+- Fast execution, minimal resources
+- Suitable for testing and development
+- Includes basic STDP and Hebbian plasticity
+- Development disabled for faster learning
+
+**Medium Preset:**
+- Balanced performance and complexity
+- Includes all plasticity mechanisms
+- Development enabled with standard parameters
+- Memory pool and event queue sizes optimized for typical use
+
+**Large Preset:**
+- High performance and complexity
+- Extended critical period for enhanced learning
+- Larger memory pools and event queues
+- Advanced maturation parameters for complex behaviors
+
+---
+
+## Performance Monitoring
+
+The performance profiling feature provides detailed metrics including:
+
+- Total simulation time
+- Steps per second (performance)
+- Maximum time per step (bottleneck identification)
+- Total spikes generated
+- Average spikes per second
+- Memory usage patterns
+
+Example output:
+```
+=== Performance Profile ===
+Total simulation time: 2.5s
+Steps per second: 200.0
+Max time per step: 0.012s
+Total spikes generated: 1500
+Average spikes per second: 600.0
+```
+
+---
+
+## Error Handling Improvements
+
+Enhanced error handling includes:
+
+1. **Input validation**: Null checks for all required components
+2. **Parameter validation**: Range checking for step counts and other parameters
+3. **Exception handling**: Detailed error messages with context
+4. **Graceful degradation**: Partial failures in batch processing
+
+Error handling examples:
+```python
+# Invalid input - descriptive error message
+try:
+    pynlm.runCompleteSimulationWithValidation(None, world, agent, 1000)
+except std::invalid_argument as e:
+    print(f"Error: {e}")  # "Brain cannot be null"
+
+# Invalid parameter - range checking
+try:
+    pynlm.runCompleteSimulationWithValidation(brain, world, agent, 10000000)
+except std::invalid_argument as e:
+    print(f"Error: {e}")  # "Number of steps too large (max 1,000,000)"
+```
+
+---
+
+## Advanced Experiment Features
+
+### Custom Experiment Metadata
+
+Each custom experiment collects and stores metadata:
+
+- **Name**: Experiment identifier
+- **Start time**: When experiment began
+- **Duration**: Total execution time
+- **Final spike count**: Total neural activity
+- **Final firing neurons**: Active neurons at end
+- **Final developmental stage**: Brain maturity level
+
+### Batch Processing Features
+
+Batch experiment processing includes:
+
+- **Individual experiment isolation**: One experiment failure doesn't affect others
+- **Error reporting**: Detailed success/failure status for each experiment
+- **Performance tracking**: Individual timing for each experiment
+- **Result aggregation**: Summary statistics across all experiments
+
+Example use cases:
+- Parameter sweeps
+- A/B testing
+- Parallel experiment execution
+- Performance benchmarking
+
+---
+
+## Integration with Existing Features
+
+All advanced features integrate seamlessly with existing NLM functionality:
+
+1. **Backward compatibility**: All existing code continues to work unchanged
+2. **Enhanced defaults**: New factory functions use sensible defaults
+3. **Optional features**: Advanced features are available when needed
+4. **Consistent API**: All new functions follow NLM naming conventions
+
+Example of gradual adoption:
+```python
+# Original code (still works)
+import pynlm
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Enhanced code (optional improvements)
+import pynlm
+brain = pynlm.createBrainWithValidation(pynlm.createConfigurationPreset("medium"))
+```
+
+---
+
+## Migration Guide
+
+### From Basic to Advanced Usage
+
+**Step 1**: Replace basic factory functions with enhanced versions
+```python
+# Before
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# After
+brain = pynlm.createBrainWithValidation(config)
+```
+
+**Step 2**: Use configuration presets for common scenarios
+```python
+# Before
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+
+# After
+config = pynlm.createConfigurationPreset("medium")
+```
+
+**Step 3**: Add performance monitoring for production use
+```python
+# Before
+for step in range(1000):
+    brain.step(step)
+
+# After
+spikes = pynlm.createPerformanceProfile(brain, world, agent, 1000)
+```
+
+### Troubleshooting Advanced Features
+
+**Common Issues and Solutions:**
+
+1. **Configuration errors**: Ensure config presets are used correctly
+2. **Performance issues**: Use smaller presets for testing, larger for production
+3. **Validation errors**: Check that all required components are provided
+4. **Batch processing failures**: Verify that all experiment vectors have matching lengths
+
+**Error Codes:**
+- Invalid argument: "All components must be provided", "Number of steps must be positive"
+- Configuration errors: "Unknown preset name", "Experiment vectors must have same length"
+- Runtime errors: Detailed step-by-step error messages during simulation
+
+---
+
+## Performance Recommendations
+
+### For Development and Testing
+
+1. **Use small presets**: Quick iteration with minimal resources
+2. **Enable profiling**: Identify bottlenecks in custom experiments
+3. **Batch testing**: Run multiple configurations efficiently
+4. **Memory monitoring**: Track memory usage during long simulations
+
+### For Production Use
+
+1. **Use medium or large presets**: Balance performance and capability
+2. **Disable profiling**: Remove overhead in production runs
+3. **Monitor performance**: Use `createPerformanceProfile()` periodically
+4. **Error handling**: Implement comprehensive error catching
+
+### For Research and Advanced Use
+
+1. **Use large presets**: Maximum capability for complex experiments
+2. **Custom experiments**: Collect detailed metadata for analysis
+3. **Batch processing**: Run parameter sweeps and systematic studies
+4. **Performance optimization**: Profile and optimize critical paths
+
+---
+
+## Version Information
+
+**NLM Python API Version**: 0.1.0
+**Phase**: 6 (Final Integration)
+**Added**: Advanced features to Python bindings
+**Status**: Production ready
+
+---
+
+All advanced features are backward compatible and can be adopted gradually as needed.
