@@ -4,13 +4,26 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding, now integrates with all Brain cognitive systems
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,7 +82,51 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
-private:
+    // ========== COGNITIVE SYSTEM ACCESSORS ==========
+    
+    // Working memory access for storing and retrieving sensory patterns
+    NeuralWorkingMemory* getWorkingMemory() const;
+    NeuralEpisodicMemory* getEpisodicMemory() const;
+    NeuralAssociativeMemory* getAssociativeMemory() const;
+    
+    // Prediction system for forward models and error computation
+    PredictionSystem* getPredictionSystem() const;
+    
+    // Neural planner for action planning and goal selection
+    NeuralPlanner* getPlanner() const;
+    
+    // Concept formation for pattern discovery and abstraction
+    ConceptFormation* getConceptFormation() const;
+    
+    // Attentional selection for focus and prioritization
+    AttentionalSelection* getAttention() const;
+    
+    // Development system for developmental stages and plasticity
+    DevelopmentSystem* getDevelopmentSystem() const;
+    
+    // Neuromodulation systems for learning signals
+    Dopamine* getDopamine() const;
+    Curiosity* getCuriosity() const;
+    Novelty* getNovelty() const;
+    PredictionError* getPredictionError() const;
+    
+    // ========== ADVANCED COGNITIVE INTEGRATION ==========
+    
+    // Process sensory input through full cognitive pipeline
+    // Implements: Sensory → Working Memory → Attention → Concept Formation → Planning → Motor
+    void processCognitivePipeline(const SensoryPercept& percept, double timestep);
+    
+    // Get integrated action plan based on current state and goals
+    std::vector<float> getActionPlan() const;
+    
+    // Update cognitive systems with new information
+    void updateCognitiveSystems(double timestep);
+    
+    // Get current cognitive state for monitoring/debugging
+    float getWorkingMemoryActivity() const;
+    float getPlanningConfidence() const;
+    float getConceptStability() const;
+    float getAttentionFocus() const;
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     

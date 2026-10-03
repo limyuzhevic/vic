@@ -83,9 +83,19 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
+# Visualization
+    src/visualization/BrainVisualizer.cpp
     src/visualization/VisualizationInterface.cpp
-)
+    src/visualization/VisualizationFactory.cpp
+    src/visualization/VisualizationUtils.cpp
+    src/visualization/VisualizeCLI.cpp
+    src/visualization/NeuralNetworkVisualizer.hpp
+    src/visualization/MemoryVisualizer.hpp
+    src/visualization/NeuromodulationVisualizer.hpp
+    src/visualization/CognitiveVisualizer.hpp
+    src/visualization/DevelopmentVisualizer.hpp
+    src/visualization/PerformanceVisualizer.hpp
+    src/visualization/VisualizationUtils.hpp
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
@@ -99,6 +109,13 @@ add_library(nlm_agent STATIC
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+# Agent CLI interface
+add_executable(nlm_agent_cli
+    src/agent/AgentMain.cpp
+)
+target_include_directories(nlm_agent_cli PUBLIC src)
+target_link_libraries(nlm_agent_cli PUBLIC nlm_core nlm_agent)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC

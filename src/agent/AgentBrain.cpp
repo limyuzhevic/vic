@@ -20,7 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups (preserved for backward compatibility)
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -84,74 +84,257 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+void AgentBrain::processCognitivePipeline(const SensoryPercept& percept, double timestep) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
+    // Step 1: Store in working memory for transient processing
+    if (auto* workingMemory = brain_->getWorkingMemory()) {
+        // Convert percept to neural pattern for working memory
+        std::vector<float> pattern;
+        const auto& vision = percept.getVision();
+        pattern.insert(pattern.end(), vision.begin(), vision.end());
+        
+        const auto& touch = percept.getTouch();
+        pattern.insert(pattern.end(), touch.begin(), touch.end());
+        
+        const auto& internal = percept.getInternal();
+        pattern.insert(pattern.end(), internal.begin(), internal.end());
+        
+        const auto& proprio = percept.getProprioception();
+        pattern.insert(pattern.end(), proprio.begin(), proprio.end());
+        
+        workingMemory->store(pattern, 1.0f);
+        
+        // Update working memory dynamics
+        workingMemory->update(timestep);
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+    // Step 2: Apply attentional selection to prioritize processing
+    if (auto* attention = brain_->getAttention()) {
+        // Get attended regions based on current cognitive state
+        std::vector<NeuronId> competitors;
+        if (auto* workingMemory = brain_->getWorkingMemory()) {
+            const auto& memoryNeurons = workingMemory->getMemoryNeurons();
+            competitors.insert(competitors.end(), memoryNeurons.begin(), memoryNeurons.end());
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Process competition and select attention winners
+        std::vector<NeuronId> winners = attention->processCompetition(competitors, 0.5f);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+        // Apply attention to selected regions
+        for (NeuronId winner : winners) {
+            // Update percept's attention weight based on selection strength
+            float attentionStrength = attention->getInhibitionFor(winner);
+            percept.setAttentionWeight(attentionStrength);
+        }
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    // Step 3: Form concepts through pattern discovery
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        // Update concept formation with current sensory input
+        conceptFormation->update(timestep);
+        
+        // Get concept relevance for current percept
+        size_t conceptCount = conceptFormation->getConceptCount();
+        for (size_t i = 0; i < conceptCount; ++i) {
+            float relevance = conceptFormation->getConceptStability(i);
+            percept.setConceptRelevance(i, relevance);
+        }
     }
+    
+    // Step 4: Generate action plans through neural planning
+    if (auto* planner = brain_->getPlanner()) {
+        // Update planner with current state and goals
+        planner->update(timestep);
+        
+        // Get current action plan
+        std::vector<float> actionPlan = planner->getCurrentGoal();
+        
+        // Store action plan in percept for motor system access
+        // Note: percept doesn't store action plans directly, but this information
+        // is available through Brain's planning system
+    }
+    
+    // Step 5: Integrate with neuromodulation systems
+    if (auto* novelty = brain_->getNovelty()) {
+        novelty->update(timestep);
+    }
+    
+    if (auto* curiosity = brain_->getCuriosity()) {
+        curiosity->update(timestep);
+    }
+    
+    if (auto* predictionError = brain_->getPredictionErrorSignal()) {
+        predictionError->update(timestep);
+    }
+    
+    // Update local neuromodulation state from Brain systems
+    if (auto* novelty = brain_->getNovelty()) {
+        noveltyLevel_ = novelty->getLevel();
+    }
+    
+    if (auto* curiosity = brain_->getCuriosity()) {
+        curiosityLevel_ = curiosity->getLevel();
+    }
+    
+    if (auto* predictionError = brain_->getPredictionErrorSignal()) {
+        predictionError_ = predictionError->getError();
+    }
+}
+
+std::vector<float> AgentBrain::getActionPlan() const {
+    if (!brain_) return std::vector<float>();
+    
+    // Get action plan from Brain's neural planner
+    if (auto* planner = brain_->getPlanner()) {
+        return planner->getCurrentGoal();
+    }
+    
+    // Fallback: generate simple reactive plan
+    std::vector<float> simplePlan;
+    // Add current motivational state
+    simplePlan.push_back(dopamineLevel_);
+    simplePlan.push_back(curiosityLevel_);
+    simplePlan.push_back(noveltyLevel_);
+    simplePlan.push_back(1.0f - std::abs(predictionError_)); // Stability factor
+    
+    return simplePlan;
+}
+
+void AgentBrain::updateCognitiveSystems(double timestep) {
+    if (!brain_) return;
+    
+    // Update all Brain cognitive systems
+    if (auto* workingMemory = brain_->getWorkingMemory()) {
+        workingMemory->update(timestep);
+    }
+    
+    if (auto* episodicMemory = brain_->getEpisodicMemory()) {
+        episodicMemory->update(timestep);
+    }
+    
+    if (auto* associativeMemory = brain_->getAssociativeMemory()) {
+        associativeMemory->update(timestep);
+    }
+    
+    if (auto* predictionSystem = brain_->getPredictionSystem()) {
+        predictionSystem->update(timestep);
+    }
+    
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        conceptFormation->update(timestep);
+    }
+    
+    if (auto* attention = brain_->getAttention()) {
+        attention->update(timestep);
+    }
+    
+    if (auto* planner = brain_->getPlanner()) {
+        planner->update(timestep);
+    }
+    
+    if (auto* developmentSystem = brain_->getDevelopmentSystem()) {
+        developmentSystem->update(brain_.get(), timestep);
+    }
+    
+    // Update neuromodulation systems
+    if (auto* novelty = brain_->getNovelty()) {
+        novelty->update(timestep);
+    }
+    
+    if (auto* curiosity = brain_->getCuriosity()) {
+        curiosity->update(timestep);
+    }
+    
+    if (auto* predictionError = brain_->getPredictionErrorSignal()) {
+        predictionError->update(timestep);
+    }
+    
+    // Update development system
+    if (developmentEnabled_) {
+        // Get development stage and update if needed
+        if (auto* devSystem = brain_->getDevelopmentSystem()) {
+            devSystem->update(brain_.get(), timestep);
+        }
+    }
+}
+
+float AgentBrain::getWorkingMemoryActivity() const {
+    if (!brain_) return 0.0f;
+    if (auto* workingMemory = brain_->getWorkingMemory()) {
+        return workingMemory->getMemoryActivity();
+    }
+    return 0.0f;
+}
+
+float AgentBrain::getPlanningConfidence() const {
+    if (!brain_) return 0.0f;
+    if (auto* planner = brain_->getPlanner()) {
+        return planner->getPlanningConfidence();
+    }
+    return 0.0f;
+}
+
+float AgentBrain::getConceptStability() const {
+    if (!brain_) return 0.0f;
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        // Get average concept stability
+        size_t conceptCount = conceptFormation->getConceptCount();
+        if (conceptCount == 0) return 0.0f;
+        
+        float totalStability = 0.0f;
+        for (size_t i = 0; i < conceptCount; ++i) {
+            totalStability += conceptFormation->getConceptStability(i);
+        }
+        return totalStability / conceptCount;
+    }
+    return 0.0f;
+}
+
+float AgentBrain::getAttentionFocus() const {
+    if (!brain_) return 0.0f;
+    if (auto* attention = brain_->getAttention()) {
+        const auto& winners = attention->getWinners();
+        return (winners.empty()) ? 0.0f : 1.0f;
+    }
+    return 0.0f;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Use Brain's neural planner for action planning (new integrated approach)
+    if (auto* planner = brain_->getPlanner()) {
+        // Get action plan from Brain's planner
+        std::vector<float> actionPlan = planner->getCurrentGoal();
+        
+        // Convert action plan to MotorCommand
+        // Action plan is a vector<float> representing action space
+        if (!actionPlan.empty()) {
+            // Find best action based on planning confidence
+            float planningConfidence = planner->getPlanningConfidence();
+            
+            // Use motor neuron activity as backup if planner not confident
+            if (planningConfidence > 0.5f) {
+                // Use planned action (simplified mapping)
+                int actionIndex = (actionPlan[0] * getMotorOutputSize()) + 0.5f;
+                actionIndex = std::clamp(actionIndex, 0, static_cast<int>(getMotorOutputSize()) - 1);
+                
+                // Convert to MotorCommand (basic mapping)
+                switch (actionIndex) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    default: return MotorCommand::Wait;
+                }
+            }
+        }
+    }
+    
+    // Fallback to local motor decoding (original functionality preserved)
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -244,71 +427,84 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
+    // Use Brain's dopamine system for proper neuromodulation integration
+    if (auto* dopamine = brain_->getDopamine()) {
+        // Update dopamine level based on prediction error
+        float newDopamineLevel = predictionError_;
+        newDopamineLevel = std::clamp(newDopamineLevel, -1.0f, 1.0f);
+        dopamine->setLevel(newDopamineLevel);
+        
+        // Signal reward/prediction error to dopamine system
+        dopamine->signalRewardPredictionError(predictionError_);
+        
+        // Update local state for backward compatibility
+        dopamineLevel_ = newDopamineLevel;
+        
+        // Use Brain's neuromodulation system with a simple signal structure
+        // Create a simple neuromodulation signal structure
+        struct NeuromodulationSignal {
+            float level;
+            float concentration;
+            const Neuromodulator* target;
+            int effect;
             
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
-            }
-        }
-    }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+            NeuromodulationSignal() : level(0.0f), concentration(0.0f), target(nullptr), effect(0) {}
+        };
+        
+        NeuromodulationSignal neuromodSignal;
+        neuromodSignal.level = predictionError_;
+        neuromodSignal.concentration = predictionError_;
+        neuromodSignal.target = dopamine;
+        neuromodSignal.effect = 1; // Plasticity
+        
+        brain_->applyNeuromodulation(neuromodSignal);
     }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
+    // Use Brain's development system for integrated developmental changes
+    if (auto* devSystem = brain_->getDevelopmentSystem()) {
+        devSystem->update(brain_.get(), timestep);
+        
+        // Update local development state from Brain's system
+        developmentalAge_ = devSystem->getDevelopmentalAge();
+        plasticityModifier_ = devSystem->getPlasticityModifier();
+        
+        // Set developmental stage in Brain
+        DevelopmentalStage stage = devSystem->getStage();
+        brain_->setDevelopmentalStage(stage);
     } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
-    }
-    
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+        // Fallback to original local development logic if Brain system not available
+        developmentalAge_ += timestep;
+        
+        // Simple developmental stages based on age
+        // This is a biologically inspired approximation
+        if (developmentalAge_ < 60.0) {  // ~1 minute
+            plasticityModifier_ = 1.0f;  // High plasticity
+            brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+        } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+            plasticityModifier_ = 0.8f;
+            brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+        } else if (developmentalAge_ < 900.0) {  // ~15 minutes
+            plasticityModifier_ = 0.5f;
+            brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
+        } else {
+            plasticityModifier_ = 0.2f;  // Adult - more stable
+            brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+        }
+        
+        // Structural plasticity changes with development
+        if (structuralPlasticityEnabled_) {
+            auto* sp = brain_->getStructuralPlasticity();
+            if (sp) {
+                // Higher synaptogenesis in early development
+                float synRate = 0.0001f * plasticityModifier_;
+                float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+                sp->setSynaptogenesisRate(synRate);
+                sp->setPruningRate(pruneRate);
+            }
         }
     }
 }
@@ -335,6 +531,7 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    // Clear local state (some state is now managed by Brain's cognitive systems)
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
@@ -343,7 +540,7 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
+    // Clear previous vision for novelty detection
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
