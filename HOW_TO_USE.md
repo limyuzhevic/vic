@@ -52,6 +52,8 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase5_demo` | Executable | Phase 5 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 comprehensive integration demo |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
@@ -65,6 +67,7 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+```
 make install
 ```
 
