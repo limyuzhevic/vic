@@ -147,6 +147,43 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+void testStepMethod() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    neuron.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Test step with default timestep
+    bool fired1 = neuron.step(0.0);
+    assert(!fired1);  // Should not fire initially
+    
+    // Test step with custom timestep
+    bool fired2 = neuron.step(0.1, 0.001);
+    assert(!fired2);  // Should not fire
+    
+    // Test with invalid timestep (should skip)
+    bool fired3 = neuron.step(0.2, 0.0);
+    assert(!fired3);  // Should skip
+    
+    std::cout << "    testStepMethod passed" << std::endl;
+}
+
+void testStepLIFMethod() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    neuron.initializeRandom(nlm::RandomGenerator(42));
+    
+    // Set neuron to fire threshold by injecting strong current
+    neuron.setMembranePotential(-50.0f); // Above typical threshold
+    neuron.setThreshold(-60.0f);
+    
+    // Step should detect firing
+    bool fired = neuron.stepLIF(0.0, 0.001);
+    assert(fired);  // Should fire since V > threshold
+    
+    // Neuron should be in refractory state
+    assert(neuron.isRefractory());
+    
+    std::cout << "    testStepLIFMethod passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();
@@ -158,6 +195,8 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testStepMethod();
+    testStepLIFMethod();
 }
 
 } // namespace test_neuron
