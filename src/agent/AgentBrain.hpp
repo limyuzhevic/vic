@@ -55,10 +55,10 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get brain pointer - returns nullptr if brain is not set
+    Brain* getBrain() const { return brain_.get(); }
     
-    // Configuration
+    // Configuration with validation
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -75,6 +75,11 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper functions for neuron distribution
+    void distributeNeuronsToGroups();
+    void distributeMotorNeuron(Neuron* neuron);
+    void distributeSensoryNeuron(Neuron* neuron);
     
     std::shared_ptr<Brain> brain_;
     

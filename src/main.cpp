@@ -383,14 +383,7 @@ int main(int argc, char** argv) {
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    logConfiguration(*config);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +402,8 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run all test suites
+    runAllTests(brain);
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -446,4 +427,37 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+void logConfiguration(const Config& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config.getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config.getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config.getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config.getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config.getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+}
+
+void runAllTests(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("=== Starting All Test Suites ===");
+    
+    // Test 1: Basic connectivity
+    NLM_LOG_INFO("\n=== Test 1: Basic Neural Connectivity ===");
+    runBasicConnectivityTest(brain);
+    
+    // Reset brain for plasticity experiment
+    brain->reset();
+    brain->initialize();
+    
+    // Test 2: Plasticity learning experiment
+    NLM_LOG_INFO("\n=== Test 2: Plasticity Learning Experiment ===");
+    runPlasticityExperiment(brain);
+    
+    // Reset and run Test 3: STDP verification
+    brain->reset();
+    brain->initialize();
+    NLM_LOG_INFO("\n=== Test 3: STDP Verification ===");
+    runStdpVerification(brain);
 }
