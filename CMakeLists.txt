@@ -92,6 +92,31 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Plugin library
+add_library(nlm_plugin STATIC
+    src/plugin/PluginBase.hpp
+    src/plugin/PluginLoader.hpp
+    src/plugin/PluginRegistry.hpp
+    src/plugin/PluginConfig.hpp
+    src/plugin/PluginManager.hpp
+    src/plugin/STDPPlugin.hpp
+    src/plugin/NeuronPlugin.hpp
+    src/plugin/SynapsePlugin.hpp
+    src/plugin/PluginManager.cpp
+    src/plugin/PluginConfig.cpp
+    src/plugin/PluginRegistry.cpp
+    src/plugin/STDPPlugin.cpp
+    src/plugin/NeuronPlugin.cpp
+    src/plugin/SynapsePlugin.cpp
+)
+
+target_include_directories(nlm_plugin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plugin>
+    $<INSTALL_INTERFACE:include/plugin>
+)
+
+target_link_libraries(nlm_plugin PUBLIC nlm_core)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -127,11 +152,12 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+# Plugin demo executable
+add_executable(nlm_plugin_demo
+    examples/PluginDemo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+target_link_libraries(nlm_plugin_demo PUBLIC nlm_core nlm_plugin)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
@@ -144,7 +170,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_plugin_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
