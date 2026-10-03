@@ -1,187 +1,171 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
 #include <vector>
-#include <memory>
-#include <functional>
 #include <unordered_map>
+#include <functional>
+#include <algorithm>
+#include <random>
+#include <chrono>
 
 namespace nlm {
 
-// NeuralWorkingMemory: Implements working memory using neural dynamics
-// NOT a simple storage vector - uses persistent activity and recurrent connections
-//
-// Key mechanisms:
-// - Persistent neural activity (reverberating activity)
-// - Recurrent synaptic connections for maintaining information
-// - Activity-dependent short-term plasticity
-// - Neural competition for selective retention
-
-class NeuralWorkingMemory {
+// Enhanced working memory with advanced features
+class WorkingMemory {
 public:
-    NeuralWorkingMemory();
-    ~NeuralWorkingMemory();
-
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
-    // Store information in working memory
-    // The information is encoded as neural activity pattern
-    void store(const std::vector<float>& pattern, float strength = 1.0f);
-
-    // Store specific neuron activation
-    void storeToNeuron(NeuronId neuron, float activation);
-
-    // Retrieve current working memory content as activity levels
-    std::vector<float> retrieve() const;
-
-    // Check if specific neuron is part of working memory
+    WorkingMemory();
+    ~WorkingMemory();
+    
+    // Store item with interference management
+    void store(NeuronId neuron, float value, float priority = 1.0f);
+    
+    // Retrieve item with decay consideration
+    float retrieve(NeuronId neuron) const;
+    
+    // Check if item exists
     bool contains(NeuronId neuron) const;
-
-    // Get activation level of a specific neuron in working memory
-    float getNeuronActivation(NeuronId neuron) const;
-
-    // Update working memory (maintenance and decay)
-    void update(TimestepDuration dt);
-
-    // Clear working memory
+    
+    // Clear all items
     void clear();
-
-    // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
-
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
-
-    // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
-
-    // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
-
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
-    float getMemoryActivity() const;
-
+    
+    // Get capacity information
+    size_t getCapacity() const;
+    size_t getCurrentSize() const;
+    
+    // Advanced decay mechanisms
+    void decay(float decayRate, bool homeostatically = false);
+    void decayWithInterference(float decayRate, float interferenceStrength = 0.1f);
+    
+    // Active maintenance through rehearsal
+    void rehearse(NeuronId neuron, SimulationStep currentStep);
+    
+    // Interference management
+    void applyInterference(float interferenceStrength, float inhibitionRadius = 0.5f);
+    
+    // Priority-based retrieval
+    std::vector<std::pair<NeuronId, float>> getPrioritizedItems() const;
+    std::vector<std::pair<NeuronId, float>> getRecentItems(size_t count) const;
+    
+    // Consolidation to long-term memory
+    void consolidate(float relevanceThreshold, bool force = false);
+    
+    // Statistical operations
+    float getMeanValue() const;
+    float getMaxValue() const;
+    float getMinValue() const;
+    size_t getItemCount() const;
+    
+    // Memory health assessment
+    float getMemoryLoad() const;
+    float getInterferenceLevel() const;
+    
+    // Configuration
+    void setCapacity(size_t capacity);
+    void setDecayRate(float rate);
+    void setRehearsalInterval(SimulationStep interval);
+    
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
     struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t capacity_;
-    float decayRate_;
-    
-    // Memory content
-    std::vector<NeuronId> memoryNeurons_;
-    std::vector<float> memoryActivations_;
-    std::vector<SimulationStep> memoryTimestamps_;
-    
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
-    
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
-    // Winner neurons (for competition)
-    std::vector<NeuronId> winners_;
+    Impl* pImpl;
 };
 
-// AttentionalSelection: Neural attention through competition
-// NOT Transformer attention - uses lateral inhibition and gain modulation
-//
-// Mechanisms:
-// - Competition between neural populations
-// - Salience-based selection
-// - Recurrent amplification of winners
-// - Inhibitory surround suppression
-
-class AttentionalSelection {
+// Enhanced episodic memory with context and consolidation
+class EpisodicMemory {
 public:
-    AttentionalSelection();
-    ~AttentionalSelection();
-
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
-    // Process competing sensory inputs and select winners
-    // Returns IDs of winning neural populations
-    std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
-                                              float globalInhibition = 0.5f);
-
-    // Apply attention to a specific region (focus processing there)
-    void focusOnRegion(RegionId region);
-
-    // Release attention (allow all regions equal processing)
-    void releaseAttention();
-
-    // Get current attention focus
-    std::vector<RegionId> getAttendedRegions() const;
-
-    // Set attention parameters
-    void setInhibitionStrength(float strength);
-    void setExcitationStrength(float strength);
-    void setCompetitionThreshold(float threshold);
-
-    // Get inhibition level for a neuron
-    float getInhibitionFor(NeuronId neuron) const;
-
-    // Get excitation level for a neuron
-    float getExcitationFor(NeuronId neuron) const;
-
-    // Update attention dynamics
-    void update(TimestepDuration dt);
-
-    // Is this neuron currently attended?
-    bool isAttended(NeuronId neuron) const;
-
-    // Get attention winners
-    const std::vector<NeuronId>& getWinners() const { return winners_; }
-
-    // Top-down attention (goal-directed)
-    void applyTopDownBias(NeuronId neuron, float biasStrength);
-
-    // Bottom-up attention (stimulus-driven)
-    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
-
-    // Reset attention
-    void reset();
-
+    EpisodicMemory();
+    ~EpisodicMemory();
+    
+    // Store episode with rich context
+    void storeEpisode(const EpisodicMemoryItem& episode);
+    void storeEpisodeWithContext(const std::vector<NeuronId>& neurons, 
+                                const std::vector<float>& values,
+                                const std::string& context = "");
+    
+    // Enhanced retrieval
+    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    std::vector<EpisodicMemoryItem> retrieveEpisodesByTime(SimulationStep startTime, 
+                                                           SimulationStep endTime) const;
+    std::vector<EpisodicMemoryItem> retrieveEpisodesByContext(const std::string& context) const;
+    
+    // Get episode statistics
+    size_t getEpisodeCount() const;
+    SimulationStep getOldestEpisodeTime() const;
+    SimulationStep getNewestEpisodeTime() const;
+    
+    // Enhanced consolidation with multiple mechanisms
+    void consolidate(float relevanceThreshold, float noveltyThreshold = 0.5f);
+    void replayRecentEpisodes(float replayStrength = 0.8f);
+    
+    // Interference management
+    void resolveTemporalInterference();
+    void resolveContentInterference();
+    
+    // Recent episodes management
+    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    void pruneOldEpisodes(size_t maxCount);
+    
+    // Clear all
+    void clear();
+    
+    // Memory statistics
+    float getConsolidationProgress() const;
+    float getReplayEffectiveness() const;
+    
+    // Configuration
+    void setMaxEpisodes(size_t max);
+    void setConsolidationInterval(SimulationStep interval);
+    void setReplayFrequency(float frequency);
+    
 private:
     struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    Impl* pImpl;
+};
 
-    Brain* brain_;
-    float inhibitionStrength_;
-    float excitationStrength_;
-    float competitionThreshold_;
+// Enhanced associative memory with pattern completion
+class AssociativeMemory {
+public:
+    AssociativeMemory();
+    ~AssociativeMemory();
     
-    std::vector<RegionId> attendedRegions_;
-    std::vector<NeuronId> winners_;
-    std::vector<float> neuronSalience_;
+    // Create association with strength and context
+    void associate(NeuronId a, NeuronId b, float strength, const std::string& context = "");
     
-    // Biases/salience stored by NeuronId for correct lookup in processCompetition
-    std::unordered_map<uint64_t, float> topDownBias_;
-    std::unordered_map<uint64_t, float> bottomUpSalience_;
+    // Enhanced retrieval with pattern completion
+    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+    float getAssociationStrength(NeuronId a, NeuronId b) const;
+    float getAssociationStrengthWithContext(NeuronId a, NeuronId b, const std::string& context) const;
+    
+    // Update association with decay and interference
+    void updateAssociation(NeuronId a, NeuronId b, float delta);
+    void updateAssociationWithContext(NeuronId a, NeuronId b, float delta, const std::string& context);
+    
+    // Pattern completion
+    std::vector<NeuronId> completePattern(const std::vector<NeuronId>& partialPattern) const;
+    
+    // Interference management
+    void applyLateralInhibition(float inhibitionStrength = 0.1f);
+    void resolveAssociativeInterference();
+    
+    // Network analysis
+    float getNetworkDensity() const;
+    float getAverageAssociationStrength() const;
+    float getClusteringCoefficient() const;
+    
+    // Clear all
+    void clear();
+    
+    // Memory statistics
+    size_t getAssociationCount() const;
+    float getNetworkIntegrity() const;
+    
+    // Configuration
+    void setMaxAssociations(size_t max);
+    void setAssociationDecayRate(float rate);
+    void setInhibitionRadius(float radius);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

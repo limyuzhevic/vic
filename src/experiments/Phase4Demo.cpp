@@ -1,7 +1,3 @@
-#include <iostream>
-#include <memory>
-#include <iomanip>
-#include <sstream>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -12,7 +8,6 @@
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
@@ -40,21 +35,35 @@ int main(int argc, char* argv[]) {
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
-    }
-    
-    // Create configuration
+    // Parse command line arguments using configuration system
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    
+    // Load from command line arguments (overrides defaults)
+    config->loadFromArgs(argc, argv);
+    
+    // Set default values for Phase 4 experiments
+    config->set("num_trials", size_t(50), ConfigSource::Default);
+    config->set("neuron_count", size_t(1000), ConfigSource::Default);
+    config->set("region_count", size_t(2), ConfigSource::Default);
+    config->set("connection_probability", 0.1f, ConfigSource::Default);
+    config->set("random_seed", uint64_t(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    
+    // Get configuration values
+    size_t numTrials = config->getOr<size_t>("num_trials", 50);
+    
+    // Log configuration summary
+    NLM_LOG_INFO("Phase 4 Configuration:");
+    NLM_LOG_INFO("  Number of trials: " + std::to_string(numTrials));
+    NLM_LOG_INFO("  Neurons: " + std::to_string(config->getOr<size_t>("neuron_count", 1000)));
+    NLM_LOG_INFO("  Regions: " + std::to_string(config->getOr<size_t>("region_count", 2)));
+    NLM_LOG_INFO("  Connection probability: " + std::to_string(config->getOr<float>("connection_probability", 0.1f)));
+    NLM_LOG_INFO("  Random seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  Time step: " + std::to_string(config->getOr<float>("simulation_timestep", 0.001f)) + "s");
+    NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.01f)));
+    NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.012f)));
     
     // Create brain
     std::cout << "Initializing brain...\n";
