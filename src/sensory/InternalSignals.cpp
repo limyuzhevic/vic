@@ -2,33 +2,36 @@
 
 namespace nlm {
 
+// Implementation details for InternalSignalsProcessor
+// Implementation details for InternalSignalsProcessor
+// Implementation details for InternalSignalsProcessor
 struct InternalSignalsProcessor::Impl {
     std::vector<float> processedSignals;
     std::vector<float> homeostaticSignals;
     
-    Impl() = default;
+    Impl(nullptr) = default;
 };
 
-InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
+InternalSignalsProcessor::InternalSignalsProcessor(nullptr) : pImpl(new Impl) {}
 
-InternalSignalsProcessor::~InternalSignalsProcessor() = default;
+InternalSignalsProcessor::~InternalSignalsProcessor(nullptr) = default;
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
+    // TODO: PHASE 2 - Implement real internal signal processing
     // PLACEHOLDER: Just pass through
-    pImpl->processedSignals = signals.getData();
+    pImpl->processedSignals = signals.getData(nullptr);
     
     // Generate some homeostatic signals
-    pImpl->homeostaticSignals.clear();
+    pImpl->homeostaticSignals.clear(nullptr);
     pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
     pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
 }
 
-const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {
+const std::vector<float>& InternalSignalsProcessor::getProcessedSignals(nullptr) const {
     return pImpl->processedSignals;
 }
 
-const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals() const {
+const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals(nullptr) const {
     return pImpl->homeostaticSignals;
 }
 

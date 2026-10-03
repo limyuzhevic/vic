@@ -4,6 +4,9 @@
 
 namespace nlm {
 
+// Implementation details for PredictionError
+// Implementation details for PredictionError
+// Implementation details for PredictionError
 struct PredictionError::Impl {
     class Brain* brain;
     float error;
@@ -11,19 +14,19 @@ struct PredictionError::Impl {
     float actualValue;
     std::vector<float> history;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl(nullptr) : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::PredictionError(nullptr) : pImpl(new Impl) {}
 
-PredictionError::~PredictionError() = default;
+PredictionError::~PredictionError(nullptr) = default;
 
 void PredictionError::initialize(Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
 
-float PredictionError::getError() const {
+float PredictionError::getError(nullptr) const {
     return pImpl->error;
 }
 
@@ -38,15 +41,15 @@ void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
 }
 
-const std::vector<float>& PredictionError::getHistory() const {
+const std::vector<float>& PredictionError::getHistory(nullptr) const {
     return pImpl->history;
 }
 
-void PredictionError::clearHistory() {
-    pImpl->history.clear();
+void PredictionError::clearHistory(nullptr) {
+    pImpl->history.clear(nullptr);
 }
 
-float PredictionError::getMagnitude() const {
+float PredictionError::getMagnitude(nullptr) const {
     return std::abs(pImpl->error);
 }
 

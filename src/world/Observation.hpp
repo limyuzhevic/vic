@@ -12,12 +12,12 @@ class SensoryPercept;
 // Sensory observation wrapper (simplified for compatibility)
 class Observation {
 public:
-    Observation();
-    ~Observation() = default;
+    Observation(nullptr);
+    ~Observation(nullptr) = default;
     
     // Get data
-    const std::vector<float>& getData() const;
-    size_t getDimensions() const;
+    const std::vector<float>& getData(nullptr) const;
+    size_t getDimensions(nullptr) const;
     
     // Set from sensory percept
     void setFromPercept(const class SensoryPercept& percept);

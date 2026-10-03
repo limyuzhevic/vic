@@ -9,15 +9,15 @@ namespace nlm {
 
 class Synaptogenesis {
 public:
-    Synaptogenesis();
-    ~Synaptogenesis();
+    Synaptogenesis(nullptr);
+    ~Synaptogenesis(nullptr);
     
     // Get formation rate
-    float getFormationRate() const;
+    float getFormationRate(nullptr) const;
     void setFormationRate(float rate);
     
     // Get target synapse density
-    float getTargetDensity() const;
+    float getTargetDensity(nullptr) const;
     void setTargetDensity(float density);
     
     // Update synapse formation

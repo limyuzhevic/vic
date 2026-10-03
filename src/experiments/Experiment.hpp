@@ -10,16 +10,16 @@ namespace nlm {
 // Experiment: Records data from a single experimental run
 class Experiment {
 public:
-    Experiment();
+    Experiment(nullptr);
     Experiment(const std::string& name);
-    ~Experiment();
+    ~Experiment(nullptr);
     
     // Experiment metadata
-    const std::string& getName() const;
+    const std::string& getName(nullptr) const;
     void setName(const std::string& name);
     
     // Random seed
-    uint64_t getSeed() const;
+    uint64_t getSeed(nullptr) const;
     void setSeed(uint64_t seed);
     
     // Configuration
@@ -32,7 +32,7 @@ public:
     void recordMetric(const std::string& name, int value);
     
     // Get all metrics
-    const std::vector<std::pair<std::string, double>>& getMetrics() const;
+    const std::vector<std::pair<std::string, double>>& getMetrics(nullptr) const;
     
     // Get metric value
     double getMetric(const std::string& name) const;
@@ -52,17 +52,17 @@ public:
         size_t firingCount;
         float avgFiringRate;
     };
-    const std::vector<StepData>& getStepData() const;
+    const std::vector<StepData>& getStepData(nullptr) const;
     
     // Duration
-    SimulationStep getStartStep() const;
+    SimulationStep getStartStep(nullptr) const;
     void setStartStep(SimulationStep step);
-    SimulationStep getEndStep() const;
+    SimulationStep getEndStep(nullptr) const;
     void setEndStep(SimulationStep step);
     
     // Notes
     void addNote(const std::string& note);
-    const std::vector<std::string>& getNotes() const;
+    const std::vector<std::string>& getNotes(nullptr) const;
     
 private:
     struct Impl;

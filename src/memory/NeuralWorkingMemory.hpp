@@ -20,8 +20,8 @@ namespace nlm {
 
 class NeuralWorkingMemory {
 public:
-    NeuralWorkingMemory();
-    ~NeuralWorkingMemory();
+    NeuralWorkingMemory(nullptr);
+    ~NeuralWorkingMemory(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -34,7 +34,7 @@ public:
     void storeToNeuron(NeuronId neuron, float activation);
 
     // Retrieve current working memory content as activity levels
-    std::vector<float> retrieve() const;
+    std::vector<float> retrieve(nullptr) const;
 
     // Check if specific neuron is part of working memory
     bool contains(NeuronId neuron) const;
@@ -46,43 +46,43 @@ public:
     void update(TimestepDuration dt);
 
     // Clear working memory
-    void clear();
+    void clear(nullptr);
 
     // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
+    size_t getActiveTraces(nullptr) const { return activeTraces_.size(nullptr); }
 
     // Get capacity
-    size_t getCapacity() const { return capacity_; }
+    size_t getCapacity(nullptr) const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
 
     // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
+    float getDecayRate(nullptr) const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }
 
     // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    const std::vector<NeuronId>& getMemoryNeurons(nullptr) const { return memoryNeurons_; }
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 
     // Competition between memory traces
-    void runCompetition();
+    void runCompetition(nullptr);
 
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;
 
     // Get overall memory activity level
-    float getMemoryActivity() const;
+    float getMemoryActivity(nullptr) const;
 
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
     // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
+    void updateRecurrentConnections(nullptr);
 
     // Decay weak memory traces
-    void decayWeakTraces();
+    void decayWeakTraces(nullptr);
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -117,8 +117,8 @@ private:
 
 class AttentionalSelection {
 public:
-    AttentionalSelection();
-    ~AttentionalSelection();
+    AttentionalSelection(nullptr);
+    ~AttentionalSelection(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -132,10 +132,10 @@ public:
     void focusOnRegion(RegionId region);
 
     // Release attention (allow all regions equal processing)
-    void releaseAttention();
+    void releaseAttention(nullptr);
 
     // Get current attention focus
-    std::vector<RegionId> getAttendedRegions() const;
+    std::vector<RegionId> getAttendedRegions(nullptr) const;
 
     // Set attention parameters
     void setInhibitionStrength(float strength);
@@ -155,7 +155,7 @@ public:
     bool isAttended(NeuronId neuron) const;
 
     // Get attention winners
-    const std::vector<NeuronId>& getWinners() const { return winners_; }
+    const std::vector<NeuronId>& getWinners(nullptr) const { return winners_; }
 
     // Top-down attention (goal-directed)
     void applyTopDownBias(NeuronId neuron, float biasStrength);
@@ -164,7 +164,7 @@ public:
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
 
     // Reset attention
-    void reset();
+    void reset(nullptr);
 
 private:
     struct Impl;

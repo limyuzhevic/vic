@@ -96,7 +96,7 @@ struct LifetimeExperimentConfig {
     bool generateVisualizations;
     bool runAblations;
     
-    LifetimeExperimentConfig();
+    LifetimeExperimentConfig(nullptr);
 };
 
 /**
@@ -173,10 +173,10 @@ struct LifetimeExperimentResult {
     time_t endTime;
     double totalWallClockTime;
     
-    LifetimeExperimentResult();
+    LifetimeExperimentResult(nullptr);
     
-    std::string toJSON() const;
-    std::string summary() const;
+    std::string toJSON(nullptr) const;
+    std::string summary(nullptr) const;
 };
 
 /**
@@ -194,8 +194,8 @@ struct ContinualTask {
  */
 class Phase5IntegratedExperiment {
 public:
-    Phase5IntegratedExperiment();
-    ~Phase5IntegratedExperiment();
+    Phase5IntegratedExperiment(nullptr);
+    ~Phase5IntegratedExperiment(nullptr);
     
     /**
      * Run the complete lifetime experiment
@@ -281,8 +281,8 @@ private:
  */
 class MultiSeedExperimentRunner {
 public:
-    MultiSeedExperimentRunner();
-    ~MultiSeedExperimentRunner();
+    MultiSeedExperimentRunner(nullptr);
+    ~MultiSeedExperimentRunner(nullptr);
     
     /**
      * Run experiment with multiple seeds
@@ -326,7 +326,7 @@ private:
 
 // Inline implementations
 
-inline LifetimeExperimentConfig::LifetimeExperimentConfig()
+inline LifetimeExperimentConfig::LifetimeExperimentConfig(nullptr)
     : initialNeurons(10000)
     , maxNeurons(100000)
     , connectionProbability(0.1f)
@@ -347,7 +347,7 @@ inline LifetimeExperimentConfig::LifetimeExperimentConfig()
     , generateVisualizations(true)
     , runAblations(true) {}
 
-inline LifetimeExperimentResult::LifetimeExperimentResult()
+inline LifetimeExperimentResult::LifetimeExperimentResult(nullptr)
     : totalReward(0.0f)
     , avgRewardPerStep(0.0f)
     , overallLearningEfficiency(0.0f)

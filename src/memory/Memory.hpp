@@ -11,11 +11,11 @@ namespace nlm {
 
 class WorkingMemory {
 public:
-    WorkingMemory();
-    ~WorkingMemory();
+    WorkingMemory(nullptr);
+    ~WorkingMemory(nullptr);
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // TODO: PHASE 2 - Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -25,11 +25,11 @@ public:
     bool contains(NeuronId neuron) const;
     
     // Clear all
-    void clear();
+    void clear(nullptr);
     
     // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    size_t getCapacity(nullptr) const;
+    size_t getCurrentSize(nullptr) const;
     
     // Decay all items
     void decay(float decayRate);
@@ -48,13 +48,13 @@ struct EpisodicMemoryItem {
     std::vector<float> values;
     std::string metadata;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    EpisodicMemoryItem(nullptr) : timestamp(0) {}
 };
 
 class EpisodicMemory {
 public:
-    EpisodicMemory();
-    ~EpisodicMemory();
+    EpisodicMemory(nullptr);
+    ~EpisodicMemory(nullptr);
     
     // Store episode
     void storeEpisode(const EpisodicMemoryItem& episode);
@@ -63,13 +63,13 @@ public:
     EpisodicMemoryItem retrieveEpisode(size_t index) const;
     
     // Get episode count
-    size_t getEpisodeCount() const;
+    size_t getEpisodeCount(nullptr) const;
     
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
     
     // Clear all
-    void clear();
+    void clear(nullptr);
     
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
@@ -84,8 +84,8 @@ private:
 
 class SemanticMemory {
 public:
-    SemanticMemory();
-    ~SemanticMemory();
+    SemanticMemory(nullptr);
+    ~SemanticMemory(nullptr);
     
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
@@ -97,10 +97,10 @@ public:
     bool hasFact(const std::string& key) const;
     
     // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
+    std::vector<std::pair<std::string, std::string>> getAllFacts(nullptr) const;
     
     // Clear all
-    void clear();
+    void clear(nullptr);
     
 private:
     struct Impl;
@@ -115,13 +115,13 @@ struct Skill {
     std::vector<NeuronId> neuralPattern;
     float proficiency;
     
-    Skill() : proficiency(0.0f) {}
+    Skill(nullptr) : proficiency(0.0f) {}
 };
 
 class ProceduralMemory {
 public:
-    ProceduralMemory();
-    ~ProceduralMemory();
+    ProceduralMemory(nullptr);
+    ~ProceduralMemory(nullptr);
     
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
@@ -130,13 +130,13 @@ public:
     Skill* getSkill(const std::string& name);
     
     // Get all skills
-    std::vector<Skill*> getAllSkills();
+    std::vector<Skill*> getAllSkills(nullptr);
     
     // Update proficiency
     void updateProficiency(const std::string& name, float delta);
     
     // Clear all
-    void clear();
+    void clear(nullptr);
     
 private:
     struct Impl;
@@ -148,8 +148,8 @@ private:
 
 class AssociativeMemory {
 public:
-    AssociativeMemory();
-    ~AssociativeMemory();
+    AssociativeMemory(nullptr);
+    ~AssociativeMemory(nullptr);
     
     // Create association
     void associate(NeuronId a, NeuronId b, float strength);
@@ -164,7 +164,7 @@ public:
     void updateAssociation(NeuronId a, NeuronId b, float delta);
     
     // Clear all
-    void clear();
+    void clear(nullptr);
     
 private:
     struct Impl;

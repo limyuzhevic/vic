@@ -2,19 +2,22 @@
 
 namespace nlm {
 
+// Implementation details for Reward
+// Implementation details for Reward
+// Implementation details for Reward
 struct Reward::Impl {
     float currentValue;
     float accumulatedReward;
     std::vector<float> history;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    Impl(nullptr) : currentValue(0.0f), accumulatedReward(0.0f) {}
 };
 
-Reward::Reward() : pImpl(new Impl) {}
+Reward::Reward(nullptr) : pImpl(new Impl) {}
 
-Reward::~Reward() = default;
+Reward::~Reward(nullptr) = default;
 
-float Reward::getValue() const {
+float Reward::getValue(nullptr) const {
     return pImpl->currentValue;
 }
 
@@ -27,23 +30,23 @@ void Reward::add(float delta) {
     pImpl->currentValue += delta;
 }
 
-void Reward::reset() {
+void Reward::reset(nullptr) {
     pImpl->currentValue = 0.0f;
     pImpl->accumulatedReward = 0.0f;
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
+    // TODO: PHASE 2 - Implement real reward computation from observation
     // PLACEHOLDER: Returns 0
     return 0.0f;
 }
 
-const std::vector<float>& Reward::getHistory() const {
+const std::vector<float>& Reward::getHistory(nullptr) const {
     return pImpl->history;
 }
 
-void Reward::clearHistory() {
-    pImpl->history.clear();
+void Reward::clearHistory(nullptr) {
+    pImpl->history.clear(nullptr);
 }
 
 } // namespace nlm

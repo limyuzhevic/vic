@@ -9,15 +9,15 @@ namespace nlm {
 
 class Pruning {
 public:
-    Pruning();
-    ~Pruning();
+    Pruning(nullptr);
+    ~Pruning(nullptr);
     
     // Get pruning threshold
-    float getThreshold() const;
+    float getThreshold(nullptr) const;
     void setThreshold(float threshold);
     
     // Get pruning rate
-    float getPruningRate() const;
+    float getPruningRate(nullptr) const;
     void setPruningRate(float rate);
     
     // Update pruning

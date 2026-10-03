@@ -2,11 +2,14 @@
 
 namespace nlm {
 
+// Implementation details for MotorSystem
+// Implementation details for MotorSystem
+// Implementation details for MotorSystem
 struct MotorSystem::Impl {
     std::vector<ActionType> availableActions;
     std::vector<const Action*> actionHistory;
     
-    Impl() {
+    Impl(nullptr) {
         availableActions = {
             ActionType::MoveForward,
             ActionType::MoveBackward,
@@ -21,36 +24,36 @@ struct MotorSystem::Impl {
     }
 };
 
-MotorSystem::MotorSystem() : pImpl(new Impl) {}
+MotorSystem::MotorSystem(nullptr) : pImpl(new Impl) {}
 
-MotorSystem::~MotorSystem() = default;
+MotorSystem::~MotorSystem(nullptr) = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
-    // TODO PHASE 2: Implement real action selection based on neural activity
+    // TODO: PHASE 2 - Implement real action selection based on neural activity
     // PLACEHOLDER: Returns random action
-    if (!pImpl->availableActions.empty()) {
+    if (!pImpl->availableActions.empty(nullptr)) {
         return std::make_unique<Action>(pImpl->availableActions[0]);
     }
     return std::make_unique<Action>(ActionType::Wait);
 }
 
-const std::vector<ActionType>& MotorSystem::getAvailableActions() const {
+const std::vector<ActionType>& MotorSystem::getAvailableActions(nullptr) const {
     return pImpl->availableActions;
 }
 
 void MotorSystem::setActionPreference(ActionType action, float preference) {
-    // TODO PHASE 2: Implement action preferences
+    // TODO: PHASE 2 - Implement action preferences
 }
 
-const std::vector<const Action*>& MotorSystem::getActionHistory() const {
+const std::vector<const Action*>& MotorSystem::getActionHistory(nullptr) const {
     return pImpl->actionHistory;
 }
 
-void MotorSystem::clearHistory() {
+void MotorSystem::clearHistory(nullptr) {
     for (auto* action : pImpl->actionHistory) {
         delete action;
     }
-    pImpl->actionHistory.clear();
+    pImpl->actionHistory.clear(nullptr);
 }
 
 } // namespace nlm

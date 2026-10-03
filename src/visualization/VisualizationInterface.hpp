@@ -10,27 +10,27 @@ namespace nlm {
 // PLACEHOLDER - Phase 2 will have real visualization
 class VisualizationInterface {
 public:
-    VisualizationInterface();
-    ~VisualizationInterface();
+    VisualizationInterface(nullptr);
+    ~VisualizationInterface(nullptr);
     
     // Initialize visualization
-    bool initialize();
+    bool initialize(nullptr);
     
     // Update visualization data
-    void update();
+    void update(nullptr);
     
     // Render current state
-    void render();
+    void render(nullptr);
     
     // Close visualization
-    void close();
+    void close(nullptr);
     
     // Check if visualization is active
-    bool isActive() const;
+    bool isActive(nullptr) const;
     
     // Set update rate
     void setUpdateRate(double hz);
-    double getUpdateRate() const;
+    double getUpdateRate(nullptr) const;
     
     // Network visualization
     void visualizeNetwork(const class Brain& brain);

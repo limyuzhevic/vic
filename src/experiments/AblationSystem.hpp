@@ -107,7 +107,7 @@ struct AblationConfig {
     std::unordered_set<AblationTarget> disabledTargets;
     std::unordered_map<AblationTarget, std::string> customDescriptions;
     
-    AblationConfig() {}
+    AblationConfig(nullptr) {}
     
     void disable(AblationTarget target) {
         disabledTargets.insert(target);
@@ -121,15 +121,15 @@ struct AblationConfig {
         return disabledTargets.count(target) > 0;
     }
     
-    void disableAll() {
+    void disableAll(nullptr) {
         disabledTargets.insert(AblationTarget::AllPlasticity);
         disabledTargets.insert(AblationTarget::AllNeuromodulation);
         disabledTargets.insert(AblationTarget::AllMemory);
         disabledTargets.insert(AblationTarget::AllCognition);
     }
     
-    void enableAll() {
-        disabledTargets.clear();
+    void enableAll(nullptr) {
+        disabledTargets.clear(nullptr);
     }
 };
 
@@ -179,10 +179,10 @@ struct AblationResult {
     double computationTime;
     size_t memoryUsageMB;
     
-    AblationResult();
+    AblationResult(nullptr);
     
-    std::string toCSV() const;
-    std::string toJSON() const;
+    std::string toCSV(nullptr) const;
+    std::string toJSON(nullptr) const;
 };
 
 /**
@@ -220,7 +220,7 @@ struct AblationExperiment {
     size_t trialsPerCondition;
     uint64_t randomSeed;
     
-    AblationExperiment();
+    AblationExperiment(nullptr);
 };
 
 /**
@@ -228,8 +228,8 @@ struct AblationExperiment {
  */
 class AblationSystem {
 public:
-    AblationSystem();
-    ~AblationSystem();
+    AblationSystem(nullptr);
+    ~AblationSystem(nullptr);
     
     /**
      * Register the current brain state as the full (non-ablated) baseline
@@ -244,7 +244,7 @@ public:
     /**
      * Reset to full (non-ablated) state
      */
-    bool resetToFull();
+    bool resetToFull(nullptr);
     
     /**
      * Check if a mechanism is currently disabled
@@ -254,7 +254,7 @@ public:
     /**
      * Get current ablation configuration
      */
-    const AblationConfig& getCurrentConfig() const { return currentConfig_; }
+    const AblationConfig& getCurrentConfig(nullptr) const { return currentConfig_; }
     
     /**
      * Get target name
@@ -269,27 +269,27 @@ public:
     /**
      * Get all available ablation targets
      */
-    static std::vector<AblationTarget> getAllTargets();
+    static std::vector<AblationTarget> getAllTargets(nullptr);
     
     /**
      * Create a standard ablation experiment
      */
-    static AblationExperiment createStandardExperiment();
+    static AblationExperiment createStandardExperiment(nullptr);
     
     /**
      * Create a plasticty ablation experiment
      */
-    static AblationExperiment createPlasticityExperiment();
+    static AblationExperiment createPlasticityExperiment(nullptr);
     
     /**
      * Create a neuromodulation ablation experiment
      */
-    static AblationExperiment createNeuromodulationExperiment();
+    static AblationExperiment createNeuromodulationExperiment(nullptr);
     
     /**
      * Create a memory ablation experiment
      */
-    static AblationExperiment createMemoryExperiment();
+    static AblationExperiment createMemoryExperiment(nullptr);
 
 private:
     AblationConfig currentConfig_;
@@ -302,8 +302,8 @@ private:
  */
 class AblationExperimentRunner {
 public:
-    AblationExperimentRunner();
-    ~AblationExperimentRunner();
+    AblationExperimentRunner(nullptr);
+    ~AblationExperimentRunner(nullptr);
     
     /**
      * Run a complete ablation experiment
@@ -351,7 +351,7 @@ private:
 
 // Inline implementations
 
-inline AblationResult::AblationResult()
+inline AblationResult::AblationResult(nullptr)
     : totalReward(0.0f)
     , avgRewardPerStep(0.0f)
     , learningEfficiency(0.0f)
@@ -376,7 +376,7 @@ inline AblationResult::AblationResult()
     , computationTime(0.0)
     , memoryUsageMB(0) {}
 
-inline std::string AblationResult::toCSV() const {
+inline std::string AblationResult::toCSV(nullptr) const {
     return std::to_string(totalReward) + "," +
            std::to_string(avgRewardPerStep) + "," +
            std::to_string(learningEfficiency) + "," +
@@ -389,7 +389,7 @@ inline std::string AblationResult::toCSV() const {
            std::to_string(stepsRun);
 }
 
-inline AblationExperiment::AblationExperiment()
+inline AblationExperiment::AblationExperiment(nullptr)
     : stepsPerTrial(10000)
     , trialsPerCondition(5)
     , randomSeed(42) {}

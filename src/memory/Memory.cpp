@@ -4,6 +4,9 @@
 namespace nlm {
 
 // Working Memory Implementation
+// Implementation details for WorkingMemory
+// Implementation details for WorkingMemory
+// Implementation details for WorkingMemory
 struct WorkingMemory::Impl {
     std::vector<std::pair<NeuronId, float>> items;
     size_t capacity;
@@ -11,19 +14,19 @@ struct WorkingMemory::Impl {
     Impl(size_t cap) : capacity(cap) {}
 };
 
-WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
+WorkingMemory::WorkingMemory(nullptr) : pImpl(new Impl(100)) {}
 
-WorkingMemory::~WorkingMemory() = default;
+WorkingMemory::~WorkingMemory(nullptr) = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // TODO: PHASE 2 - Implement real storage with capacity limits
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
+    if (pImpl->items.size(nullptr) < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
     }
 }
@@ -46,16 +49,16 @@ bool WorkingMemory::contains(NeuronId neuron) const {
     return false;
 }
 
-void WorkingMemory::clear() {
-    pImpl->items.clear();
+void WorkingMemory::clear(nullptr) {
+    pImpl->items.clear(nullptr);
 }
 
-size_t WorkingMemory::getCapacity() const {
+size_t WorkingMemory::getCapacity(nullptr) const {
     return pImpl->capacity;
 }
 
-size_t WorkingMemory::getCurrentSize() const {
-    return pImpl->items.size();
+size_t WorkingMemory::getCurrentSize(nullptr) const {
+    return pImpl->items.size(nullptr);
 }
 
 void WorkingMemory::decay(float decayRate) {
@@ -65,6 +68,9 @@ void WorkingMemory::decay(float decayRate) {
 }
 
 // Episodic Memory Implementation
+// Implementation details for EpisodicMemory
+// Implementation details for EpisodicMemory
+// Implementation details for EpisodicMemory
 struct EpisodicMemory::Impl {
     std::vector<EpisodicMemoryItem> episodes;
     size_t maxEpisodes;
@@ -72,53 +78,56 @@ struct EpisodicMemory::Impl {
     Impl(size_t max) : maxEpisodes(max) {}
 };
 
-EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
+EpisodicMemory::EpisodicMemory(nullptr) : pImpl(new Impl(1000)) {}
 
-EpisodicMemory::~EpisodicMemory() = default;
+EpisodicMemory::~EpisodicMemory(nullptr) = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
-        pImpl->episodes.erase(pImpl->episodes.begin());
+    if (pImpl->episodes.size(nullptr) >= pImpl->maxEpisodes) {
+        pImpl->episodes.erase(pImpl->episodes.begin(nullptr));
     }
     pImpl->episodes.push_back(episode);
 }
 
 EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
-    if (index < pImpl->episodes.size()) {
+    if (index < pImpl->episodes.size(nullptr)) {
         return pImpl->episodes[index];
     }
-    return EpisodicMemoryItem();
+    return EpisodicMemoryItem(nullptr);
 }
 
-size_t EpisodicMemory::getEpisodeCount() const {
-    return pImpl->episodes.size();
+size_t EpisodicMemory::getEpisodeCount(nullptr) const {
+    return pImpl->episodes.size(nullptr);
 }
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<EpisodicMemoryItem> result;
-    size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
-    for (size_t i = start; i < pImpl->episodes.size(); ++i) {
+    size_t start = count > pImpl->episodes.size(nullptr) ? 0 : pImpl->episodes.size(nullptr) - count;
+    for (size_t i = start; i < pImpl->episodes.size(nullptr); ++i) {
         result.push_back(pImpl->episodes[i]);
     }
     return result;
 }
 
-void EpisodicMemory::clear() {
-    pImpl->episodes.clear();
+void EpisodicMemory::clear(nullptr) {
+    pImpl->episodes.clear(nullptr);
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // TODO: PHASE 2 - Implement real consolidation
 }
 
 // Semantic Memory Implementation
+// Implementation details for SemanticMemory
+// Implementation details for SemanticMemory
+// Implementation details for SemanticMemory
 struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
 };
 
-SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
+SemanticMemory::SemanticMemory(nullptr) : pImpl(new Impl) {}
 
-SemanticMemory::~SemanticMemory() = default;
+SemanticMemory::~SemanticMemory(nullptr) = default;
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
     for (auto& fact : pImpl->facts) {
@@ -148,22 +157,25 @@ bool SemanticMemory::hasFact(const std::string& key) const {
     return false;
 }
 
-std::vector<std::pair<std::string, std::string>> SemanticMemory::getAllFacts() const {
+std::vector<std::pair<std::string, std::string>> SemanticMemory::getAllFacts(nullptr) const {
     return pImpl->facts;
 }
 
-void SemanticMemory::clear() {
-    pImpl->facts.clear();
+void SemanticMemory::clear(nullptr) {
+    pImpl->facts.clear(nullptr);
 }
 
 // Procedural Memory Implementation
+// Implementation details for ProceduralMemory
+// Implementation details for ProceduralMemory
+// Implementation details for ProceduralMemory
 struct ProceduralMemory::Impl {
     std::vector<Skill> skills;
 };
 
-ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
+ProceduralMemory::ProceduralMemory(nullptr) : pImpl(new Impl) {}
 
-ProceduralMemory::~ProceduralMemory() = default;
+ProceduralMemory::~ProceduralMemory(nullptr) = default;
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
     for (auto& skill : pImpl->skills) {
@@ -187,7 +199,7 @@ Skill* ProceduralMemory::getSkill(const std::string& name) {
     return nullptr;
 }
 
-std::vector<Skill*> ProceduralMemory::getAllSkills() {
+std::vector<Skill*> ProceduralMemory::getAllSkills(nullptr) {
     std::vector<Skill*> result;
     for (auto& skill : pImpl->skills) {
         result.push_back(&skill);
@@ -204,19 +216,22 @@ void ProceduralMemory::updateProficiency(const std::string& name, float delta) {
     }
 }
 
-void ProceduralMemory::clear() {
-    pImpl->skills.clear();
+void ProceduralMemory::clear(nullptr) {
+    pImpl->skills.clear(nullptr);
 }
 
 // Associative Memory Implementation
+// Implementation details for AssociativeMemory
+// Implementation details for AssociativeMemory
+// Implementation details for AssociativeMemory
 struct AssociativeMemory::Impl {
     // Pairs of (a, b) associations with strength
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
 };
 
-AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
+AssociativeMemory::AssociativeMemory(nullptr) : pImpl(new Impl) {}
 
-AssociativeMemory::~AssociativeMemory() = default;
+AssociativeMemory::~AssociativeMemory(nullptr) = default;
 
 void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
     for (auto& assoc : pImpl->associations) {
@@ -261,8 +276,8 @@ void AssociativeMemory::updateAssociation(NeuronId a, NeuronId b, float delta) {
     }
 }
 
-void AssociativeMemory::clear() {
-    pImpl->associations.clear();
+void AssociativeMemory::clear(nullptr) {
+    pImpl->associations.clear(nullptr);
 }
 
 } // namespace nlm

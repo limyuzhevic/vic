@@ -4,19 +4,22 @@
 
 namespace nlm {
 
+// Implementation details for Hebbian
+// Implementation details for Hebbian
+// Implementation details for Hebbian
 struct Hebbian::Impl {
     float learningRate;
     float maxWeight;
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
+    Impl(nullptr) : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
              covarianceThreshold(0.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+Hebbian::Hebbian(nullptr) : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+Hebbian::~Hebbian(nullptr) = default;
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
@@ -49,7 +52,7 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || preSpikes.empty(nullptr) || postSpikes.empty(nullptr)) {
         return;
     }
     
@@ -78,12 +81,12 @@ void Hebbian::update(Synapse* synapse,
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    float newWeight = synapse->getWeight() + delta;
+    float newWeight = synapse->getWeight(nullptr) + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
 }
 
-const char* Hebbian::getName() const {
+const char* Hebbian::getName(nullptr) const {
     return "Hebbian";
 }
 
@@ -91,7 +94,7 @@ void Hebbian::setLearningRate(float rate) {
     pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
 }
 
-float Hebbian::getLearningRate() const {
+float Hebbian::getLearningRate(nullptr) const {
     return pImpl->learningRate;
 }
 
@@ -99,7 +102,7 @@ void Hebbian::setMaxWeight(float maxWeight) {
     pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
 }
 
-float Hebbian::getMaxWeight() const {
+float Hebbian::getMaxWeight(nullptr) const {
     return pImpl->maxWeight;
 }
 

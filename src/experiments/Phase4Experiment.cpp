@@ -11,9 +11,9 @@
 
 namespace nlm {
 
-Phase4Results::Phase4Results() { reset(); }
+Phase4Results::Phase4Results(nullptr) { reset(nullptr); }
 
-void Phase4Results::reset() {
+void Phase4Results::reset(nullptr) {
     predictionErrorInitial = 0.0f;
     predictionErrorFinal = 0.0f;
     predictionAccuracyImprovement = 0.0f;
@@ -44,7 +44,7 @@ void Phase4Results::reset() {
     transferPerformance = 0.0f;
 }
 
-std::string Phase4Results::toCSV() const {
+std::string Phase4Results::toCSV(nullptr) const {
     return std::to_string(predictionErrorInitial) + "," +
            std::to_string(predictionErrorFinal) + "," +
            std::to_string(predictionAccuracyImprovement) + "," +
@@ -63,12 +63,12 @@ std::string Phase4Results::toCSV() const {
 }
 
 // TemporalPredictionExperiment
-TemporalPredictionExperiment::TemporalPredictionExperiment() {}
-TemporalPredictionExperiment::~TemporalPredictionExperiment() {}
+TemporalPredictionExperiment::TemporalPredictionExperiment(nullptr) {}
+TemporalPredictionExperiment::~TemporalPredictionExperiment(nullptr) {}
 
 Phase4Results TemporalPredictionExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    errorHistory_.clear();
+    errorHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -117,12 +117,12 @@ Phase4Results TemporalPredictionExperiment::run(Brain* brain, size_t numTrials) 
 }
 
 // WorkingMemoryExperiment
-WorkingMemoryExperiment::WorkingMemoryExperiment() {}
-WorkingMemoryExperiment::~WorkingMemoryExperiment() {}
+WorkingMemoryExperiment::WorkingMemoryExperiment(nullptr) {}
+WorkingMemoryExperiment::~WorkingMemoryExperiment(nullptr) {}
 
 Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    retentionByDelay_.clear();
+    retentionByDelay_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -144,7 +144,7 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
         }
         
         // Retrieve
-        auto retrieved = wm.retrieve();
+        auto retrieved = wm.retrieve(nullptr);
         float retention = RepresentationAnalyzer::computePatternSimilarity(testPattern, retrieved);
         
         if (trial < numTrials / 4) {
@@ -155,11 +155,11 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
         }
         
         // Test different delays
-        if (trial % 10 == 0 && retentionByDelay_.size() < 10) {
+        if (trial % 10 == 0 && retentionByDelay_.size(nullptr) < 10) {
             retentionByDelay_.push_back(retention);
         }
         
-        wm.clear();
+        wm.clear(nullptr);
     }
     
     initialRetention /= (numTrials / 4);
@@ -167,18 +167,18 @@ Phase4Results WorkingMemoryExperiment::run(Brain* brain, size_t numTrials) {
     
     results.workingMemoryRetentionInitial = initialRetention;
     results.workingMemoryRetentionFinal = finalRetention;
-    results.workingMemoryCapacity = wm.getCapacity();
+    results.workingMemoryCapacity = wm.getCapacity(nullptr);
     
     return results;
 }
 
 // EpisodicRecallExperiment
-EpisodicRecallExperiment::EpisodicRecallExperiment() {}
-EpisodicRecallExperiment::~EpisodicRecallExperiment() {}
+EpisodicRecallExperiment::EpisodicRecallExperiment(nullptr) {}
+EpisodicRecallExperiment::~EpisodicRecallExperiment(nullptr) {}
 
 Phase4Results EpisodicRecallExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    recallHistory_.clear();
+    recallHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -200,7 +200,7 @@ Phase4Results EpisodicRecallExperiment::run(Brain* brain, size_t numTrials) {
         // After delay, try to recall
         if (trial > 5) {
             auto similar = epiMem.retrieveSimilar(episode.sensoryState, 1);
-            if (!similar.empty() && similar[0]->reward == episode.reward) {
+            if (!similar.empty(nullptr) && similar[0]->reward == episode.reward) {
                 successfulRecalls++;
             }
         }
@@ -209,19 +209,19 @@ Phase4Results EpisodicRecallExperiment::run(Brain* brain, size_t numTrials) {
     }
     
     results.episodicRecallAccuracy = static_cast<float>(successfulRecalls) / numTrials;
-    results.episodesStored = epiMem.getEpisodeCount();
+    results.episodesStored = epiMem.getEpisodeCount(nullptr);
     results.episodicInfluence = results.episodicRecallAccuracy;
     
     return results;
 }
 
 // ConceptFormationExperiment
-ConceptFormationExperiment::ConceptFormationExperiment() {}
-ConceptFormationExperiment::~ConceptFormationExperiment() {}
+ConceptFormationExperiment::ConceptFormationExperiment(nullptr) {}
+ConceptFormationExperiment::~ConceptFormationExperiment(nullptr) {}
 
 Phase4Results ConceptFormationExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    stabilityHistory_.clear();
+    stabilityHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -238,7 +238,7 @@ Phase4Results ConceptFormationExperiment::run(Brain* brain, size_t numTrials) {
         // Create variation
         std::vector<float> variation = basePattern;
         for (auto& v : variation) {
-            v += (brain->getRandomGenerator()->uniformReal(-0.1f, 0.1f));
+            v += (brain->getRandomGenerator(nullptr)->uniformReal(-0.1f, 0.1f));
             v = std::clamp(v, 0.0f, 1.0f);
         }
         
@@ -247,18 +247,18 @@ Phase4Results ConceptFormationExperiment::run(Brain* brain, size_t numTrials) {
         
         if (trial % 10 == 0) {
             float totalStability = 0.0f;
-            for (const auto& c : concepts.getConcepts()) {
+            for (const auto& c : concepts.getConcepts(nullptr)) {
                 totalStability += concepts.getConceptStability(c.id);
             }
-            stabilityHistory_.push_back(totalStability / std::max(1ul, concepts.getConceptCount()));
+            stabilityHistory_.push_back(totalStability / std::max(1ul, concepts.getConceptCount(nullptr)));
         }
     }
     
-    results.conceptsFormed = concepts.getConceptCount();
+    results.conceptsFormed = concepts.getConceptCount(nullptr);
     if (results.conceptsFormed > 0) {
         float totalStability = 0.0f;
         float totalGeneralization = 0.0f;
-        for (const auto& c : concepts.getConcepts()) {
+        for (const auto& c : concepts.getConcepts(nullptr)) {
             totalStability += concepts.getConceptStability(c.id);
             totalGeneralization += concepts.getGeneralizationAbility(c.id);
         }
@@ -270,12 +270,12 @@ Phase4Results ConceptFormationExperiment::run(Brain* brain, size_t numTrials) {
 }
 
 // AttentionExperiment
-AttentionExperiment::AttentionExperiment() {}
-AttentionExperiment::~AttentionExperiment() {}
+AttentionExperiment::AttentionExperiment(nullptr) {}
+AttentionExperiment::~AttentionExperiment(nullptr) {}
 
 Phase4Results AttentionExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    selectivityHistory_.clear();
+    selectivityHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -293,19 +293,19 @@ Phase4Results AttentionExperiment::run(Brain* brain, size_t numTrials) {
         
         // Give one stronger salience
         attention.applyBottomUpSalience(competitors[0], 1.0f);
-        for (size_t i = 1; i < competitors.size(); ++i) {
+        for (size_t i = 1; i < competitors.size(nullptr); ++i) {
             attention.applyBottomUpSalience(competitors[i], 0.3f);
         }
         
         // Process competition
         auto winners = attention.processCompetition(competitors);
         
-        float selectivity = winners.empty() ? 0.0f : 
+        float selectivity = winners.empty(nullptr) ? 0.0f : 
                            (winners[0] == competitors[0] ? 1.0f : 0.0f);
         totalSelectivity += selectivity;
         selectivityHistory_.push_back(selectivity);
         
-        attention.reset();
+        attention.reset(nullptr);
     }
     
     results.attentionSelectivity = totalSelectivity / numTrials;
@@ -314,12 +314,12 @@ Phase4Results AttentionExperiment::run(Brain* brain, size_t numTrials) {
 }
 
 // PlanningExperiment
-PlanningExperiment::PlanningExperiment() {}
-PlanningExperiment::~PlanningExperiment() {}
+PlanningExperiment::PlanningExperiment(nullptr) {}
+PlanningExperiment::~PlanningExperiment(nullptr) {}
 
 Phase4Results PlanningExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    successHistory_.clear();
+    successHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -353,18 +353,18 @@ Phase4Results PlanningExperiment::run(Brain* brain, size_t numTrials) {
     }
     
     results.planningAccuracy = static_cast<float>(successfulPlans) / numTrials;
-    results.planningConfidence = planner.getPlanningConfidence();
+    results.planningConfidence = planner.getPlanningConfidence(nullptr);
     
     return results;
 }
 
 // SelfModelExperiment
-SelfModelExperiment::SelfModelExperiment() {}
-SelfModelExperiment::~SelfModelExperiment() {}
+SelfModelExperiment::SelfModelExperiment(nullptr) {}
+SelfModelExperiment::~SelfModelExperiment(nullptr) {}
 
 Phase4Results SelfModelExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    selfPredHistory_.clear();
+    selfPredHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -382,7 +382,7 @@ Phase4Results SelfModelExperiment::run(Brain* brain, size_t numTrials) {
         // Create expected after-state (simplified)
         std::vector<float> afterState = beforeState;
         if (action == ActionType::MoveForward) {
-            for (size_t i = 10; i < afterState.size(); ++i) {
+            for (size_t i = 10; i < afterState.size(nullptr); ++i) {
                 afterState[i - 10] = afterState[i] * 0.9f;
             }
         }
@@ -398,14 +398,14 @@ Phase4Results SelfModelExperiment::run(Brain* brain, size_t numTrials) {
     }
     
     results.selfPredictionAccuracy = totalAccuracy / numTrials;
-    results.bodyAwareness = selfModel.getBodyAwareness();
+    results.bodyAwareness = selfModel.getBodyAwareness(nullptr);
     
     return results;
 }
 
 // ObjectPermanenceExperiment
-ObjectPermanenceExperiment::ObjectPermanenceExperiment() {}
-ObjectPermanenceExperiment::~ObjectPermanenceExperiment() {}
+ObjectPermanenceExperiment::ObjectPermanenceExperiment(nullptr) {}
+ObjectPermanenceExperiment::~ObjectPermanenceExperiment(nullptr) {}
 
 Phase4Results ObjectPermanenceExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
@@ -419,12 +419,12 @@ Phase4Results ObjectPermanenceExperiment::run(Brain* brain, size_t numTrials) {
 }
 
 // SocialLearningExperiment
-SocialLearningExperiment::SocialLearningExperiment() {}
-SocialLearningExperiment::~SocialLearningExperiment() {}
+SocialLearningExperiment::SocialLearningExperiment(nullptr) {}
+SocialLearningExperiment::~SocialLearningExperiment(nullptr) {}
 
 Phase4Results SocialLearningExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    imitationHistory_.clear();
+    imitationHistory_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -458,18 +458,18 @@ Phase4Results SocialLearningExperiment::run(Brain* brain, size_t numTrials) {
     }
     
     results.imitationAccuracy = static_cast<float>(successfulImitations) / numTrials;
-    results.observationsFromOthers = social.getObservationCount();
+    results.observationsFromOthers = social.getObservationCount(nullptr);
     
     return results;
 }
 
 // ContinualLearningExperiment
-ContinualLearningExperiment::ContinualLearningExperiment() {}
-ContinualLearningExperiment::~ContinualLearningExperiment() {}
+ContinualLearningExperiment::ContinualLearningExperiment(nullptr) {}
+ContinualLearningExperiment::~ContinualLearningExperiment(nullptr) {}
 
 Phase4Results ContinualLearningExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
-    taskPerformance_.clear();
+    taskPerformance_.clear(nullptr);
     
     if (!brain) return results;
     
@@ -495,10 +495,10 @@ Phase4Results ContinualLearningExperiment::run(Brain* brain, size_t numTrials) {
     }
     
     // Calculate forgetting
-    if (taskPerformance_.size() >= 2) {
+    if (taskPerformance_.size(nullptr) >= 2) {
         results.behaviorImprovement = taskPerformance_[0];
         // Check if later tasks hurt earlier performance
-        float forgetting = std::max(0.0f, taskPerformance_[0] - taskPerformance_.back());
+        float forgetting = std::max(0.0f, taskPerformance_[0] - taskPerformance_.back(nullptr));
         results.transferPerformance = 1.0f - forgetting;
     }
     
@@ -506,8 +506,8 @@ Phase4Results ContinualLearningExperiment::run(Brain* brain, size_t numTrials) {
 }
 
 // GeneralizationExperiment
-GeneralizationExperiment::GeneralizationExperiment() {}
-GeneralizationExperiment::~GeneralizationExperiment() {}
+GeneralizationExperiment::GeneralizationExperiment(nullptr) {}
+GeneralizationExperiment::~GeneralizationExperiment(nullptr) {}
 
 Phase4Results GeneralizationExperiment::run(Brain* brain, size_t numTrials) {
     Phase4Results results;
@@ -546,12 +546,12 @@ Phase4Results GeneralizationExperiment::run(Brain* brain, size_t numTrials) {
 }
 
 // Phase4IntegratedExperiment
-Phase4IntegratedExperiment::Phase4IntegratedExperiment() {}
-Phase4IntegratedExperiment::~Phase4IntegratedExperiment() {}
+Phase4IntegratedExperiment::Phase4IntegratedExperiment(nullptr) {}
+Phase4IntegratedExperiment::~Phase4IntegratedExperiment(nullptr) {}
 
 Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, size_t stepsPerEpisode) {
     Phase4Results aggregated;
-    episodeResults_.clear();
+    episodeResults_.clear(nullptr);
     
     if (!brain) return aggregated;
     
@@ -594,8 +594,8 @@ Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, 
             
             // Create next state (simplified)
             std::vector<float> nextState = currentState;
-            for (size_t i = 0; i < nextState.size(); ++i) {
-                nextState[i] = nextState[i] * 0.95f + brain->getRandomGenerator()->uniformReal(0, 0.1f);
+            for (size_t i = 0; i < nextState.size(nullptr); ++i) {
+                nextState[i] = nextState[i] * 0.95f + brain->getRandomGenerator(nullptr)->uniformReal(0, 0.1f);
             }
             
             // Store episode
@@ -604,7 +604,7 @@ Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, 
             episodeItem.sensoryState = currentState;
             episodeItem.resultingSensoryState = nextState;
             episodeItem.action = plannedAction;
-            episodeItem.reward = brain->getRandomGenerator()->uniformReal(-0.1f, 0.2f);
+            episodeItem.reward = brain->getRandomGenerator(nullptr)->uniformReal(-0.1f, 0.2f);
             episodicMem.storeEpisode(episodeItem);
             
             // Update concepts
@@ -623,22 +623,22 @@ Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, 
     }
     
     aggregated.totalReward = totalReward;
-    aggregated.predictionErrorFinal = predictor.getPredictionError();
-    aggregated.episodesStored = episodicMem.getEpisodeCount();
-    aggregated.conceptsFormed = concepts.getConceptCount();
-    aggregated.planningConfidence = planner.getPlanningConfidence();
-    aggregated.bodyAwareness = selfModel.getBodyAwareness();
+    aggregated.predictionErrorFinal = predictor.getPredictionError(nullptr);
+    aggregated.episodesStored = episodicMem.getEpisodeCount(nullptr);
+    aggregated.conceptsFormed = concepts.getConceptCount(nullptr);
+    aggregated.planningConfidence = planner.getPlanningConfidence(nullptr);
+    aggregated.bodyAwareness = selfModel.getBodyAwareness(nullptr);
     
     return aggregated;
 }
 
-Phase4Results Phase4IntegratedExperiment::compareBeforeAfter() const {
+Phase4Results Phase4IntegratedExperiment::compareBeforeAfter(nullptr) const {
     Phase4Results comparison;
     
-    if (episodeResults_.empty()) return comparison;
+    if (episodeResults_.empty(nullptr)) return comparison;
     
     // Early performance (first 10%)
-    size_t earlyEnd = std::max(1ul, episodeResults_.size() / 10);
+    size_t earlyEnd = std::max(1ul, episodeResults_.size(nullptr) / 10);
     float earlyReward = 0.0f;
     for (size_t i = 0; i < earlyEnd; ++i) {
         earlyReward += episodeResults_[i].totalReward;
@@ -646,12 +646,12 @@ Phase4Results Phase4IntegratedExperiment::compareBeforeAfter() const {
     earlyReward /= earlyEnd;
     
     // Late performance (last 10%)
-    size_t lateStart = episodeResults_.size() * 9 / 10;
+    size_t lateStart = episodeResults_.size(nullptr) * 9 / 10;
     float lateReward = 0.0f;
-    for (size_t i = lateStart; i < episodeResults_.size(); ++i) {
+    for (size_t i = lateStart; i < episodeResults_.size(nullptr); ++i) {
         lateReward += episodeResults_[i].totalReward;
     }
-    lateReward /= (episodeResults_.size() - lateStart);
+    lateReward /= (episodeResults_.size(nullptr) - lateStart);
     
     comparison.predictionErrorInitial = 1.0f;  // Assume worse initially
     comparison.predictionErrorFinal = 0.5f;
@@ -662,15 +662,15 @@ Phase4Results Phase4IntegratedExperiment::compareBeforeAfter() const {
 }
 
 // RepresentationAnalyzer
-RepresentationAnalyzer::RepresentationAnalyzer() {}
-RepresentationAnalyzer::~RepresentationAnalyzer() {}
+RepresentationAnalyzer::RepresentationAnalyzer(nullptr) {}
+RepresentationAnalyzer::~RepresentationAnalyzer(nullptr) {}
 
 float RepresentationAnalyzer::computePatternSimilarity(const std::vector<float>& a,
                                                       const std::vector<float>& b) {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
+    if (a.size(nullptr) != b.size(nullptr) || a.empty(nullptr)) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-    for (size_t i = 0; i < a.size(); ++i) {
+    for (size_t i = 0; i < a.size(nullptr); ++i) {
         dot += a[i] * b[i];
         normA += a[i] * a[i];
         normB += b[i] * b[i];
@@ -683,12 +683,12 @@ float RepresentationAnalyzer::computePatternSimilarity(const std::vector<float>&
 
 float RepresentationAnalyzer::measureRepresentationalStability(
     const std::vector<std::vector<float>>& patterns) {
-    if (patterns.size() < 2) return 0.0f;
+    if (patterns.size(nullptr) < 2) return 0.0f;
     
     float totalStability = 0.0f;
     size_t comparisons = 0;
     
-    for (size_t i = 1; i < patterns.size(); ++i) {
+    for (size_t i = 1; i < patterns.size(nullptr); ++i) {
         float sim = computePatternSimilarity(patterns[i], patterns[i-1]);
         totalStability += sim;
         comparisons++;
@@ -700,14 +700,14 @@ float RepresentationAnalyzer::measureRepresentationalStability(
 float RepresentationAnalyzer::measureClustering(const std::vector<std::vector<float>>& patterns,
                                               size_t numClusters) {
     // Simplified clustering measure
-    if (patterns.size() < numClusters) return 0.0f;
+    if (patterns.size(nullptr) < numClusters) return 0.0f;
     
     // Random baseline
     return 1.0f / numClusters;
 }
 
 float RepresentationAnalyzer::measureSelectivity(const std::vector<std::vector<float>>& responses) {
-    if (responses.empty()) return 0.0f;
+    if (responses.empty(nullptr)) return 0.0f;
     
     float maxResponse = 0.0f;
     float totalResponse = 0.0f;
@@ -722,7 +722,7 @@ float RepresentationAnalyzer::measureSelectivity(const std::vector<std::vector<f
     if (totalResponse < 0.0001f) return 0.0f;
     
     // Selectivity = how much the max dominates
-    float avgResponse = totalResponse / responses.size();
+    float avgResponse = totalResponse / responses.size(nullptr);
     return maxResponse > 0.0f ? (maxResponse - avgResponse) / maxResponse : 0.0f;
 }
 
@@ -731,7 +731,7 @@ std::vector<float> RepresentationAnalyzer::computePopulationVector(
     // Return weighted average of neuron activities
     std::vector<float> result(1, 0.0f);  // Simple scalar
     
-    if (neuronActivities.empty()) return result;
+    if (neuronActivities.empty(nullptr)) return result;
     
     float totalWeight = 0.0f;
     for (const auto& [neuron, activity] : neuronActivities) {
@@ -748,7 +748,7 @@ std::vector<float> RepresentationAnalyzer::computePopulationVector(
 
 float RepresentationAnalyzer::measureTemporalPrecision(
     const std::vector<std::vector<float>>& temporalPatterns) {
-    if (temporalPatterns.size() < 2) return 0.0f;
+    if (temporalPatterns.size(nullptr) < 2) return 0.0f;
     
     // Measure consistency of patterns across time
     return measureRepresentationalStability(temporalPatterns);

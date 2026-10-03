@@ -2,18 +2,21 @@
 
 namespace nlm {
 
+// Implementation details for Synaptogenesis
+// Implementation details for Synaptogenesis
+// Implementation details for Synaptogenesis
 struct Synaptogenesis::Impl {
     float formationRate;
     float targetDensity;
     
-    Impl() : formationRate(0.001f), targetDensity(0.1f) {}
+    Impl(nullptr) : formationRate(0.001f), targetDensity(0.1f) {}
 };
 
-Synaptogenesis::Synaptogenesis() : pImpl(new Impl) {}
+Synaptogenesis::Synaptogenesis(nullptr) : pImpl(new Impl) {}
 
-Synaptogenesis::~Synaptogenesis() = default;
+Synaptogenesis::~Synaptogenesis(nullptr) = default;
 
-float Synaptogenesis::getFormationRate() const {
+float Synaptogenesis::getFormationRate(nullptr) const {
     return pImpl->formationRate;
 }
 
@@ -21,7 +24,7 @@ void Synaptogenesis::setFormationRate(float rate) {
     pImpl->formationRate = rate;
 }
 
-float Synaptogenesis::getTargetDensity() const {
+float Synaptogenesis::getTargetDensity(nullptr) const {
     return pImpl->targetDensity;
 }
 
@@ -30,7 +33,7 @@ void Synaptogenesis::setTargetDensity(float density) {
 }
 
 void Synaptogenesis::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real synaptogenesis
+    // TODO: PHASE 2 - Implement real synaptogenesis
     // PLACEHOLDER: New synapses form probabilistically
 }
 

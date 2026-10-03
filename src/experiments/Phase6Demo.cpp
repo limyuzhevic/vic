@@ -16,14 +16,14 @@ int main(int argc, char* argv[]) {
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    Logger::getInstance(nullptr).setLevel(Logger::Level::Info);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
     std::cout << "--- Integration Verification ---" << std::endl;
-    bool integrationOK = experiment.verifyIntegration();
+    bool integrationOK = experiment.verifyIntegration(nullptr);
     
     std::cout << std::endl;
     
@@ -36,19 +36,19 @@ int main(int argc, char* argv[]) {
     
     // Test individual systems
     std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    experiment.testMemoryIntegration(nullptr);
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    experiment.testNeuromodulationIntegration(nullptr);
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
+    experiment.testCheckpointing(nullptr);
     std::cout << std::endl;
     
     std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    experiment.testReplay(nullptr);
     std::cout << std::endl;
     
     // Run full experiment with smaller settings for demo

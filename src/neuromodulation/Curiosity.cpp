@@ -3,6 +3,9 @@
 
 namespace nlm {
 
+// Implementation details for Curiosity
+// Implementation details for Curiosity
+// Implementation details for Curiosity
 struct Curiosity::Impl {
     class Brain* brain;
     float level;
@@ -10,7 +13,7 @@ struct Curiosity::Impl {
     float predictionErrorWeight;
     float decayRate;
     
-    Impl() 
+    Impl(nullptr) 
         : brain(nullptr)
         , level(0.0f)
         , noveltyWeight(0.5f)
@@ -18,16 +21,16 @@ struct Curiosity::Impl {
         , decayRate(0.05f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::Curiosity(nullptr) : pImpl(new Impl) {}
 
-Curiosity::~Curiosity() = default;
+Curiosity::~Curiosity(nullptr) = default;
 
 void Curiosity::initialize(Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
 
-float Curiosity::getLevel() const {
+float Curiosity::getLevel(nullptr) const {
     return pImpl->level;
 }
 
@@ -43,7 +46,7 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-float Curiosity::getExplorationDrive() const {
+float Curiosity::getExplorationDrive(nullptr) const {
     return pImpl->level;
 }
 
@@ -55,7 +58,7 @@ void Curiosity::setPredictionErrorWeight(float weight) {
     pImpl->predictionErrorWeight = weight;
 }
 
-void Curiosity::reset() {
+void Curiosity::reset(nullptr) {
     pImpl->level = 0.0f;
 }
 

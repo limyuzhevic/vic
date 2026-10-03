@@ -30,13 +30,13 @@ struct AgentBody {
     bool isTurning;
     float lastActionTime;
     
-    AgentBody()
+    AgentBody(nullptr)
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
         , energy(1.0f), health(1.0f), age(0.0f)
         , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
     
-    void reset() {
+    void reset(nullptr) {
         x = 0.0f;
         y = 0.0f;
         orientation = 0.0f;
@@ -71,7 +71,7 @@ struct ActionResult {
     bool success;
     std::string message;
     
-    ActionResult() : reward(0.0f), success(false), message("") {}
+    ActionResult(nullptr) : reward(0.0f), success(false), message("") {}
     ActionResult(float r, bool s, const std::string& m = "") 
         : reward(r), success(s), message(m) {}
 };

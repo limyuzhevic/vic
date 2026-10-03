@@ -8,52 +8,52 @@
 
 namespace test_stdp {
 
-void testSTDPCreation() {
+void testSTDPCreation(nullptr) {
     nlm::STDP stdp;
     
-    assert(stdp.getLTPWeight() == 0.01f);
-    assert(stdp.getLTDWeight() == 0.012f);
-    assert(stdp.getTimeConstant() == 20.0f);
+    assert(stdp.getLTPWeight(nullptr) == 0.01f);
+    assert(stdp.getLTDWeight(nullptr) == 0.012f);
+    assert(stdp.getTimeConstant(nullptr) == 20.0f);
     
     std::cout << "    testSTDPCreation passed" << std::endl;
 }
 
-void testSTDPConfiguration() {
+void testSTDPConfiguration(nullptr) {
     nlm::STDP stdp;
     
     stdp.setLTPWeight(0.05f);
     stdp.setLTDWeight(0.06f);
     stdp.setTimeConstant(30.0f);
     
-    assert(stdp.getLTPWeight() == 0.05f);
-    assert(stdp.getLTDWeight() == 0.06f);
-    assert(stdp.getTimeConstant() == 30.0f);
+    assert(stdp.getLTPWeight(nullptr) == 0.05f);
+    assert(stdp.getLTDWeight(nullptr) == 0.06f);
+    assert(stdp.getTimeConstant(nullptr) == 30.0f);
     
     std::cout << "    testSTDPConfiguration passed" << std::endl;
 }
 
-void testSTDPConfigure() {
+void testSTDPConfigure(nullptr) {
     nlm::STDP stdp;
     
     stdp.configure(0.03f, 0.035f, 25.0f);
     
-    assert(stdp.getLTPWeight() == 0.03f);
-    assert(stdp.getLTDWeight() == 0.035f);
-    assert(stdp.getTimeConstant() == 25.0f);
+    assert(stdp.getLTPWeight(nullptr) == 0.03f);
+    assert(stdp.getLTDWeight(nullptr) == 0.035f);
+    assert(stdp.getTimeConstant(nullptr) == 25.0f);
     
     std::cout << "    testSTDPConfigure passed" << std::endl;
 }
 
-void testSTDPName() {
+void testSTDPName(nullptr) {
     nlm::STDP stdp;
     
-    assert(stdp.getName() != nullptr);
-    assert(std::string(stdp.getName()) == "STDP");
+    assert(stdp.getName(nullptr) != nullptr);
+    assert(std::string(stdp.getName(nullptr)) == "STDP");
     
     std::cout << "    testSTDPName passed" << std::endl;
 }
 
-void testSTDPPotentiation() {
+void testSTDPPotentiation(nullptr) {
     nlm::STDP stdp;
     nlm::RandomGenerator rng(42);
     
@@ -62,7 +62,7 @@ void testSTDPPotentiation() {
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.5f);
     
-    float initialWeight = synapse.getWeight();
+    float initialWeight = synapse.getWeight(nullptr);
     
     // Pre fires before post (positive dt) - should potentiate
     std::vector<nlm::Timestamp> preSpikes = {0.0, 10.0, 20.0};  // ms
@@ -70,7 +70,7 @@ void testSTDPPotentiation() {
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
-    float finalWeight = synapse.getWeight();
+    float finalWeight = synapse.getWeight(nullptr);
     
     // Weight should have increased due to pre-before-post
     assert(finalWeight > initialWeight);
@@ -79,7 +79,7 @@ void testSTDPPotentiation() {
               << (finalWeight - initialWeight) << ")" << std::endl;
 }
 
-void testSTDPDepression() {
+void testSTDPDepression(nullptr) {
     nlm::STDP stdp;
     
     // Create a synapse
@@ -87,7 +87,7 @@ void testSTDPDepression() {
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.5f);
     
-    float initialWeight = synapse.getWeight();
+    float initialWeight = synapse.getWeight(nullptr);
     
     // Post fires before pre (negative dt) - should depress
     std::vector<nlm::Timestamp> preSpikes = {10.0, 20.0, 30.0};
@@ -95,7 +95,7 @@ void testSTDPDepression() {
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
-    float finalWeight = synapse.getWeight();
+    float finalWeight = synapse.getWeight(nullptr);
     
     // Weight should have decreased due to post-before-pre
     assert(finalWeight < initialWeight);
@@ -104,29 +104,29 @@ void testSTDPDepression() {
               << (finalWeight - initialWeight) << ")" << std::endl;
 }
 
-void testSTDPEmptySpikes() {
+void testSTDPEmptySpikes(nullptr) {
     nlm::STDP stdp;
     
     nlm::Synapse synapse(nlm::SynapseId(3), nlm::NeuronId(5), nlm::NeuronId(6));
-    float initialWeight = synapse.getWeight();
+    float initialWeight = synapse.getWeight(nullptr);
     
     // Empty pre spikes - should not change
     std::vector<nlm::Timestamp> preSpikes;
     std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0};
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    assert(synapse.getWeight(nullptr) == initialWeight);
     
     // Empty post spikes - should not change
     preSpikes = {1.0, 2.0};
     postSpikes = {};
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    assert(synapse.getWeight(nullptr) == initialWeight);
     
     std::cout << "    testSTDPEmptySpikes passed" << std::endl;
 }
 
-void testSTDPWeightBounds() {
+void testSTDPWeightBounds(nullptr) {
     nlm::STDP stdp;
     
     nlm::Synapse synapse(nlm::SynapseId(4), nlm::NeuronId(7), nlm::NeuronId(8));
@@ -140,21 +140,21 @@ void testSTDPWeightBounds() {
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
     // Weight should be clamped to max
-    assert(synapse.getWeight() <= 1.0f);
+    assert(synapse.getWeight(nullptr) <= 1.0f);
     
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
-void runAll() {
+void runAll(nullptr) {
     std::cout << "Running STDP tests..." << std::endl;
-    testSTDPCreation();
-    testSTDPConfiguration();
-    testSTDPConfigure();
-    testSTDPName();
-    testSTDPPotentiation();
-    testSTDPDepression();
-    testSTDPEmptySpikes();
-    testSTDPWeightBounds();
+    testSTDPCreation(nullptr);
+    testSTDPConfiguration(nullptr);
+    testSTDPConfigure(nullptr);
+    testSTDPName(nullptr);
+    testSTDPPotentiation(nullptr);
+    testSTDPDepression(nullptr);
+    testSTDPEmptySpikes(nullptr);
+    testSTDPWeightBounds(nullptr);
 }
 
 } // namespace test_stdp

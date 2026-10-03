@@ -9,17 +9,17 @@ namespace nlm {
 
 class AudioProcessor {
 public:
-    AudioProcessor();
-    ~AudioProcessor();
+    AudioProcessor(nullptr);
+    ~AudioProcessor(nullptr);
     
     // Process audio input
     void process(const Audio& input);
     
     // Get feature representation
-    const std::vector<float>& getFeatures() const;
+    const std::vector<float>& getFeatures(nullptr) const;
     
     // Get feature dimensionality
-    size_t getFeatureDimensions() const;
+    size_t getFeatureDimensions(nullptr) const;
     
 private:
     struct Impl;

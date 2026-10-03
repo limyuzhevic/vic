@@ -14,18 +14,18 @@ class RandomGenerator;
 
 class DevelopmentSystem {
 public:
-    DevelopmentSystem();
-    ~DevelopmentSystem();
+    DevelopmentSystem(nullptr);
+    ~DevelopmentSystem(nullptr);
     
     // Get current developmental stage
-    DevelopmentalStage getStage() const;
+    DevelopmentalStage getStage(nullptr) const;
     void setStage(DevelopmentalStage stage);
     
     // Advance developmental stage
-    void advanceStage();
+    void advanceStage(nullptr);
     
     // Get stage name
-    const char* getStageName() const;
+    const char* getStageName(nullptr) const;
     
     // Update development (simple version)
     void update(Brain* brain, SimulationStep currentStep);
@@ -34,14 +34,14 @@ public:
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
     // Get plasticity modifier for current stage
-    float getPlasticityModifier() const;
+    float getPlasticityModifier(nullptr) const;
     
     // Get critical period info
-    bool isCriticalPeriod() const;
-    float getCriticalPeriodProgress() const;
+    bool isCriticalPeriod(nullptr) const;
+    float getCriticalPeriodProgress(nullptr) const;
     
     // Get developmental age (in simulation time)
-    double getDevelopmentalAge() const { return age_; }
+    double getDevelopmentalAge(nullptr) const { return age_; }
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }

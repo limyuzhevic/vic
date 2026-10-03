@@ -9,24 +9,24 @@ namespace nlm {
 // Base class for all sensory input
 class SensoryInput {
 public:
-    SensoryInput();
-    virtual ~SensoryInput() = default;
+    SensoryInput(nullptr);
+    virtual ~SensoryInput(nullptr) = default;
     
     // Get input type
-    virtual const char* getType() const = 0;
+    virtual const char* getType(nullptr) const = 0;
     
     // Get raw data as vector
-    virtual const std::vector<float>& getData() const = 0;
+    virtual const std::vector<float>& getData(nullptr) const = 0;
     
     // Get dimensionality
-    virtual size_t getDimensions() const = 0;
+    virtual size_t getDimensions(nullptr) const = 0;
     
     // Get timestamp
-    double getTimestamp() const;
+    double getTimestamp(nullptr) const;
     void setTimestamp(double timestamp);
     
     // Clone
-    virtual std::unique_ptr<SensoryInput> clone() const = 0;
+    virtual std::unique_ptr<SensoryInput> clone(nullptr) const = 0;
     
 protected:
     double timestamp_;
@@ -35,23 +35,23 @@ protected:
 // Vision input placeholder
 class Vision : public SensoryInput {
 public:
-    Vision();
+    Vision(nullptr);
     explicit Vision(size_t width, size_t height, size_t channels = 3);
-    ~Vision() override;
+    ~Vision(nullptr) override;
     
-    const char* getType() const override;
-    const std::vector<float>& getData() const override;
-    size_t getDimensions() const override;
-    std::unique_ptr<SensoryInput> clone() const override;
+    const char* getType(nullptr) const override;
+    const std::vector<float>& getData(nullptr) const override;
+    size_t getDimensions(nullptr) const override;
+    std::unique_ptr<SensoryInput> clone(nullptr) const override;
     
     // Set image data
     void setData(const std::vector<float>& data);
     void setData(float* data, size_t size);
     
     // Image properties
-    size_t getWidth() const;
-    size_t getHeight() const;
-    size_t getChannels() const;
+    size_t getWidth(nullptr) const;
+    size_t getHeight(nullptr) const;
+    size_t getChannels(nullptr) const;
     
 private:
     struct Impl;
@@ -61,21 +61,21 @@ private:
 // Audio input placeholder
 class Audio : public SensoryInput {
 public:
-    Audio();
+    Audio(nullptr);
     explicit Audio(size_t sampleRate, size_t numSamples);
-    ~Audio() override;
+    ~Audio(nullptr) override;
     
-    const char* getType() const override;
-    const std::vector<float>& getData() const override;
-    size_t getDimensions() const override;
-    std::unique_ptr<SensoryInput> clone() const override;
+    const char* getType(nullptr) const override;
+    const std::vector<float>& getData(nullptr) const override;
+    size_t getDimensions(nullptr) const override;
+    std::unique_ptr<SensoryInput> clone(nullptr) const override;
     
     // Set audio data
     void setData(const std::vector<float>& data);
     void setSampleRate(size_t rate);
     
-    size_t getSampleRate() const;
-    size_t getNumSamples() const;
+    size_t getSampleRate(nullptr) const;
+    size_t getNumSamples(nullptr) const;
     
 private:
     struct Impl;
@@ -85,17 +85,17 @@ private:
 // Internal signals (来自大脑内部状态)
 class InternalSignals : public SensoryInput {
 public:
-    InternalSignals();
-    ~InternalSignals() override;
+    InternalSignals(nullptr);
+    ~InternalSignals(nullptr) override;
     
-    const char* getType() const override;
-    const std::vector<float>& getData() const override;
-    size_t getDimensions() const override;
-    std::unique_ptr<SensoryInput> clone() const override;
+    const char* getType(nullptr) const override;
+    const std::vector<float>& getData(nullptr) const override;
+    size_t getDimensions(nullptr) const override;
+    std::unique_ptr<SensoryInput> clone(nullptr) const override;
     
     // Add signal
     void addSignal(float value);
-    void clearSignals();
+    void clearSignals(nullptr);
     
 private:
     struct Impl;

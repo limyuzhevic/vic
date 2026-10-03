@@ -29,7 +29,7 @@ struct ConceptInstance {
     // Stability: how consistent is this pattern
     float stability;
     
-    ConceptInstance()
+    ConceptInstance(nullptr)
         : observationCount(0), lastObserved(0), avgReward(0), stability(0) {}
 };
 
@@ -58,7 +58,7 @@ struct DiscoveredConcept {
     // Average stability of instances
     float avgStability;
     
-    DiscoveredConcept() 
+    DiscoveredConcept(nullptr) 
         : id(0), totalObservations(0), avgStability(0) {}
 };
 
@@ -74,8 +74,8 @@ struct DiscoveredConcept {
 
 class ConceptFormation {
 public:
-    ConceptFormation();
-    ~ConceptFormation();
+    ConceptFormation(nullptr);
+    ~ConceptFormation(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -93,7 +93,7 @@ public:
                               float similarityThreshold = 0.7f) const;
 
     // Get all concepts
-    const std::vector<DiscoveredConcept>& getConcepts() const { return concepts_; }
+    const std::vector<DiscoveredConcept>& getConcepts(nullptr) const { return concepts_; }
 
     // Get a specific concept
     const DiscoveredConcept* getConcept(size_t conceptId) const;
@@ -108,7 +108,7 @@ public:
     float getConceptStability(size_t conceptId) const;
 
     // Get number of concepts discovered
-    size_t getConceptCount() const { return concepts_.size(); }
+    size_t getConceptCount(nullptr) const { return concepts_.size(nullptr); }
 
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
@@ -129,7 +129,7 @@ public:
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
 
     // Clear all concepts
-    void clear();
+    void clear(nullptr);
 
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
@@ -174,8 +174,8 @@ private:
 
 class SpatialRepresentation {
 public:
-    SpatialRepresentation();
-    ~SpatialRepresentation();
+    SpatialRepresentation(nullptr);
+    ~SpatialRepresentation(nullptr);
 
     void initialize(Brain* brain);
 
@@ -183,7 +183,7 @@ public:
     void recordPosition(float x, float y, const std::vector<float>& sensoryCues);
 
     // Get predicted position based on path integration
-    std::pair<float, float> getPredictedPosition() const;
+    std::pair<float, float> getPredictedPosition(nullptr) const;
 
     // Update position estimate based on movement
     void integrateMovement(float dx, float dy);
@@ -195,13 +195,13 @@ public:
     std::vector<NeuronId> getPlaceNeuronsNear(float x, float y, float radius) const;
 
     // Get grid spacing (if grid cells have formed)
-    float getGridSpacing() const { return gridSpacing_; }
+    float getGridSpacing(nullptr) const { return gridSpacing_; }
 
     // Clear spatial representations
-    void clear();
+    void clear(nullptr);
 
     // Have place cells formed?
-    bool hasPlaceCells() const { return !placeCells_.empty(); }
+    bool hasPlaceCells(nullptr) const { return !placeCells_.empty(nullptr); }
 
 private:
     struct PlaceCell {
@@ -228,8 +228,8 @@ private:
 
 class TemporalRelation {
 public:
-    TemporalRelation();
-    ~TemporalRelation();
+    TemporalRelation(nullptr);
+    ~TemporalRelation(nullptr);
 
     void initialize(Brain* brain);
 
@@ -248,10 +248,10 @@ public:
     float getPredictionConfidence(const std::vector<float>& event) const;
 
     // Get sequence length
-    size_t getSequenceLength() const { return sequences_.size(); }
+    size_t getSequenceLength(nullptr) const { return sequences_.size(nullptr); }
 
     // Clear sequences
-    void clear();
+    void clear(nullptr);
 
 private:
     struct SequenceLink {
