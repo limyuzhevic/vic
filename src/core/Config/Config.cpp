@@ -1,8 +1,4 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -18,42 +14,81 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+// Load from file (JSON format)
+    bool loadFromFile(const std::string& filepath) {
+        // Parse JSON configuration file
+        // Supports basic JSON format for key-value pairs
+        // Simplified parser for Phase 2 requirements
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Try to parse as JSON first
+        nlohmann::json configJson;
+        try {
+            file >> configJson;
+        } catch (...) {
+            // If JSON parsing fails, fall back to simple key=value format
+            file.clear();
+            file.seekg(0);
+            return loadFromSimpleFormat(file);
         }
+        
+        // Extract key-value pairs from JSON
+        for (auto it = configJson.begin(); it != configJson.end(); ++it) {
+            std::string key = it.key();
+            
+            // Handle different JSON value types
+            if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // For arrays, store as string representation
+                set(key, it->dump(), ConfigSource::File);
+            } else {
+                // Unknown type, skip
+                continue;
+            }
+        }
+        
+        return true;
     }
     
-    return true;
-}
+    // Legacy simple key=value format support
+    bool loadFromSimpleFormat(std::ifstream& file) {
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        return true;
+    }
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -84,10 +119,54 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write as JSON format for modern configuration files
+    nlohmann::json configJson;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        const std::string& key = entry.key;
+        
+        // Convert ConfigValue to JSON
+        if (std::holds_alternative<int>(entry.value)) {
+            configJson[key] = std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            configJson[key] = std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            configJson[key] = std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            configJson[key] = std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            configJson[key] = std::get<std::string>(entry.value);
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            // Convert vector to array
+            auto arr = nlohmann::json::array();
+            for (int val : std::get<std::vector<int>>(entry.value)) {
+                arr.push_back(val);
+            }
+            configJson[key] = arr;
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            // Convert vector to array
+            auto arr = nlohmann::json::array();
+            for (double val : std::get<std::vector<double>>(entry.value)) {
+                arr.push_back(val);
+            }
+            configJson[key] = arr;
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            // Convert vector to array
+            auto arr = nlohmann::json::array();
+            for (const auto& val : std::get<std::vector<std::string>>(entry.value)) {
+                arr.push_back(val);
+            }
+            configJson[key] = arr;
+        }
+        
+        // Add comment as description if present
+        if (!entry.description.empty()) {
+            configJson[key]["_description"] = entry.description;
+        }
     }
+    
+    // Write formatted JSON to file
+    file << configJson.dump(2) << std::endl;
     
     return true;
 }

@@ -36,6 +36,36 @@ private:
     bool enabled_;
 };
 
+// STDP implementation placeholder
+// TODO: Remove when real STDP is implemented
+class STDP : public PlasticityRule {
+public:
+    STDP();
+    ~STDP() override;
+    
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // STDP parameters
+    void setLTPWeight(float weight);
+    float getLTPWeight() const;
+    void setLTDWeight(float weight);
+    float getLTDWeight() const;
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
+    
+    // Update parameters from config
+    void configure(float ltpWeight, float ltdWeight, float tau);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
 // Hebbian plasticity rule: "neurons that fire together, wire together"
 // PLACEHOLDER - Phase 2 will implement real Hebbian learning
 class HebbianRule : public PlasticityRule {
