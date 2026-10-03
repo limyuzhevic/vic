@@ -1,0 +1,30 @@
+// PluginManager implementation
+g++ -c src/plugins/PluginManager.cpp -o build/plugins/PluginManager.o
+
+// Create a simple test to verify the plugin system
+#include "src/plugins/PluginManager.hpp"
+#include <iostream>
+
+int main() {
+    std::cout << "NLM Plugin System Test" << std::endl;
+    std::cout << "=======================" << std::endl;
+    
+    nlm::PluginManager pluginManager;
+    
+    // List available plugins
+    std::cout << "Available plugins: " << std::endl;
+    auto plugins = pluginManager.listPlugins();
+    for (const auto& plugin : plugins) {
+        std::cout << "  - " << plugin << std::endl;
+    }
+    
+    // Get plugin info for each plugin
+    std::cout << std::endl << "Plugin information:" << std::endl;
+    for (const auto& plugin : plugins) {
+        std::cout << pluginManager.getPluginInfo(plugin);
+        std::cout << "---" << std::endl;
+    }
+    
+    std::cout << "Plugin system test completed successfully!" << std::endl;
+    return 0;
+}

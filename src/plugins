@@ -1,0 +1,242 @@
+#pragma once
+
+#include <string>
+#include <memory>
+#include <vector>
+#include <map>
+#include <functional>
+
+namespace nlm {
+
+// Plugin base classes for extending NLM functionality
+// These allow users to add custom neuron types, plasticity rules, and other components
+
+// Plugin interface base class
+class PluginInterface {
+public:
+    virtual ~PluginInterface() = default;
+    virtual std::string getName() const = 0;
+    virtual std::string getVersion() const = 0;
+    virtual bool initialize() = 0;
+    virtual void shutdown() = 0;
+};
+
+// Neuron factory for creating custom neuron types
+class NeuronFactory : public PluginInterface {
+public:
+    virtual ~NeuronFactory() = default;
+    
+    // Create a custom neuron with given parameters
+    virtual std::unique_ptr<class Neuron> createNeuron(
+        NeuronId id,
+        const std::map<std::string, float>& parameters = std::map<std::string, float>()) = 0;
+    
+    // Get neuron type name
+    virtual std::string getNeuronTypeName() const = 0;
+};
+
+// Synapse factory for creating custom synapse types
+class SynapseFactory : public PluginInterface {
+public:
+    virtual ~SynapseFactory() = default;
+    
+    // Create a custom synapse with given parameters
+    virtual std::unique_ptr<class Synapse> createSynapse(
+        NeuronId source,
+        NeuronId destination,
+        const std::map<std::string, float>& parameters = std::map<std::string, float>()) = 0;
+    
+    // Get synapse type name
+    virtual std::string getSynapseTypeName() const = 0;
+};
+
+// Plasticity rule factory for creating custom plasticity rules
+class PlasticityRuleFactory : public PluginInterface {
+public:
+    virtual ~PlasticityRuleFactory() = default;
+    
+    // Create a custom plasticity rule with given parameters
+    virtual std::unique_ptr<class PlasticityRule> createRule(
+        const std::map<std::string, float>& parameters = std::map<std::string, float>()) = 0;
+    
+    // Get rule name
+    virtual std::string getRuleName() const = 0;
+};
+
+// Neuromodulator factory for creating custom neuromodulators
+class NeuromodulatorFactory : public PluginInterface {
+public:
+    virtual ~NeuromodulatorFactory() = default;
+    
+    // Create a custom neuromodulator with given parameters
+    virtual std::unique_ptr<class Neuromodulator> createNeuromodulator(
+        const std::map<std::string, float>& parameters = std::map<std::string, float>()) = 0;
+    
+    // Get neuromodulator name
+    virtual std::string getNeuromodulatorName() const = 0;
+};
+
+// Memory system factory for creating custom memory systems
+class MemorySystemFactory : public PluginInterface {
+public:
+    virtual ~MemorySystemFactory() = default;
+    
+    // Create a custom memory system with given parameters
+    virtual std::unique_ptr<class MemorySystem> createMemorySystem(
+        const std::map<std::string, float>& parameters = std::map<std::string, float>()) = 0;
+    
+    // Get memory system name
+    virtual std::string getMemorySystemName() const = 0;
+};
+
+// Plugin manager for loading and managing plugins
+class PluginManager {
+public:
+    PluginManager();
+    ~PluginManager();
+    
+    // Load a plugin from a shared library
+    bool loadPlugin(const std::string& pluginPath);
+    
+    // Load a built-in plugin
+    bool loadBuiltinPlugin(const std::string& pluginName);
+    
+    // Unload a plugin
+    bool unloadPlugin(const std::string& pluginName);
+    
+    // Get a neuron factory by type name
+    std::shared_ptr<NeuronFactory> getNeuronFactory(const std::string& neuronTypeName) const;
+    
+    // Get a synapse factory by type name
+    std::shared_ptr<SynapseFactory> getSynapseFactory(const std::string& synapseTypeName) const;
+    
+    // Get a plasticity rule factory by name
+    std::shared_ptr<PlasticityRuleFactory> getPlasticityRuleFactory(const std::string& ruleName) const;
+    
+    // Get a neuromodulator factory by name
+    std::shared_ptr<NeuromodulatorFactory> getNeuromodulatorFactory(const std::string& neuromodulatorName) const;
+    
+    // Get a memory system factory by name
+    std::shared_ptr<MemorySystemFactory> getMemorySystemFactory(const std::string& systemName) const;
+    
+    // List all available plugins
+    std::vector<std::string> listPlugins() const;
+    
+    // Check if a plugin is loaded
+    bool isPluginLoaded(const std::string& pluginName) const;
+    
+    // Get plugin info
+    std::string getPluginInfo(const std::string& pluginName) const;
+    
+    // Register a built-in plugin
+    void registerBuiltinPlugin(const std::string& pluginName, 
+                              std::function<std::shared_ptr<NeuronFactory>()> neuronFactory,
+                              std::function<std::shared_ptr<SynapseFactory>()> synapseFactory,
+                              std::function<std::shared_ptr<PlasticityRuleFactory>()> ruleFactory,
+                              std::function<std::shared_ptr<NeuromodulatorFactory>()> neuromodulatorFactory,
+                              std::function<std::shared_ptr<MemorySystemFactory>()> memoryFactory);
+    
+    // Clear all loaded plugins
+    void clearPlugins();
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Custom neuron type registry
+class CustomNeuronRegistry {
+public:
+    static CustomNeuronRegistry& getInstance();
+    
+    // Register a custom neuron type
+    bool registerNeuronType(const std::string& typeName, std::shared_ptr<NeuronFactory> factory);
+    
+    // Get a neuron factory for a type
+    std::shared_ptr<NeuronFactory> getNeuronFactory(const std::string& typeName) const;
+    
+    // Get all registered neuron types
+    std::vector<std::string> getRegisteredNeuronTypes() const;
+    
+    // Unregister a neuron type
+    bool unregisterNeuronType(const std::string& typeName);
+    
+    // Check if a neuron type is registered
+    bool isNeuronTypeRegistered(const std::string& typeName) const;
+
+private:
+    CustomNeuronRegistry();
+    ~CustomNeuronRegistry();
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Plugin system for neuroscience research
+// This allows users to extend NLM with custom neural models,
+// plasticity rules, neuromodulation systems, and memory mechanisms
+namespace plugins {
+
+// Built-in plugin names
+const std::string BUILTIN_NEURON_FACTORIES = "neuron_factories";
+const std::string BUILTIN_SYNAPSE_FACTORIES = "synapse_factories";
+const std::string BUILTIN_PLASTICITY_RULES = "plasticity_rules";
+const std::string BUILTIN_NEUROMODULATORS = "neuromodulators";
+const std::string BUILTIN_MEMORY_SYSTEMS = "memory_systems";
+
+// Example built-in plugins (these would be in separate files)
+class StandardNeuronFactory : public NeuronFactory {
+public:
+    std::string getName() const override { return "StandardNeuronFactory"; }
+    std::string getVersion() const override { return "1.0.0"; }
+    bool initialize() override { return true; }
+    void shutdown() override {}
+    
+    std::unique_ptr<class Neuron> createNeuron(
+        NeuronId id,
+        const std::map<std::string, float>& parameters) override;
+    
+    std::string getNeuronTypeName() const override { return "StandardNeuron"; }
+};
+
+class AdaptivePlasticityFactory : public PlasticityRuleFactory {
+public:
+    std::string getName() const override { return "AdaptivePlasticityFactory"; }
+    std::string getVersion() const override { return "1.0.0"; }
+    bool initialize() override { return true; }
+    void shutdown() override {}
+    
+    std::unique_ptr<class PlasticityRule> createRule(
+        const std::map<std::string, float>& parameters) override;
+    
+    std::string getRuleName() const override { return "AdaptivePlasticity"; }
+};
+
+class RewardLearningNeuromodulator : public NeuromodulatorFactory {
+public:
+    std::string getName() const override { return "RewardLearningNeuromodulator"; }
+    std::string getVersion() const override { return "1.0.0"; }
+    bool initialize() override { return true; }
+    void shutdown() override {}
+    
+    std::unique_ptr<class Neuromodulator> createNeuromodulator(
+        const std::map<std::string, float>& parameters) override;
+    
+    std::string getNeuromodulatorName() const override { return "Dopamine"; }
+};
+
+class HierarchicalMemorySystem : public MemorySystemFactory {
+public:
+    std::string getName() const override { return "HierarchicalMemorySystem"; }
+    std::string getVersion() const override { return "1.0.0"; }
+    bool initialize() override { return true; }
+    void shutdown() override {}
+    
+    std::unique_ptr<class MemorySystem> createMemorySystem(
+        const std::map<std::string, float>& parameters) override;
+    
+    std::string getMemorySystemName() const override { return "HierarchicalMemory"; }
+};
+
+} // namespace plugins
+
+} // namespace nlm
