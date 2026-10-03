@@ -94,6 +94,52 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+            
+            // Store in brain's working memory for memory integration
+            if (brain_->getWorkingMemory() && current > 1.0f) {
+                float activation = std::min(1.0f, current / 10.0f);
+                brain_->getWorkingMemory()->storeToNeuron(sensoryVision_[i]->getId(), activation);
+                
+                // Update prediction system with sensory observation
+                if (brain_->getPredictionSystem()) {
+                    // Convert neural activity to prediction-relevant features
+                    std::vector<float> predictionFeatures;
+                    predictionFeatures.reserve(5);
+                    
+                    // Simple feature: intensity, normalized
+                    predictionFeatures.push_back(activation);
+                    predictionFeatures.push_back(std::min(1.0f, activation * 2.0f));
+                    predictionFeatures.push_back(std::pow(activation, 2.0f));
+                    
+                    // If we have enough features, update prediction
+                    if (predictionFeatures.size() >= 3) {
+                        brain_->getPredictionSystem()->updatePrediction(predictionFeatures);
+                    }
+                }
+                
+                // Store sensory experience in episodic memory
+                if (brain_->getEpisodicMemory()) {
+                    // Create episodic memory item with current sensory input
+                    EpisodicMemoryItem episode;
+                    episode.timestamp = percept.getTimestamp();
+                    episode.stepCount = brain_->getConfig()->getOr<size_t>("current_step", 0);
+                    
+                    // Encode sensory experience
+                    for (size_t j = 0; j < 10 && j < vision.size(); ++j) {
+                        float sensoryValue = vision[j];
+                        if (sensoryValue > 0.5f) {  // Only store significant sensory input
+                            episode.sensoryValues.push_back(sensoryValue);
+                            episode.activeNeurons.push_back(sensoryVision_[j]->getId());
+                            episode.neuronActivations.push_back(activation);
+                        }
+                    }
+                    
+                    // Store to episodic memory if we captured any significant activity
+                    if (!episode.activeNeurons.empty()) {
+                        brain_->getEpisodicMemory()->storeEpisode(episode);
+                    }
+                }
+            }
         }
     }
     
@@ -103,6 +149,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+            
+            // Store in brain's working memory
+            if (brain_->getWorkingMemory() && current > 1.0f) {
+                float activation = std::min(1.0f, current / 10.0f);
+                brain_->getWorkingMemory()->storeToNeuron(sensoryTouch_[i]->getId(), activation);
+            }
         }
     }
     
@@ -112,6 +164,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+            
+            // Store in brain's working memory
+            if (brain_->getWorkingMemory() && current > 1.0f) {
+                float activation = std::min(1.0f, std::abs(current) / 10.0f);
+                brain_->getWorkingMemory()->storeToNeuron(sensoryInternal_[i]->getId(), activation);
+            }
         }
     }
     
@@ -121,6 +179,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+            
+            // Store in brain's working memory
+            if (brain_->getWorkingMemory() && current > 1.0f) {
+                float activation = std::min(1.0f, std::abs(current) / 10.0f);
+                brain_->getWorkingMemory()->storeToNeuron(sensoryProprioception_[i]->getId(), activation);
+            }
         }
     }
     
@@ -140,12 +204,22 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+        
+        // Update brain's novelty system if available
+        if (brain_->getNovelty()) {
+            brain_->getNovelty()->update(0.001f);
+        }
     }
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Update brain's curiosity system if available
+        if (brain_->getCuriosity()) {
+            brain_->getCuriosity()->update(0.001f);
+        }
     }
 }
 

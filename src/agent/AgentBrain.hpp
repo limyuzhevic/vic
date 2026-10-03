@@ -58,60 +58,107 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Memory system configuration
+    void setWorkingMemoryCapacity(size_t capacity);
+    void setWorkingMemoryDecayRate(float rate);
+    void enableEpisodicMemory(bool enable);
+    void setMaxEpisodicEpisodes(size_t maxEpisodes);
+    void enableAssociativeMemory(bool enable);
+    void enablePredictionSystem(bool enable);
+    void setPredictionInterval(size_t interval);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Cognition system configuration
+    void setPlanningDepth(size_t depth);
+    void enableConceptFormation(bool enable);
+    void setAttentionInhibitionStrength(float strength);
+    void setAttentionExcitationStrength(float strength);
+    void enableSelfModel(bool enable);
+    void enableSocialLearning(bool enable);
+    
+    // Development system configuration
+    void setDevelopmentStage(DevelopmentalStage stage);
+    void enableMaturation(bool enable);
+    void setCriticalPeriodDuration(float duration);
+    void setMaturationDuration(float duration);
+    
+    // Neuromodulation system configuration
+    void enableDopamine(bool enable);
+    void setDopamineEffect(float effect);
+    void enableCuriosity(bool enable);
+    void setCuriosityGain(float gain);
+    void enableNovelty(bool enable);
+    void setNoveltyThreshold(float threshold);
+    void enablePredictionError(bool enable);
+    
+    // Plasticity system configuration
+    void enableSTDP(bool enable);
+    void setSTDPParameters(float ltpWeight, float ltdWeight, float tau);
+    void enableHebbian(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void setSynaptogenesisRate(float rate);
+    void setPruningRate(float rate);
+    
+    // Sleep/rest cycle configuration
+    void enableSleepCycle(bool enable);
+    void setRestInterval(size_t interval);
+    void setConsolidationInterval(size_t interval);
+    void setReplayInterval(size_t interval);
+    
+    // Performance monitoring
+    void enablePerformanceMonitoring(bool enable);
+    void setPerformanceSampleInterval(size_t interval);
+    
+    // Checkpoint system
+    void setCheckpointDir(const std::string& dir);
+    void setCheckpointInterval(size_t interval);
+    void enableCheckpointCompression(bool enable);
+    
+    // Statistics and diagnostics
+    size_t getWorkingMemoryCapacity() const;
+    float getWorkingMemoryDecayRate() const;
+    size_t getEpisodicMemoryEpisodeCount() const;
+    size_t getEpisodicMemoryMaxEpisodes() const;
+    size_t getAssociativeMemoryPatternCount() const;
+    size_t getPredictionSystemFeatureCount() const;
+    float getAttentionInhibitionStrength() const;
+    float getAttentionExcitationStrength() const;
+    size_t getPlannerDepth() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionError() const;
+    DevelopmentalStage getCurrentDevelopmentalStage() const;
+    size_t getRestStepsRemaining() const;
+    size_t getConsolidationStepsRemaining() const;
+    
+    // Advanced commands for expert users
+    void saveBrainState(const std::string& filepath) const;
+    bool loadBrainState(const std::string& filepath);
+    void resetMemorySystems();
+    void clearEpisodicMemory();
+    void consolidateMemory();
+    void replayEpisodicMemory(size_t episodeCount);
+    void enableReplay(bool enable);
+    
+    // Configuration import/export
+    void importConfiguration(const std::string& configFile);
+    void exportConfiguration(const std::string& configFile) const;
+    void resetConfiguration();
+    
+    // Debug and monitoring
+    void enableDebugLogging(bool enable);
+    void setLogLevel(const std::string& level);
+    void logSystemStatus() const;
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
-};
+    // Internal configuration methods
+    void configureMemorySystems();
+    void configurePredictionSystem();
+    void configureCognitionSystems();
+    void configureDevelopmentSystem();
+    void configureNeuromodulationSystems();
+    void configurePlasticitySystems();
+    void configureSleepRestCycle();
+    void configurePerformanceMonitoring();
+    void configureCheckpointSystem();
 
 } // namespace nlm
