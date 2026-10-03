@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <variant>
+#include <optional>
 
 namespace nlm {
 
@@ -19,40 +24,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format based on extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Try JSON parser first
+    if (ext == "json") {
+        return loadFromJSONFile(filepath);
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Then try YAML parser
+    else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAMLFile(filepath);
     }
-    
-    return true;
+    // Fall back to simple key=value format
+    else {
+        return loadFromSimpleFile(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -92,6 +79,61 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON parsing - for now just parse key=value pairs
+    // TODO: Add proper nlohmann/json integration
+    nlohmann::json jsonData;
+    try {
+        file >> jsonData;
+    } catch (const std::exception& e) {
+        return false;
+    }
+    
+    // Extract simple key-value pairs from JSON object
+    for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+        std::string key = it.key();
+        setFromVariant(key, it.value(), ConfigSource::File);
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple YAML parsing - convert to JSON-like structure
+    // TODO: Add proper yaml-cpp integration or convert YAML to JSON
+    std::string line;
+    std::string currentKey;
+    
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        // Parse YAML key: value format
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            currentKey = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
+            
+            // Convert YAML string to appropriate type
+            setFromStringValue(currentKey, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -111,10 +153,50 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    // Helper method to set value from variant
+template<typename T>
+void Config::setFromVariant(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_unsigned()) {
+        set(key, value.get<uint64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_array()) {
+        // For arrays, store as string representation for now
+        std::string arrayStr = "[";
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (i > 0) arrayStr += ",";
+            arrayStr += value[i].dump();
+        }
+        arrayStr += "]";
+        set(key, arrayStr, source);
+    }
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+// Helper method to set value from string
+template<typename T>
+void Config::setFromStringValue(const std::string& key, const std::string& value, ConfigSource source) {
+    try {
+        if constexpr (std::is_same_v<T, int>) {
+            set(key, std::stoi(value), source);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            set(key, std::stoll(value), source);
+        } else if constexpr (std::is_same_v<T, double>) {
+            set(key, std::stod(value), source);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            set(key, (value == "true" || value == "1" || value == "yes"), source);
+        } else {
+            set(key, value, source);
+        }
+    } catch (const std::exception&) {
+        set(key, value, source);
+    }
+}
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     

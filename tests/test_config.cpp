@@ -2,6 +2,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -78,12 +80,119 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigLoadFromJSONFile() {
+    nlm::Config config;
+    
+    // Create a temporary JSON file
+    std::string jsonContent = R"({
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.15,
+        "learning_rate": 0.01,
+        "enabled": true
+    })";
+    
+    std::string jsonFile = "/tmp/test_config.json";
+    std::ofstream file(jsonFile);
+    file << jsonContent;
+    file.close();
+    
+    // Load JSON file
+    bool loadSuccess = config.loadFromFile(jsonFile);
+    assert(loadSuccess);
+    
+    // Check loaded values
+    auto neuronCount = config.get<size_t>("neuron_count");
+    assert(neuronCount.has_value());
+    assert(*neuronCount == 1000);
+    
+    auto regionCount = config.get<size_t>("region_count");
+    assert(regionCount.has_value());
+    assert(*regionCount == 2);
+    
+    auto connectionProb = config.get<float>("connection_probability");
+    assert(connectionProb.has_value());
+    assert(*connectionProb == 0.15f);
+    
+    auto learningRate = config.get<float>("learning_rate");
+    assert(learningRate.has_value());
+    assert(*learningRate == 0.01f);
+    
+    auto enabled = config.get<bool>("enabled");
+    assert(enabled.has_value());
+    assert(*enabled == true);
+    
+    // Cleanup
+    std::remove(jsonFile.c_str());
+    
+    std::cout << "    testConfigLoadFromJSONFile passed" << std::endl;
+}
+
+void testConfigLoadFromSimpleFile() {
+    nlm::Config config;
+    
+    // Create a temporary simple config file
+    std::string simpleContent = R"(
+# Simple config file
+neuron_count = 500
+region_count = 1
+connection_probability = 0.1
+learning_rate = 0.005
+enabled = false
+)";
+    
+    std::string simpleFile = "/tmp/test_config_simple.txt";
+    std::ofstream file(simpleFile);
+    file << simpleContent;
+    file.close();
+    
+    // Load simple file
+    bool loadSuccess = config.loadFromFile(simpleFile);
+    assert(loadSuccess);
+    
+    // Check loaded values
+    auto neuronCount = config.get<size_t>("neuron_count");
+    assert(neuronCount.has_value());
+    assert(*neuronCount == 500);
+    
+    auto regionCount = config.get<size_t>("region_count");
+    assert(regionCount.has_value());
+    assert(*regionCount == 1);
+    
+    auto connectionProb = config.get<float>("connection_probability");
+    assert(connectionProb.has_value());
+    assert(*connectionProb == 0.1f);
+    
+    // Cleanup
+    std::remove(simpleFile.c_str());
+    
+    std::cout << "    testConfigLoadFromSimpleFile passed" << std::endl;
+}
+
+void testConfigErrorHandling() {
+    nlm::Config config;
+    
+    // Test loading non-existent file
+    bool loadSuccess = config.loadFromFile("/tmp/nonexistent_file.json");
+    assert(!loadSuccess);
+    
+    // Test setting invalid string to numeric value
+    config.set("test_value", "invalid_number", nlm::ConfigSource::Runtime);
+    auto intVal = config.get<int>("test_value");
+    assert(!intVal.has_value());  // Should fail to parse
+    
+    std::cout << "    testConfigErrorHandling passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigLoadFromJSONFile();
+    testConfigLoadFromSimpleFile();
+    testConfigErrorHandling();
 }
 
 } // namespace test_config

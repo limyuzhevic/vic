@@ -37,12 +37,19 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_plasticity {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Hebbian Plasticity (Improved)" << std::endl;
+    std::cout << "  - Config Parser (JSON/YAML)" << std::endl;
+    std::cout << "  - Error Handling & Memory Management" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +120,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity tests..." << std::endl;
+    try {
+        test_plasticity::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

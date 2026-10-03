@@ -30,7 +30,9 @@ NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl != nullptr) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
