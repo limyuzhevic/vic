@@ -29,9 +29,6 @@ struct BenchmarkResult {
 };
 
 BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
-    std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
-              << steps << " steps..." << std::flush;
-    
     // Create configuration
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
@@ -68,11 +65,6 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     result.stepsPerSecond = steps / totalTime;
     result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
     result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
-    
-    std::cout << " Done!" << std::endl;
-    std::cout << "    Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
-    std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;
-    std::cout << "    Spikes/step: " << std::fixed << std::setprecision(2) << result.spikesPerStep << std::endl;
     
     return result;
 }
