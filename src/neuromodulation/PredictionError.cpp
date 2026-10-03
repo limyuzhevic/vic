@@ -27,6 +27,20 @@ float PredictionError::getError() const {
     return pImpl->error;
 }
 
+void PredictionError::setLevel(float level) {
+    pImpl->error = level;
+}
+
+float PredictionError::getPlasticityFactor() const {
+    // Prediction error modulates learning rate
+    return 1.0f + std::abs(pImpl->error) * 0.5f;
+}
+
+void PredictionError::update(TimestepDuration dt) {
+    // Prediction error decays over time
+    pImpl->error = std::max(0.0f, pImpl->error * 0.9f);
+}
+
 void PredictionError::computeError(float predicted, float actual) {
     pImpl->predictedValue = predicted;
     pImpl->actualValue = actual;
@@ -48,6 +62,13 @@ void PredictionError::clearHistory() {
 
 float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
+}
+
+void PredictionError::reset() {
+    pImpl->error = 0.0f;
+    pImpl->predictedValue = 0.0f;
+    pImpl->actualValue = 0.0f;
+    pImpl->history.clear();
 }
 
 } // namespace nlm

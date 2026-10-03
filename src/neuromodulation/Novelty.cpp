@@ -9,9 +9,8 @@ struct Novelty::Impl {
     class Brain* brain;
     float level;
     float decayRate;
-    std::vector<float> history;
-    std::vector<float> lastPattern;
     float noveltyThreshold;
+    std::vector<float> history;
     
     Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
 };
@@ -22,7 +21,7 @@ Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+    NLM_LOG_INFO("Novelty detection system initialized");
 }
 
 float Novelty::getLevel() const {
@@ -30,13 +29,21 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
+float Novelty::getPlasticityFactor() const {
+    // Novelty promotes exploration and adaptation
+    return 1.0f + pImpl->level * 1.2f;
+}
+
+void Novelty::update(TimestepDuration dt) {
+    // Decay novelty over time
+    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Novelty::detectNovelty(const Observation& observation) {
+    // Simple implementation: set level to a placeholder
     pImpl->level = 1.0f;
     pImpl->history.push_back(pImpl->level);
 }
@@ -63,14 +70,11 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     // Update novelty level based on difference
     pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
     pImpl->history.push_back(pImpl->level);
-    
-    // Store current pattern for next comparison
-    pImpl->lastPattern = currentPattern;
 }
 
-void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+void Novelty::reset() {
+    pImpl->level = 0.0f;
+    pImpl->history.clear();
 }
 
 const std::vector<float>& Novelty::getHistory() const {
