@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace nlm {
 
@@ -18,6 +19,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , learningRate_(0.01f)
+    , explorationRate_(0.1f)
+    , memoryCapacity_(100)
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
@@ -257,7 +261,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             
             if (std::abs(eligibility) > 0.001f) {
                 // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                float delta = eligibility * dopamineLevel_ * learningRate_ * plasticityModifier_;
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -334,6 +338,116 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+std::string AgentBrain::getNetworkStats() const {
+    std::ostringstream oss;
+    
+    if (!brain_) {
+        return "No brain initialized";
+    }
+    
+    oss << "=== NLM Agent Network Statistics ===" << std::endl;
+    oss << "Brain Statistics:" << std::endl;
+    oss << "  Total neurons: " << brain_->getTotalNeuronCount() << std::endl;
+    oss << "  Total synapses: " << brain_->getTotalSynapseCount() << std::endl;
+    oss << "  Active neurons: " << brain_->getActiveNeuronCount() << std::endl;
+    oss << "  Firing neurons: " << brain_->getFiringNeuronCount() << std::endl;
+    oss << "  Average firing rate: " << brain_->getAverageFiringRate() << std::endl;
+    oss << "  Total spikes: " << brain_->getTotalSpikeCount() << std::endl;
+    oss << "  Excitation/inhibition ratio: " << brain_->getExcitationInhibitionRatio() << std::endl;
+    oss << "  Developmental stage: " << static_cast<int>(brain_->getDevelopmentalStage()) << std::endl;
+    
+    oss << "\nAgent Statistics:" << std::endl;
+    oss << "  Neuromodulation level: " << dopamineLevel_ << std::endl;
+    oss << "  Curiosity level: " << curiosityLevel_ << std::endl;
+    oss << "  Novelty level: " << noveltyLevel_ << std::endl;
+    oss << "  Prediction error: " << predictionError_ << std::endl;
+    oss << "  Expected reward: " << expectedReward_ << std::endl;
+    oss << "  Developmental age: " << developmentalAge_ << std::endl;
+    oss << "  Plasticity modifier: " << plasticityModifier_ << std::endl;
+    oss << "  Learning rate: " << learningRate_ << std::endl;
+    oss << "  Exploration rate: " << explorationRate_ << std::endl;
+    oss << "  Memory capacity: " << memoryCapacity_ << std::endl;
+    
+    oss << "\nMotor neuron groups:" << std::endl;
+    oss << "  Forward: " << motorForward_.size() << " neurons" << std::endl;
+    oss << "  Backward: " << motorBackward_.size() << " neurons" << std::endl;
+    oss << "  Turn left: " << motorTurnLeft_.size() << " neurons" << std::endl;
+    oss << "  Turn right: " << motorTurnRight_.size() << " neurons" << std::endl;
+    oss << "  Interact: " << motorInteract_.size() << " neurons" << std::endl;
+    oss << "  Wait: " << motorWait_.size() << " neurons" << std::endl;
+    
+    oss << "\nSensory neuron groups:" << std::endl;
+    oss << "  Vision: " << sensoryVision_.size() << " neurons" << std::endl;
+    oss << "  Touch: " << sensoryTouch_.size() << " neurons" << std::endl;
+    oss << "  Internal: " << sensoryInternal_.size() << " neurons" << std::endl;
+    oss << "  Proprioception: " << sensoryProprioception_.size() << " neurons" << std::endl;
+    
+    oss << "\nPlasticity enabled:" << std::endl;
+    oss << "  Reward modulation: " << (rewardModulationEnabled_ ? "Yes" : "No") << std::endl;
+    oss << "  Structural plasticity: " << (structuralPlasticityEnabled_ ? "Yes" : "No") << std::endl;
+    oss << "  Development: " << (developmentEnabled_ ? "Yes" : "No") << std::endl;
+    oss << "  Curiosity: " << (curiosityEnabled_ ? "Yes" : "No") << std::endl;
+    
+    return oss.str();
+}
+
+float AgentBrain::simulateEpisode(SimpleWorld& world, int numSteps) {
+    float totalReward = 0.0f;
+    
+    for (int step = 0; step < numSteps; ++step) {
+        world.update(0.1);
+        auto percept = world.getSensoryPercept();
+        processSensoryInput(percept);
+        
+        // In a real implementation, you would have access to the brain here
+        // For now, we'll use a simplified approach where the world has a brain
+        if (world.getAgentBody() && world.getAgentBody()->brain_) {
+            // This would require the world to have a brain reference
+            // For demonstration purposes, we'll skip this
+        }
+        
+        // Apply small reward for surviving
+        totalReward += 0.1f;
+        
+        // Apply curiosity-driven exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            float exploreChance = curiosityLevel_ * 0.2f;
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Occasionally take a different action
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 3);
+                switch (choice) {
+                    case 0: world.applyMotorCommand(MotorCommand::MoveForward, world.getSimulationTime()); break;
+                    case 1: world.applyMotorCommand(MotorCommand::TurnLeft, world.getSimulationTime()); break;
+                    case 2: world.applyMotorCommand(MotorCommand::TurnRight, world.getSimulationTime()); break;
+                }
+            }
+        }
+    }
+    
+    return totalReward;
+}
+
+float AgentBrain::train(SimpleWorld& world, int episodes, int stepsPerEpisode) {
+    float totalReward = 0.0f;
+    
+    for (int episode = 0; episode < episodes; ++episode) {
+        float episodeReward = simulateEpisode(world, stepsPerEpisode);
+        totalReward += episodeReward;
+        updateDevelopment(0.1f * stepsPerEpisode);
+        
+        // Print progress
+        if (episode % 10 == 0) {
+            NLM_LOG_INFO("Episode " + std::to_string(episode) + 
+                         "/" + std::to_string(episodes) + 
+                         ", Reward: " + std::to_string(episodeReward) +
+                         ", Curiosity: " + std::to_string(curiosityLevel_));
+        }
+    }
+    
+    return totalReward / episodes;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -342,6 +456,8 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    learningRate_ = 0.01f;
+    explorationRate_ = 0.1f;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);

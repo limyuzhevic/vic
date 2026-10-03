@@ -57,6 +57,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -68,6 +69,22 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Advanced agent capabilities
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    float getLearningRate() const { return learningRate_; }
+    
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    float getExplorationRate() const { return explorationRate_; }
+    
+    void setMemoryCapacity(size_t capacity) { memoryCapacity_ = capacity; }
+    size_t getMemoryCapacity() const { return memoryCapacity_; }
+    
+    std::string getNetworkStats() const;
+    
+    // High-level simulation methods
+    float simulateEpisode(SimpleWorld& world, int numSteps);
+    float train(SimpleWorld& world, int episodes, int stepsPerEpisode);
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -108,6 +125,11 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Advanced configuration
+    float learningRate_;
+    float explorationRate_;
+    size_t memoryCapacity_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
