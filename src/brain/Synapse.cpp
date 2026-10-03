@@ -15,9 +15,9 @@ struct Synapse::Impl {
     // Synapse type
     SynapseType type;
     
-    // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    // Spike history for STDP - using SpikeHistoryManager to eliminate duplication
+    SpikeHistoryManager preSpikeHistory;
+    SpikeHistoryManager postSpikeHistory;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -128,30 +128,24 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
-    }
+    pImpl->preSpikeHistory.recordSpike(timestamp);
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
-    }
+    pImpl->postSpikeHistory.recordSpike(timestamp);
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
+    return pImpl->preSpikeHistory.getHistory();
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
+    return pImpl->postSpikeHistory.getHistory();
 }
 
 void Synapse::clearHistory() {
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
+    pImpl->preSpikeHistory.clearHistory();
+    pImpl->postSpikeHistory.clearHistory();
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -224,8 +218,8 @@ void Synapse::step(Timestamp currentTime) {
 
 void Synapse::reset() {
     pImpl->weight = 0.0f;
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
+    pImpl->preSpikeHistory.clearHistory();
+    pImpl->postSpikeHistory.clearHistory();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
 }

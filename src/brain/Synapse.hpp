@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Utilities/SpikeHistoryManager.hpp"
+#include <vector>
 
 namespace nlm {
 

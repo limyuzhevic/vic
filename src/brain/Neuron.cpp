@@ -13,7 +13,7 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
+    SpikeHistoryManager spikeHistoryManager;  // Shared spike history management
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
@@ -148,14 +148,11 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    pImpl->spikeHistoryManager.recordSpike(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    pImpl->spikeHistoryManager.clearHistory();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -265,10 +262,8 @@ void Neuron::step(Timestamp currentTime) {
     stepLIF(currentTime, dt);
 }
 
-void Neuron::reset() {
-    pImpl->state = NeuronState();
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistoryManager.getHistory();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -296,7 +291,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    pImpl->spikeHistoryManager.clearHistory();
 }
 
 } // namespace nlm
