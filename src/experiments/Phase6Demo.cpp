@@ -6,7 +6,7 @@
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;
