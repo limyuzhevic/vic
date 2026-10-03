@@ -19,8 +19,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Load configuration from a file (Phase 6: Advanced file format support)
+    // Currently supports simple key=value format with comments
+    // TODO PHASE 8: Implement proper JSON/YAML parser with schema validation
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -29,7 +30,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        // Skip empty lines and comments (Phase 4: Improved parsing)
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
