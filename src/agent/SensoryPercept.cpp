@@ -11,7 +11,7 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    audio_.resize(64, 0.0f);  // Enable audio processing with 8x8 audio grid
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
