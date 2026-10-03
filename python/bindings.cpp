@@ -387,6 +387,49 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        
+        // Pythonic property access
+        .def_readonly_property("brain", &AgentBrain::getBrain,
+                              "Get the underlying brain (read-only)")
+        
+        // Configuration helpers
+        .def("enable_reward_modulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"),
+             "Enable/disable reward modulation")
+        .def("enable_structural_plasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"),
+             "Enable/disable structural plasticity")
+        .def("enable_development", &AgentBrain::enableDevelopment,
+             py::arg("enable"),
+             "Enable/disable development")
+        .def("enable_curiosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"),
+             "Enable/disable curiosity-based exploration")
+        
+        // Convenience methods
+        .def("step", [](AgentBrain& self, std::shared_ptr<Brain> brain, SimulationStep step) {
+            brain->step(step, step * 0.001);
+            return self.decodeMotorCommand();
+        }, py::arg("brain"), py::arg("step"),
+             "Run a complete step cycle: process sensory input, brain step, decode action")
+        
+        .def("step_with_reward", [](AgentBrain& self, std::shared_ptr<Brain> brain, SimulationStep step, 
+                                   float reward, float predicted_reward = 0.0f) {
+            brain->step(step, step * 0.001);
+            self.applyRewardModulation(reward, predicted_reward);
+            return self.decodeMotorCommand();
+        }, py::arg("brain"), py::arg("step"), py::arg("reward"), py::arg("predicted_reward") = 0.0f,
+             "Run a step with reward modulation")
+        
+        .def("get_stats", [](const AgentBrain& self) {
+            py::dict stats;
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            stats["neuromodulation_level"] = self.getNeuromodulationLevel();
+            stats["curiosity_level"] = self.getCuriosityLevel();
+            stats["novelty_level"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            return stats;
+        }, "Get agent statistics as a dictionary")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
