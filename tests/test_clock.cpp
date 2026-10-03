@@ -5,77 +5,77 @@
 
 namespace test_clock {
 
-void testClockCreation() {
+void testClockCreation(nullptr) {
     nlm::SimulationClock clock(0.001);
     
-    assert(clock.getStep() == 0);
-    assert(clock.getTime() == 0.0);
-    assert(clock.getTimestep() == 0.001);
+    assert(clock.getStep(nullptr) == 0);
+    assert(clock.getTime(nullptr) == 0.0);
+    assert(clock.getTimestep(nullptr) == 0.001);
     
     std::cout << "    testClockCreation passed" << std::endl;
 }
 
-void testClockAdvance() {
+void testClockAdvance(nullptr) {
     nlm::SimulationClock clock(0.001);
     
-    clock.advance();
-    assert(clock.getStep() == 1);
-    assert(clock.getTime() == 0.001);
+    clock.advance(nullptr);
+    assert(clock.getStep(nullptr) == 1);
+    assert(clock.getTime(nullptr) == 0.001);
     
-    clock.advance();
-    assert(clock.getStep() == 2);
-    assert(clock.getTime() == 0.002);
+    clock.advance(nullptr);
+    assert(clock.getStep(nullptr) == 2);
+    assert(clock.getTime(nullptr) == 0.002);
     
     std::cout << "    testClockAdvance passed" << std::endl;
 }
 
-void testClockReset() {
+void testClockReset(nullptr) {
     nlm::SimulationClock clock(0.001);
     
-    clock.advance();
-    clock.advance();
-    clock.advance();
+    clock.advance(nullptr);
+    clock.advance(nullptr);
+    clock.advance(nullptr);
     
-    assert(clock.getStep() == 3);
+    assert(clock.getStep(nullptr) == 3);
     
-    clock.reset();
-    assert(clock.getStep() == 0);
-    assert(clock.getTime() == 0.0);
+    clock.reset(nullptr);
+    assert(clock.getStep(nullptr) == 0);
+    assert(clock.getTime(nullptr) == 0.0);
     
     std::cout << "    testClockReset passed" << std::endl;
 }
 
-void testClockSetStep() {
+void testClockSetStep(nullptr) {
     nlm::SimulationClock clock(0.001);
     
     clock.setStep(100);
-    assert(clock.getStep() == 100);
-    assert(clock.getTime() == 0.1);
+    assert(clock.getStep(nullptr) == 100);
+    assert(clock.getTime(nullptr) == 0.1);
     
     std::cout << "    testClockSetStep passed" << std::endl;
 }
 
-void testClockSetTime() {
+void testClockSetTime(nullptr) {
     nlm::SimulationClock clock(0.001);
     
     clock.setTime(0.5);
-    assert(clock.getTime() == 0.5);
-    assert(clock.getStep() == 500);
+    assert(clock.getTime(nullptr) == 0.5);
+    assert(clock.getStep(nullptr) == 500);
     
     std::cout << "    testClockSetTime passed" << std::endl;
 }
 
-void testClockAdvanceBy() {
+void testClockAdvanceBy(nullptr) {
     nlm::SimulationClock clock(0.001);
     
     clock.advanceBy(100);
-    assert(clock.getStep() == 100);
-    assert(clock.getTime() == 0.1);
+    assert(clock.getStep(nullptr) == 100);
+    assert(clock.getTime(nullptr) == 0.1);
     
     std::cout << "    testClockAdvanceBy passed" << std::endl;
 }
 
-void testClockConversions() {
+void testClockConversions(nullptr) {
     nlm::SimulationClock clock(0.001);
     
     nlm::Timestamp ts = clock.stepToTime(500);
@@ -87,26 +87,26 @@ void testClockConversions() {
     std::cout << "    testClockConversions passed" << std::endl;
 }
 
-void testClockFirstLastStep() {
+void testClockFirstLastStep(nullptr) {
     nlm::SimulationClock clock(0.001);
     
-    assert(clock.isFirstStep());
+    assert(clock.isFirstStep(nullptr));
     
-    clock.advance();
-    assert(!clock.isFirstStep());
+    clock.advance(nullptr);
+    assert(!clock.isFirstStep(nullptr));
     
-    clock.reset();
-    assert(clock.isFirstStep());
+    clock.reset(nullptr);
+    assert(clock.isFirstStep(nullptr));
     
     assert(clock.isLastStep(0));  // With 0 total steps, step 0 is last
-    clock.advance();
+    clock.advance(nullptr);
     assert(!clock.isLastStep(0));
     assert(clock.isLastStep(1));  // With 1 total step, step 1 is last
     
     std::cout << "    testClockFirstLastStep passed" << std::endl;
 }
 
-void testClockTimeAtFutureStep() {
+void testClockTimeAtFutureStep(nullptr) {
     nlm::SimulationClock clock(0.001);
     
     clock.advanceBy(100);
@@ -117,16 +117,16 @@ void testClockTimeAtFutureStep() {
     std::cout << "    testClockTimeAtFutureStep passed" << std::endl;
 }
 
-void runAll() {
-    testClockCreation();
-    testClockAdvance();
-    testClockReset();
-    testClockSetStep();
-    testClockSetTime();
-    testClockAdvanceBy();
-    testClockConversions();
-    testClockFirstLastStep();
-    testClockTimeAtFutureStep();
+void runAll(nullptr) {
+    testClockCreation(nullptr);
+    testClockAdvance(nullptr);
+    testClockReset(nullptr);
+    testClockSetStep(nullptr);
+    testClockSetTime(nullptr);
+    testClockAdvanceBy(nullptr);
+    testClockConversions(nullptr);
+    testClockFirstLastStep(nullptr);
+    testClockTimeAtFutureStep(nullptr);
 }
 
 } // namespace test_clock

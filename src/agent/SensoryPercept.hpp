@@ -11,37 +11,37 @@ namespace nlm {
 // Contains only low-level sensory signals, NO semantic labels
 class SensoryPercept {
 public:
-    SensoryPercept();
-    ~SensoryPercept() = default;
+    SensoryPercept(nullptr);
+    ~SensoryPercept(nullptr) = default;
     
     // Vision: simple grayscale intensity grid (no RGB, no object labels)
     // Format: row-major, values 0.0-1.0
-    const std::vector<float>& getVision() const { return vision_; }
+    const std::vector<float>& getVision(nullptr) const { return vision_; }
     void setVision(const std::vector<float>& v) { vision_ = v; }
-    size_t getVisionWidth() const { return visionWidth_; }
-    size_t getVisionHeight() const { return visionHeight_; }
+    size_t getVisionWidth(nullptr) const { return visionWidth_; }
+    size_t getVisionHeight(nullptr) const { return visionHeight_; }
     
     // Touch/proximity sensors (binary collision signals)
-    const std::vector<float>& getTouch() const { return touch_; }
+    const std::vector<float>& getTouch(nullptr) const { return touch_; }
     void setTouch(const std::vector<float>& t) { touch_ = t; }
     
     // Internal state signals (homeostatic signals)
-    const std::vector<float>& getInternal() const { return internal_; }
+    const std::vector<float>& getInternal(nullptr) const { return internal_; }
     void setInternal(const std::vector<float>& i) { internal_ = i; }
     
     // Proprioception: body position/velocity signals
-    const std::vector<float>& getProprioception() const { return proprioception_; }
+    const std::vector<float>& getProprioception(nullptr) const { return proprioception_; }
     void setProprioception(const std::vector<float>& p) { proprioception_ = p; }
     
     // Audio-like signals (if enabled)
-    const std::vector<float>& getAudio() const { return audio_; }
+    const std::vector<float>& getAudio(nullptr) const { return audio_; }
     void setAudio(const std::vector<float>& a) { audio_ = a; }
     
     // Get all signals concatenated (for brain input)
-    std::vector<float> getAllSignals() const;
+    std::vector<float> getAllSignals(nullptr) const;
     
     // Timestamp
-    double getTimestamp() const { return timestamp_; }
+    double getTimestamp(nullptr) const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }
     
 private:

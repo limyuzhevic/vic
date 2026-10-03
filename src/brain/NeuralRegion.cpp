@@ -4,6 +4,9 @@
 
 namespace nlm {
 
+// Implementation details for NeuralRegion
+// Implementation details for NeuralRegion
+// Implementation details for NeuralRegion
 struct NeuralRegion::Impl {
     RegionId id;
     std::string name;
@@ -22,7 +25,7 @@ NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Imp
     pImpl->name = name;
 }
 
-NeuralRegion::~NeuralRegion() = default;
+NeuralRegion::~NeuralRegion(nullptr) = default;
 
 NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -37,11 +40,11 @@ NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     return *this;
 }
 
-RegionId NeuralRegion::getId() const {
+RegionId NeuralRegion::getId(nullptr) const {
     return pImpl->id;
 }
 
-const std::string& NeuralRegion::getName() const {
+const std::string& NeuralRegion::getName(nullptr) const {
     return pImpl->name;
 }
 
@@ -50,7 +53,7 @@ void NeuralRegion::setName(const std::string& name) {
 }
 
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
-    PopulationId popId(pImpl->populations.size() + 1);
+    PopulationId popId(pImpl->populations.size(nullptr) + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);
     population->setNeuronType(type);
     pImpl->populations.push_back(std::move(population));
@@ -58,32 +61,32 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index(nullptr) == 0 || id.index(nullptr) > pImpl->populations.size(nullptr)) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[id.index(nullptr) - 1].get(nullptr);
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index(nullptr) == 0 || id.index(nullptr) > pImpl->populations.size(nullptr)) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[id.index(nullptr) - 1].get(nullptr);
 }
 
-size_t NeuralRegion::getPopulationCount() const {
-    return pImpl->populations.size();
+size_t NeuralRegion::getPopulationCount(nullptr) const {
+    return pImpl->populations.size(nullptr);
 }
 
-const std::vector<std::unique_ptr<NeuralPopulation>>& NeuralRegion::getPopulations() const {
+const std::vector<std::unique_ptr<NeuralPopulation>>& NeuralRegion::getPopulations(nullptr) const {
     return pImpl->populations;
 }
 
-std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
+std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations(nullptr) {
     std::vector<NeuralPopulation*> result;
-    result.reserve(pImpl->populations.size());
+    result.reserve(pImpl->populations.size(nullptr));
     for (auto& pop : pImpl->populations) {
-        result.push_back(pop.get());
+        result.push_back(pop.get(nullptr));
     }
     return result;
 }
@@ -104,8 +107,8 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
     for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
+        if (syn->getId(nullptr) == id) {
+            return syn.get(nullptr);
         }
     }
     return nullptr;
@@ -113,25 +116,25 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
     for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
+        if (syn->getId(nullptr) == id) {
+            return syn.get(nullptr);
         }
     }
     return nullptr;
 }
 
-size_t NeuralRegion::getSynapseCount() const {
-    return pImpl->synapses.size();
+size_t NeuralRegion::getSynapseCount(nullptr) const {
+    return pImpl->synapses.size(nullptr);
 }
 
-const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
+const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses(nullptr) const {
     return pImpl->synapses;
 }
 
 std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     std::vector<Synapse*> result;
     auto it = pImpl->outgoingSynapses.find(neuron);
-    if (it != pImpl->outgoingSynapses.end()) {
+    if (it != pImpl->outgoingSynapses.end(nullptr)) {
         for (SynapseId synId : it->second) {
             if (auto* syn = getSynapse(synId)) {
                 result.push_back(syn);
@@ -144,7 +147,7 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
 std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
     std::vector<Synapse*> result;
     auto it = pImpl->incomingSynapses.find(neuron);
-    if (it != pImpl->incomingSynapses.end()) {
+    if (it != pImpl->incomingSynapses.end(nullptr)) {
         for (SynapseId synId : it->second) {
             if (auto* syn = getSynapse(synId)) {
                 result.push_back(syn);
@@ -154,61 +157,61 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
     return result;
 }
 
-size_t NeuralRegion::getTotalNeuronCount() const {
+size_t NeuralRegion::getTotalNeuronCount(nullptr) const {
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
-        total += pop->getSize();
+        total += pop->getSize(nullptr);
     }
     return total;
 }
 
-size_t NeuralRegion::getActiveNeuronCount() const {
+size_t NeuralRegion::getActiveNeuronCount(nullptr) const {
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
-        total += pop->getActiveCount();
+        total += pop->getActiveCount(nullptr);
     }
     return total;
 }
 
-size_t NeuralRegion::getFiringNeuronCount() const {
+size_t NeuralRegion::getFiringNeuronCount(nullptr) const {
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
-        total += pop->getFiringCount();
+        total += pop->getFiringCount(nullptr);
     }
     return total;
 }
 
-float NeuralRegion::getAverageFiringRate() const {
-    size_t popCount = pImpl->populations.size();
+float NeuralRegion::getAverageFiringRate(nullptr) const {
+    size_t popCount = pImpl->populations.size(nullptr);
     if (popCount == 0) return 0.0f;
     
     float sum = 0.0f;
     for (const auto& pop : pImpl->populations) {
-        sum += pop->getAverageFiringRate();
+        sum += pop->getAverageFiringRate(nullptr);
     }
     return sum / static_cast<float>(popCount);
 }
 
-float NeuralRegion::getAverageSynapticWeight() const {
-    if (pImpl->synapses.empty()) {
+float NeuralRegion::getAverageSynapticWeight(nullptr) const {
+    if (pImpl->synapses.empty(nullptr)) {
         return 0.0f;
     }
     float sum = 0.0f;
     for (const auto& syn : pImpl->synapses) {
-        sum += syn->getWeight();
+        sum += syn->getWeight(nullptr);
     }
-    return sum / static_cast<float>(pImpl->synapses.size());
+    return sum / static_cast<float>(pImpl->synapses.size(nullptr));
 }
 
-float NeuralRegion::getSynapticDensity() const {
-    size_t neuronCount = getTotalNeuronCount();
+float NeuralRegion::getSynapticDensity(nullptr) const {
+    size_t neuronCount = getTotalNeuronCount(nullptr);
     if (neuronCount == 0) return 0.0f;
     
     // Maximum possible connections: N * (N-1) for directed graph
     size_t maxConnections = neuronCount * (neuronCount - 1);
     if (maxConnections == 0) return 0.0f;
     
-    return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
+    return static_cast<float>(pImpl->synapses.size(nullptr)) / static_cast<float>(maxConnections);
 }
 
 void NeuralRegion::step(Timestamp currentTime) {
@@ -223,12 +226,12 @@ void NeuralRegion::step(Timestamp currentTime) {
     }
 }
 
-void NeuralRegion::reset() {
+void NeuralRegion::reset(nullptr) {
     for (auto& pop : pImpl->populations) {
-        pop->reset();
+        pop->reset(nullptr);
     }
     for (auto& syn : pImpl->synapses) {
-        syn->reset();
+        syn->reset(nullptr);
     }
 }
 
@@ -242,13 +245,13 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     // - Inhibitory neurons -> all neurons (inhibitory synapses)
     
     // Get all neurons
-    auto neurons = getAllNeurons();
-    size_t neuronCount = neurons.size();
+    auto neurons = getAllNeurons(nullptr);
+    size_t neuronCount = neurons.size(nullptr);
     
     // Create random connections
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
-        NeuronType preType = preNeuron->getType();
+        NeuronType preType = preNeuron->getType(nullptr);
         
         // Skip if not a proper source neuron
         if (preType == NeuronType::Modulatory) continue;
@@ -284,7 +287,7 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             }
             
             // Add synapse
-            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+            SynapseId synId = addSynapse(preNeuron->getId(nullptr), postNeuron->getId(nullptr), weight, 1);
             
             // Initialize random properties
             if (Synapse* syn = getSynapse(synId)) {
@@ -295,20 +298,20 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     }
 }
 
-std::vector<Neuron*> NeuralRegion::getAllNeurons() {
+std::vector<Neuron*> NeuralRegion::getAllNeurons(nullptr) {
     std::vector<Neuron*> result;
     for (auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        auto popNeurons = pop->getNeurons(nullptr);
+        result.insert(result.end(nullptr), popNeurons.begin(nullptr), popNeurons.end(nullptr));
     }
     return result;
 }
 
-std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
+std::vector<const Neuron*> NeuralRegion::getAllNeurons(nullptr) const {
     std::vector<const Neuron*> result;
     for (const auto& pop : pImpl->populations) {
-        auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        auto popNeurons = pop->getNeurons(nullptr);
+        result.insert(result.end(nullptr), popNeurons.begin(nullptr), popNeurons.end(nullptr));
     }
     return result;
 }

@@ -20,8 +20,8 @@ namespace nlm {
 
 class NeuralPrediction {
 public:
-    NeuralPrediction();
-    ~NeuralPrediction();
+    NeuralPrediction(nullptr);
+    ~NeuralPrediction(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -44,10 +44,10 @@ public:
                                                   const std::vector<float>& currentState);
 
     // Get current prediction error (0 = perfect prediction, 1 = total error)
-    float getPredictionError() const { return predictionError_; }
+    float getPredictionError(nullptr) const { return predictionError_; }
 
     // Get prediction confidence based on consistency of learned patterns
-    float getPredictionConfidence() const { return predictionConfidence_; }
+    float getPredictionConfidence(nullptr) const { return predictionConfidence_; }
 
     // Multi-step prediction: predict N steps into the future
     std::vector<std::vector<float>> predictMultipleSteps(SimulationStep currentStep,
@@ -57,10 +57,10 @@ public:
     void recordAction(ActionType action, SimulationStep step);
 
     // Get the prediction history for analysis
-    const std::deque<float>& getErrorHistory() const { return errorHistory_; }
+    const std::deque<float>& getErrorHistory(nullptr) const { return errorHistory_; }
 
     // Clear prediction history
-    void clearHistory();
+    void clearHistory(nullptr);
 
     // Enable/disable mechanisms
     void enableTemporalPrediction(bool enable) { temporalPredictionEnabled_ = enable; }
@@ -71,8 +71,8 @@ public:
     void setPredictionHorizon(size_t steps) { predictionHorizon_ = steps; }
 
     // Get neurons involved in prediction
-    std::vector<NeuronId> getPredictionNeurons() const;
-    std::vector<NeuronId> getSequenceNeurons() const;
+    std::vector<NeuronId> getPredictionNeurons(nullptr) const;
+    std::vector<NeuronId> getSequenceNeurons(nullptr) const;
 
 private:
     // Learn temporal sequence from sensory observations
@@ -123,8 +123,8 @@ private:
 // Uses the neural substrate to store and retrieve action consequences
 class ActionConsequencePredictor {
 public:
-    ActionConsequencePredictor();
-    ~ActionConsequencePredictor();
+    ActionConsequencePredictor(nullptr);
+    ~ActionConsequencePredictor(nullptr);
 
     void initialize(Brain* brain);
 
@@ -152,7 +152,7 @@ public:
     float getActionQuality(ActionType action) const;
 
     // Clear learned associations
-    void clear();
+    void clear(nullptr);
 
 private:
     struct Impl;
@@ -163,8 +163,8 @@ private:
 // Acts as neuromodulatory signal to enhance learning
 class PredictionErrorSignal {
 public:
-    PredictionErrorSignal();
-    ~PredictionErrorSignal();
+    PredictionErrorSignal(nullptr);
+    ~PredictionErrorSignal(nullptr);
 
     // Compute error between predicted and actual
     // Returns magnitude of error for neuromodulation
@@ -178,20 +178,20 @@ public:
         float temporalError;     // When things happened
         float totalError;
     };
-    ErrorComponents getErrorComponents() const { return errorComponents_; }
+    ErrorComponents getErrorComponents(nullptr) const { return errorComponents_; }
 
     // Get neuromodulation signal strength (0-1)
-    float getModulationSignal() const;
+    float getModulationSignal(nullptr) const;
 
     // Update history
     void recordError(float error, SimulationStep step);
-    const std::deque<float>& getErrorHistory() const { return errorHistory_; }
+    const std::deque<float>& getErrorHistory(nullptr) const { return errorHistory_; }
 
     // Is this a surprising event (error > threshold)?
-    bool isSurprising() const { return lastError_ > surpriseThreshold_; }
+    bool isSurprising(nullptr) const { return lastError_ > surpriseThreshold_; }
 
     void setSurpriseThreshold(float t) { surpriseThreshold_ = t; }
-    float getSurpriseThreshold() const { return surpriseThreshold_; }
+    float getSurpriseThreshold(nullptr) const { return surpriseThreshold_; }
 
 private:
     struct Impl;

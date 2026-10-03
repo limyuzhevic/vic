@@ -9,20 +9,20 @@ namespace nlm {
 
 class Maturation {
 public:
-    Maturation();
-    ~Maturation();
+    Maturation(nullptr);
+    ~Maturation(nullptr);
     
     // Get maturation progress (0-1)
-    float getProgress() const;
+    float getProgress(nullptr) const;
     void setProgress(float progress);
     
     // Update maturation
     void update(class Brain* brain, SimulationStep currentStep);
     
     // Get mature properties
-    MembranePotential getMatureThreshold() const;
-    MembranePotential getMatureRestingPotential() const;
-    float getMatureTimeConstant() const;
+    MembranePotential getMatureThreshold(nullptr) const;
+    MembranePotential getMatureRestingPotential(nullptr) const;
+    float getMatureTimeConstant(nullptr) const;
     
 private:
     struct Impl;

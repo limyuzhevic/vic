@@ -6,7 +6,7 @@
 
 namespace test_random {
 
-void testRandomGeneratorCreation() {
+void testRandomGeneratorCreation(nullptr) {
     nlm::RandomGenerator rng1(42);
     nlm::RandomGenerator rng2(42);
     
@@ -18,7 +18,7 @@ void testRandomGeneratorCreation() {
     std::cout << "    testRandomGeneratorCreation passed" << std::endl;
 }
 
-void testUniformInt() {
+void testUniformInt(nullptr) {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
@@ -29,7 +29,7 @@ void testUniformInt() {
     std::cout << "    testUniformInt passed" << std::endl;
 }
 
-void testUniformReal() {
+void testUniformReal(nullptr) {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
@@ -40,7 +40,7 @@ void testUniformReal() {
     std::cout << "    testUniformReal passed" << std::endl;
 }
 
-void testNormal() {
+void testNormal(nullptr) {
     nlm::RandomGenerator rng(42);
     
     double sum = 0.0;
@@ -57,7 +57,7 @@ void testNormal() {
     std::cout << "    testNormal passed" << std::endl;
 }
 
-void testBernoulli() {
+void testBernoulli(nullptr) {
     nlm::RandomGenerator rng(42);
     
     int trueCount = 0;
@@ -75,17 +75,17 @@ void testBernoulli() {
     std::cout << "    testBernoulli passed" << std::endl;
 }
 
-void testRandomBool() {
+void testRandomBool(nullptr) {
     nlm::RandomGenerator rng(42);
     
-    bool val = rng.randomBool();
+    bool val = rng.randomBool(nullptr);
     // Just check it doesn't crash
     assert(true || false);  // Always true
     
     std::cout << "    testRandomBool passed" << std::endl;
 }
 
-void testPickRandomIndex() {
+void testPickRandomIndex(nullptr) {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
@@ -96,7 +96,7 @@ void testPickRandomIndex() {
     std::cout << "    testPickRandomIndex passed" << std::endl;
 }
 
-void testShuffle() {
+void testShuffle(nullptr) {
     nlm::RandomGenerator rng(42);
     
     std::vector<int> vec = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -105,17 +105,17 @@ void testShuffle() {
     rng.shuffle(vec);
     
     // Should have same elements but possibly different order
-    assert(vec.size() == vecCopy.size());
+    assert(vec.size(nullptr) == vecCopy.size(nullptr));
     
     // Sort and compare
-    std::sort(vec.begin(), vec.end());
-    std::sort(vecCopy.begin(), vecCopy.end());
+    std::sort(vec.begin(nullptr), vec.end(nullptr));
+    std::sort(vecCopy.begin(nullptr), vecCopy.end(nullptr));
     assert(vec == vecCopy);
     
     std::cout << "    testShuffle passed" << std::endl;
 }
 
-void testSeed() {
+void testSeed(nullptr) {
     nlm::RandomGenerator rng;
     
     rng.seed(12345);
@@ -129,16 +129,16 @@ void testSeed() {
     std::cout << "    testSeed passed" << std::endl;
 }
 
-void runAll() {
-    testRandomGeneratorCreation();
-    testUniformInt();
-    testUniformReal();
-    testNormal();
-    testBernoulli();
-    testRandomBool();
-    testPickRandomIndex();
-    testShuffle();
-    testSeed();
+void runAll(nullptr) {
+    testRandomGeneratorCreation(nullptr);
+    testUniformInt(nullptr);
+    testUniformReal(nullptr);
+    testNormal(nullptr);
+    testBernoulli(nullptr);
+    testRandomBool(nullptr);
+    testPickRandomIndex(nullptr);
+    testShuffle(nullptr);
+    testSeed(nullptr);
 }
 
 } // namespace test_random

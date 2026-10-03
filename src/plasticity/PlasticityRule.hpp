@@ -10,10 +10,10 @@ namespace nlm {
 
 class PlasticityRule {
 public:
-    virtual ~PlasticityRule() = default;
+    virtual ~PlasticityRule(nullptr) = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    // TODO: PHASE 2 - Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -23,14 +23,14 @@ public:
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
     // Get rule name
-    virtual const char* getName() const = 0;
+    virtual const char* getName(nullptr) const = 0;
     
     // Check if rule is enabled
-    bool isEnabled() const;
+    bool isEnabled(nullptr) const;
     void setEnabled(bool enabled);
     
 protected:
-    PlasticityRule() : enabled_(true) {}
+    PlasticityRule(nullptr) : enabled_(true) {}
     
 private:
     bool enabled_;
@@ -40,19 +40,19 @@ private:
 // PLACEHOLDER - Phase 2 will implement real Hebbian learning
 class HebbianRule : public PlasticityRule {
 public:
-    HebbianRule();
-    ~HebbianRule() override;
+    HebbianRule(nullptr);
+    ~HebbianRule(nullptr) override;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
-    const char* getName() const override;
+    const char* getName(nullptr) const override;
     
     // Parameters
     void setLearningRate(float rate);
-    float getLearningRate() const;
+    float getLearningRate(nullptr) const;
     
 private:
     struct Impl;
@@ -68,7 +68,7 @@ public:
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
+    const char* getName(nullptr) const override { return "AntiHebbian"; }
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
@@ -80,7 +80,7 @@ public:
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+    const char* getName(nullptr) const override { return "BCM"; }
 };
 
 } // namespace nlm

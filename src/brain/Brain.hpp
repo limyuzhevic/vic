@@ -37,11 +37,11 @@ struct InterRegionConnection {
     Delay delay;
     PlasticityFlags plasticityFlags;
     
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
+    InterRegionConnection(nullptr)
+        : sourceRegion(nullptr), targetRegion(nullptr), weight(0.0f), delay(1), plasticityFlags(nullptr) {}
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags(nullptr) {}
 };
 
 // Brain: The central coordinator of the neural system
@@ -53,7 +53,7 @@ public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
     
-    ~Brain();
+    ~Brain(nullptr);
     
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
@@ -62,7 +62,7 @@ public:
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration
-    bool initialize();
+    bool initialize(nullptr);
     
     // Main simulation step
     void step(SimulationStep currentStep);
@@ -81,33 +81,33 @@ public:
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    SpikeSystem* getSpikeSystem(nullptr);
+    const SpikeSystem* getSpikeSystem(nullptr) const;
     
     // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    STDP* getSTDP(nullptr);
+    Hebbian* getHebbian(nullptr);
+    StructuralPlasticity* getStructuralPlasticity(nullptr);
     
     // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    float getExcitationInhibitionRatio(nullptr) const;
+    size_t getTotalSpikeCount(nullptr) const;
+    size_t getPendingSpikeEventCount(nullptr) const;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    std::unique_ptr<class Action> produceAction(nullptr);
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    void updatePlasticity(nullptr);
     
     // Apply developmental changes (called automatically in step)
-    void develop();
+    void develop(nullptr);
     
     // Reset brain state
-    void reset();
+    void reset(nullptr);
     
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
@@ -119,11 +119,11 @@ public:
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
+    size_t getRegionCount(nullptr) const;
+    std::vector<RegionId> getRegionIds(nullptr) const;
     
     // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions(nullptr) const;
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
@@ -131,67 +131,67 @@ public:
     void removeInterRegionConnection(RegionId source, RegionId target);
     
     // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    size_t getTotalNeuronCount(nullptr) const;
+    size_t getTotalSynapseCount(nullptr) const;
+    size_t getActiveNeuronCount(nullptr) const;
+    size_t getFiringNeuronCount(nullptr) const;
+    float getAverageFiringRate(nullptr) const;
     
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getWorkingMemory(nullptr);
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getEpisodicMemory(nullptr);
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory(nullptr);
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem(nullptr);
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    NeuralPlanner* getPlanner(nullptr);
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    ConceptFormation* getConceptFormation(nullptr);
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    AttentionalSelection* getAttention(nullptr);
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
+    DevelopmentSystem* getDevelopmentSystem(nullptr);
+    DevelopmentalStage getDevelopmentalStage(nullptr) const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    Dopamine* getDopamine(nullptr);
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    Curiosity* getCuriosity(nullptr);
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    Novelty* getNovelty(nullptr);
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionErrorSignal(nullptr);
     
     // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    std::shared_ptr<const Config> getConfig(nullptr) const;
     
     // Get random generator
-    RandomGenerator* getRandomGenerator();
+    RandomGenerator* getRandomGenerator(nullptr);
     
     // Logging
-    void logStatus() const;
+    void logStatus(nullptr) const;
     
 private:
     struct Impl;

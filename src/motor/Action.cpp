@@ -2,16 +2,16 @@
 
 namespace nlm {
 
-Action::Action() : type_(ActionType::Wait) {}
+Action::Action(nullptr) : type_(ActionType::Wait) {}
 
 Action::Action(ActionType type) : type_(type) {}
 
 Action::Action(ActionType type, const std::vector<float>& params) 
     : type_(type), parameters_(params) {}
 
-Action::~Action() = default;
+Action::~Action(nullptr) = default;
 
-ActionType Action::getType() const {
+ActionType Action::getType(nullptr) const {
     return type_;
 }
 
@@ -19,7 +19,7 @@ void Action::setType(ActionType type) {
     type_ = type;
 }
 
-const std::vector<float>& Action::getParameters() const {
+const std::vector<float>& Action::getParameters(nullptr) const {
     return parameters_;
 }
 
@@ -48,11 +48,11 @@ const char* Action::actionTypeToString(ActionType type) {
     }
 }
 
-std::string Action::getName() const {
+std::string Action::getName(nullptr) const {
     return std::string(actionTypeToString(type_));
 }
 
-std::unique_ptr<Action> Action::clone() const {
+std::unique_ptr<Action> Action::clone(nullptr) const {
     return std::make_unique<Action>(type_, parameters_);
 }
 

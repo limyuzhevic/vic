@@ -16,8 +16,8 @@ namespace nlm {
 
 class Phase3Demo {
 public:
-    Phase3Demo() {}
-    ~Phase3Demo() {}
+    Phase3Demo(nullptr) {}
+    ~Phase3Demo(nullptr) {}
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
         std::cout << "===========================================\n";
@@ -36,7 +36,7 @@ public:
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
+        brain->initialize(nullptr);
         
         // Create agent brain interface
         AgentBrain agentBrain(brain);
@@ -49,10 +49,10 @@ public:
         agentBrain.enableCuriosity(true);
         
         std::cout << "Initial brain state:\n";
-        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
-        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
-        std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
-        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
+        std::cout << "  Neurons: " << brain->getTotalNeuronCount(nullptr) << "\n";
+        std::cout << "  Synapses: " << brain->getTotalSynapseCount(nullptr) << "\n";
+        std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize(nullptr) << "\n";
+        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize(nullptr) << "\n\n";
         
         // Metrics tracking
         std::vector<ExperimentMetrics> allMetrics;
@@ -62,9 +62,9 @@ public:
             std::cout << "--- Episode " << episode << " started ---\n";
             
             // Reset world
-            world.reset();
-            agentBrain.reset();
-            brain->reset();
+            world.reset(nullptr);
+            agentBrain.reset(nullptr);
+            brain->reset(nullptr);
             
             ExperimentMetrics metrics;
             metrics.episode = episode;
@@ -74,7 +74,7 @@ public:
             // Run steps
             for (int step = 0; step < stepsPerEpisode; ++step) {
                 // 1. Get sensory percept from world
-                const SensoryPercept& percept = world.getSensoryPercept();
+                const SensoryPercept& percept = world.getSensoryPercept(nullptr);
                 
                 // 2. Inject sensory input into brain
                 agentBrain.processSensoryInput(percept);
@@ -85,10 +85,10 @@ public:
                 }
                 
                 // 4. Decode motor command from brain activity
-                MotorCommand cmd = agentBrain.decodeMotorCommand();
+                MotorCommand cmd = agentBrain.decodeMotorCommand(nullptr);
                 
                 // 5. Apply motor command to world
-                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
+                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime(nullptr));
                 
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
@@ -103,7 +103,7 @@ public:
                 episodeReward += result.reward;
                 metrics.steps++;
                 metrics.totalReward += result.reward;
-                metrics.totalSpikes += brain->getFiringNeuronCount();
+                metrics.totalSpikes += brain->getFiringNeuronCount(nullptr);
                 
                 // Count actions
                 switch (cmd) {
@@ -120,22 +120,22 @@ public:
                     std::cout << "  Step " << step 
                               << ": reward=" << result.reward
                               << ", action=" << motorCommandToString(cmd)
-                              << ", neuromod=" << agentBrain.getNeuromodulationLevel()
-                              << ", novelty=" << agentBrain.getNoveltyLevel()
-                              << ", energy=" << world.getAgentBody().energy
+                              << ", neuromod=" << agentBrain.getNeuromodulationLevel(nullptr)
+                              << ", novelty=" << agentBrain.getNoveltyLevel(nullptr)
+                              << ", energy=" << world.getAgentBody(nullptr).energy
                               << "\n";
                 }
             }
             
             // Record final metrics
-            metrics.finalNovelty = agentBrain.getNoveltyLevel();
-            metrics.finalCuriosity = agentBrain.getCuriosityLevel();
-            metrics.finalEnergy = world.getAgentBody().energy;
-            metrics.predictionError = agentBrain.getPredictionError();
-            metrics.developmentalAge = agentBrain.getBrain()->getTotalSynapseCount();  // Use as proxy
-            metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
-            metrics.totalSynapses = brain->getTotalSynapseCount();
-            metrics.averageFiringRate = brain->getAverageFiringRate();
+            metrics.finalNovelty = agentBrain.getNoveltyLevel(nullptr);
+            metrics.finalCuriosity = agentBrain.getCuriosityLevel(nullptr);
+            metrics.finalEnergy = world.getAgentBody(nullptr).energy;
+            metrics.predictionError = agentBrain.getPredictionError(nullptr);
+            metrics.developmentalAge = agentBrain.getBrain(nullptr)->getTotalSynapseCount(nullptr);  // Use as proxy
+            metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage(nullptr));
+            metrics.totalSynapses = brain->getTotalSynapseCount(nullptr);
+            metrics.averageFiringRate = brain->getAverageFiringRate(nullptr);
             
             allMetrics.push_back(metrics);
             
@@ -158,11 +158,11 @@ public:
         std::cout << "SUMMARY\n";
         std::cout << "===========================================\n";
         
-        if (allMetrics.size() >= 2) {
-            const auto& first = allMetrics.front();
-            const auto& last = allMetrics.back();
+        if (allMetrics.size(nullptr) >= 2) {
+            const auto& first = allMetrics.front(nullptr);
+            const auto& last = allMetrics.back(nullptr);
             
-            std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
+            std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size(nullptr) - 1) << "):\n";
             std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
             std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
             std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";

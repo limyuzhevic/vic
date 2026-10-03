@@ -6,6 +6,9 @@
 
 namespace nlm {
 
+// Implementation details for StructuralPlasticity
+// Implementation details for StructuralPlasticity
+// Implementation details for StructuralPlasticity
 struct StructuralPlasticity::Impl {
     float synaptogenesisRate;     // Probability of new synapse per step
     float pruningRate;            // Probability of pruning per step
@@ -19,16 +22,16 @@ struct StructuralPlasticity::Impl {
     size_t totalSynapsesCreated;
     size_t totalSynapsesPruned;
     
-    Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
+    Impl(nullptr) : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
              minWeightThreshold(0.05f), activityThreshold(0.001f),
              maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
              useActivityDependency(true),
              totalSynapsesCreated(0), totalSynapsesPruned(0) {}
 };
 
-StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
+StructuralPlasticity::StructuralPlasticity(nullptr) : pImpl(new Impl) {}
 
-StructuralPlasticity::~StructuralPlasticity() = default;
+StructuralPlasticity::~StructuralPlasticity(nullptr) = default;
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {
@@ -45,24 +48,24 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
     }
     
     // Find the region containing the destination neuron
-    for (auto& region : brain->getRegions()) {
+    for (auto& region : brain->getRegions(nullptr)) {
         auto synapsesTo = region->getSynapsesTo(destination);
         
         // Check if connection already exists
         for (Synapse* syn : synapsesTo) {
-            if (syn->getSourceNeuron() == source) {
+            if (syn->getSourceNeuron(nullptr) == source) {
                 return INVALID_SYNAPSE_ID;  // Connection already exists
             }
         }
         
         // Check max synapses limit
-        if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
+        if (region->getSynapseCount(nullptr) >= pImpl->maxTotalSynapses) {
             return INVALID_SYNAPSE_ID;
         }
         
         // Count outgoing synapses from source in this region
         auto synapsesFrom = region->getSynapsesFrom(source);
-        if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
+        if (synapsesFrom.size(nullptr) >= pImpl->maxSynapsesPerNeuron) {
             continue;  // Try next region
         }
         
@@ -83,7 +86,7 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     }
     
     // Search all regions for the synapse
-    for (auto& region : brain->getRegions()) {
+    for (auto& region : brain->getRegions(nullptr)) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
             // For now, we mark the synapse for removal by zeroing its weight
@@ -110,7 +113,7 @@ bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
     return false;
 }
 
-float StructuralPlasticity::getSynaptogenesisRate() const {
+float StructuralPlasticity::getSynaptogenesisRate(nullptr) const {
     return pImpl->synaptogenesisRate;
 }
 
@@ -118,7 +121,7 @@ void StructuralPlasticity::setSynaptogenesisRate(float rate) {
     pImpl->synaptogenesisRate = std::clamp(rate, 0.0f, 0.1f);
 }
 
-float StructuralPlasticity::getPruningRate() const {
+float StructuralPlasticity::getPruningRate(nullptr) const {
     return pImpl->pruningRate;
 }
 
@@ -146,9 +149,9 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
      */
     if (!brain) return;
     
-    for (auto& region : brain->getRegions()) {
-        auto neurons = region->getAllNeurons();
-        size_t neuronCount = neurons.size();
+    for (auto& region : brain->getRegions(nullptr)) {
+        auto neurons = region->getAllNeurons(nullptr);
+        size_t neuronCount = neurons.size(nullptr);
         
         if (neuronCount < 2) continue;
         
@@ -166,28 +169,28 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             float avgWeight = 0.0f;
             size_t synCount = 0;
             
-            auto incoming = region->getSynapsesTo(neuron->getId());
+            auto incoming = region->getSynapsesTo(neuron->getId(nullptr));
             for (auto* syn : incoming) {
-                avgWeight += std::abs(syn->getWeight());
+                avgWeight += std::abs(syn->getWeight(nullptr));
                 ++synCount;
             }
             
             // Activity based on spike history
-            const auto& spikes = neuron->getSpikeHistory();
-            if (!spikes.empty()) {
+            const auto& spikes = neuron->getSpikeHistory(nullptr);
+            if (!spikes.empty(nullptr)) {
                 // More recent spikes = higher activity
-                activity = static_cast<float>(spikes.size());
+                activity = static_cast<float>(spikes.size(nullptr));
             }
             
             if (synCount > 0) {
                 avgWeight /= static_cast<float>(synCount);
             }
             
-            activities.push_back({neuron->getId(), activity, avgWeight});
+            activities.push_back({neuron->getId(nullptr), activity, avgWeight});
         }
         
         // Synaptogenesis: Create new synapses between active neurons
-        if (region->getSynapseCount() < pImpl->maxTotalSynapses) {
+        if (region->getSynapseCount(nullptr) < pImpl->maxTotalSynapses) {
             for (size_t attempt = 0; attempt < neuronCount; ++attempt) {
                 // Probabilistic synapse formation
                 if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
@@ -210,8 +213,8 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         }
         
         // Pruning: Remove weak or unused synapses
-        for (auto& syn : region->getSynapses()) {
-            float weight = std::abs(syn->getWeight());
+        for (auto& syn : region->getSynapses(nullptr)) {
+            float weight = std::abs(syn->getWeight(nullptr));
             
             // Check pruning conditions
             bool shouldPrune = false;
@@ -221,14 +224,14 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
                 shouldPrune = rng.bernoulli(pImpl->pruningRate);
             } else if (pImpl->useActivityDependency) {
                 // Check if synapse has been unused (no recent weight changes)
-                float eligibility = std::abs(syn->getEligibilityTrace());
+                float eligibility = std::abs(syn->getEligibilityTrace(nullptr));
                 if (eligibility < pImpl->activityThreshold) {
                     shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
                 }
             }
             
             if (shouldPrune) {
-                removeSynapse(brain, syn->getId());
+                removeSynapse(brain, syn->getId(nullptr));
             }
         }
     }

@@ -11,56 +11,56 @@ namespace nlm {
 struct NeuronId {
     uint64_t value;
     
-    constexpr NeuronId() : value(0) {}
+    constexpr NeuronId(nullptr) : value(0) {}
     explicit constexpr NeuronId(uint64_t v) : value(v) {}
     
     constexpr bool operator==(const NeuronId& other) const = default;
     constexpr bool operator!=(const NeuronId& other) const = default;
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
-    constexpr uint64_t index() const { return value; }
+    constexpr uint64_t index(nullptr) const { return value; }
 };
 
 // Synapse identifier
 struct SynapseId {
     uint64_t value;
     
-    constexpr SynapseId() : value(0) {}
+    constexpr SynapseId(nullptr) : value(0) {}
     explicit constexpr SynapseId(uint64_t v) : value(v) {}
     
     constexpr bool operator==(const SynapseId& other) const = default;
     constexpr bool operator!=(const SynapseId& other) const = default;
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
-    constexpr uint64_t index() const { return value; }
+    constexpr uint64_t index(nullptr) const { return value; }
 };
 
 // Region identifier
 struct RegionId {
     uint64_t value;
     
-    constexpr RegionId() : value(0) {}
+    constexpr RegionId(nullptr) : value(0) {}
     explicit constexpr RegionId(uint64_t v) : value(v) {}
     
     constexpr bool operator==(const RegionId& other) const = default;
     constexpr bool operator!=(const RegionId& other) const = default;
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
-    constexpr uint64_t index() const { return value; }
+    constexpr uint64_t index(nullptr) const { return value; }
 };
 
 // Population identifier
 struct PopulationId {
     uint64_t value;
     
-    constexpr PopulationId() : value(0) {}
+    constexpr PopulationId(nullptr) : value(0) {}
     explicit constexpr PopulationId(uint64_t v) : value(v) {}
     
     constexpr bool operator==(const PopulationId& other) const = default;
     constexpr bool operator!=(const PopulationId& other) const = default;
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
-    constexpr uint64_t index() const { return value; }
+    constexpr uint64_t index(nullptr) const { return value; }
 };
 
 // Simulation step counter
@@ -117,7 +117,7 @@ struct PlasticityFlags {
     bool structural : 1;
     bool eligible : 1;
     
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
+    constexpr PlasticityFlags(nullptr) : hebbian(false), stdp(false), 
                                   reward_modulated(false), structural(false), 
                                   eligible(false) {}
 };
@@ -137,7 +137,7 @@ struct SpikeEvent {
     Timestamp timestamp;
     SimulationStep step;
     
-    SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
+    SpikeEvent(nullptr) : source_neuron(nullptr), timestamp(0.0), step(0) {}
     SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
         : source_neuron(nid), timestamp(ts), step(s) {}
 };
@@ -155,8 +155,8 @@ struct DelayedSpikeEvent {
     SimulationStep delivery_step;  // Step when spike should be delivered
     bool is_excitatory;  // Cached for quick lookup
     
-    DelayedSpikeEvent()
-        : source_neuron(), destination_neuron(), synapse_id()
+    DelayedSpikeEvent(nullptr)
+        : source_neuron(nullptr), destination_neuron(nullptr), synapse_id(nullptr)
         , weight(0.0f), synapse_type(SynapseType::Excitatory)
         , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
         , is_excitatory(true) {}

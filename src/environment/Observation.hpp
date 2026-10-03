@@ -7,18 +7,18 @@ namespace nlm {
 // Sensory input observation
 class Observation {
 public:
-    Observation();
+    Observation(nullptr);
     Observation(const SensoryInput& input);
-    ~Observation();
+    ~Observation(nullptr);
     
     // Get the sensory input
-    const SensoryInput* getSensoryInput() const;
+    const SensoryInput* getSensoryInput(nullptr) const;
     
     // Check if observation is valid
-    bool isValid() const;
+    bool isValid(nullptr) const;
     
     // Clone
-    std::unique_ptr<Observation> clone() const;
+    std::unique_ptr<Observation> clone(nullptr) const;
     
 private:
     std::unique_ptr<SensoryInput> sensoryInput_;

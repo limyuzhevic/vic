@@ -58,23 +58,23 @@ struct Phase4Results {
     float behaviorImprovement;
     float transferPerformance;
     
-    Phase4Results();
-    void reset();
-    std::string toCSV() const;
+    Phase4Results(nullptr);
+    void reset(nullptr);
+    std::string toCSV(nullptr) const;
 };
 
 // Experiment: Temporal Prediction Learning
 // Tests if NLM can learn that state A predicts state B
 class TemporalPredictionExperiment {
 public:
-    TemporalPredictionExperiment();
-    ~TemporalPredictionExperiment();
+    TemporalPredictionExperiment(nullptr);
+    ~TemporalPredictionExperiment(nullptr);
     
     // Run the experiment
     Phase4Results run(Brain* brain, size_t numTrials = 100);
     
     // Get prediction error over time
-    const std::vector<float>& getErrorHistory() const { return errorHistory_; }
+    const std::vector<float>& getErrorHistory(nullptr) const { return errorHistory_; }
     
 private:
     std::vector<float> errorHistory_;
@@ -84,14 +84,14 @@ private:
 // Tests if information can be maintained after stimulus disappears
 class WorkingMemoryExperiment {
 public:
-    WorkingMemoryExperiment();
-    ~WorkingMemoryExperiment();
+    WorkingMemoryExperiment(nullptr);
+    ~WorkingMemoryExperiment(nullptr);
     
     // Run delayed response test
     Phase4Results run(Brain* brain, size_t numTrials = 50);
     
     // Get retention over delay periods
-    std::vector<float> getRetentionByDelay() const { return retentionByDelay_; }
+    std::vector<float> getRetentionByDelay(nullptr) const { return retentionByDelay_; }
     
 private:
     std::vector<float> retentionByDelay_;
@@ -101,14 +101,14 @@ private:
 // Tests if past experiences influence future behavior
 class EpisodicRecallExperiment {
 public:
-    EpisodicRecallExperiment();
-    ~EpisodicRecallExperiment();
+    EpisodicRecallExperiment(nullptr);
+    ~EpisodicRecallExperiment(nullptr);
     
     // Run episodic memory test
     Phase4Results run(Brain* brain, size_t numTrials = 50);
     
     // Get recall accuracy over time
-    std::vector<float> getRecallAccuracyHistory() const { return recallHistory_; }
+    std::vector<float> getRecallAccuracyHistory(nullptr) const { return recallHistory_; }
     
 private:
     std::vector<float> recallHistory_;
@@ -118,14 +118,14 @@ private:
 // Tests if recurring patterns form stable representations
 class ConceptFormationExperiment {
 public:
-    ConceptFormationExperiment();
-    ~ConceptFormationExperiment();
+    ConceptFormationExperiment(nullptr);
+    ~ConceptFormationExperiment(nullptr);
     
     // Run concept formation test
     Phase4Results run(Brain* brain, size_t numTrials = 100);
     
     // Get concept stability over time
-    std::vector<float> getConceptStabilityHistory() const { return stabilityHistory_; }
+    std::vector<float> getConceptStabilityHistory(nullptr) const { return stabilityHistory_; }
     
 private:
     std::vector<float> stabilityHistory_;
@@ -135,14 +135,14 @@ private:
 // Tests if competing signals produce selective processing
 class AttentionExperiment {
 public:
-    AttentionExperiment();
-    ~AttentionExperiment();
+    AttentionExperiment(nullptr);
+    ~AttentionExperiment(nullptr);
     
     // Run attention test
     Phase4Results run(Brain* brain, size_t numTrials = 50);
     
     // Get attention selectivity over time
-    std::vector<float> getSelectivityHistory() const { return selectivityHistory_; }
+    std::vector<float> getSelectivityHistory(nullptr) const { return selectivityHistory_; }
     
 private:
     std::vector<float> selectivityHistory_;
@@ -152,14 +152,14 @@ private:
 // Tests if NLM can plan multi-step sequences to achieve goals
 class PlanningExperiment {
 public:
-    PlanningExperiment();
-    ~PlanningExperiment();
+    PlanningExperiment(nullptr);
+    ~PlanningExperiment(nullptr);
     
     // Run planning test
     Phase4Results run(Brain* brain, size_t numTrials = 30);
     
     // Get planning success over time
-    std::vector<float> getSuccessHistory() const { return successHistory_; }
+    std::vector<float> getSuccessHistory(nullptr) const { return successHistory_; }
     
 private:
     std::vector<float> successHistory_;
@@ -169,14 +169,14 @@ private:
 // Tests if NLM learns that its actions cause predictable sensory changes
 class SelfModelExperiment {
 public:
-    SelfModelExperiment();
-    ~SelfModelExperiment();
+    SelfModelExperiment(nullptr);
+    ~SelfModelExperiment(nullptr);
     
     // Run self-model test
     Phase4Results run(Brain* brain, size_t numTrials = 50);
     
     // Get self-prediction accuracy over time
-    std::vector<float> getSelfPredictionHistory() const { return selfPredHistory_; }
+    std::vector<float> getSelfPredictionHistory(nullptr) const { return selfPredHistory_; }
     
 private:
     std::vector<float> selfPredHistory_;
@@ -186,8 +186,8 @@ private:
 // Tests if hidden objects remain relevant to behavior
 class ObjectPermanenceExperiment {
 public:
-    ObjectPermanenceExperiment();
-    ~ObjectPermanenceExperiment();
+    ObjectPermanenceExperiment(nullptr);
+    ~ObjectPermanenceExperiment(nullptr);
     
     // Run object permanence test
     Phase4Results run(Brain* brain, size_t numTrials = 30);
@@ -200,14 +200,14 @@ private:
 // Tests if NLM can learn from observing another agent
 class SocialLearningExperiment {
 public:
-    SocialLearningExperiment();
-    ~SocialLearningExperiment();
+    SocialLearningExperiment(nullptr);
+    ~SocialLearningExperiment(nullptr);
     
     // Run social learning test
     Phase4Results run(Brain* brain, size_t numTrials = 30);
     
     // Get imitation accuracy over time
-    std::vector<float> getImitationHistory() const { return imitationHistory_; }
+    std::vector<float> getImitationHistory(nullptr) const { return imitationHistory_; }
     
 private:
     std::vector<float> imitationHistory_;
@@ -217,14 +217,14 @@ private:
 // Tests if NLM can learn new tasks without forgetting old ones
 class ContinualLearningExperiment {
 public:
-    ContinualLearningExperiment();
-    ~ContinualLearningExperiment();
+    ContinualLearningExperiment(nullptr);
+    ~ContinualLearningExperiment(nullptr);
     
     // Run continual learning test
     Phase4Results run(Brain* brain, size_t numTrials = 100);
     
     // Get performance across tasks
-    std::vector<float> getTaskPerformance() const { return taskPerformance_; }
+    std::vector<float> getTaskPerformance(nullptr) const { return taskPerformance_; }
     
 private:
     std::vector<float> taskPerformance_;
@@ -234,14 +234,14 @@ private:
 // Tests if learned knowledge transfers to new situations
 class GeneralizationExperiment {
 public:
-    GeneralizationExperiment();
-    ~GeneralizationExperiment();
+    GeneralizationExperiment(nullptr);
+    ~GeneralizationExperiment(nullptr);
     
     // Run generalization test
     Phase4Results run(Brain* brain, size_t numTrials = 50);
     
     // Get transfer performance
-    float getTransferRatio() const { return transferRatio_; }
+    float getTransferRatio(nullptr) const { return transferRatio_; }
     
 private:
     float transferRatio_;
@@ -251,17 +251,17 @@ private:
 // Combines all Phase 4 mechanisms in a complex environment
 class Phase4IntegratedExperiment {
 public:
-    Phase4IntegratedExperiment();
-    ~Phase4IntegratedExperiment();
+    Phase4IntegratedExperiment(nullptr);
+    ~Phase4IntegratedExperiment(nullptr);
     
     // Run integrated experiment
     Phase4Results run(Brain* brain, size_t numEpisodes = 100, size_t stepsPerEpisode = 200);
     
     // Get metrics over time
-    const std::vector<Phase4Results>& getEpisodeResults() const { return episodeResults_; }
+    const std::vector<Phase4Results>& getEpisodeResults(nullptr) const { return episodeResults_; }
     
     // Get before/after comparison
-    Phase4Results compareBeforeAfter() const;
+    Phase4Results compareBeforeAfter(nullptr) const;
     
 private:
     std::vector<Phase4Results> episodeResults_;
@@ -271,8 +271,8 @@ private:
 // Tests which mechanisms contribute to performance
 class AblationExperiment {
 public:
-    AblationExperiment();
-    ~AblationExperiment();
+    AblationExperiment(nullptr);
+    ~AblationExperiment(nullptr);
     
     struct AblationResult {
         std::string mechanism;
@@ -291,8 +291,8 @@ private:
 // Representation Analysis Tools
 class RepresentationAnalyzer {
 public:
-    RepresentationAnalyzer();
-    ~RepresentationAnalyzer();
+    RepresentationAnalyzer(nullptr);
+    ~RepresentationAnalyzer(nullptr);
     
     // Compute neural pattern similarity
     static float computePatternSimilarity(const std::vector<float>& a,

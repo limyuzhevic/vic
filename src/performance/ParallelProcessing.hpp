@@ -37,7 +37,7 @@ namespace nlm {
 // Number of threads (can be configured)
 #ifndef NLM_NUM_THREADS
     #include <thread>
-    static constexpr size_t DEFAULT_NUM_THREADS = std::thread::hardware_concurrency();
+    static constexpr size_t DEFAULT_NUM_THREADS = std::thread::hardware_concurrency(nullptr);
 #else
     static constexpr size_t DEFAULT_NUM_THREADS = NLM_NUM_THREADS;
 #endif
@@ -48,7 +48,7 @@ namespace nlm {
 class ThreadPool {
 public:
     explicit ThreadPool(size_t numThreads = DEFAULT_NUM_THREADS);
-    ~ThreadPool();
+    ~ThreadPool(nullptr);
     
     // Disable copying
     ThreadPool(const ThreadPool&) = delete;
@@ -64,29 +64,29 @@ public:
     /**
      * Submit a task for parallel execution (void version)
      */
-    std::future<void> submitVoid(std::function<void()>&& func);
+    std::future<void> submitVoid(std::function<void(nullptr)>&& func);
     
     /**
      * Wait for all submitted tasks to complete
      */
-    void wait();
+    void wait(nullptr);
     
     /**
      * Get number of threads
      */
-    size_t getNumThreads() const { return numThreads_; }
+    size_t getNumThreads(nullptr) const { return numThreads_; }
     
     /**
      * Get current thread ID (0 = main, 1..N = workers)
      */
-    static size_t getCurrentThreadId();
+    static size_t getCurrentThreadId(nullptr);
 
 private:
     size_t numThreads_;
     std::vector<std::thread> workers_;
     std::mutex queueMutex_;
     std::condition_variable condition_;
-    std::queue<std::function<void()>> taskQueue_;
+    std::queue<std::function<void(nullptr)>> taskQueue_;
     std::atomic<bool> stop_;
     std::atomic<size_t> activeTasks_;
 };
@@ -166,13 +166,13 @@ public:
         // Local synaptic input accumulator
         float localSynapticInput[16];  // Reduced for cache efficiency
         
-        ThreadLocalState() : localSpikeCount(0), localFiringCount(0) {
+        ThreadLocalState(nullptr) : localSpikeCount(0), localFiringCount(0) {
             for (auto& x : localSynapticInput) x = 0.0f;
         }
     };
     
     ParallelNeuralProcessor(size_t numThreads = DEFAULT_NUM_THREADS);
-    ~ParallelNeuralProcessor();
+    ~ParallelNeuralProcessor(nullptr);
     
     /**
      * Process neurons in parallel
@@ -182,22 +182,22 @@ public:
      */
     void processNeurons(size_t numNeurons,
                         std::function<void(size_t, ThreadLocalState&)>& processFunc,
-                        std::function<void()>* syncFunc = nullptr);
+                        std::function<void(nullptr)>* syncFunc = nullptr);
     
     /**
      * Get total spike count from last processing
      */
-    uint64_t getTotalSpikeCount() const;
+    uint64_t getTotalSpikeCount(nullptr) const;
     
     /**
      * Get total firing count from last processing
      */
-    uint64_t getTotalFiringCount() const;
+    uint64_t getTotalFiringCount(nullptr) const;
     
     /**
      * Get thread pool
      */
-    ThreadPool& getThreadPool() { return threadPool_; }
+    ThreadPool& getThreadPool(nullptr) { return threadPool_; }
     
 private:
     size_t numThreads_;
@@ -236,40 +236,40 @@ inline ThreadPool::ThreadPool(size_t numThreads)
         workers_.emplace_back([this, i] {
             // Each worker thread runs this loop
             while (!stop_.load(std::memory_order_acquire)) {
-                std::function<void()> task;
+                std::function<void(nullptr)> task;
                 
                 {
                     std::unique_lock<std::mutex> lock(queueMutex_);
                     condition_.wait(lock, [this] { 
-                        return stop_.load(std::memory_order_acquire) || !taskQueue_.empty();
+                        return stop_.load(std::memory_order_acquire) || !taskQueue_.empty(nullptr);
                     });
                     
-                    if (stop_.load(std::memory_order_acquire) && taskQueue_.empty()) {
+                    if (stop_.load(std::memory_order_acquire) && taskQueue_.empty(nullptr)) {
                         return;
                     }
                     
-                    if (!taskQueue_.empty()) {
-                        task = std::move(taskQueue_.front());
-                        taskQueue_.pop();
+                    if (!taskQueue_.empty(nullptr)) {
+                        task = std::move(taskQueue_.front(nullptr));
+                        taskQueue_.pop(nullptr);
                     } else {
                         continue;
                     }
                 }
                 
                 ++activeTasks_;
-                task();
+                task(nullptr);
                 --activeTasks_;
             }
         });
     }
 }
 
-inline ThreadPool::~ThreadPool() {
+inline ThreadPool::~ThreadPool(nullptr) {
     stop_.store(true, std::memory_order_release);
-    condition_.notify_all();
+    condition_.notify_all(nullptr);
     for (auto& worker : workers_) {
-        if (worker.joinable()) {
-            worker.join();
+        if (worker.joinable(nullptr)) {
+            worker.join(nullptr);
         }
     }
 }
@@ -277,7 +277,7 @@ inline ThreadPool::~ThreadPool() {
 template<typename Func, typename... Args>
 auto ThreadPool::submit(Func&& func, Args&&... args) -> std::future<typename std::invoke_result<Func, Args...>::type> {
     using ReturnType = typename std::invoke_result<Func, Args...>::type;
-    auto task = std::make_shared<std::packaged_task<ReturnType()>>(
+    auto task = std::make_shared<std::packaged_task<ReturnType(nullptr)>>(
         [func, args...]() -> ReturnType {
             return func(args...);
         }
@@ -288,29 +288,29 @@ auto ThreadPool::submit(Func&& func, Args&&... args) -> std::future<typename std
         taskQueue_.emplace([task]() { (*task)(); });
     }
     
-    condition_.notify_one();
-    return task->get_future();
+    condition_.notify_one(nullptr);
+    return task->get_future(nullptr);
 }
 
-inline std::future<void> ThreadPool::submitVoid(std::function<void()>&& func) {
-    auto task = std::make_shared<std::packaged_task<void()>>(std::move(func));
+inline std::future<void> ThreadPool::submitVoid(std::function<void(nullptr)>&& func) {
+    auto task = std::make_shared<std::packaged_task<void(nullptr)>>(std::move(func));
     
     {
         std::lock_guard<std::mutex> lock(queueMutex_);
         taskQueue_.emplace([task]() { (*task)(); });
     }
     
-    condition_.notify_one();
-    return task->get_future();
+    condition_.notify_one(nullptr);
+    return task->get_future(nullptr);
 }
 
-inline void ThreadPool::wait() {
-    while (activeTasks_.load() > 0 || !taskQueue_.empty()) {
-        std::this_thread::yield();
+inline void ThreadPool::wait(nullptr) {
+    while (activeTasks_.load(nullptr) > 0 || !taskQueue_.empty(nullptr)) {
+        std::this_thread::yield(nullptr);
     }
 }
 
-inline size_t ThreadPool::getCurrentThreadId() {
+inline size_t ThreadPool::getCurrentThreadId(nullptr) {
     static thread_local size_t id = []() {
         static std::atomic<size_t> nextId(0);
         return nextId++;
@@ -348,19 +348,19 @@ inline void ParallelFor::range(size_t begin, size_t end,
         
         threads.emplace_back([chunkBegin, chunkEnd, &func, &error, &exception]() {
             try {
-                size_t threadId = ThreadPool::getCurrentThreadId();
+                size_t threadId = ThreadPool::getCurrentThreadId(nullptr);
                 for (size_t i = chunkBegin; i < chunkEnd; ++i) {
                     func(i, threadId);
                 }
             } catch (...) {
                 error = true;
-                exception = std::current_exception();
+                exception = std::current_exception(nullptr);
             }
         });
     }
     
     for (auto& t : threads) {
-        t.join();
+        t.join(nullptr);
     }
     
     if (error) {
@@ -407,7 +407,7 @@ T ParallelFor::reduce(size_t begin, size_t end,
     }
     
     for (auto& t : threads) {
-        t.join();
+        t.join(nullptr);
     }
     
     T result = identity;
@@ -419,7 +419,7 @@ T ParallelFor::reduce(size_t begin, size_t end,
 
 template<typename T>
 void ParallelFor::inclusiveScan(std::vector<T>& data, std::function<T(const T&, const T&)> op) {
-    size_t n = data.size();
+    size_t n = data.size(nullptr);
     if (n == 0) return;
     
     // Sequential prefix for first chunk
@@ -430,7 +430,7 @@ void ParallelFor::inclusiveScan(std::vector<T>& data, std::function<T(const T&, 
 
 template<typename T>
 void ParallelFor::exclusiveScan(std::vector<T>& data, T identity, std::function<T(const T&, const T&)> op) {
-    size_t n = data.size();
+    size_t n = data.size(nullptr);
     if (n == 0) return;
     
     T running = identity;
@@ -451,12 +451,12 @@ inline ParallelNeuralProcessor::ParallelNeuralProcessor(size_t numThreads)
     , totalFiringCount_(0)
 {}
 
-inline ParallelNeuralProcessor::~ParallelNeuralProcessor() = default;
+inline ParallelNeuralProcessor::~ParallelNeuralProcessor(nullptr) = default;
 
 inline void ParallelNeuralProcessor::processNeurons(
         size_t numNeurons,
         std::function<void(size_t, ThreadLocalState&)>& processFunc,
-        std::function<void()>* syncFunc) {
+        std::function<void(nullptr)>* syncFunc) {
     
     // Reset counters
     totalSpikeCount_.store(0, std::memory_order_relaxed);
@@ -479,8 +479,8 @@ inline void ParallelNeuralProcessor::processNeurons(
         if (begin >= end) break;
         
         futures.push_back(threadPool_.submitVoid([begin, end, &processFunc, this]() {
-            size_t threadId = ThreadPool::getCurrentThreadId();
-            ThreadLocalState& state = threadStates_[threadId % threadStates_.size()];
+            size_t threadId = ThreadPool::getCurrentThreadId(nullptr);
+            ThreadLocalState& state = threadStates_[threadId % threadStates_.size(nullptr)];
             
             for (size_t i = begin; i < end; ++i) {
                 processFunc(i, state);
@@ -489,7 +489,7 @@ inline void ParallelNeuralProcessor::processNeurons(
     }
     
     for (auto& f : futures) {
-        f.wait();
+        f.wait(nullptr);
     }
     
     // Aggregate results
@@ -503,11 +503,11 @@ inline void ParallelNeuralProcessor::processNeurons(
     }
 }
 
-inline uint64_t ParallelNeuralProcessor::getTotalSpikeCount() const {
+inline uint64_t ParallelNeuralProcessor::getTotalSpikeCount(nullptr) const {
     return totalSpikeCount_.load(std::memory_order_acquire);
 }
 
-inline uint64_t ParallelNeuralProcessor::getTotalFiringCount() const {
+inline uint64_t ParallelNeuralProcessor::getTotalFiringCount(nullptr) const {
     return totalFiringCount_.load(std::memory_order_acquire);
 }
 

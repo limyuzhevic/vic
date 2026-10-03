@@ -16,7 +16,7 @@ struct PlanningCandidate {
     float confidence;
     size_t depth;
     
-    PlanningCandidate() 
+    PlanningCandidate(nullptr) 
         : expectedReward(0), confidence(0), depth(0) {}
 };
 
@@ -31,8 +31,8 @@ struct PlanningCandidate {
 
 class NeuralPlanner {
 public:
-    NeuralPlanner();
-    ~NeuralPlanner();
+    NeuralPlanner(nullptr);
+    ~NeuralPlanner(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -48,11 +48,11 @@ public:
                                       const std::vector<float>& startState);
 
     // Get number of steps to look ahead
-    size_t getPlanningDepth() const { return planningDepth_; }
+    size_t getPlanningDepth(nullptr) const { return planningDepth_; }
     void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
 
     // Get planning confidence
-    float getPlanningConfidence() const { return planningConfidence_; }
+    float getPlanningConfidence(nullptr) const { return planningConfidence_; }
 
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
@@ -60,7 +60,7 @@ public:
                           float actualReward);
 
     // Clear planning cache
-    void clearCache();
+    void clearCache(nullptr);
 
     // Set action quality function (from experience)
     void setActionQuality(ActionType action, float quality) {
@@ -68,11 +68,11 @@ public:
     }
 
     // Get current goal
-    std::vector<float> getCurrentGoal() const { return currentGoal_; }
+    std::vector<float> getCurrentGoal(nullptr) const { return currentGoal_; }
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
 
     // Has recent planning been successful?
-    bool wasRecentPlanSuccessful() const;
+    bool wasRecentPlanSuccessful(nullptr) const;
 
 private:
     // Generate possible action sequences
@@ -109,8 +109,8 @@ private:
 
 class SelfModel {
 public:
-    SelfModel();
-    ~SelfModel();
+    SelfModel(nullptr);
+    ~SelfModel(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -143,16 +143,16 @@ public:
                         ActionType action);
 
     // Get current capability level (0-1)
-    float getCapabilityLevel() const { return capabilityLevel_; }
+    float getCapabilityLevel(nullptr) const { return capabilityLevel_; }
 
     // Get body awareness (how accurately can predict consequences)
-    float getBodyAwareness() const;
+    float getBodyAwareness(nullptr) const;
 
     // Clear self-model
-    void clear();
+    void clear(nullptr);
 
     // Has self-model formed?
-    bool hasSelfModel() const { return !actionEffects_.empty(); }
+    bool hasSelfModel(nullptr) const { return !actionEffects_.empty(nullptr); }
 
 private:
     // Find best matching previous experience
@@ -187,8 +187,8 @@ private:
 
 class SocialLearning {
 public:
-    SocialLearning();
-    ~SocialLearning();
+    SocialLearning(nullptr);
+    ~SocialLearning(nullptr);
 
     // Initialize with brain reference
     void initialize(Brain* brain);
@@ -213,22 +213,22 @@ public:
     bool detectSignal(const std::vector<float>& neuralPattern) const;
 
     // Get learned signal pattern
-    std::vector<float> getSignalPattern() const;
+    std::vector<float> getSignalPattern(nullptr) const;
 
     // Get signal meaning (associated reward)
-    float getSignalMeaning() const;
+    float getSignalMeaning(nullptr) const;
 
     // Update social knowledge based on interactions
     void updateSocialKnowledge(float interactionReward);
 
     // Clear social learning
-    void clear();
+    void clear(nullptr);
 
     // Has learned from others?
-    bool hasSocialKnowledge() const { return observationCount_ > 0; }
+    bool hasSocialKnowledge(nullptr) const { return observationCount_ > 0; }
 
     // Get observation count
-    size_t getObservationCount() const { return observationCount_; }
+    size_t getObservationCount(nullptr) const { return observationCount_; }
 
 private:
     struct Impl;

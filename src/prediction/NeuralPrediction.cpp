@@ -6,6 +6,9 @@
 
 namespace nlm {
 
+// Implementation details for NeuralPrediction
+// Implementation details for NeuralPrediction
+// Implementation details for NeuralPrediction
 struct NeuralPrediction::Impl {
     Brain* brain;
     
@@ -24,10 +27,10 @@ struct NeuralPrediction::Impl {
     std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
     std::vector<float> actionRewards;
     
-    Impl() : brain(nullptr) {}
+    Impl(nullptr) : brain(nullptr) {}
 };
 
-NeuralPrediction::NeuralPrediction()
+NeuralPrediction::NeuralPrediction(nullptr)
     : pImpl(new Impl)
     , sequenceMemorySize_(10)
     , predictionHorizon_(1)
@@ -39,7 +42,7 @@ NeuralPrediction::NeuralPrediction()
 {
 }
 
-NeuralPrediction::~NeuralPrediction() = default;
+NeuralPrediction::~NeuralPrediction(nullptr) = default;
 
 void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -56,32 +59,32 @@ void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState
     stateTimestamps_.push_back(currentStep);
     
     // Keep only recent states
-    if (recentSensoryStates_.size() > sequenceMemorySize_) {
-        recentSensoryStates_.erase(recentSensoryStates_.begin());
-        stateTimestamps_.erase(stateTimestamps_.begin());
+    if (recentSensoryStates_.size(nullptr) > sequenceMemorySize_) {
+        recentSensoryStates_.erase(recentSensoryStates_.begin(nullptr));
+        stateTimestamps_.erase(stateTimestamps_.begin(nullptr));
     }
     
     // Learn sequence if we have at least 2 states
-    if (recentSensoryStates_.size() >= 2) {
-        learnTemporalSequence(recentSensoryStates_[recentSensoryStates_.size() - 2],
-                            recentSensoryStates_.back(),
+    if (recentSensoryStates_.size(nullptr) >= 2) {
+        learnTemporalSequence(recentSensoryStates_[recentSensoryStates_.size(nullptr) - 2],
+                            recentSensoryStates_.back(nullptr),
                             currentStep);
     }
 }
 
 std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentStep) {
-    if (!temporalPredictionEnabled_ || recentSensoryStates_.empty()) {
+    if (!temporalPredictionEnabled_ || recentSensoryStates_.empty(nullptr)) {
         return std::vector<float>();
     }
     
     // Find best matching learned sequence
-    const auto& currentState = recentSensoryStates_.back();
+    const auto& currentState = recentSensoryStates_.back(nullptr);
     
     // Find most similar pattern we've seen
     NeuronId bestMatch = INVALID_NEURON_ID;
     float bestSimilarity = 0.0f;
     
-    for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
+    for (size_t i = 0; i < pImpl->patternRepresentations.size(nullptr); ++i) {
         float sim = computeSimilarity(currentState, pImpl->patternRepresentations[i]);
         if (sim > bestSimilarity) {
             bestSimilarity = sim;
@@ -95,7 +98,7 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
         for (const auto& assoc : pImpl->sequenceAssociations) {
             if (assoc.first == bestMatch) {
                 // Found association - return the associated pattern
-                for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
+                for (size_t i = 0; i < pImpl->patternNeurons.size(nullptr); ++i) {
                     if (pImpl->patternNeurons[i] == assoc.second) {
                         predictionConfidence_ = bestSimilarity;
                         return pImpl->patternRepresentations[i];
@@ -116,7 +119,7 @@ float NeuralPrediction::updateWithObservation(const std::vector<float>& actualSt
     auto predicted = generatePrediction(currentStep);
     
     // Compute error
-    if (predicted.empty()) {
+    if (predicted.empty(nullptr)) {
         predictionError_ = 0.0f;
     } else {
         predictionError_ = computeSimilarity(predicted, actualState);
@@ -124,8 +127,8 @@ float NeuralPrediction::updateWithObservation(const std::vector<float>& actualSt
     }
     
     errorHistory_.push_back(predictionError_);
-    if (errorHistory_.size() > 1000) {
-        errorHistory_.erase(errorHistory_.begin());
+    if (errorHistory_.size(nullptr) > 1000) {
+        errorHistory_.erase(errorHistory_.begin(nullptr));
     }
     
     // Record the actual state for future learning
@@ -148,19 +151,19 @@ std::vector<float> NeuralPrediction::predictActionConsequence(ActionType action,
     float bestMatch = 0.0f;
     std::vector<float> bestConsequence;
     
-    for (size_t i = 0; i < recentActions_.size(); ++i) {
+    for (size_t i = 0; i < recentActions_.size(nullptr); ++i) {
         if (recentActions_[i].first == action) {
             float sim = computeSimilarity(currentState, recentActions_[i].second);
             if (sim > bestMatch) {
                 bestMatch = sim;
-                if (i < pImpl->actionConsequences.size()) {
+                if (i < pImpl->actionConsequences.size(nullptr)) {
                     bestConsequence = pImpl->actionConsequences[i].second;
                 }
             }
         }
     }
     
-    if (bestMatch > 0.5f && !bestConsequence.empty()) {
+    if (bestMatch > 0.5f && !bestConsequence.empty(nullptr)) {
         return bestConsequence;
     }
     
@@ -171,18 +174,18 @@ std::vector<std::vector<float>> NeuralPrediction::predictMultipleSteps(Simulatio
                                                                        size_t numSteps) {
     std::vector<std::vector<float>> predictions;
     
-    auto currentPred = recentSensoryStates_.empty() ? 
-                       std::vector<float>() : recentSensoryStates_.back();
+    auto currentPred = recentSensoryStates_.empty(nullptr) ? 
+                       std::vector<float>() : recentSensoryStates_.back(nullptr);
     
     for (size_t step = 0; step < numSteps; ++step) {
-        if (currentPred.empty()) break;
+        if (currentPred.empty(nullptr)) break;
         
         predictions.push_back(currentPred);
         
         // Use current prediction to generate next
         // (simple approach - in reality this would use chained predictions)
         auto nextPred = generatePrediction(currentStep + step);
-        if (nextPred.empty()) break;
+        if (nextPred.empty(nullptr)) break;
         currentPred = nextPred;
     }
     
@@ -190,11 +193,11 @@ std::vector<std::vector<float>> NeuralPrediction::predictMultipleSteps(Simulatio
 }
 
 void NeuralPrediction::recordAction(ActionType action, SimulationStep step) {
-    if (recentSensoryStates_.empty()) return;
+    if (recentSensoryStates_.empty(nullptr)) return;
     
-    recentActions_.push_back({action, recentSensoryStates_.back()});
-    if (recentActions_.size() > 100) {
-        recentActions_.erase(recentActions_.begin());
+    recentActions_.push_back({action, recentSensoryStates_.back(nullptr)});
+    if (recentActions_.size(nullptr) > 100) {
+        recentActions_.erase(recentActions_.begin(nullptr));
     }
 }
 
@@ -213,7 +216,7 @@ void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentSt
 NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& pattern,
                                                     float similarityThreshold) {
     // Check if we already have a similar pattern
-    for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
+    for (size_t i = 0; i < pImpl->patternRepresentations.size(nullptr); ++i) {
         float sim = computeSimilarity(pattern, pImpl->patternRepresentations[i]);
         if (sim >= similarityThreshold) {
             return pImpl->patternNeurons[i];
@@ -222,7 +225,7 @@ NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& p
     
     // Create new pattern neuron
     if (brain_) {
-        NeuronId newId = NeuronId(pImpl->patternNeurons.size() + 10000);
+        NeuronId newId = NeuronId(pImpl->patternNeurons.size(nullptr) + 10000);
         pImpl->patternNeurons.push_back(newId);
         pImpl->patternRepresentations.push_back(pattern);
         return newId;
@@ -248,14 +251,14 @@ void NeuralPrediction::createSequenceAssociation(NeuronId from, NeuronId to, flo
 
 float NeuralPrediction::computeSimilarity(const std::vector<float>& a, 
                                          const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
+    if (a.size(nullptr) != b.size(nullptr) || a.empty(nullptr)) return 0.0f;
     
     // Cosine similarity
     float dotProduct = 0.0f;
     float normA = 0.0f;
     float normB = 0.0f;
     
-    for (size_t i = 0; i < a.size(); ++i) {
+    for (size_t i = 0; i < a.size(nullptr); ++i) {
         dotProduct += a[i] * b[i];
         normA += a[i] * a[i];
         normB += b[i] * b[i];
@@ -270,9 +273,9 @@ void NeuralPrediction::modulatePredictionSynapses(float error, float reward) {
     if (!brain_) return;
     
     // Apply reward-modulated plasticity to prediction-related synapses
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
+    for (const auto& region : brain_->getRegions(nullptr)) {
+        for (auto* syn : region->getSynapses(nullptr)) {
+            float eligibility = syn->getEligibilityTrace(nullptr);
             
             // If this synapse was recently active in prediction pathway
             if (std::abs(eligibility) > 0.001f) {
@@ -286,11 +289,11 @@ void NeuralPrediction::modulatePredictionSynapses(float error, float reward) {
     }
 }
 
-std::vector<NeuronId> NeuralPrediction::getPredictionNeurons() const {
+std::vector<NeuronId> NeuralPrediction::getPredictionNeurons(nullptr) const {
     return predictionNeurons_;
 }
 
-std::vector<NeuronId> NeuralPrediction::getSequenceNeurons() const {
+std::vector<NeuronId> NeuralPrediction::getSequenceNeurons(nullptr) const {
     std::vector<NeuronId> result;
     for (const auto& assoc : pImpl->sequenceAssociations) {
         result.push_back(assoc.first);
@@ -299,16 +302,19 @@ std::vector<NeuronId> NeuralPrediction::getSequenceNeurons() const {
     return result;
 }
 
-void NeuralPrediction::clearHistory() {
-    errorHistory_.clear();
-    recentSensoryStates_.clear();
-    stateTimestamps_.clear();
-    recentActions_.clear();
-    pImpl->learnedSequences.clear();
-    pImpl->sequenceAssociations.clear();
+void NeuralPrediction::clearHistory(nullptr) {
+    errorHistory_.clear(nullptr);
+    recentSensoryStates_.clear(nullptr);
+    stateTimestamps_.clear(nullptr);
+    recentActions_.clear(nullptr);
+    pImpl->learnedSequences.clear(nullptr);
+    pImpl->sequenceAssociations.clear(nullptr);
 }
 
 // ActionConsequencePredictor Implementation
+// Implementation details for ActionConsequencePredictor
+// Implementation details for ActionConsequencePredictor
+// Implementation details for ActionConsequencePredictor
 struct ActionConsequencePredictor::Impl {
     Brain* brain;
     
@@ -318,15 +324,15 @@ struct ActionConsequencePredictor::Impl {
     // Average reward per action
     std::vector<std::pair<ActionType, float>> actionQuality;
     
-    Impl() : brain(nullptr) {}
+    Impl(nullptr) : brain(nullptr) {}
 };
 
-ActionConsequencePredictor::ActionConsequencePredictor()
+ActionConsequencePredictor::ActionConsequencePredictor(nullptr)
     : pImpl(new Impl)
 {
 }
 
-ActionConsequencePredictor::~ActionConsequencePredictor() = default;
+ActionConsequencePredictor::~ActionConsequencePredictor(nullptr) = default;
 
 void ActionConsequencePredictor::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -358,8 +364,8 @@ void ActionConsequencePredictor::recordExperience(ActionType action,
     }
     
     // Limit experience memory
-    if (pImpl->experiences.size() > 1000) {
-        pImpl->experiences.erase(pImpl->experiences.begin());
+    if (pImpl->experiences.size(nullptr) > 1000) {
+        pImpl->experiences.erase(pImpl->experiences.begin(nullptr));
     }
 }
 
@@ -375,10 +381,10 @@ std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType act
             const auto& before = exp.first.first;
             const auto& after = exp.second;
             
-            if (before.size() != currentState.size()) continue;
+            if (before.size(nullptr) != currentState.size(nullptr)) continue;
             
             float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
-            for (size_t i = 0; i < before.size(); ++i) {
+            for (size_t i = 0; i < before.size(nullptr); ++i) {
                 dot += before[i] * currentState[i];
                 norm1 += before[i] * before[i];
                 norm2 += currentState[i] * currentState[i];
@@ -394,7 +400,7 @@ std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType act
         }
     }
     
-    if (bestSimilarity > 0.5f && !bestConsequence.empty()) {
+    if (bestSimilarity > 0.5f && !bestConsequence.empty(nullptr)) {
         return bestConsequence;
     }
     
@@ -432,21 +438,24 @@ float ActionConsequencePredictor::getActionQuality(ActionType action) const {
     return 0.0f;
 }
 
-void ActionConsequencePredictor::clear() {
-    pImpl->experiences.clear();
-    pImpl->actionQuality.clear();
+void ActionConsequencePredictor::clear(nullptr) {
+    pImpl->experiences.clear(nullptr);
+    pImpl->actionQuality.clear(nullptr);
 }
 
 // PredictionErrorSignal Implementation
+// Implementation details for PredictionErrorSignal
+// Implementation details for PredictionErrorSignal
+// Implementation details for PredictionErrorSignal
 struct PredictionErrorSignal::Impl {
     float lastIntensityError;
     float lastSpatialError;
     float lastTemporalError;
     
-    Impl() : lastIntensityError(0.0f), lastSpatialError(0.0f), lastTemporalError(0.0f) {}
+    Impl(nullptr) : lastIntensityError(0.0f), lastSpatialError(0.0f), lastTemporalError(0.0f) {}
 };
 
-PredictionErrorSignal::PredictionErrorSignal()
+PredictionErrorSignal::PredictionErrorSignal(nullptr)
     : pImpl(new Impl)
     , lastError_(0.0f)
     , surpriseThreshold_(0.3f)
@@ -457,11 +466,11 @@ PredictionErrorSignal::PredictionErrorSignal()
     errorComponents_.totalError = 0.0f;
 }
 
-PredictionErrorSignal::~PredictionErrorSignal() = default;
+PredictionErrorSignal::~PredictionErrorSignal(nullptr) = default;
 
 float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
                                          const std::vector<float>& actual) {
-    if (predicted.empty() || actual.empty()) {
+    if (predicted.empty(nullptr) || actual.empty(nullptr)) {
         lastError_ = 0.0f;
         return 0.0f;
     }
@@ -470,22 +479,22 @@ float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
     float totalDiff = 0.0f;
     float intensityDiff = 0.0f;
     
-    for (size_t i = 0; i < std::min(predicted.size(), actual.size()); ++i) {
+    for (size_t i = 0; i < std::min(predicted.size(nullptr), actual.size(nullptr)); ++i) {
         float diff = std::abs(predicted[i] - actual[i]);
         totalDiff += diff;
         intensityDiff += diff * diff;
     }
     
-    float meanError = totalDiff / predicted.size();
-    float meanSqError = intensityDiff / predicted.size();
+    float meanError = totalDiff / predicted.size(nullptr);
+    float meanSqError = intensityDiff / predicted.size(nullptr);
     
     // Compute spatial error (variance of differences)
     float spatialVar = 0.0f;
-    for (size_t i = 0; i < predicted.size(); ++i) {
+    for (size_t i = 0; i < predicted.size(nullptr); ++i) {
         float diff = predicted[i] - actual[i];
         spatialVar += (diff - meanError) * (diff - meanError);
     }
-    float spatialError = std::sqrt(spatialVar / predicted.size());
+    float spatialError = std::sqrt(spatialVar / predicted.size(nullptr));
     
     // Update components
     pImpl->lastIntensityError = std::sqrt(meanSqError);
@@ -500,7 +509,7 @@ float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
     return lastError_;
 }
 
-float PredictionErrorSignal::getModulationSignal() const {
+float PredictionErrorSignal::getModulationSignal(nullptr) const {
     // Convert error to modulation signal (0-1)
     // Higher error = stronger modulation for learning
     return std::min(1.0f, lastError_ * 2.0f);
@@ -508,8 +517,8 @@ float PredictionErrorSignal::getModulationSignal() const {
 
 void PredictionErrorSignal::recordError(float error, SimulationStep step) {
     errorHistory_.push_back(error);
-    if (errorHistory_.size() > 10000) {
-        errorHistory_.erase(errorHistory_.begin());
+    if (errorHistory_.size(nullptr) > 10000) {
+        errorHistory_.erase(errorHistory_.begin(nullptr));
     }
 }
 

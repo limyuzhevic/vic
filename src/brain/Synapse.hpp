@@ -15,7 +15,7 @@ public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
-    ~Synapse();
+    ~Synapse(nullptr);
     
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;
@@ -24,58 +24,58 @@ public:
     Synapse& operator=(Synapse&&) noexcept;
     
     // Identity
-    SynapseId getId() const;
+    SynapseId getId(nullptr) const;
     
     // Connection
-    NeuronId getSourceNeuron() const;
-    NeuronId getDestinationNeuron() const;
+    NeuronId getSourceNeuron(nullptr) const;
+    NeuronId getDestinationNeuron(nullptr) const;
     
     // Weight
-    SynapticWeight getWeight() const;
+    SynapticWeight getWeight(nullptr) const;
     void setWeight(SynapticWeight weight);
     void addToWeight(SynapticWeight delta);
     
     // Delay (in simulation steps)
-    Delay getDelay() const;
+    Delay getDelay(nullptr) const;
     void setDelay(Delay delay);
     
     // Type
-    SynapseType getType() const;
+    SynapseType getType(nullptr) const;
     void setType(SynapseType type);
     
     // Excitatory/Inhibitory
-    bool isExcitatory() const;
-    bool isInhibitory() const;
+    bool isExcitatory(nullptr) const;
+    bool isInhibitory(nullptr) const;
     
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getPreSpikeHistory() const;
-    const std::vector<Timestamp>& getPostSpikeHistory() const;
-    void clearHistory();
+    const std::vector<Timestamp>& getPreSpikeHistory(nullptr) const;
+    const std::vector<Timestamp>& getPostSpikeHistory(nullptr) const;
+    void clearHistory(nullptr);
     
     // Plasticity flags
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
+    const PlasticityFlags& getPlasticityFlags(nullptr) const;
+    PlasticityFlags& getPlasticityFlags(nullptr);
     
     // Enable/disable plasticity rules
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
     // Eligibility trace (for reward-modulated learning)
-    float getEligibilityTrace() const;
+    float getEligibilityTrace(nullptr) const;
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
     // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
+    float getEfficacy(nullptr) const;
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // TODO: PHASE 2 - Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
-    void reset();
+    void reset(nullptr);
     
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);

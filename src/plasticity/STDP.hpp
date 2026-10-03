@@ -9,23 +9,23 @@ namespace nlm {
 
 class STDP : public PlasticityRule {
 public:
-    STDP();
-    ~STDP() override;
+    STDP(nullptr);
+    ~STDP(nullptr) override;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
-    const char* getName() const override;
+    const char* getName(nullptr) const override;
     
     // STDP parameters
     void setLTPWeight(float weight);    // Long-term potentiation weight
-    float getLTPWeight() const;
+    float getLTPWeight(nullptr) const;
     void setLTDWeight(float weight);    // Long-term depression weight
-    float getLTDWeight() const;
+    float getLTDWeight(nullptr) const;
     void setTimeConstant(float tau);    // STDP time constant (ms)
-    float getTimeConstant() const;
+    float getTimeConstant(nullptr) const;
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
@@ -44,7 +44,7 @@ public:
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
+    const char* getName(nullptr) const override { return "R-STDP"; }
 };
 
 // Spike-timing dependent plasticity with triplet interactions
@@ -56,7 +56,7 @@ public:
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "TripletSTDP"; }
+    const char* getName(nullptr) const override { return "TripletSTDP"; }
 };
 
 } // namespace nlm

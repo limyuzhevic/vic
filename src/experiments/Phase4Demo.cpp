@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
     // Create brain
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
-    if (!brain->initialize()) {
+    if (!brain->initialize(nullptr)) {
         std::cerr << "Failed to initialize brain!\n";
         return 1;
     }
@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
     printSection("1. Temporal Prediction Learning");
     {
         TemporalPredictionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Initial Prediction Error", results.predictionErrorInitial);
         printResult("Final Prediction Error", results.predictionErrorFinal);
@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     printSection("2. Working Memory");
     {
         WorkingMemoryExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Initial Retention", results.workingMemoryRetentionInitial);
         printResult("Final Retention", results.workingMemoryRetentionFinal);
@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
     printSection("3. Episodic Memory");
     {
         EpisodicRecallExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Recall Accuracy", results.episodicRecallAccuracy);
         printResult("Episodes Stored", results.episodesStored);
@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
     printSection("4. Concept Formation");
     {
         ConceptFormationExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Concepts Formed", results.conceptsFormed);
         printResult("Concept Stability", results.conceptStability);
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
     printSection("5. Neural Attention");
     {
         AttentionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Attention Selectivity", results.attentionSelectivity);
         printResult("Distraction Resistance", results.distractionResistance);
@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
     printSection("6. Multi-Step Planning");
     {
         PlanningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials / 2);
         
         printResult("Planning Accuracy", results.planningAccuracy);
         printResult("Planning Confidence", results.planningConfidence);
@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
     printSection("7. Self-Model");
     {
         SelfModelExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Self-Prediction Accuracy", results.selfPredictionAccuracy);
         printResult("Body Awareness", results.bodyAwareness);
@@ -167,7 +167,7 @@ int main(int argc, char* argv[]) {
     printSection("8. Social Learning");
     {
         SocialLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials / 2);
         
         printResult("Imitation Accuracy", results.imitationAccuracy);
         printResult("Observations from Others", results.observationsFromOthers);
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
     printSection("9. Continual Learning");
     {
         ContinualLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(nullptr), numTrials);
         
         printResult("Behavior Improvement", results.behaviorImprovement);
         printResult("Transfer Performance", results.transferPerformance);
@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
     printSection("10. Integrated Phase 4");
     {
         Phase4IntegratedExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), 10, 50);
+        Phase4Results results = experiment.run(brain.get(nullptr), 10, 50);
         
         printResult("Total Reward", results.totalReward);
         printResult("Episodes Stored", results.episodesStored);
