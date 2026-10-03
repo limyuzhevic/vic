@@ -1,0 +1,656 @@
+# Comprehensive Python Examples for NLM
+
+This directory contains advanced examples demonstrating various use cases of the NLM Python API.
+
+## Overview
+
+These examples cover a range of applications from basic usage to advanced scenarios including:
+
+- **Basic Brain Setup and Simulation**
+- **Agent-Word Interactions**
+- **Memory System Demonstrations**
+- **Neuromodulation and Learning**
+- **Developmental Processes**
+- **Advanced Action Selection**
+- **Checkpointing and Persistence**
+- **Multi-Agent Systems**
+- **Experiment Automation**
+
+## Example 1: Basic Brain with Development
+
+```python
+import pynlm
+
+def basic_developmental_brain():
+    """Create a brain that develops over time."""
+    # Create configuration
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 500)
+    config.set("brain.synapse_density", 0.05)
+    
+    # Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    print(f"Brain initialized with {brain.getTotalNeuronCount()} neurons")
+    print(f"Initial developmental stage: {brain.getDevelopmentalStage()}")
+    
+    # Run simulation with development
+    for step in range(1000):
+        brain.step(step)
+        
+        # Update development every 100 steps
+        if step % 100 == 0:
+            brain.develop()
+            print(f"Step {step}: Development stage = {brain.getDevelopmentalStage()}")
+    
+    print(f"Final firing rate: {brain.getAverageFiringRate():.4f}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    
+    return brain
+
+# Run the example
+brain = basic_developmental_brain()
+```
+
+## Example 2: Complete Agent System
+
+```python
+import pynlm
+
+def complete_agent_system():
+    """Create a complete agent with sensory input and motor output."""
+    # Setup
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Create world and setup
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    agent.initialize(world)
+    
+    # Enable all learning systems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("=== Agent Simulation Started ===")
+    
+    # Run simulation
+    for step in range(500):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain thinks
+        brain.step(step)
+        
+        # Get action from brain
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = 0.0
+        if action.getType() == pynlm.ActionType.Eat:
+            reward = 1.0
+        elif action.getType() == pynlm.ActionType.Interact:
+            reward = 0.5
+            
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 50 == 0:
+            print(f"Step {step}: Action = {action.getType()}, "
+                  f"Curiosity = {agent.getCuriosityLevel():.3f}, "
+                  f"Firing rate = {brain.getAverageFiringRate():.3f}")
+    
+    print("=== Agent Simulation Complete ===")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Final novelty level: {agent.getNoveltyLevel():.3f}")
+    
+    return brain, world, agent
+
+# Run the example
+brain, world, agent = complete_agent_system()
+```
+
+## Example 3: Memory System Demonstration
+
+```python
+import pynlm
+
+def memory_system_demo():
+    """Demonstrate working and episodic memory systems."""
+    # Create brain with memory systems
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 1000)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Check initial memory state
+    working_memory = brain.getWorkingMemory()
+    episodic_memory = brain.getEpisodicMemory()
+    
+    print(f"Initial working memory capacity: {working_memory.getCapacity()}")
+    print(f"Initial working memory traces: {working_memory.getActiveTraces()}")
+    print(f"Initial episodic memory episodes: {episodic_memory.getEpisodeCount()}")
+    
+    # Run simulation to build memories
+    for step in range(200):
+        brain.step(step)
+        
+        # Inject sensory input to build working memory
+        if step % 10 == 0:
+            # Create simple sensory input
+            vision_data = [0.5, 0.3, 0.8, 0.2, 0.6] * 8  # 40 elements
+            from pynlm import Vision
+            sensory_input = Vision(8, 8, 3)
+            sensory_input.setData(vision_data)
+            brain.receiveSensoryInput(sensory_input)
+        
+        # Store episode in episodic memory every 50 steps
+        if step % 50 == 49:
+            episode = episodic_memory.getCurrentEpisode()
+            episode.timestamp = step
+            episodic_memory.storeEpisode(episode)
+            print(f"Stored episode {episodic_memory.getEpisodeCount()} at step {step}")
+    
+    print(f"\nFinal memory statistics:")
+    print(f"Working memory traces: {working_memory.getActiveTraces()}")
+    print(f"Episodic memory episodes: {episodic_memory.getEpisodeCount()}")
+    print(f"Average firing rate: {brain.getAverageFiringRate():.3f}")
+    
+    return brain
+
+# Run the example
+brain = memory_system_demo()
+```
+
+## Example 4: Neuromodulation and Learning
+
+```python
+import pynlm
+import random
+
+def neuromodulation_demo():
+    """Demonstrate neuromodulation systems (dopamine, curiosity, novelty)."""
+    # Create brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent
+    world = pynlm.createSimpleWorld()
+    world.configure(width=15, height=15, visionWidth=6, visionHeight=6)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all neuromodulation systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    print("=== Neuromodulation Demo ===")
+    print(f"Initial dopamine level: {agent.getNeuromodulationLevel():.3f}")
+    print(f"Initial curiosity level: {agent.getCuriosityLevel():.3f}")
+    
+    # Run simulation with various experiences
+    for episode in range(3):
+        print(f"\n--- Episode {episode + 1} ---")
+        
+        for step in range(100):
+            # Random action (exploration)
+            actions = list(pynlm.ActionType)
+            action_type = random.choice(actions)
+            action = pynlm.Action(action_type)
+            
+            # Apply action to world
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            
+            # Brain step
+            brain.step(step)
+            
+            # Decode action from brain
+            brain_action = agent.decodeMotorCommand()
+            
+            # Calculate reward based on action
+            reward = 0.0
+            if brain_action.getType() == pynlm.ActionType.Eat:
+                reward = 1.0
+            elif brain_action.getType() == pynlm.ActionType.Interact:
+                reward = 0.5
+            
+            # Apply reward modulation
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+        
+        # Print neuromodulation levels
+        print(f"Episode {episode + 1} - Dopamine: {agent.getNeuromodulationLevel():.3f}, "
+              f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+              f"Novelty: {agent.getNoveltyLevel():.3f}")
+    
+    print("\n=== Neuromodulation Demo Complete ===")
+    
+    return brain, agent
+
+# Run the example
+brain, agent = neuromodulation_demo()
+```
+
+## Example 5: Advanced Action Selection
+
+```python
+import pynlm
+
+def advanced_action_selection():
+    """Demonstrate advanced action selection with multiple factors."""
+    # Create sophisticated brain
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 2000)
+    config.set("plasticity.stdp.enable", True)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent with world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+    world.reset()
+    world.setAgentStart(15.0, 15.0)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all advanced systems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("=== Advanced Action Selection Demo ===")
+    
+    # Run complex simulation
+    action_stats = {}
+    for action_type in pynlm.ActionType:
+        action_stats[str(action_type)] = 0
+    
+    for step in range(1000):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain processes
+        brain.step(step)
+        
+        # Advanced action selection
+        action = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Calculate reward
+        reward = world.computeReward(brain.getRegion(brain.getRegionIds()[0]))
+        
+        # Apply neuromodulation
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Track action statistics
+        action_name = str(action.getType())
+        action_stats[action_name] += 1
+        
+        # Update development
+        if step % 50 == 0:
+            agent.updateDevelopment(0.5)
+            brain.develop()
+        
+        # Print progress
+        if step % 200 == 0:
+            print(f"Step {step}: Most common actions: {get_most_common_actions(action_stats, 3)}")
+            print(f"Brain stats - Firing rate: {brain.getAverageFiringRate():.3f}, "
+                  f"Development stage: {brain.getDevelopmentalStage()}")
+    
+    print(f"\n=== Action Statistics ===")
+    for action, count in action_stats.items():
+        print(f"{action}: {count} ({count/10:.1f}%)")
+    
+    print(f"\nFinal neuromodulation levels:")
+    print(f"Curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"Novelty: {agent.getNoveltyLevel():.3f}")
+    print(f"Prediction error: {agent.getPredictionError():.3f}")
+    
+    return brain, agent, action_stats
+
+def get_most_common_actions(stats, n):
+    """Get the n most common actions."""
+    sorted_actions = sorted(stats.items(), key=lambda x: x[1], reverse=True)
+    return [action for action, count in sorted_actions[:n]]
+
+# Run the example
+brain, agent, action_stats = advanced_action_selection()
+```
+
+## Example 6: Checkpoint and Persistence
+
+```python
+import pynlm
+import os
+
+def checkpoint_demo():
+    """Demonstrate checkpoint save/load functionality."""
+    print("=== Checkpoint Demo ===")
+    
+    # Create first brain and run simulation
+    print("Creating and running first brain...")
+    config1 = pynlm.createDefaultConfig()
+    config1.set("brain.neuron_count", 800)
+    
+    brain1 = pynlm.createBrain(config1)
+    brain1.initialize()
+    
+    for step in range(300):
+        brain1.step(step)
+    
+    # Save checkpoint
+    checkpoint_path = "/tmp/nlm_checkpoint_test.bin"
+    if brain1.save(checkpoint_path):
+        print(f"Checkpoint saved successfully to {checkpoint_path}")
+    else:
+        print("Failed to save checkpoint")
+        return None
+    
+    # Create second brain and load checkpoint
+    print("Creating second brain and loading checkpoint...")
+    config2 = pynlm.createDefaultConfig()
+    config2.set("brain.neuron_count", 800)  # Same configuration
+    
+    brain2 = pynlm.createBrain(config2)
+    brain2.initialize()
+    
+    if brain2.load(checkpoint_path):
+        print("Checkpoint loaded successfully")
+    else:
+        print("Failed to load checkpoint")
+        return None
+    
+    # Verify checkpoint integrity
+    neurons1 = brain1.getTotalNeuronCount()
+    neurons2 = brain2.getTotalNeuronCount()
+    spikes1 = brain1.getTotalSpikeCount()
+    spikes2 = brain2.getTotalSpikeCount()
+    
+    print(f"Brain 1: {neurons1} neurons, {spikes1} spikes")
+    print(f"Brain 2: {neurons2} neurons, {spikes2} spikes")
+    
+    if neurons1 == neurons2 and spikes1 == spikes2:
+        print("✓ Checkpoint integrity verified!")
+    else:
+        print("✗ Checkpoint integrity check failed!")
+    
+    # Clean up
+    if os.path.exists(checkpoint_path):
+        os.remove(checkpoint_path)
+    
+    return brain1, brain2
+
+# Run the example
+brain1, brain2 = checkpoint_demo()
+```
+
+## Example 7: Multi-Agent System
+
+```python
+import pynlm
+
+def multi_agent_demo():
+    """Demonstrate multiple agents in the same world."""
+    print("=== Multi-Agent Demo ===")
+    
+    # Create shared world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=10, visionHeight=10)
+    world.reset()
+    world.setAgentStart(25.0, 25.0)
+    
+    # Create multiple agents with different configurations
+    agents = []
+    brains = []
+    
+    configs = [
+        {"name": "Agent 1", "neurons": 500, "curiosity": 0.8},
+        {"name": "Agent 2", "neurons": 800, "curiosity": 0.5},
+        {"name": "Agent 3", "neurons": 300, "curiosity": 1.2},
+    ]
+    
+    for i, config_data in enumerate(configs):
+        # Create brain
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", config_data["neurons"])
+        config.set("neuromod.dopamine.scale", config_data["curiosity"])
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create agent
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Set different curiosity levels
+        agent.enableCuriosity(True)
+        
+        agents.append(agent)
+        brains.append(brain)
+        
+        print(f"Created {config_data['name']}: {config_data['neurons']} neurons, "
+              f"curiosity: {config_data['curiosity']}")
+    
+    # Run simulation with all agents
+    print("\nRunning multi-agent simulation...")
+    for step in range(200):
+        world.update(0.1)
+        
+        # Each agent processes sensory input
+        for i, agent in enumerate(agents):
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            
+            # Brain processes
+            brains[i].step(step)
+            
+            # Each agent decides its own action
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Apply reward based on agent's action
+            reward = 0.1 if action.getType() != pynlm.ActionType.Wait else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+    
+    # Print final statistics
+    print("\n=== Multi-Agent Results ===")
+    for i, agent in enumerate(agents):
+        print(f"{configs[i]['name']} - "
+              f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+              f"Novelty: {agent.getNoveltyLevel():.3f}, "
+              f"Firing rate: {brains[i].getAverageFiringRate():.3f}")
+    
+    return brains, agents
+
+# Run the example
+brains, agents = multi_agent_demo()
+```
+
+## Example 8: Experiment Automation
+
+```python
+import pynlm
+
+def experiment_automation():
+    """Demonstrate automated experiment running."""
+    print("=== Experiment Automation Demo ===")
+    
+    def run_experiment(experiment_id, config_overrides=None):
+        """Run a single experiment with given configuration."""
+        print(f"Starting Experiment {experiment_id}...")
+        
+        # Create configuration
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", 1000)
+        
+        # Apply overrides if provided
+        if config_overrides:
+            for key, value in config_overrides.items():
+                config.set(key, value)
+        
+        # Run experiment
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create agent and world
+        agent = pynlm.createAgentBrain(brain)
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        agent.initialize(world)
+        
+        # Run simulation
+        total_reward = 0.0
+        for step in range(500):
+            world.update(0.1)
+            
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            
+            brain.step(step)
+            
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            reward = world.computeReward(brain.getRegion(brain.getRegionIds()[0]))
+            total_reward += reward
+            
+            agent.applyRewardModulation(reward, 0.0)
+            
+            if step % 100 == 0:
+                agent.updateDevelopment(0.5)
+        
+        # Return results
+        return {
+            "experiment_id": experiment_id,
+            "total_reward": total_reward,
+            "avg_firing_rate": brain.getAverageFiringRate(),
+            "curiosity_level": agent.getCuriosityLevel(),
+            "final_action": action.getType()
+        }
+    
+    # Run multiple experiments in parallel
+    experiments = [
+        ("baseline", {"brain.synapse_density": 0.1}),
+        ("high_curiosity", {"neuromod.dopamine.scale": 2.0}),
+        ("low_curiosity", {"neuromod.dopamine.scale": 0.5}),
+        ("high_plasticity", {"plasticity.stdp.learning_rate": 0.005}),
+        ("low_plasticity", {"plasticity.stdp.learning_rate": 0.0001}),
+    ]
+    
+    results = []
+    for exp_id, overrides in experiments:
+        result = run_experiment(exp_id, overrides)
+        results.append(result)
+        print(f"Experiment {exp_id} completed: Reward = {result['total_reward']:.2f}")
+    
+    # Analyze results
+    print("\n=== Experiment Analysis ===")
+    for result in results:
+        print(f"Exp {result['experiment_id']}: "
+              f"Reward={result['total_reward']:.2f}, "
+              f"Firing={result['avg_firing_rate']:.3f}, "
+              f"Curiosity={result['curiosity_level']:.3f}, "
+              f"Final Action={result['final_action']}")
+    
+    return results
+
+# Run the example
+results = experiment_automation()
+```
+
+## File Structure
+
+```
+examples/
+├── example1_basic.py                    # Basic brain setup
+├── example2_agent.py                   # Complete agent system
+├── example3_memory.py                  # Memory system demonstration
+├── example4_neuromodulation.py         # Neuromodulation systems
+├── example5_advanced_action.py          # Advanced action selection
+├── example6_checkpoint.py              # Checkpoint and persistence
+├── example7_multi_agent.py             # Multi-agent systems
+├── example8_automation.py              # Experiment automation
+├── README_examples.md                  # Examples overview
+└── requirements.txt                    # Dependencies
+```
+
+## Running Examples
+
+### Basic Setup
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run any example: `python example1_basic.py`
+
+### Building Examples
+```bash
+cd examples
+mkdir build
+python -m pip install -e ../.
+python example1_basic.py
+```
+
+## Contributing
+
+Please contribute by:
+1. Adding new examples for specific use cases
+2. Improving existing examples
+3. Reporting issues with examples
+4. Suggesting new functionality to demonstrate
+
+Examples should follow these guidelines:
+- Include comprehensive comments
+- Provide clear output descriptions
+- Demonstrate best practices
+- Include error handling where appropriate
+- Be self-contained and easy to run
+
+## Further Reading
+
+For more advanced topics, see:
+- `HOW_TO_USE.md` - Detailed API documentation
+- `docs/ARCHITECTURE.md` - System architecture
+- `docs/SCIENCE.md` - Scientific background
+- `docs/EXPERIMENTS.md` - Experiment descriptions
+
+This directory provides a comprehensive set of examples for getting started with NLM and exploring its advanced capabilities.
