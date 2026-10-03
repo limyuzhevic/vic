@@ -29,6 +29,12 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Enhanced neuromodulation systems
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Reward;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -172,17 +178,17 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // Core neuromodulators
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Enhanced neuromodulators
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
+    Reward* getReward();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
