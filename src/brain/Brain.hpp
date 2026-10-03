@@ -6,8 +6,12 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/Notifications/Observer.hpp"
+#include "../core/Notifications/Subject.hpp"
+#include "../core/Notifications/NotificationManager.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -28,6 +32,13 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MemoryObserver;
+class PredictionObserver;
+class MotorObserver;
+class SensoryObserver;
+class NeuromodulationObserver;
+class DevelopmentObserver;
+class CognitionObserver;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -190,12 +201,28 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Notification system methods
+    void registerObserver(const std::string& systemName, std::shared_ptr<Observer> observer);
+    void unregisterObserver(const std::string& systemName, const std::shared_ptr<Observer>& observer);
+    void registerSystemObserver(const std::shared_ptr<Observer>& observer);
+    void broadcastNotification(const Notification& notification);
+    void notifySpike(NeuronId neuron);
+    void notifyMemoryUpdate(const std::string& memoryType);
+    void notifyPredictionError();
+    void notifyNeuromodulation(const std::string& modulatorType);
+    void notifySensoryInput(const std::string& modality);
+    void notifyMotorOutput(const std::string& action);
+    void notifyDevelopmentUpdate(const std::string& stage);
+    void notifyConceptFormation(const std::string& concept);
+    void notifyAttentionShift(const std::string& target);
+    void notifyCuriosityActivation(const std::string& trigger);
+    void notifyRewardReceived(const std::string& reward);
+    void notifyNoveltyDetected(const std::string& novelty);
+    void notifyIntegrationComplete(const std::string& stage);
+    void notifySystemReady(const std::string& system);
+    void notifyPlasticityUpdate(const std::string& ruleType);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // Observer management
+    void initializeObservers();
+    void shutdownObservers();
+    void setupSystemObservers();
