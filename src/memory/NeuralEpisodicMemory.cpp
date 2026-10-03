@@ -36,11 +36,34 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
+    // Set position based on recent neural activity if available
+    if (!episode.activeNeurons.empty()) {
+        // Find a neuron with highest activation to determine episode position
+        float maxActivation = 0.0f;
+        NeuronId bestNeuron;
+        
+        for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+            if (i < episode.neuronActivations.size() && 
+                episode.neuronActivations[i] > maxActivation) {
+                maxActivation = episode.neuronActivations[i];
+                bestNeuron = episode.activeNeurons[i];
+            }
+        }
+        
+        if (maxActivation > 0.0f) {
+            // Use region and population as positional information
+            stored.positionX = bestNeuron.getRegionId().index() * 10.0f;
+            stored.positionY = bestNeuron.getPopulationId() * 10.0f;
+            stored.orientation = 0.0f;  // Could be derived from neural connectivity
+        }
+    }
+    
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
+        // Use a simple mapping to create unique neuron IDs for episodes
+        NeuronId epNeuron(30000 + episodes_.size());
         pImpl->episodeNeurons.push_back(epNeuron);
         
         // Store episode index in the neuron

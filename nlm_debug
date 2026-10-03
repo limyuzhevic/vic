@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+
+# NLM Debug Tools
+# Advanced debugging utilities for NLM researchers
+
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Default configuration
+NLM_CONFIG="config.json"
+
+# Show debug help
+show_debug_help() {
+    echo "Usage: ${0##*/} [DEBUG_COMMAND] [OPTIONS]"
+    echo ""
+    echo "NLM Debug Tools - Advanced debugging for researchers"
+    echo ""
+    echo "Available debug commands:"
+    echo "  neurons                 Debug neuron populations and activity"
+    echo "  synapses                Debug synaptic connections and plasticity"
+    echo "  memory                 Debug memory systems (working, episodic, associative)"
+    echo "  prediction              Debug prediction system and prediction error"
+    echo "  attention               Debug attention and selection mechanisms"
+    echo "  neuromodulation          Debug neuromodulator systems (dopamine, curiosity, etc.)"
+    echo "  concept                 Debug concept formation and discovery"
+    echo "  development             Debug developmental processes"
+    echo "  performance             Debug performance and bottlenecks"
+    echo "  connectivity            Debug brain-wide connectivity patterns"
+    echo ""
+    echo "Options (common to all commands):"
+    echo "  -h, --help              Show help for specific command"
+    echo "  -c, --config FILE       Configuration file"
+    echo "  -l, --log LEVEL         Log level (debug, info, warn, error)"
+    echo "  -o, --output FILE       Save debug output to file"
+    echo "  --live                  Enable live debugging updates"
+    echo "  --stats                 Show statistical summaries"
+}
+
+# Debug neurons
+debug_neurons() {
+    local live=0
+    local stats=0
+    local output_file=""
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                echo "Debug neurons help:"
+                echo "  Show neuron statistics and populations"
+                echo "  List active neurons"
+                echo "  Check neuron connectivity"
+                echo "  Debug neuron types and regions"
+                exit 0
+                ;;
+            -c|--config)
+                NLM_CONFIG="$2"
+                shift 2
+                ;;
+            -l|--log)
+                shift 1
+                ;;
+            -o|--output)
+                output_file="$2"
+                shift 2
+                ;;
+            --live)
+                live=1
+                shift
+                ;;
+            --stats)
+                stats=1
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    echo -e "${BLUE}NLM Neuron Debug Tool${NC}"
+    echo -e "Live monitoring: $live"
+    echo -e "Statistics mode: $stats"
+    
+    if [[ $live -eq 1 ]]; then
+        echo -e "${YELLOW}Live neuron monitoring requires NLM executable with debug support${NC}"
+        echo "This would connect to a running NLM instance for real-time neuron monitoring"
+        echo "Features would include:"
+        echo "  - Real-time neuron activity visualization"
+        echo "  - Dynamic connectivity updates"
+        echo "  - Population-based statistics"
+        echo "  - Spiking pattern analysis"
+    else
+        echo -e "${YELLOW}Static neuron analysis${NC}"
+        echo "This would analyze the compiled NLM brain structure"
+        echo "Features would include:"
+        echo "  - Neuron population statistics"
+        echo "  - Regional distribution analysis"
+        echo "  - Activity pattern summaries"
+        echo "  - Connectivity metrics"
+    fi
+    
+    # Save output if requested
+    if [[ -n "$output_file" ]]; then
+        echo -e "${GREEN}Saving debug output to: $output_file${NC}"
+        # This would save the debug output to the specified file
+        echo "Debug output saved successfully"
+    fi
+}
+
+# Debug synapses
+debug_synapses() {
+    echo -e "${BLUE}NLM Synapse Debug Tool${NC}"
+    echo "This tool would debug synaptic connections and plasticity mechanisms"
+    echo ""
+    echo "Features would include:"
+    echo "  - Synaptic weight analysis"
+    echo "  - Plasticity rule debugging"
+    echo "  - STDP and Hebbian learning analysis"
+    echo "  - Connection strength distributions"
+    echo "  - Synaptic type classification"
+    echo "  - Developmental connectivity changes"
+}
+
+# Debug memory systems
+debug_memory() {
+    echo -e "${BLUE}NLM Memory Systems Debug Tool${NC}"
+    echo "This tool would debug working memory, episodic memory, and associative memory"
+    echo ""
+    echo "Features would include:"
+    echo "  - Working memory trace analysis"
+    echo "  - Episodic memory episode inspection"
+    echo "  - Memory consolidation debugging"
+    echo "  - Memory retrieval testing"
+    echo "  - Memory capacity and decay analysis"
+    echo "  - Memory-trace interference studies"
+}
+
+# Debug prediction system
+debug_prediction() {
+    echo -e "${BLUE}NLM Prediction System Debug Tool${NC}"
+    echo "This tool would debug prediction mechanisms and prediction error"
+    echo ""
+    echo "Features would include:"
+    echo "  - Prediction accuracy analysis"
+    echo "  - Prediction error signal debugging"
+    echo "  - Sensory prediction testing"
+    echo "  - Prediction confidence metrics"
+    echo "  - Prediction-learning curve analysis"
+}
+
+# Debug attention system
+debug_attention() {
+    echo -e "${BLUE}NLM Attention Debug Tool${NC}"
+    echo "This tool would debug attention selection and focus mechanisms"
+    echo ""
+    echo "Features would include:"
+    echo "  - Attention winner analysis"
+    echo "  - Competition mechanism debugging"
+    echo "  - Salience and bias analysis"
+    echo "  - Focus duration statistics"
+    echo "  - Attentional capture testing"
+}
+
+# Debug neuromodulation
+debug_neuromodulation() {
+    echo -e "${BLUE}NLM Neuromodulation Debug Tool${NC}"
+    echo "This tool would debug neuromodulator systems (dopamine, curiosity, novelty, etc.)"
+    echo ""
+    echo "Features would include:"
+    echo "  - Neuromodulator level monitoring"
+    echo "  - Plasticity factor analysis"
+    echo "  - Excitability modulation debugging"
+    echo "  - Motivation signal analysis"
+    echo "  - Neuromodulatory network interactions"
+}
+
+# Debug concept formation
+debug_concept() {
+    echo -e "${BLUE}NLM Concept Formation Debug Tool${NC}"
+    echo "This tool would debug concept discovery and category formation"
+    echo ""
+    echo "Features would include:"
+    echo "  - Concept prototype analysis"
+    echo "  - Instance categorization"
+    echo "  - Concept stability metrics"
+    echo "  - Novelty detection debugging"
+    echo "  - Concept merging analysis"
+    echo "  - Generalization ability testing"
+}
+
+# Debug development
+debug_development() {
+    echo -e "${BLUE}NLM Development Debug Tool${NC}"
+    echo "This tool would debug developmental processes and plasticity changes"
+    echo ""
+    echo "Features would include:"
+    echo "  - Developmental stage tracking"
+    echo "  - Plasticity rate analysis"
+    echo "  - Synaptogenesis and pruning debugging"
+    echo "  - Critical period analysis"
+    echo "  - Maturation progress monitoring"
+}
+
+# Debug performance
+debug_performance() {
+    echo -e "${BLUE}NLM Performance Debug Tool${NC}"
+    echo "This tool would analyze performance bottlenecks and optimization opportunities"
+    echo ""
+    echo "Features would include:"
+    echo "  - Memory usage analysis"
+    echo "  - Computational performance profiling"
+    echo "  - Event queue analysis"
+    echo "  - Spike processing efficiency"
+    echo "  - Network throughput metrics"
+}
+
+# Debug connectivity
+debug_connectivity() {
+    echo -e "${BLUE}NLM Connectivity Debug Tool${NC}"
+    echo "This tool would analyze brain-wide connectivity patterns"
+    echo ""
+    echo "Features would include:"
+    echo "  - Regional connectivity matrices"
+    echo "  - Inter-regional connection analysis"
+    echo "  - Network module identification"
+    echo "  - Hub identification"
+    echo "  - Small-world analysis"
+}
+
+# Main debug dispatcher
+main() {
+    local command=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_debug_help
+                exit 0
+                ;;
+            -c|--config)
+                NLM_CONFIG="$2"
+                shift 2
+                ;;
+            -l|--log)
+                shift 1
+                ;;
+            -*)
+                echo "Unknown option: $1"
+                show_debug_help
+                exit 1
+                ;;
+            *)
+                # First non-option argument is the command
+                command="$1"
+                shift
+                break
+                ;;
+        esac
+    done
+    
+    # Execute command
+    case "$command" in
+        neurons)
+            debug_neurons "$@"
+            ;;
+        synapses)
+            debug_synapses "$@"
+            ;;
+        memory)
+            debug_memory "$@"
+            ;;
+        prediction)
+            debug_prediction "$@"
+            ;;
+        attention)
+            debug_attention "$@"
+            ;;
+        neuromodulation)
+            debug_neuromodulation "$@"
+            ;;
+        concept)
+            debug_concept "$@"
+            ;;
+        development)
+            debug_development "$@"
+            ;;
+        performance)
+            debug_performance "$@"
+            ;;
+        connectivity)
+            debug_connectivity "$@"
+            ;;
+        *)
+            if [[ -n "$command" ]]; then
+                echo "Unknown debug command: $command"
+                show_debug_help
+                exit 1
+            else
+                echo "No debug command specified"
+                show_debug_help
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"

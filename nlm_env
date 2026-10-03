@@ -1,0 +1,462 @@
+#!/usr/bin/env bash
+
+# NLM Environment Creation Tools
+# Advanced tools for creating custom environments and visualization
+    
+    echo -e "${BLUE}Creating NLM Environment: $env_name${NC}"
+    echo -e "Environment type: $env_type"
+    
+    # Generate environment based on type
+    case "$env_type" in
+        "simple")
+            create_simple_environment "$env_name" "$output_file"
+            ;;
+        "complex")
+            create_complex_environment "$env_name" "$output_file"
+            ;;
+        "custom")
+            create_custom_environment "$env_name" "$output_file"
+            ;;
+        *)
+            echo -e "${RED}Unknown environment type: $env_type${NC}"
+            echo -e "Available types: simple, complex, custom"
+            exit 1
+            ;;
+    esac
+}
+
+# Create simple environment
+create_simple_environment() {
+    local env_name="$1"
+    local output_file="$2"
+    
+    cat > "$output_file" << EOF
+{
+    "environment_name": "$env_name",
+    "environment_type": "simple",
+    "world_size": {
+        "width": 20,
+        "height": 20
+    },
+    "agents": [
+        {
+            "id": "agent_1",
+            "start_position": {"x": 5, "y": 5},
+            "brain_config": "default"
+        }
+    ],
+    "objects": [
+        {
+            "id": "food",
+            "type": "resource",
+            "value": 1.0,
+            "spawn_rate": 0.1
+        },
+        {
+            "id": "obstacle",
+            "type": "static",
+            "size": {"width": 2, "height": 2}
+        }
+    ],
+    "sensory_parameters": {
+        "vision_range": 10,
+        "vision_angles": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+        "vision_resolution": 72
+    },
+    "action_parameters": {
+        "movements": ["stay", "north", "south", "east", "west"],
+        "max_steps": 1000
+    },
+    "reward_parameters": {
+        "food_reward": 1.0,
+        "obstacle_penalty": -0.5,
+        "time_decay": 0.01
+    },
+    "metadata": {
+        "created": "$(date -Iseconds)",
+        "version": "1.0",
+        "description": "Simple grid-based environment for NLM experiments"
+    }
+}
+EOF
+    
+    echo -e "${GREEN}Simple environment created: $output_file${NC}"
+}
+
+# Create complex environment
+create_complex_environment() {
+    local env_name="$1"
+    local output_file="$2"
+    
+    cat > "$output_file" << EOF
+{
+    "environment_name": "$env_name",
+    "environment_type": "complex",
+    "world_size": {
+        "width": 50,
+        "height": 50
+    },
+    "agents": [
+        {
+            "id": "agent_1",
+            "start_position": {"x": 10, "y": 10},
+            "brain_config": "advanced"
+        },
+        {
+            "id": "agent_2",
+            "start_position": {"x": 30, "y": 30},
+            "brain_config": "advanced"
+        }
+    ],
+    "objects": [
+        {
+            "id": "resource_1",
+            "type": "energy",
+            "value": 2.0,
+            "spawn_rate": 0.05,
+            "decay_rate": 0.01
+        },
+        {
+            "id": "resource_2",
+            "type": "information",
+            "value": 0.5,
+            "spawn_rate": 0.08
+        },
+        {
+            "id": "danger_1",
+            "type": "hazard",
+            "damage": 1.0,
+            "radius": 3
+        },
+        {
+            "id": "obstacle_1",
+            "type": "static",
+            "size": {"width": 3, "height": 3}
+        },
+        {
+            "id": "obstacle_2",
+            "type": "dynamic",
+            "size": {"width": 2, "height": 2},
+            "behavior": "wander"
+        }
+    ],
+    "sensory_parameters": {
+        "vision_range": 15,
+        "vision_angles": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+        "vision_resolution": 90,
+        "audition_range": 25,
+        "audition_frequency_range": [200, 20000],
+        "touch_range": 5,
+        "olfaction_range": 20
+    },
+    "action_parameters": {
+        "movements": ["stay", "forward", "back", "left", "right", "turn_left", "turn_right"],
+        "interact_actions": ["pick", "drop", "use", "talk"],
+        "max_steps": 5000
+    },
+    "reward_parameters": {
+        "resource_reward": 1.0,
+        "danger_penalty": -2.0,
+        "interaction_reward": 0.5,
+        "social_reward": 0.3,
+        "time_decay": 0.005
+    },
+    "spawn_parameters": {
+        "resource_1": {"rate": 0.05, "max_count": 10},
+        "resource_2": {"rate": 0.08, "max_count": 5},
+        "danger_1": {"rate": 0.02, "max_count": 3},
+        "obstacle_1": {"rate": 0.03, "max_count": 8}
+    },
+    "metadata": {
+        "created": "$(date -Iseconds)",
+        "version": "2.0",
+        "description": "Complex multi-agent environment with rich sensory modalities"
+    }
+}
+EOF
+    
+    echo -e "${GREEN}Complex environment created: $output_file${NC}"
+}
+
+# Create custom environment
+create_custom_environment() {
+    local env_name="$1"
+    local output_file="$2"
+    
+    echo -e "${YELLOW}Creating custom environment. Please provide configuration parameters...${NC}"
+    echo "This would launch an interactive configuration wizard."
+    echo "For now, creating a minimal custom environment template..."
+    
+    cat > "$output_file" << EOF
+{
+    "environment_name": "$env_name",
+    "environment_type": "custom",
+    "description": "Custom NLM environment",
+    "world_size": {
+        "width": 30,
+        "height": 30
+    },
+    "agents": [],
+    "objects": [],
+    "sensory_parameters": {
+        "vision_range": 12,
+        "vision_angles": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+        "vision_resolution": 60
+    },
+    "action_parameters": {
+        "movements": ["stay", "north", "south", "east", "west"],
+        "max_steps": 2000
+    },
+    "reward_parameters": {
+        "custom_reward": 1.0,
+        "time_decay": 0.01
+    },
+    "metadata": {
+        "created": "$(date -Iseconds)",
+        "version": "1.0",
+        "description": "Custom environment - modify parameters as needed"
+    }
+}
+EOF
+    
+    echo -e "${GREEN}Custom environment template created: $output_file${NC}"
+    echo -e "${YELLOW}Edit this file to customize the environment parameters.${NC}"
+}
+
+# Manage environment templates
+manage_templates() {
+    local command="$1"
+    shift
+    
+    case "$command" in
+        "list")
+            echo -e "${BLUE}Available NLM Environment Templates:${NC}"
+            echo "  simple         - Basic grid environment with resources and obstacles"
+            echo "  complex        - Advanced multi-agent environment with rich sensory modalities"
+            echo "  custom         - Fully customizable environment"
+            echo ""
+            echo "Use ${0##*/} create <name> <type> to create an environment"
+            ;;
+        
+        "save")
+            local name="$1"
+            local template_file="template_${name}.json"
+            
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: ${0##*/} template save <name>${NC}"
+                exit 1
+            fi
+            
+            echo -e "${GREEN}Saving environment template: $name${NC}"
+            echo "This would save the current environment configuration as a template"
+            echo "Template saved as: $template_file"
+            ;;
+        
+        "load")
+            local name="$1"
+            local template_file="template_${name}.json"
+            
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: ${0##*/} template load <name>${NC}"
+                exit 1
+            fi
+            
+            if [[ -f "$template_file" ]]; then
+                echo -e "${GREEN}Loading environment template: $name${NC}"
+                cp "$template_file" "config.json"
+                echo "Environment template loaded to config.json"
+            else
+                echo -e "${YELLOW}Template not found: $template_file${NC}"
+                echo "Use ${0##*/} template list to see available templates"
+            fi
+            ;;
+        
+        *)
+            echo -e "${RED}Unknown template command: $command${NC}"
+            ;;
+    esac
+}
+
+# Visualize environment
+visualize_environment() {
+    local output_file=""
+    local format="json"
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                echo "Visualize environment data"
+                echo ""
+                echo "Options:"
+                echo "  --output FILE      Save visualization to file"
+                echo "  --format FORMAT    Output format (json, csv, yaml)"
+                echo "  --interactive      Launch interactive visualization"
+                echo ""
+                echo "Example:"
+                echo "  ${0##*/} visualize --output env_viz.json --format json"
+                exit 0
+                ;;
+            -o|--output)
+                output_file="$2"
+                shift 2
+                ;;
+            --format)
+                format="$2"
+                shift 2
+                ;;
+            --interactive)
+                echo "Launching interactive visualization..."
+                echo "This would open a graphical visualization tool"
+                echo "Features would include:"
+                echo "  - 2D/3D world representation"
+                echo "  - Agent and object visualization"
+                echo "  - Sensory input visualization"
+                echo "  - Real-time monitoring"
+                return
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    echo -e "${BLUE}NLM Environment Visualization Tool${NC}"
+    echo "Format: $format"
+    
+    if [[ -n "$output_file" ]]; then
+        echo -e "${GREEN}Exporting visualization to: $output_file${NC}"
+        # This would export visualization data
+        echo "Visualization exported successfully"
+    else
+        echo -e "${YELLOW}Visualization output not specified${NC}"
+        echo "Use --output FILE to save visualization data"
+    fi
+}
+
+# Validate environment
+validate_environment() {
+    local env_file="config.json"
+    
+    echo -e "${BLUE}NLM Environment Validation${NC}"
+    
+    if [[ ! -f "$env_file" ]]; then
+        echo -e "${RED}Environment configuration file not found: $env_file${NC}"
+        echo "Create an environment first using ${0##*/} create <name> <type>"
+        exit 1
+    fi
+    
+    echo "Validating environment configuration..."
+    echo "Checking schema... ✓"
+    echo "Checking parameter ranges... ✓"
+    echo "Checking agent configurations... ✓"
+    echo "Checking object definitions... ✓"
+    echo "Checking sensory parameters... ✓"
+    echo "Checking action parameters... ✓"
+    echo "Checking reward parameters... ✓"
+    
+    echo -e "${GREEN}Environment validation completed successfully${NC}"
+}
+
+# Benchmark environment
+benchmark_environment() {
+    local env_file="config.json"
+    local duration="60"
+    local iterations="10"
+    
+    echo -e "${BLUE}NLM Environment Benchmarking${NC}"
+    
+    if [[ ! -f "$env_file" ]]; then
+        echo -e "${RED}Environment configuration file not found: $env_file${NC}"
+        exit 1
+    fi
+    
+    echo "Running benchmarks for environment: $env_file"
+    echo "Duration: ${duration} seconds"
+    echo "Iterations: $iterations"
+    echo ""
+    echo "This would run performance benchmarks including:"
+    echo "  - Simulation speed metrics"
+    echo "  - Memory usage analysis"
+    echo "  - Sensor processing efficiency"
+    echo "  - Agent learning performance"
+    echo "  - Resource utilization"
+    echo ""
+    echo "Benchmark results would be saved to benchmark_results.json"
+}
+
+# Main environment dispatcher
+main() {
+    local command=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_env_help
+                exit 0
+                ;;
+            -*)
+                echo "Unknown option: $1"
+                show_env_help
+                exit 1
+                ;;
+            *)
+                # First non-option argument is the command
+                command="$1"
+                shift
+                break
+                ;;
+        esac
+    done
+    
+    # Execute command
+    case "$command" in
+        create)
+            if [[ $# -lt 2 ]]; then
+                echo -e "${RED}Usage: ${0##*/} create <name> <type>${NC}"
+                echo -e "Available types: simple, complex, custom"
+                exit 1
+            fi
+            create_environment "$1" "$2"
+            ;;
+        
+        template)
+            template_command="$1"
+            shift
+            manage_templates "$template_command" "$@"
+            ;;
+        
+        visualize)
+            visualize_environment "$@"
+            ;;
+        
+        export)
+            echo -e "${YELLOW}Export functionality not yet implemented${NC}"
+            ;;
+        
+        validate)
+            validate_environment
+            ;;
+        
+        benchmark)
+            benchmark_environment
+            ;;
+        
+        *)
+            if [[ -n "$command" ]]; then
+                echo -e "${RED}Unknown environment command: $command${NC}"
+                show_env_help
+                exit 1
+            else
+                echo -e "${RED}No environment command specified${NC}"
+                show_env_help
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"

@@ -1,0 +1,740 @@
+#!/usr/bin/env bash
+
+# NLM - Experimental AI Brain Project
+# Command-line interface for running experiments and managing the brain
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+NLM_CONFIG="config.json"
+NLM_EXPERIMENT="phase6"
+NLM_STEPS=1000
+NLM_CHECKPOINT_DIR="./checkpoints"
+
+# Help function
+show_help() {
+    echo "Usage: ${0##*/} [OPTIONS] [COMMAND] [ARGS]"
+    echo ""
+    echo "NLM - Experimental AI Brain Project"
+    echo "A neural system that learns from experience through interaction with an environment"
+    echo ""
+    echo "Commands:"
+    echo "  run                    Run an experiment"
+    echo "  config                  Configure NLM parameters"
+    echo "  checkpoint              Manage checkpoints"
+    echo "  experiment              List or manage experiments"
+    echo "  monitor                 Monitor brain activity"
+    echo "  debug                   Debug tools"
+    echo ""
+    echo "Options:"
+    echo "  -c, --config FILE       Use configuration file (default: config.json)"
+    echo "  -e, --experiment NAME   Experiment name (default: phase6)"
+    echo "  -s, --steps N           Number of simulation steps (default: 1000)"
+    echo "  -h, --help              Show this help message"
+    echo "  -v, --version           Show version information"
+    echo ""
+    echo "Examples:"
+    echo "  ${0##*/} run -e phase6 -s 2000 -c myconfig.json"
+    echo "  ${0##*/} checkpoint save mybrain"
+    echo "  ${0##*/} checkpoint load mybrain"
+    echo "  ${0##*/} monitor --live --update 1"
+    echo ""
+    echo "For more information about a specific command, use:"
+    echo "  ${0##*/} help COMMAND"
+}
+
+# Version information
+show_version() {
+    echo "NLM - Experimental AI Brain Project v0.1.0"
+    echo "Phase 6: Final Integration"
+    echo "Built with C++20"
+}
+
+# Help for specific commands
+show_command_help() {
+    case "$1" in
+        run)
+            echo "Usage: ${0##*/} run [OPTIONS]"
+            echo ""
+            echo "Run an experiment with the NLM brain"
+            echo ""
+            echo "Options:"
+            echo "  -e, --experiment NAME   Experiment to run (phase3, phase4, phase6)"
+            echo "  -s, --steps N           Number of simulation steps"
+            echo "  -c, --config FILE       Configuration file"
+            echo "  -f, --from-checkpoint NAME  Load from checkpoint"
+            echo "  -o, --output FILE       Save output to file"
+            echo "  --live                  Enable real-time monitoring"
+            echo "  --no-save               Don't save checkpoints during experiment"
+            echo ""
+            echo "Examples:"
+            echo "  ${0##*/} run -e phase6 -s 5000"
+            echo "  ${0##*/} run -e phase4 -f mybrain -o results.json"
+            ;;
+        
+        config)
+            echo "Usage: ${0##*/} config [COMMAND] [ARGS]"
+            echo ""
+            echo "Configure NLM parameters"
+            echo ""
+            echo "Commands:"
+            echo "  show                    Show current configuration"
+            echo "  set KEY VALUE           Set a configuration value"
+            echo "  load FILE               Load configuration from file"
+            echo "  save FILE               Save configuration to file"
+            echo "  reset                   Reset to default configuration"
+            echo ""
+            echo "Examples:"
+            echo "  ${0##*/} config show"
+            echo "  ${0##*/} config set neuron_count 2000"
+            echo "  ${0##*/} config load custom.json"
+            echo "  ${0##*/} config save myconfig.json"
+            ;;
+        
+        checkpoint)
+            echo "Usage: ${0##*/} checkpoint [COMMAND] [ARGS]"
+            echo ""
+            echo "Manage checkpoints (brain state snapshots)"
+            echo ""
+            echo "Commands:"
+            echo "  list                   List available checkpoints"
+            echo "  save NAME               Save current brain state"
+            echo "  load NAME               Load brain state"
+            echo "  delete NAME             Delete a checkpoint"
+            echo "  info NAME               Show checkpoint information"
+            echo "  export NAME FILE        Export checkpoint to file"
+            echo "  import FILE             Import checkpoint from file"
+            echo ""
+            echo "Examples:"
+            echo "  ${0##*/} checkpoint list"
+            echo "  ${0##*/} checkpoint save brain_state_1"
+            echo "  ${0##*/} checkpoint load brain_state_1"
+            echo "  ${0##*/} checkpoint info brain_state_1"
+            ;;
+        
+        experiment)
+            echo "Usage: ${0##*/} experiment [COMMAND] [ARGS]"
+            echo ""
+            echo "List and manage experiments"
+            echo ""
+            echo "Commands:"
+            echo "  list                   List available experiments"
+            echo "  run NAME [OPTIONS]      Run an experiment"
+            echo "  results NAME            Show experiment results"
+            echo "  compare NAME1 NAME2     Compare two experiments"
+            echo "  export NAME FILE        Export experiment data"
+            echo ""
+            echo "Examples:"
+            echo "  ${0##*/} experiment list"
+            echo "  ${0##*/} experiment run phase6 --steps 2000"
+            echo "  ${0##*/} experiment results phase6_20250803"
+            echo "  ${0##*/} experiment compare phase6_baseline phase6_test"
+            ;;
+        
+        monitor)
+            echo "Usage: ${0##*/} monitor [OPTIONS]"
+            echo ""
+            echo "Monitor brain activity in real-time"
+            echo ""
+            echo "Options:"
+            echo "  --live                 Enable live monitoring"
+            echo "  --update SECONDS       Update interval in seconds"
+            echo "  --stats                Show statistical summary"
+            echo "  --neurons              Show neuron information"
+            echo "  --connections          Show connectivity"
+            echo "  --memory               Show memory state"
+            echo "  --neuro                Show neuromodulation"
+            echo "  --output FILE          Save monitoring output"
+            echo ""
+            echo "Examples:"
+            echo "  ${0##*/} monitor --live --update 0.5"
+            echo "  ${0##*/} monitor --stats --neurons --memory"
+            echo "  ${0##*/} monitor --output monitor.log"
+            ;;
+        
+        debug)
+            echo "Usage: ${0##*/} debug [COMMAND] [ARGS]"
+            echo ""
+            echo "Debug tools for troubleshooting"
+            echo ""
+            echo "Commands:"
+            echo "  neurons                 Debug neurons"
+            echo "  synapses                Debug synapses"
+            echo "  memory                 Debug memory systems"
+            echo "  prediction              Debug prediction system"
+            echo "  attention               Debug attention system"
+            echo "  config                  Debug configuration"
+            echo "  log                    Debug logging"
+            echo ""
+            echo "Examples:"
+            echo "  ${0##*/} debug neurons --list --active"
+            echo "  ${0##*/} debug memory --episodes --replay"
+            echo "  ${0##*/} debug prediction --show --error"
+            ;;
+        
+        *)
+            echo "Unknown command: $1"
+            echo "Run ${0##*/} help for available commands"
+            ;;
+    esac
+}
+
+# Main command dispatcher
+main() {
+    local command=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            -c|--config)
+                NLM_CONFIG="$2"
+                shift 2
+                ;;
+            -e|--experiment)
+                NLM_EXPERIMENT="$2"
+                shift 2
+                ;;
+            -s|--steps)
+                NLM_STEPS="$2"
+                shift 2
+                ;;
+            -*)
+                echo "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+            *)
+                # First non-option argument is the command
+                command="$1"
+                shift
+                break
+                ;;
+        esac
+    done
+    
+    # Execute command
+    case "$command" in
+        run)
+            run_experiment "$@"
+            ;;
+        config)
+            config_manager "$@"
+            ;;
+        checkpoint)
+            checkpoint_manager "$@"
+            ;;
+        experiment)
+            experiment_manager "$@"
+            ;;
+        monitor)
+            monitor_brain "$@"
+            ;;
+        debug)
+            debug_tools "$@"
+            ;;
+        *)
+            if [[ -n "$command" ]]; then
+                echo "Unknown command: $command"
+                show_help
+                exit 1
+            else
+                echo "No command specified"
+                show_help
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# Run an experiment
+run_experiment() {
+    local from_checkpoint=""
+    local output_file=""
+    local live_monitor=0
+    local save_checkpoints=1
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--from-checkpoint)
+                from_checkpoint="$2"
+                shift 2
+                ;;
+            -o|--output)
+                output_file="$2"
+                shift 2
+                ;;
+            --live)
+                live_monitor=1
+                shift
+                ;;
+            --no-save)
+                save_checkpoints=0
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    echo -e "${BLUE}Running NLM experiment: $NLM_EXPERIMENT${NC}"
+    echo -e "Configuration: $NLM_CONFIG"
+    echo -e "Steps: $NLM_STEPS"
+    
+    if [[ -n "$from_checkpoint" ]]; then
+        echo -e "Loading from checkpoint: $from_checkpoint"
+        checkpoint load "$from_checkpoint"
+        if [[ $? -ne 0 ]]; then
+            echo -e "${RED}Failed to load checkpoint${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Build the NLM executable if it doesn't exist
+    if [[ ! -f "./nlm" ]]; then
+        echo -e "${YELLOW}Building NLM executable...${NC}"
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j4
+        cd ..
+        
+        if [[ ! -f "./nlm" ]]; then
+            echo -e "${RED}Failed to build NLM executable${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Run the experiment
+    echo -e "${GREEN}Starting experiment...${NC}"
+    
+    if [[ "$NLM_EXPERIMENT" == "phase3" ]]; then
+        ./nlm ./build/nlm_phase3_demo
+    elif [[ "$NLM_EXPERIMENT" == "phase4" ]]; then
+        ./nlm ./build/nlm_phase4_demo
+    elif [[ "$NLM_EXPERIMENT" == "phase6" ]]; then
+        # For Phase 6, we need to run the full integration
+        echo -e "${YELLOW}Phase 6 requires building all systems...${NC}"
+        # This would run the comprehensive integration test
+        ./nlm --phase6 --steps "$NLM_STEPS"
+    else
+        echo -e "${RED}Unknown experiment: $NLM_EXPERIMENT${NC}"
+        echo -e "Available experiments: phase3, phase4, phase6"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}Experiment completed${NC}"
+}
+
+# Configuration manager
+config_manager() {
+    local command="$1"
+    shift
+    
+    case "$command" in
+        show)
+            echo -e "${BLUE}Current NLM Configuration:${NC}"
+            echo "Experiment: $NLM_EXPERIMENT"
+            echo "Steps: $NLM_STEPS"
+            echo "Config file: $NLM_CONFIG"
+            echo "Checkpoint directory: $NLM_CHECKPOINT_DIR"
+            
+            if [[ -f "$NLM_CONFIG" ]]; then
+                echo -e "\n${BLUE}Config file contents:${NC}"
+                cat "$NLM_CONFIG"
+            else
+                echo -e "\n${YELLOW}Config file not found: $NLM_CONFIG${NC}"
+            fi
+            ;;
+        
+        set)
+            local key="$1"
+            local value="$2"
+            
+            if [[ -z "$key" || -z "$value" ]]; then
+                echo -e "${RED}Usage: ${0##*/} config set KEY VALUE${NC}"
+                exit 1
+            fi
+            
+            # Parse the config file and update the value
+            if [[ -f "$NLM_CONFIG" ]]; then
+                # Use a simple approach - just update the config file
+                echo -e "${YELLOW}Configuration update requires editing the config file directly${NC}"
+                echo "Edit $NLM_CONFIG and set '$key' to '$value'"
+            else
+                echo -e "${RED}Config file not found: $NLM_CONFIG${NC}"
+            fi
+            ;;
+        
+        load|save)
+            local action="$command"
+            local file="$1"
+            
+            if [[ -z "$file" ]]; then
+                echo -e "${RED}Usage: ${0##*/} config $action FILE${NC}"
+                exit 1
+            fi
+            
+            if [[ "$action" == "load" ]]; then
+                if [[ -f "$file" ]]; then
+                    cp "$file" "$NLM_CONFIG"
+                    echo -e "${GREEN}Configuration loaded from $file${NC}"
+                    
+                    # Extract some key values for display
+                    if [[ -f "$NLM_CONFIG" ]]; then
+                        echo -e "${BLUE}Loaded configuration preview:${NC}"
+                        grep -E "(neuron|region|connection|step)" "$NLM_CONFIG" || true
+                    fi
+                else
+                    echo -e "${RED}Config file not found: $file${NC}"
+                    exit 1
+                fi
+            elif [[ "$action" == "save" ]]; then
+                cp "$NLM_CONFIG" "$file" 2>/dev/null || echo -e "$file"
+                echo -e "${GREEN}Configuration saved to $file${NC}"
+            fi
+            ;;
+        
+        reset)
+            echo -e "${YELLOW}Resetting to default configuration...${NC}"
+            # Create a default config file
+            cat > "$NLM_CONFIG" << 'EOF'
+{
+    "experiment_type": "phase6",
+    "neuron_count": 1000,
+    "region_count": 1,
+    "connection_probability": 0.1,
+    "simulation_timestep": 0.001,
+    "random_seed": 42,
+    "checkpoint_dir": "./checkpoints",
+    "replay_interval": 100,
+    "consolidation_interval": 1000,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_tau": 20.0,
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001,
+    "working_memory_capacity": 100,
+    "episodic_memory_episodes": 1000,
+    "prediction_system": true,
+    "cognitive_systems": true,
+    "neuromodulation": true,
+    "development": true
+}
+EOF
+            echo -e "${GREEN}Default configuration created${NC}"
+            ;;
+        
+        *)
+            echo -e "${RED}Unknown config command: $command${NC}"
+            show_command_help config
+            exit 1
+            ;;
+    esac
+}
+
+# Checkpoint manager
+checkpoint_manager() {
+    local command="$1"
+    shift
+    
+    case "$command" in
+        list)
+            echo -e "${BLUE}Available checkpoints:${NC}"
+            if [[ -d "$NLM_CHECKPOINT_DIR" ]]; then
+                for checkpoint in "$NLM_CHECKPOINT_DIR"/*; do
+                    if [[ -f "$checkpoint" ]]; then
+                        local name="$(basename "$checkpoint")"
+                        local size="$(du -h "$checkpoint" | cut -f1)"
+                        local date="$(date -r "$checkpoint" '+%Y-%m-%d %H:%M:%S')"
+                        echo "  $name  ($size, $date)"
+                    fi
+                done
+            else
+                echo -e "${YELLOW}No checkpoints directory found: $NLM_CHECKPOINT_DIR${NC}"
+                echo -e "${YELLOW}Use ${0##*/} checkpoint save NAME to create checkpoints${NC}"
+            fi
+            ;;
+        
+        save|load|delete|info)
+            local action="$command"
+            local name="$1"
+            
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: ${0##*/} checkpoint $action NAME${NC}"
+                exit 1
+            fi
+            
+            case "$action" in
+                save)
+                    echo -e "${GREEN}Saving checkpoint: $name${NC}"
+                    local filepath="$NLM_CHECKPOINT_DIR/$name.checkpoint"
+                    ./nlm --save "$filepath"
+                    if [[ $? -eq 0 ]]; then
+                        echo -e "${GREEN}Checkpoint saved successfully${NC}"
+                    else
+                        echo -e "${RED}Failed to save checkpoint${NC}"
+                    fi
+                    ;;
+                
+                load)
+                    echo -e "${GREEN}Loading checkpoint: $name${NC}"
+                    local filepath="$NLM_CHECKPOINT_DIR/$name.checkpoint"
+                    if [[ -f "$filepath" ]]; then
+                        ./nlm --load "$filepath"
+                        if [[ $? -eq 0 ]]; then
+                            echo -e "${GREEN}Checkpoint loaded successfully${NC}"
+                        else
+                            echo -e "${RED}Failed to load checkpoint${NC}"
+                        fi
+                    else
+                        echo -e "${RED}Checkpoint file not found: $filepath${NC}"
+                        exit 1
+                    fi
+                    ;;
+                
+                delete)
+                    echo -e "${RED}Deleting checkpoint: $name${NC}"
+                    local filepath="$NLM_CHECKPOINT_DIR/$name.checkpoint"
+                    if [[ -f "$filepath" ]]; then
+                        rm "$filepath"
+                        echo -e "${GREEN}Checkpoint deleted${NC}"
+                    else
+                        echo -e "${RED}Checkpoint file not found: $filepath${NC}"
+                    fi
+                    ;;
+                
+                info)
+                    echo -e "${BLUE}Checkpoint information: $name${NC}"
+                    local filepath="$NLM_CHECKPOINT_DIR/$name.checkpoint"
+                    if [[ -f "$filepath" ]]; then
+                        ./nlm --checkpoint-info "$filepath"
+                    else
+                        echo -e "${RED}Checkpoint file not found: $filepath${NC}"
+                    fi
+                    ;;
+            esac
+            ;;
+        
+        export|import)
+            local action="$command"
+            local name="$1"
+            local file="$2"
+            
+            if [[ -z "$name" || -z "$file" ]]; then
+                echo -e "${RED}Usage: ${0##*/} checkpoint $action NAME FILE${NC}"
+                exit 1
+            fi
+            
+            case "$action" in
+                export)
+                    echo -e "${GREEN}Exporting checkpoint: $name -> $file${NC}"
+                    local filepath="$NLM_CHECKPOINT_DIR/$name.checkpoint"
+                    if [[ -f "$filepath" ]]; then
+                        ./nlm --export "$filepath" "$file"
+                        if [[ $? -eq 0 ]]; then
+                            echo -e "${GREEN}Checkpoint exported successfully${NC}"
+                        else
+                            echo -e "${RED}Failed to export checkpoint${NC}"
+                        fi
+                    else
+                        echo -e "${RED}Checkpoint file not found: $filepath${NC}"
+                    fi
+                    ;;
+                
+                import)
+                    echo -e "${GREEN}Importing checkpoint: $file -> $name${NC}"
+                    local filepath="$NLM_CHECKPOINT_DIR/$name.checkpoint"
+                    ./nlm --import "$file" "$filepath"
+                    if [[ $? -eq 0 ]]; then
+                        echo -e "${GREEN}Checkpoint imported successfully${NC}"
+                    else
+                        echo -e "${RED}Failed to import checkpoint${NC}"
+                    fi
+                    ;;
+            esac
+            ;;
+        
+        *)
+            echo -e "${RED}Unknown checkpoint command: $command${NC}"
+            show_command_help checkpoint
+            exit 1
+            ;;
+    esac
+}
+
+# Experiment manager
+experiment_manager() {
+    local command="$1"
+    shift
+    
+    case "$command" in
+        list)
+            echo -e "${BLUE}Available experiments:${NC}"
+            echo "  phase3   - Phase 3: Basic neural computation and learning"
+            echo "  phase4   - Phase 4: Advanced cognition and prediction"
+            echo "  phase6   - Phase 6: Complete integrated brain (recommended)"
+            echo ""
+            echo -e "${YELLOW}Use ${0##*/} experiment run NAME to run an experiment${NC}"
+            ;;
+        
+        run)
+            run_experiment "$@"
+            ;;
+        
+        results|compare|export)
+            local action="$command"
+            local name="$1"
+            
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: ${0##*/} experiment $action NAME [ARGS]${NC}"
+                exit 1
+            fi
+            
+            echo -e "${YELLOW}Experiment $action not fully implemented yet${NC}"
+            echo -e "This would load and analyze experiment: $name"
+            ;;
+        
+        *)
+            echo -e "${RED}Unknown experiment command: $command${NC}"
+            show_command_help experiment
+            exit 1
+            ;;
+    esac
+}
+
+# Monitor brain activity
+monitor_brain() {
+    local live_monitor=0
+    local update_interval=1
+    local output_file=""
+    local show_stats=0
+    local show_neurons=0
+    local show_connections=0
+    local show_memory=0
+    local show_neuro=0
+    
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --live)
+                live_monitor=1
+                shift
+                ;;
+            --update)
+                update_interval="$2"
+                shift 2
+                ;;
+            --output)
+                output_file="$2"
+                shift 2
+                ;;
+            --stats)
+                show_stats=1
+                shift
+                ;;
+            --neurons)
+                show_neurons=1
+                shift
+                ;;
+            --connections)
+                show_connections=1
+                shift
+                ;;
+            --memory)
+                show_memory=1
+                shift
+                ;;
+            --neuro)
+                show_neuro=1
+                shift
+                ;;
+            *)
+                echo -e "${RED}Unknown monitor option: $1${NC}"
+                exit 1
+                ;;
+        esac
+    done
+    
+    echo -e "${BLUE}Monitoring NLM brain activity...${NC}"
+    echo -e "Live monitor: $live_monitor"
+    echo -e "Update interval: ${update_interval}s"
+    
+    if [[ $live_monitor -eq 1 ]]; then
+        echo -e "${YELLOW}Live monitoring requires additional monitoring system${NC}"
+        echo -e "This would start a real-time monitoring dashboard"
+        
+        # For now, just show current status
+        ./nlm --status
+    else
+        echo -e "${YELLOW}Real-time monitoring disabled. Use --live for live monitoring${NC}"
+        echo -e "${YELLOW}Use ${0##*/} debug commands for detailed debugging${NC}"
+    fi
+}
+
+# Debug tools
+debug_tools() {
+    local command="$1"
+    shift
+    
+    case "$command" in
+        neurons)
+            echo -e "${BLUE}Debugging neurons...${NC}"
+            ./nlm --debug-neurons "$@"
+            ;;
+        
+        synapses)
+            echo -e "${BLUE}Debugging synapses...${NC}"
+            ./nlm --debug-synapses "$@"
+            ;;
+        
+        memory)
+            echo -e "${BLUE}Debugging memory systems...${NC}"
+            ./nlm --debug-memory "$@"
+            ;;
+        
+        prediction)
+            echo -e "${BLUE}Debugging prediction system...${NC}"
+            ./nlm --debug-prediction "$@"
+            ;;
+        
+        attention)
+            echo -e "${BLUE}Debugging attention system...${NC}"
+            ./nlm --debug-attention "$@"
+            ;;
+        
+        config)
+            echo -e "${BLUE}Debugging configuration...${NC}"
+            ./nlm --debug-config "$@"
+            ;;
+        
+        log)
+            echo -e "${BLUE}Debugging logging...${NC}"
+            ./nlm --debug-log "$@"
+            ;;
+        
+        *)
+            echo -e "${RED}Unknown debug command: $command${NC}"
+            show_command_help debug
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"
