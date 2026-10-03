@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <unordered_map>
+#include <iomanip>
 
 namespace nlm {
 
@@ -84,9 +87,22 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n\n";
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeString(arg) << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -195,7 +211,8 @@ std::string Config::trim(const std::string& str) {
 
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
     return result;
 }
 
@@ -212,4 +229,76 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Escape special characters in strings for file output
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() * 2); // Pre-allocate for efficiency
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    // Escape control characters
+                    result += "\\u00";
+                    char hex[3];
+                    snprintf(hex, sizeof(hex), "%02X", static_cast<unsigned char>(c));
+                    result += hex;
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    
+    return result;
+}
+
+std::string Config::unescapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\' && i + 1 < str.size()) {
+            switch (str[i + 1]) {
+                case '\\': result += '\\'; i++; break;
+                case '"': result += '"'; i++; break;
+                case 'n': result += '\n'; i++; break;
+                case 'r': result += '\r'; i++; break;
+                case 't': result += '\t'; i++; break;
+                case 'b': result += '\b'; i++; break;
+                case 'f': result += '\f'; i++; break;
+                case 'u':
+                    // Handle Unicode escape if needed
+                    if (i + 6 < str.size()) {
+                        std::string hex = str.substr(i + 2, 4);
+                        // Convert hex to character
+                        char* end;
+                        unsigned long codepoint = strtol(hex.c_str(), &end, 16);
+                        if (*end == '\0') {
+                            result += static_cast<char>(codepoint);
+                            i += 6;
+                        } else {
+                            result += str[i]; // Keep original if invalid
+                        }
+                    } else {
+                        result += str[i]; // Keep original if incomplete
+                    }
+                    break;
+                default:
+                    result += str[i]; // Keep unknown escape
+                    break;
+            }
+        } else {
+            result += str[i];
+        }
+    }
+    
+    return result;
+}

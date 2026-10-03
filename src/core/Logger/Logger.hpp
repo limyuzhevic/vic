@@ -26,6 +26,33 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    
+    LogEntry() : level(LogLevel::Info), line(0), timestamp(std::chrono::system_clock::now()) {}
+};
+
+// Progress tracking
+struct ProgressInfo {
+    std::string taskName;
+    double progress;  // 0.0 to 1.0
+    std::string status; // "Running", "Completed", "Failed"
+    std::chrono::system_clock::time_point startTime;
+    std::chrono::system_clock::time_point endTime;
+    
+    ProgressInfo(const std::string& name) : taskName(name), progress(0.0), 
+        status("Running"), startTime(std::chrono::system_clock::now()) {}
+    
+    double getElapsedSeconds() const {
+        auto now = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - startTime);
+        return static_cast<double>(elapsed.count());
+    }
+    
+    double getEstimatedTotalSeconds() const {
+        if (progress > 0.0) {
+            return getElapsedSeconds() / progress;
+        }
+        return 0.0;
+    }
 };
 
 // Logger interface
@@ -35,6 +62,12 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Progress tracking support
+    virtual void progressStarted(const std::string& taskName) {}
+    virtual void progressUpdated(const std::string& taskName, double progress) {}
+    virtual void progressCompleted(const std::string& taskName, bool success = true) {}
+    virtual void progressFailed(const std::string& taskName, const std::string& error) {}
 };
 
 // Console logger implementation
