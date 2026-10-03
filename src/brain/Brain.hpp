@@ -18,7 +18,6 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -184,11 +183,39 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // ========== CONVENIENCE METHODS ==========
+
+    // Create default configuration
+    static std::shared_ptr<Config> createDefaultConfig();
+
+    // Convenience constructor that sets up default configuration
+    explicit Brain();
+
+    // Convenience method for quick setup with common parameters
+    bool setupBrain(size_t neuronCount = 1000, size_t regionCount = 1,
+                   float connectionProbability = 0.1f, size_t maxSteps = 10000);
+
+    // Get brain statistics in a convenient format
+    std::string getBrainStats() const;
+
+    // Simple simulation run with automatic sensory integration
+    bool runSimulation(int steps);
+
+    // Memory system status check
+    bool isMemoryIntegrated() const;
+
+    // Development progress tracking
+    std::string getDevelopmentStatus() const;
+
+    // Checkpoint utility methods
+    bool autoCheckpoint(const std::string& prefix = "brain_checkpoint", 
+                       size_t interval = 1000);
+
+    // Performance monitoring
+    float getPerformanceScore() const;
+
+    // Integration verification helper
+    bool verifyAllSystems() const;
     
     // Logging
     void logStatus() const;

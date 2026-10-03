@@ -43,15 +43,20 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+    if (brain_ && neuron.getId() >= 1000) {
+        auto* region = brain_->getRegion(neuron.getId() / 1000);
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            if (neurons) {
+                for (auto* nn : *neurons) {
+                    if (nn && nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
+    }
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -121,7 +126,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         
-        if (activation > 0.1f) {
+        if (activation > 0.1f && brain_) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
@@ -180,6 +185,7 @@ void NeuralWorkingMemory::runCompetition() {
             // Apply strong inhibition
             brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
+    }
     }
 }
 

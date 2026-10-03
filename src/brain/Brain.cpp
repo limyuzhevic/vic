@@ -11,6 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -220,7 +221,7 @@ bool Brain::initialize() {
         }
     }
     
-    // Initialize connectivity with random weights
+    // Create neurons across regions
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
@@ -1112,6 +1113,159 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// ========== CONVENIENCE METHODS IMPLEMENTATION ==========
+
+std::shared_ptr<Config> Brain::createDefaultConfig() {
+    auto config = std::make_shared<Config>();
+    
+    // Set reasonable default values
+    config->set("neuron_count", 1000);
+    config->set("region_count", 1);
+    config->set("connection_probability", 0.1f);
+    config->set("stdp_ltp_weight", 0.01f);
+    config->set("stdp_ltd_weight", 0.012f);
+    config->set("stdp_tau", 20.0f);
+    config->set("synaptogenesis_rate", 0.0001f);
+    config->set("pruning_rate", 0.00001f);
+    config->set("simulation_timestep", 0.001);
+    config->set("max_steps", 10000);
+    config->set("replay_interval", 100);
+    config->set("consolidation_interval", 1000);
+    config->set("random_seed", 42);
+    config->set("checkpoint_dir", "./checkpoints");
+    
+    return config;
+}
+
+Brain::Brain() : Brain(createDefaultConfig()) {
+    // Default constructor uses default configuration
+}
+
+bool Brain::setupBrain(size_t neuronCount, size_t regionCount,
+                      float connectionProbability, size_t maxSteps) {
+    auto config = std::make_shared<Config>();
+    
+    config->set("neuron_count", neuronCount);
+    config->set("region_count", regionCount);
+    config->set("connection_probability", connectionProbability);
+    config->set("max_steps", maxSteps);
+    
+    // Create a new brain instance with this configuration
+    *this = Brain(config);
+    
+    return initialize();
+}
+
+std::string Brain::getBrainStats() const {
+    std::stringstream ss;
+    ss << "=== NLM Brain Statistics ===" << std::endl;
+    ss << "Regions: " << getRegionCount() << std::endl;
+    ss << "Total Neurons: " << getTotalNeuronCount() << std::endl;
+    ss << "Total Synapses: " << getTotalSynapseCount() << std::endl;
+    ss << "Active Neurons: " << getActiveNeuronCount() << std::endl;
+    ss << "Firing Rate: " << getAverageFiringRate() << std::endl;
+    ss << "E/I Ratio: " << getExcitationInhibitionRatio() << std::endl;
+    ss << "Total Spikes: " << getTotalSpikeCount() << std::endl;
+    
+    if (pImpl->workingMemory) {
+        ss << "Working Memory Traces: " << pImpl->workingMemory->getActiveTraces() << std::endl;
+    }
+    if (pImpl->episodicMemory) {
+        ss << "Episodic Episodes: " << pImpl->episodicMemory->getEpisodeCount() << std::endl;
+    }
+    
+    ss << "Development Stage: " << static_cast<int>(pImpl->developmentalStage) << std::endl;
+    
+    return ss.str();
+}
+
+bool Brain::runSimulation(int steps) {
+    for (int step = 0; step < steps; ++step) {
+        step(step, step * 0.001);
+        
+        // Optional: Add periodic checkpointing
+        if (step % 1000 == 0 && pImpl->checkpointManager) {
+            std::string filename = "checkpoint_step_" + std::to_string(step) + ".bin";
+            save(filename);
+        }
+    }
+    return true;
+}
+
+bool Brain::isMemoryIntegrated() const {
+    return (pImpl->workingMemory && pImpl->episodicMemory && 
+            pImpl->associativeMemory && getWorkingMemory() && 
+            getEpisodicMemory() && getAssociativeMemory());
+}
+
+std::string Brain::getDevelopmentStatus() const {
+    std::string stageStr;
+    switch (pImpl->developmentalStage) {
+        case DevelopmentalStage::Initial: stageStr = "Initial"; break;
+        case DevelopmentalStage::CriticalPeriod: stageStr = "Critical Period"; break;
+        case DevelopmentalStage::Maturation: stageStr = "Maturation"; break;
+        case DevelopmentalStage::Adult: stageStr = "Adult"; break;
+        default: stageStr = "Unknown";
+    }
+    
+    return "Developmental Stage: " + stageStr + 
+           " (Step " + std::to_string(pImpl->currentStep) + ")";
+}
+
+bool Brain::autoCheckpoint(const std::string& prefix, size_t interval) {
+    if (!pImpl->checkpointManager) return false;
+    
+    static int checkpointCount = 0;
+    if (pImpl->currentStep % interval == 0) {
+        std::string filename = prefix + "_step_" + std::to_string(pImpl->currentStep) + ".bin";
+        return save(filename);
+    }
+    return true;
+}
+
+float Brain::getPerformanceScore() const {
+    float firingRate = getAverageFiringRate();
+    float memoryScore = 0.0f;
+    
+    if (pImpl->workingMemory) {
+        memoryScore += pImpl->workingMemory->getActiveTraces() * 0.1f;
+    }
+    if (pImpl->episodicMemory) {
+        memoryScore += pImpl->episodicMemory->getEpisodeCount() * 0.05f;
+    }
+    
+    // Simple performance scoring
+    float performance = firingRate + memoryScore;
+    return std::min(performance, 100.0f); // Cap at 100
+}
+
+bool Brain::verifyAllSystems() const {
+    bool allGood = true;
+    
+    // Check core systems
+    if (!pImpl->spikeSystem) { NLM_LOG_ERROR("Spike system not initialized"); allGood = false; }
+    if (!pImpl->stdp) { NLM_LOG_ERROR("STDP system not initialized"); allGood = false; }
+    
+    // Check integrated systems
+    if (!pImpl->workingMemory) { NLM_LOG_ERROR("Working memory not integrated"); allGood = false; }
+    if (!pImpl->episodicMemory) { NLM_LOG_ERROR("Episodic memory not integrated"); allGood = false; }
+    if (!pImpl->associativeMemory) { NLM_LOG_ERROR("Associative memory not integrated"); allGood = false; }
+    if (!pImpl->predictionSystem) { NLM_LOG_ERROR("Prediction system not integrated"); allGood = false; }
+    if (!pImpl->planner) { NLM_LOG_ERROR("Planner not integrated"); allGood = false; }
+    if (!pImpl->conceptFormation) { NLM_LOG_ERROR("Concept formation not integrated"); allGood = false; }
+    if (!pImpl->attention) { NLM_LOG_ERROR("Attention system not integrated"); allGood = false; }
+    if (!pImpl->developmentSystem) { NLM_LOG_ERROR("Development system not integrated"); allGood = false; }
+    if (!pImpl->dopamine) { NLM_LOG_ERROR("Dopamine system not integrated"); allGood = false; }
+    
+    if (allGood) {
+        NLM_LOG_INFO("=== All Systems Integrated Successfully ===");
+    } else {
+        NLM_LOG_ERROR("=== System Integration Incomplete ===");
+    }
+    
+    return allGood;
 }
 
 } // namespace nlm
