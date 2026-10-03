@@ -8,9 +8,6 @@ namespace nlm {
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
-    
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
@@ -44,12 +41,11 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+        auto allNeurons = brain_->getRegion(neuron.getId() % 1000)->getAllNeurons();
+        for (auto* nn : allNeurons) {
+            if (nn->getId() == neuron) {
+                nn->injectCurrent(activation * 5.0f);
+                break;
             }
         }
         
@@ -63,9 +59,12 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Create maintenance connections if needed - connect to nearby neurons for reinforcement
+    if (!memoryNeurons_.empty() && brain_) {
+        // Create a self-connection for each neuron to maintain its activation
+        createRecurrentConnection(memoryNeurons_[0], 
+                                 memoryNeurons_[0], 
+                                 strength * 0.3f);
     }
 }
 
@@ -149,7 +148,7 @@ void NeuralWorkingMemory::clear() {
     memoryActivations_.clear();
     memoryTimestamps_.clear();
     activeTraces_.clear();
-    pImpl->maintenanceSynapses.clear();
+    maintenanceSynapses_.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -199,27 +198,56 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
     // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
+    for (const auto& conn : maintenanceSynapses_) {
         if (conn.first == from && conn.second == to) return;
     }
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    // Only create self-connections (neuron maintains its own activation)
+    if (from == to && memoryNeurons_.size() < capacity_) {
+        maintenanceSynapses_.emplace_back(from, to);
+    }
+    // Optionally create connections between different neurons for mutual reinforcement
+    else if (from != to) {
+        // Find neurons by ID in the brain
+        bool fromFound = false, toFound = false;
+        
+        for (auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getId() == from) fromFound = true;
+                    if (neuron->getId() == to) toFound = true;
+                    if (fromFound && toFound) break;
+                }
+                if (fromFound && toFound) break;
+            }
+            if (fromFound && toFound) break;
+        }
+        
+        if (fromFound && toFound && maintenanceSynapses_.size() < capacity_ * 2) {
+            maintenanceSynapses_.emplace_back(from, to);
+        }
+    }
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
+    if (!brain_) return;
+    
     // Apply maintenance currents through recurrent connections
-    for (const auto& conn : pImpl->maintenanceSynapses) {
+    for (const auto& conn : maintenanceSynapses_) {
+        // Find source neuron activation
         float fromActivation = 0.0f;
-        
-        // Find from neuron activation
-        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
-        if (it != memoryNeurons_.end()) {
-            size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
+        auto itFrom = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
+        if (itFrom != memoryNeurons_.end()) {
+            size_t idxFrom = std::distance(memoryNeurons_.begin(), itFrom);
+            fromActivation = memoryActivations_[idxFrom];
         }
         
+        // Find destination neuron exists in memory
+        auto itTo = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.second);
+        if (itTo == memoryNeurons_.end()) continue;
+        
         if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
+            // Send maintenance signal to destination
             brain_->injectCurrent(conn.second, fromActivation * 2.0f);
         }
     }

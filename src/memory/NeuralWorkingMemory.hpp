@@ -99,6 +99,9 @@ private:
     // Active memory traces
     std::vector<size_t> activeTraces_;
     
+    // Maintenance connections (recurrent)
+    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses_;
+    
     // Recurrent connections for maintenance
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
     

@@ -1,0 +1,65 @@
+{
+    "simulation_parameters": {
+        "random_seed": 12345,
+        "simulation_timestep": 0.0005,
+        "neuron_count": 2000,
+        "region_count": 3,
+        "connection_probability": 0.2,
+        "connection_strength": 0.25,
+        "hebbian_learning_rate": 0.02,
+        "max_steps": 50000,
+        "thread_count": 4
+    },
+    "plasticity_parameters": {
+        "stdp_ltp_weight": 0.025,
+        "stdp_ltd_weight": 0.012,
+        "stdp_tau": 25.0,
+        "synaptogenesis_rate": 0.0005,
+        "pruning_rate": 0.00005,
+        "max_synapses": 50000,
+        "plasticity_decay": 0.02
+    },
+    "memory_parameters": {
+        "working_memory_capacity": 200,
+        "episodic_memory_max_episodes": 5000,
+        "associative_memory_capacity": 10000
+    },
+    "neuromodulation_parameters": {
+        "dopamine_baseline": 0.5,
+        "curiosity_strength": 2.0,
+        "novelty_threshold": 0.7,
+        "prediction_error_decay": 0.15
+    },
+    "development_parameters": {
+        "developmental_stage_duration": 2000,
+        "plasticity_decay": 0.015
+    },
+    "performance_tuning": {
+        "checkpoint_interval": 5000,
+        "memory_limit_mb": 4096,
+        "max_memory_mb": 8192
+    },
+    "debugging_options": {
+        "enable_debug_logging": true,
+        "enable_spike_tracing": true,
+        "enable_visualization": true,
+        "trace_spikes": true,
+        "show_synaptic_graphics": true
+    },
+    "file_options": {
+        "output_file": "advanced_results.json",
+        "checkpoint_dir": "./advanced_checkpoints"
+    },
+    "logging_options": {
+        "log_level": "DEBUG",
+        "log_file": "advanced_nlm.log",
+        "verbose": true
+    },
+    "experiment_options": {
+        "experiment_mode": "learning",
+        "test_number": 42,
+        "enable_profiling": true,
+        "profile_interval": 500,
+        "fast_mode": false
+    }
+}

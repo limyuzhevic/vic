@@ -1,0 +1,67 @@
+---
+# NLM Configuration File (YAML Format)
+# Optimized for research experiments with comprehensive settings
+
+simulation:
+  random_seed: 999
+  timestep: 0.001
+  neurons: 1000
+  regions: 2
+  connectivity:
+    probability: 0.1
+    strength: 0.2
+
+plasticity:
+  stdp:
+    ltp_weight: 0.01
+    ltd_weight: 0.012
+    tau: 20.0
+  hebbian_learning_rate: 0.01
+  structural:
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+    max_synapses: 20000
+
+memory:
+  working_capacity: 100
+  episodic_max_episodes: 1000
+  associative_capacity: 5000
+
+neuromodulation:
+  dopamine_baseline: 0.0
+  curiosity_strength: 1.0
+  novelty_threshold: 0.5
+  prediction_error_decay: 0.1
+
+development:
+  stage_duration: 1000
+  plasticity_decay: 0.01
+
+performance:
+  max_steps: 10000
+  checkpoint_interval: 1000
+  memory_limit_mb: 2048
+  thread_count: 2
+
+debugging:
+  debug_logging: false
+  spike_tracing: false
+  visualization: false
+  trace_spikes: false
+
+files:
+  config_file: configs/default.cfg
+  output_file: nlm_output.txt
+  checkpoint_dir: ./checkpoints
+
+logging:
+  level: INFO
+  log_file: nlm.log
+  verbose: false
+
+experiment:
+  mode: auto
+  test_number: 0
+  profile: false
+  profile_interval: 100
+  fast_mode: false

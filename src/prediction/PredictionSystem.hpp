@@ -6,6 +6,10 @@
 
 namespace nlm {
 
+// Forward declarations for brain-related classes
+class Brain;
+class SensoryInput;
+
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
@@ -26,6 +30,9 @@ public:
     
     // Get prediction confidence
     float getConfidence() const;
+    
+    // Set current simulation step for internal state tracking
+    void setCurrentStep(SimulationStep step);
     
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;

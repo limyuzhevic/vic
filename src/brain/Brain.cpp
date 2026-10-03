@@ -26,7 +26,7 @@ struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
+    std::vector<InterRegionConnection> interRegionConnections{};
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -65,9 +65,12 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // Sensory data for prediction system
+    std::vector<float> currentSensoryData;
+    
     // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    std::vector<Neuron*> sensoryNeurons{};
+    std::vector<Neuron*> motorNeurons{};
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -77,6 +80,10 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // State variables that need initialization
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -152,12 +159,7 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
-
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+; // Restore struct termination
 
 Brain::~Brain() = default;
 
@@ -243,7 +245,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +513,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Predict next sensory state based on current neural activity
+        if (pImpl->workingMemory) {
+            // Get current sensory prediction from working memory (learned patterns)
+            // For now, use a simplified prediction based on recent activity
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Store current state as a simple prediction for testing
+            if (!memoryNeurons.empty()) {
+                // Create a simple internal signal representing the current prediction
+                auto prediction = std::make_unique<InternalSignals>();
+                for (size_t i = 0; i < memoryNeurons.size(); ++i) {
+                    prediction->addSignal(static_cast<float>(memoryNeurons[i]) / 1000.0f);
+                }
+                
+                // If we have actual sensory input from this step, use it
+                if (!pImpl->currentSensoryData.empty()) {
+                    // Create actual sensory input from stored data
+                    auto actualInput = std::make_unique<InternalSignals>();
+                    for (float val : pImpl->currentSensoryData) {
+                        actualInput->addSignal(val);
+                    }
+                    
+                    // Update prediction system with actual observation
+                    pImpl->predictionSystem->updatePredictions(*prediction, *actualInput);
+                }
+            }
+        }
+        
+        // Generate prediction for next state
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Create current state as sensory input
+            auto currentInput = std::make_unique<InternalSignals>();
+            for (auto neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                currentInput->addSignal(static_cast<float>(neuronId) / 1000.0f);
+            }
+            
+            // Generate prediction for next state
+            auto prediction = pImpl->predictionSystem->predictNextState(*currentInput);
+            
+            // Track prediction error
+            if (prediction) {
+                // Convert prediction back to neural representation
+                const auto& predictedData = prediction->getData();
+                // This could be used to guide neural activity for next step
+                // For now, just log it
+                float confidence = pImpl->predictionSystem->getConfidence();
+                if (confidence > 0.5f) {
+                    // High confidence predictions could influence neural dynamics
+                    // e.g., by biasing certain neurons or enhancing certain pathways
+                }
+            }
+        }
+        
+        // ========== PREDICTION ERROR AND NEUROMODULATION INTEGRATION ==========
+        // Get prediction error and integrate with neuromodulation systems
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getError();
+            float errorMagnitude = pImpl->predictionError->getMagnitude();
+            
+            // Integrate with Dopamine (reward prediction error)
+            if (pImpl->dopamine) {
+                pImpl->dopamine->signalRewardPredictionError(predictionError);
+            }
+            
+            // Integrate with Curiosity (exploration drive)
+            if (pImpl->curiosity) {
+                // Get novelty from the novelty system
+                float novelty = 0.0f;
+                if (pImpl->novelty) {
+                    novelty = pImpl->novelty->getLevel();
+                }
+                pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
+            }
+            
+            // Use prediction error to modulate plasticity
+            if (errorMagnitude > 0.1f) {
+                // High prediction error increases plasticity
+                float plasticityMod = 1.0f + errorMagnitude * 2.0f;
+                // Apply plasticity modulation
+                // This would typically affect STDP, Hebbian, and structural plasticity
+                // For now, just log it
+                NLM_LOG_INFO("Prediction system: High prediction error " + std::to_string(errorMagnitude) +
+                             " -> plasticity modulation: " + std::to_string(plasticityMod));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -614,7 +699,28 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
-}
+    
+    // ========== PREDICTION SYSTEM INTEGRATION ==========
+    // Store sensory data in the prediction system
+    if (pImpl->predictionSystem) {
+        // Convert sensory input to vector<float> for prediction system
+        std::vector<float> sensoryVector(values.begin(), values.end());
+        
+        // Store the sensory observation for prediction system
+        pImpl->predictionSystem->train(input);
+        
+        // Get prediction error for tracking
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->computeError(predictionError, 0.0f); // Actual will be set in updatePredictions
+        }
+        
+        // Store sensory data for use in the next step
+        pImpl->currentSensoryData = sensoryVector;
+        
+        NLM_LOG_INFO("PredictionSystem: Updated with sensory input, error: " + 
+                     std::to_string(pImpl->predictionSystem->getPredictionError()));
+    }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {
@@ -697,21 +803,72 @@ std::unique_ptr<class Action> Brain::produceAction() {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Check if prediction system is available and use it for action planning
+    ActionType actionType = ActionType::Wait;
+    
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Get current working memory state as vector for prediction
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        if (!memoryNeurons.empty()) {
+            // Create current state vector for action prediction
+            std::vector<float> currentState;
+            for (auto neuronId : memoryNeurons) {
+                currentState.push_back(static_cast<float>(neuronId) / 1000.0f);
+            }
+            
+            // Use prediction system to plan actions
+            // Predict consequences of different actions
+            ActionType bestAction = ActionType::Wait;
+            float bestConfidence = 0.0f;
+            
+            // Test forward action
+            auto forwardConsequence = pImpl->predictionSystem->predictActionConsequence(
+                ActionType::MoveForward, currentState);
+            
+            // Calculate action quality based on prediction confidence
+            float forwardConfidence = pImpl->predictionSystem->getConsequenceConfidence(
+                ActionType::MoveForward, currentState);
+            
+            if (forwardConfidence > bestConfidence) {
+                bestConfidence = forwardConfidence;
+                bestAction = ActionType::MoveForward;
+            }
+            
+            // Also consider motor neuron activity as a factor
+            size_t firingMotor = 0;
+            for (auto* neuron : pImpl->motorNeurons) {
+                if (neuron->isFiring()) {
+                    ++firingMotor;
+                }
+            }
+            
+            // If motor neurons are firing, encourage movement
+            if (firingMotor > 0 && bestAction == ActionType::Wait) {
+                bestAction = ActionType::MoveForward;
+            }
+            
+            actionType = bestAction;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Fallback to simple motor neuron-based selection if prediction system not available
+    if (actionType == ActionType::Wait) {
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // Return a simple action
+        if (firingMotor > 0) {
+            actionType = ActionType::MoveForward;
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    auto action = std::make_unique<Action>(actionType);
     
     return action;
 }

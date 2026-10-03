@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
 #include <deque>
 #include <memory>
@@ -77,8 +78,8 @@ public:
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,
-                              const std::vector<float>& nextState,
-                              SimulationStep currentStep);
+                               const std::vector<float>& nextState,
+                               SimulationStep currentStep);
 
     // Find or create neurons that respond to specific sensory pattern
     NeuronId findMatchingPatternNeuron(const std::vector<float>& pattern,
