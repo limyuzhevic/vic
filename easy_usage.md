@@ -254,6 +254,198 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Learning with Memory
+
+```python
+import pynlm
+
+# Create and initialize brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent with world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run learning simulation
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Get reward
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Reward: {reward:.3f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  Working memory traces: {brain.getWorkingMemory().getActiveTraces() if brain.getWorkingMemory() else 0}")
+
+print("Learning simulation complete!")
+```
+
+### Project 5: Checkpoint and Restore
+
+```python
+import pynlm
+import tempfile
+import os
+
+# Create and initialize brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+
+# Run some steps
+for step in range(100):
+    brain.step(step)
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getTotalSpikeCount()} total spikes")
+
+print("Brain initialized and running...")
+
+# Save checkpoint with temporary file
+with tempfile.NamedTemporaryFile(suffix='.bin', delete=False) as tmp:
+    checkpoint_path = tmp.name
+
+if brain.save(checkpoint_path):
+    print(f"Checkpoint saved: {checkpoint_path}")
+    
+    # Create new brain and load
+    new_brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    new_brain.initialize()
+    
+    if new_brain.load(checkpoint_path):
+        print("Checkpoint loaded successfully")
+        print(f"Loaded brain had {new_brain.getTotalSpikeCount()} spikes")
+        
+        # Continue simulation
+        for step in range(100, 150):
+            new_brain.step(step)
+            if step % 20 == 0:
+                print(f"Step {step} after load: {new_brain.getTotalSpikeCount()} total spikes")
+    else:
+        print("Failed to load checkpoint")
+    
+    # Clean up
+    os.unlink(checkpoint_path)
+else:
+    print("Failed to save checkpoint")
+```
+
+### Project 6: Advanced Agent with Prediction
+
+```python
+import pynlm
+
+# Create configuration with advanced settings
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+config.set("neuromod.dopamine.scale", 1.5)
+config.set("neuromod.curiosity.enable", True)
+
+# Create brain and agent
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run extended simulation with detailed logging
+def run_advanced_simulation(steps=500):
+    print("Starting advanced simulation...")
+    print(f"Configuration: {config.get('brain.neuron_count')} neurons, "
+          f"{config.get('brain.synapse_density')*100:.1f}% connectivity")
+    
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get perception
+        percept = world.getSensoryPercept()
+        
+        # Process in agent
+        agent.processSensoryInput(percept)
+        
+        # Brain step
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Apply to world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Reward and learning
+        reward = 0.0
+        if percept.getInternal() and not percept.getInternal().empty():
+            reward = percept.getInternal()[0]
+        
+        if agent.isRewardModulationEnabled():
+            agent.applyRewardModulation(reward, 0.0)
+        
+        # Development updates
+        if agent.isDevelopmentEnabled():
+            agent.updateDevelopment(0.1)
+        
+        # Log progress
+        if step % 100 == 0:
+            print(f"\nStep {step}:")
+            print(f"  Action: {action}")
+            print(f"  Reward: {reward:.3f}")
+            print(f"  Cur: {agent.getCuriosityLevel():.3f} | Nov: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev stage: {brain.getDevelopmentalStage()}")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            if brain.getWorkingMemory():
+                print(f"  Working memory: {brain.getWorkingMemory().getActiveTraces()} traces")
+    
+    return step
+
+# Run the simulation
+run_advanced_simulation(500)
+
+print("\nAdvanced simulation complete!")
+print("Final stats:")
+print(f"  Total reward: {run_advanced_simulation(500) / 500:.3f}")
+print(f"  Average firing rate: {brain.getAverageFiringRate():.3f}")
+```
+
 ---
 
 ## Quick Reference
