@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,6 +17,53 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+
+// Error handling utilities
+namespace py = pybind11;
+
+// Custom exception classes for NLM
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMInitializationError : public NLMError {
+public:
+    explicit NLMInitializationError(const std::string& msg) : NLMError("Initialization failed: " + msg) {}
+};
+
+class NLMInvalidArgumentError : public NLMError {
+public:
+    explicit NLMInvalidArgumentError(const std::string& msg) : NLMError("Invalid argument: " + msg) {}
+};
+
+class NLMMemoryError : public NLMError {
+public:
+    explicit NLMMemoryError(const std::string& msg) : NLMError("Memory error: " + msg) {}
+};
+
+class NLMFileError : public NLMError {
+public:
+    explicit NLMFileError(const std::string& msg) : NLMError("File error: " + msg) {}
+};
+
+// Helper function for error checking
+template<typename T>
+T check_not_null(T ptr, const std::string& context = "") {
+    if (!ptr) {
+        std::stringstream ss;
+        ss << "Null pointer encountered " << (context.empty() ? "" : context);
+        throw NLMError(ss.str());
+    }
+    return ptr;
+}
+
+// Exception translator
+void init_exception_handlers(py::module_& m) {
+    m.def("get_last_error", []() -> std::string {
+        return "Error reporting not yet implemented"; // TODO: Implement error reporting
+    }, "Get the last error message");
+}
 
 namespace py = pybind11;
 namespace nlm {
@@ -144,39 +193,71 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+        .def("loadFromFile", py::overload_cast<const std::string&>(&Config::loadFromFile), py::arg("filepath"),
+             "Load configuration from a JSON file",
+             py::return_value_policy::reference_internal)
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            if (!self.loadFromFile(filepath)) {
+                throw NLMFileError("Failed to load configuration from: " + filepath);
+            }
+        }, py::arg("filepath"),
+             "Load configuration from a JSON file and throw on failure")
+        .def("saveToFile", py::overload_cast<const std::string&>(&Config::saveToFile), py::arg("filepath"),
+             "Save configuration to a JSON file",
+             py::return_value_policy::reference_internal)
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            if (!self.saveToFile(filepath)) {
+                throw NLMFileError("Failed to save configuration to: " + filepath);
+            }
+        }, py::arg("filepath"),
+             "Save configuration to a JSON file and throw on failure")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
-        .def("summary", &Config::summary,
+        .def("get_int", [](Config& self, const std::string& key, int default_value) {
+            auto value = self.get<int>(key);
+            return value ? *value : default_value;
+        }, py::arg("key"), py::arg("default_value"),
+             "Get integer value from configuration")
+        .def("get_float", [](Config& self, const std::string& key, float default_value) {
+            auto value = self.get<float>(key);
+            return value ? *value : default_value;
+        }, py::arg("key"), py::arg("default_value"),
+             "Get float value from configuration")
+        .def("get_string", [](Config& self, const std::string& key, const std::string& default_value) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : default_value;
+        }, py::arg("key"), py::arg("default_value"),
+             "Get string value from configuration")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set float configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set string configuration value")
+        .def("get_summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
-
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw NLMInvalidArgumentError("Cannot set vision data from empty vector");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
@@ -187,6 +268,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw NLMInvalidArgumentError("Cannot set audio data from empty vector");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
@@ -207,7 +291,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + " with " + std::to_string(action.getParameters().size()) + " parameters>";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -219,7 +306,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("__repr__", [](const WorldObject& obj) {
+            return "<WorldObject: type=" + std::to_string(static_cast<int>(obj.type)) +
+                   " at (" + std::to_string(obj.x) + ", " + std::to_string(obj.y) + ")>";
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -235,7 +326,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("isMoving", &AgentBody::isMoving)
         .def_readwrite("isTurning", &AgentBody::isTurning)
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def("reset", &AgentBody::reset)
+        .def("__repr__", [](const AgentBody& body) {
+            std::stringstream ss;
+            ss << "<AgentBody: pos(" << body.x << ", " << body.y << ") "
+               << "energy=" << body.energy << "/" << body.energy
+               << " health=" << body.health << " age=" << body.age << ">";
+            return ss.str();
+        });
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
@@ -243,7 +341,17 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("reward"), py::arg("success"), py::arg("message") = "")
         .def_readwrite("reward", &ActionResult::reward)
         .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def_readwrite("message", &ActionResult::message)
+        .def("__repr__", [](const ActionResult& result) {
+            std::stringstream ss;
+            ss << "<ActionResult: reward=" << result.reward 
+               << " success=" << (result.success ? "true" : "false");
+            if (!result.message.empty()) {
+                ss << " message=\"" << result.message << "\"";
+            }
+            ss << ">";
+            return ss.str();
+        });
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
@@ -261,7 +369,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        .def("__repr__", [](const SensoryPercept& percept) {
+            return "<SensoryPercept with vision, touch, internal signals>";
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -416,10 +527,12 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+} // namespace nlm
+
+void init_exception_handlers(py::module_& m) {
+    m.def("get_last_error", []() -> std::string {
+        return "Error reporting not yet implemented"; // TODO: Implement error reporting
+    }, "Get the last error message");
 }
 
 } // namespace nlm
