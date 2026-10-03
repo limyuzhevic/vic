@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_AGENT_SENORY_PERCEPT_HPP
+#define NLM_AGENT_SENORY_PERCEPT_HPP
 
 #include "AgentBody.hpp"
 #include "../sensory/SensoryInput.hpp"
@@ -56,3 +57,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENT_SENORY_PERCEPT_HPP

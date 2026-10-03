@@ -1,12 +1,21 @@
+#pragma once
+
 #include "AgentBrain.hpp"
+#include "AgentBrainMotor.hpp"
+#include "AgentBrainSensory.hpp"
+#include "AgentBrainNeuromodulation.hpp"
+#include "AgentBrainConfig.hpp"
+#include "AgentBrainError.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , config_(std::make_shared<AgentBrainConfig>())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -19,332 +28,396 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , errorRecoveryMode_(false)
+    , motorComponent_(std::make_unique<AgentBrainMotor>())
+    , sensoryComponent_(std::make_unique<AgentBrainSensory>())
+    , neuromodulationComponent_(std::make_unique<AgentBrainNeuromodulation>())
 {
-    // Initialize motor and sensory neuron groups
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
+        try {
+            auto motorResult = motorComponent_->distributeMotorNeurons(*brain_);
+            if (!motorResult) {
+                // Log motor error but continue (graceful degradation)
+                NLM_LOG_WARN(std::string("Motor neuron distribution failed: ") + motorResult.error()->what());
+                setErrorRecoveryMode(true);
             }
+            
+            auto sensoryResult = sensoryComponent_->distributeSensoryNeurons(*brain_);
+            if (!sensoryResult) {
+                // Log sensory error but continue (graceful degradation)
+                NLM_LOG_WARN(std::string("Sensory neuron distribution failed: ") + sensoryResult.error()->what());
+                setErrorRecoveryMode(true);
+            }
+        } catch (const std::bad_alloc&) {
+            NLM_LOG_ERROR("Memory allocation failed in AgentBrain constructor");
+            setErrorRecoveryMode(true);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception in AgentBrain constructor: ") + e.what());
+            setErrorRecoveryMode(true);
         }
     }
 }
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
-}
-
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
-
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
-    
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+AgentBrainResult<void> AgentBrain::initialize(const SimpleWorld& world) {
+    try {
+        if (!validateNotNull(&world, "world pointer")) {
+            return AgentBrainInvalidInputError("AgentBrain",
+                                              "world pointer cannot be null in initialize");
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
-    
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
-}
-
-MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
-    
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
-    }
-    
-    return decoded;
-}
-
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        if (!validateBrainState("initialize")) {
+            return AgentBrainResult<void>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for initialization"));
         }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+        
+        auto sensoryResult = sensoryComponent_->initialize(world);
+        if (!sensoryResult) {
+            NLM_LOG_ERROR(std::string("Sensory initialization failed: ") + sensoryResult.error()->what());
+            return sensoryResult;
         }
+        
+        developmentalAge_ = 0.0;
+        plasticityModifier_ = 1.0f;
+        
+        NLM_LOG_INFO("AgentBrain initialized with " + 
+                     std::to_string(sensoryComponent_->getVisionNeuronCount()) + " vision sensory neurons, " +
+                     std::to_string(sensoryComponent_->getTouchNeuronCount()) + " touch sensory neurons, " +
+                     std::to_string(sensoryComponent_->getInternalNeuronCount()) + " internal sensory neurons");
+        
+        return AgentBrainResult<void>(true);
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Memory allocation failed in AgentBrain::initialize");
+        return AgentBrainMemoryError("AgentBrain", "memory allocation failed in initialize");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::initialize: ") + e.what());
+        return AgentBrainResult<void>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in initialize: ") + e.what()));
     }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+AgentBrainResult<size_t> AgentBrain::getSensoryInputSize() const {
+    try {
+        if (!validateBrainState("getSensoryInputSize")) {
+            return AgentBrainResult<size_t>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for getSensoryInputSize"));
+        }
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        return sensoryComponent_->getSensoryInputSize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::getSensoryInputSize: ") + e.what());
+        return AgentBrainResult<size_t>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in getSensoryInputSize: ") + e.what()));
+    }
+}
+
+AgentBrainResult<size_t> AgentBrain::getMotorOutputSize() const {
+    try {
+        if (!validateBrainState("getMotorOutputSize")) {
+            return AgentBrainResult<size_t>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for getMotorOutputSize"));
+        }
+        
+        return motorComponent_->getMotorOutputSize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::getMotorOutputSize: ") + e.what());
+        return AgentBrainResult<size_t>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in getMotorOutputSize: ") + e.what()));
+    }
+}
+
+AgentBrainResult<void> AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    try {
+        if (!validateNotNull(&percept, "percept pointer")) {
+            return AgentBrainInvalidInputError("AgentBrain",
+                                              "percept pointer cannot be null in processSensoryInput");
+        }
+        
+        if (!validateBrainState("processSensoryInput")) {
+            return AgentBrainResult<void>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for processSensoryInput"));
+        }
+        
+        auto sensoryResult = sensoryComponent_->processInput(percept);
+        if (!sensoryResult) {
+            NLM_LOG_ERROR(std::string("Sensory processing failed: ") + sensoryResult.error()->what());
+            return sensoryResult;
+        }
+        
+        neuromodulationComponent_->updateCuriosity(*sensoryComponent_);
+        neuromodulationComponent_->updateNovelty(*sensoryComponent_, previousVision_);
+        
+        return AgentBrainResult<void>(true);
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Memory allocation failed in AgentBrain::processSensoryInput");
+        return AgentBrainMemoryError("AgentBrain", "memory allocation failed in processSensoryInput");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::processSensoryInput: ") + e.what());
+        return AgentBrainResult<void>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in processSensoryInput: ") + e.what()));
+    }
+}
+
+AgentBrainResult<MotorCommand> AgentBrain::decodeMotorCommand() {
+    try {
+        if (!validateBrainState("decodeMotorCommand")) {
+            return AgentBrainResult<MotorCommand>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for decodeMotorCommand"));
+        }
+        
+        MotorCommand decoded = MotorCommand::Wait;
+        
+        auto decodeResult = motorComponent_->decodeCommand(*brain_);
+        if (!decodeResult) {
+            NLM_LOG_WARN(std::string("Motor command decoding failed: ") + decodeResult.error()->what());
+            // Graceful degradation: continue with default wait command
+            decoded = MotorCommand::Wait;
+        } else {
+            decoded = decodeResult.value();
+        }
+        
+        if (curiosityEnabled_ && neuromodulationComponent_->getCuriosityLevel() > 0.3f) {
+            auto curiosityResult = motorComponent_->selectWithCuriosity(decoded, *brain_);
+            if (!curiosityResult) {
+                NLM_LOG_WARN(std::string("Curiosity-based command selection failed: ") + curiosityResult.error()->what());
+            } else {
+                decoded = curiosityResult.value();
             }
         }
+        
+        return AgentBrainResult<MotorCommand>(decoded);
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Memory allocation failed in AgentBrain::decodeMotorCommand");
+        return AgentBrainMemoryError<MotorCommand>("AgentBrain", "memory allocation failed in decodeMotorCommand");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::decodeMotorCommand: ") + e.what());
+        return AgentBrainResult<MotorCommand>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in decodeMotorCommand: ") + e.what()));
     }
-    
-    return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
-    
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
-            }
+AgentBrainResult<void> AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+    try {
+        if (!validateBrainState("applyRewardModulation")) {
+            return AgentBrainResult<void>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for applyRewardModulation"));
         }
-    }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
-    }
-}
-
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
-    
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
-    }
-    
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+        
+        if (!validateRange(reward, -1.0f, 1.0f, "reward")) {
+            return AgentBrainInvalidInputError("AgentBrain",
+                                              "reward " + std::to_string(reward) + " is out of valid range [-1.0, 1.0]");
         }
+        
+        if (!validateRange(predictedReward, -1.0f, 1.0f, "predicted reward")) {
+            return AgentBrainInvalidInputError("AgentBrain",
+                                              "predicted reward " + std::to_string(predictedReward) + " is out of valid range [-1.0, 1.0]");
+        }
+        
+        auto rewardResult = neuromodulationComponent_->applyReward(brain_, reward, predictedReward, plasticityModifier_);
+        if (!rewardResult) {
+            NLM_LOG_ERROR(std::string("Reward modulation failed: ") + rewardResult.error()->what());
+            return rewardResult;
+        }
+        
+        neuromodulationComponent_->updatePredictionError(reward, predictedReward);
+        
+        return AgentBrainResult<void>(true);
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Memory allocation failed in AgentBrain::applyRewardModulation");
+        return AgentBrainMemoryError("AgentBrain", "memory allocation failed in applyRewardModulation");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::applyRewardModulation: ") + e.what());
+        return AgentBrainResult<void>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in applyRewardModulation: ") + e.what()));
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
+AgentBrainResult<void> AgentBrain::updateDevelopment(double timestep) {
+    try {
+        if (!validateBrainState("updateDevelopment")) {
+            return AgentBrainResult<void>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for updateDevelopment"));
+        }
+        
+        if (!validateRange(timestep, 0.0, 3600.0, "timestep")) {
+            return AgentBrainInvalidInputError("AgentBrain",
+                                              "timestep " + std::to_string(timestep) + " is out of valid range [0.0, 3600.0]");
+        }
+        
+        neuromodulationComponent_->updateDevelopment(brain_, timestep, developmentalAge_, plasticityModifier_);
+        
+        return AgentBrainResult<void>(true);
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Memory allocation failed in AgentBrain::updateDevelopment");
+        return AgentBrainMemoryError("AgentBrain", "memory allocation failed in updateDevelopment");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::updateDevelopment: ") + e.what());
+        return AgentBrainResult<void>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in updateDevelopment: ") + e.what()));
+    }
+}
+
+AgentBrainResult<DevelopmentalStage> AgentBrain::getDevelopmentalStage() const {
+    try {
+        if (!validateBrainState("getDevelopmentalStage")) {
+            return AgentBrainResult<DevelopmentalStage>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for getDevelopmentalStage"));
+        }
+        
+        return neuromodulationComponent_->getDevelopmentalStage(brain_);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::getDevelopmentalStage: ") + e.what());
+        return AgentBrainResult<DevelopmentalStage>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in getDevelopmentalStage: ") + e.what()));
+    }
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    return neuromodulationComponent_->getDopamineLevel();
 }
 
 float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+    return neuromodulationComponent_->getCuriosityLevel();
 }
 
 float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+    return neuromodulationComponent_->getNoveltyLevel();
 }
 
 float AgentBrain::getPredictionError() const {
-    return predictionError_;
+    return neuromodulationComponent_->getPredictionError();
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+AgentBrainResult<void> AgentBrain::reset() {
+    try {
+        if (!validateBrainState("reset")) {
+            return AgentBrainResult<void>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for reset"));
+        }
+        
+        neuromodulationComponent_->reset();
+        motorComponent_->reset();
+        sensoryComponent_->reset(previousVision_);
+        developmentalAge_ = 0.0;
+        plasticityModifier_ = 1.0f;
+        
+        NLM_LOG_INFO("AgentBrain reset completed");
+        
+        return AgentBrainResult<void>(true);
+    } catch (const std::bad_alloc&) {
+        NLM_LOG_ERROR("Memory allocation failed in AgentBrain::reset");
+        return AgentBrainMemoryError("AgentBrain", "memory allocation failed in reset");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::reset: ") + e.what());
+        return AgentBrainResult<void>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in reset: ") + e.what()));
+    }
 }
+
+Brain* AgentBrain::getBrain() { return brain_.get(); }
+
+void AgentBrain::enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
+void AgentBrain::enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+void AgentBrain::enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+void AgentBrain::enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+
+bool AgentBrain::isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+bool AgentBrain::isCuriosityEnabled() const { return curiosityEnabled_; }
+
+AgentBrainResult<Brain*> AgentBrain::getBrain() {
+    try {
+        if (!validateBrainState("getBrain")) {
+            return AgentBrainResult<Brain*>(std::make_shared<AgentBrainStateError>(
+                "AgentBrain", "brain is in an invalid state for getBrain"));
+        }
+        
+        return AgentBrainResult<Brain*>(brain_.get());
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception in AgentBrain::getBrain: ") + e.what());
+        return AgentBrainResult<Brain*>(std::make_shared<AgentBrainError>(
+            AgentBrainErrorCode::NEURAL_ERROR, "AgentBrain", std::string("exception in getBrain: ") + e.what()));
+    }
+}
+
+// Helper method implementations
+bool AgentBrain::validateNotNull(const void* ptr, const std::string& context) const {
+    if (!ptr) {
+        NLM_LOG_WARN(std::string("Validation failed: ") + context + " is null");
+        return false;
+    }
+    return true;
+}
+
+bool AgentBrain::validateIndex(size_t idx, size_t maxSize, const std::string& context) const {
+    if (idx >= maxSize) {
+        NLM_LOG_WARN(std::string("Validation failed: ") + context + 
+                   " index " + std::to_string(idx) + " is out of bounds [0, " + std::to_string(maxSize) + "]");
+        return false;
+    }
+    return true;
+}
+
+bool AgentBrain::validateRange(double value, double min, double max, const std::string& context) const {
+    if (value < min || value > max) {
+        NLM_LOG_WARN(std::string("Validation failed: ") + context + 
+                   " value " + std::to_string(value) + " is out of range [" + std::to_string(min) + ", " + std::to_string(max) + "]");
+        return false;
+    }
+    return true;
+}
+
+bool AgentBrain::validateRange(float value, float min, float max, const std::string& context) const {
+    if (value < min || value > max) {
+        NLM_LOG_WARN(std::string("Validation failed: ") + context + 
+                   " value " + std::to_string(value) + " is out of range [" + std::to_string(min) + ", " + std::to_string(max) + "]");
+        return false;
+    }
+    return true;
+}
+
+bool AgentBrain::validateBrainState(const std::string& operation) const {
+    if (!brain_) {
+        NLM_LOG_WARN(std::string("Validation failed: ") + operation + 
+                   " cannot be performed with null brain");
+        return false;
+    }
+    
+    if (isErrorRecoveryMode()) {
+        NLM_LOG_WARN(std::string("Validation failed: ") + operation + 
+                   " cannot be performed in error recovery mode");
+        return false;
+    }
+    
+    return true;
+}
+
+// Other methods that need to be updated
+
+float AgentBrain::getNeuromodulationLevel() const {
+    return neuromodulationComponent_->getDopamineLevel();
+}
+
+float AgentBrain::getCuriosityLevel() const {
+    return neuromodulationComponent_->getCuriosityLevel();
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return neuromodulationComponent_->getNoveltyLevel();
+}
+
+float AgentBrain::getPredictionError() const {
+    return neuromodulationComponent_->getPredictionError();
+}
+
+void AgentBrain::enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
+void AgentBrain::enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+void AgentBrain::enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+void AgentBrain::enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+
+bool AgentBrain::isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+bool AgentBrain::isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+bool AgentBrain::isDevelopmentEnabled() const { return developmentEnabled_; }
+bool AgentBrain::isCuriosityEnabled() const { return curiosityEnabled_; }
 
 } // namespace nlm

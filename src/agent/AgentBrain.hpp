@@ -1,44 +1,49 @@
-#pragma once
+#ifndef NLM_AGENT_BRAIN_HPP
+#define NLM_AGENT_BRAIN_HPP
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../agent/SensoryPercept.hpp"
+#include "../motor/Action.hpp"
+#include "../agent/AgentBrainConfig.hpp"
+#include "AgentBrainError.hpp"
 #include <memory>
-#include <vector>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Refactored facade that delegates to modular components
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
+    // Initialize with world - returns error result for failure cases
+    AgentBrainResult<void> initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    // Get sensory input size expected by brain - returns error if brain is null
+    AgentBrainResult<size_t> getSensoryInputSize() const;
     
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    // Get motor output size expected - returns error if brain is null
+    AgentBrainResult<size_t> getMotorOutputSize() const;
     
     // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
+    AgentBrainResult<void> processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
+    AgentBrainResult<MotorCommand> decodeMotorCommand();
     
     // Apply neuromodulation based on reward
-    void applyRewardModulation(float reward, float predictedReward);
+    AgentBrainResult<void> applyRewardModulation(float reward, float predictedReward);
     
     // Update development system
-    void updateDevelopment(double timestep);
+    AgentBrainResult<void> updateDevelopment(double timestep);
     
-    // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
+    // Get current developmental stage - returns error if brain is null
+    AgentBrainResult<DevelopmentalStage> getDevelopmentalStage() const;
     
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
@@ -53,10 +58,10 @@ public:
     float getPredictionError() const;
     
     // Reset agent for new episode
-    void reset();
+    AgentBrainResult<void> reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get brain pointer - returns error if brain is null
+    AgentBrainResult<Brain*> getBrain();
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -70,27 +75,23 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    std::shared_ptr<AgentBrainConfig> config_;
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Previous sensory state for novelty detection
+    std::vector<float> previousVision_;
+    float sensoryNoveltyDecay_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Configuration flags
+    bool rewardModulationEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool developmentEnabled_;
+    bool curiosityEnabled_;
+    
+    // Development state
+    double developmentalAge_;
+    float plasticityModifier_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -99,19 +100,28 @@ private:
     float predictionError_;
     float expectedReward_;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    // Error handling state
+    bool errorRecoveryMode_;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Component classes for modularity
+    class AgentBrainMotor;
+    class AgentBrainSensory;
+    class AgentBrainNeuromodulation;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    std::unique_ptr<AgentBrainMotor> motorComponent_;
+    std::unique_ptr<AgentBrainSensory> sensoryComponent_;
+    std::unique_ptr<AgentBrainNeuromodulation> neuromodulationComponent_;
+    
+    // Helper methods for error handling
+    bool validateNotNull(const void* ptr, const std::string& context) const;
+    bool validateIndex(size_t idx, size_t maxSize, const std::string& context) const;
+    bool validateRange(double value, double min, double max, const std::string& context) const;
+    bool validateRange(float value, float min, float max, const std::string& context) const;
+    bool validateBrainState(const std::string& operation) const;
+    void setErrorRecoveryMode(bool enable) { errorRecoveryMode_ = enable; }
+    bool isErrorRecoveryMode() const { return errorRecoveryMode_; }
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENT_BRAIN_HPP

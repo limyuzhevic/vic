@@ -11,7 +11,8 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // Audio is optional - only allocate if needed
+    // Audio can be enabled dynamically if auditory processing is used
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_AGENT_BODY_HPP
+#define NLM_AGENT_BODY_HPP
 
 #include <cstdint>
 #include <string>
@@ -86,3 +87,5 @@ enum class WorldObjectType {
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENT_BODY_HPP
