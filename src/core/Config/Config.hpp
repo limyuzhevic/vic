@@ -41,6 +41,11 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Equality for testing
+    bool operator==(const ConfigEntry& other) const {
+        return key == other.key && value == other.value && source == other.source && description == other.description;
+    }
 };
 
 // Main configuration class
