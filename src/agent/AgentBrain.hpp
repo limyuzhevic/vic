@@ -14,22 +14,22 @@ namespace nlm {
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
+    ~AgentBrain(nullptr);
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
     // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    size_t getSensoryInputSize(nullptr) const;
     
     // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    size_t getMotorOutputSize(nullptr) const;
     
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
+    MotorCommand decodeMotorCommand(nullptr);
     
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
@@ -38,25 +38,25 @@ public:
     void updateDevelopment(double timestep);
     
     // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
+    DevelopmentalStage getDevelopmentalStage(nullptr) const;
     
     // Get neuromodulation level
-    float getNeuromodulationLevel() const;
+    float getNeuromodulationLevel(nullptr) const;
     
     // Get curiosity level
-    float getCuriosityLevel() const;
+    float getCuriosityLevel(nullptr) const;
     
     // Get novelty level
-    float getNoveltyLevel() const;
+    float getNoveltyLevel(nullptr) const;
     
     // Get prediction error
-    float getPredictionError() const;
+    float getPredictionError(nullptr) const;
     
     // Reset agent for new episode
-    void reset();
+    void reset(nullptr);
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain(nullptr) { return brain_.get(nullptr); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -64,14 +64,14 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isRewardModulationEnabled(nullptr) const { return rewardModulationEnabled_; }
+    bool isStructuralPlasticityEnabled(nullptr) const { return structuralPlasticityEnabled_; }
+    bool isDevelopmentEnabled(nullptr) const { return developmentEnabled_; }
+    bool isCuriosityEnabled(nullptr) const { return curiosityEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    MotorCommand decodeFromMotorNeurons(nullptr);
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);

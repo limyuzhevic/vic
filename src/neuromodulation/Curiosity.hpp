@@ -9,27 +9,27 @@ namespace nlm {
 
 class Curiosity {
 public:
-    Curiosity();
-    ~Curiosity();
+    Curiosity(nullptr);
+    ~Curiosity(nullptr);
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
     // Get curiosity level
-    float getLevel() const;
+    float getLevel(nullptr) const;
     
     // Update curiosity based on novelty and prediction error
     void update(float novelty, float predictionError, TimestepDuration dt);
     
     // Get exploration drive (same as level)
-    float getExplorationDrive() const;
+    float getExplorationDrive(nullptr) const;
     
     // Set curiosity parameters
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
     
     // Reset
-    void reset();
+    void reset(nullptr);
     
 private:
     struct Impl;

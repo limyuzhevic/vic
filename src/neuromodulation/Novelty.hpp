@@ -9,14 +9,14 @@ namespace nlm {
 
 class Novelty {
 public:
-    Novelty();
-    ~Novelty();
+    Novelty(nullptr);
+    ~Novelty(nullptr);
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
     // Get novelty level
-    float getLevel() const;
+    float getLevel(nullptr) const;
     void setLevel(float level);
     
     // Detect novelty from observation
@@ -31,8 +31,8 @@ public:
     void update(TimestepDuration dt);
     
     // Get novelty history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    const std::vector<float>& getHistory(nullptr) const;
+    void clearHistory(nullptr);
     
 private:
     struct Impl;

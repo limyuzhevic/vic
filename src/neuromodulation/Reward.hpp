@@ -9,26 +9,26 @@ namespace nlm {
 
 class Reward {
 public:
-    Reward();
-    ~Reward();
+    Reward(nullptr);
+    ~Reward(nullptr);
     
     // Get current reward value
-    float getValue() const;
+    float getValue(nullptr) const;
     void setValue(float value);
     
     // Accumulate reward
     void add(float delta);
     
     // Reset accumulated reward
-    void reset();
+    void reset(nullptr);
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
+    // TODO: PHASE 2 - Implement real reward computation
     float computeReward(const class Observation& observation) const;
     
     // Reward history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    const std::vector<float>& getHistory(nullptr) const;
+    void clearHistory(nullptr);
     
 private:
     struct Impl;

@@ -47,10 +47,10 @@ namespace nlm {
 class OptimizedBrain : public Brain {
 public:
     explicit OptimizedBrain(std::shared_ptr<Config> config);
-    ~OptimizedBrain() override;
+    ~OptimizedBrain(nullptr) override;
     
     // Initialize with configuration
-    bool initialize() override;
+    bool initialize(nullptr) override;
     
     // Optimized simulation step
     void step(SimulationStep currentStep) override;
@@ -71,7 +71,7 @@ public:
         double stepTimeMs;
     };
     
-    PerformanceStats getPerformanceStats() const;
+    PerformanceStats getPerformanceStats(nullptr) const;
     
     // Enable/disable optimizations
     void enableEventDriven(bool enable) { eventDrivenEnabled_ = enable; }
@@ -79,14 +79,14 @@ public:
     void enableSIMD(bool enable) { simdEnabled_ = enable; }
     void enableSparseConnectivity(bool enable) { sparseEnabled_ = enable; }
     
-    bool isEventDrivenEnabled() const { return eventDrivenEnabled_; }
-    bool isMultithreadingEnabled() const { return multithreadingEnabled_; }
-    bool isSIMDEnabled() const { return simdEnabled_; }
-    bool isSparseEnabled() const { return sparseEnabled_; }
+    bool isEventDrivenEnabled(nullptr) const { return eventDrivenEnabled_; }
+    bool isMultithreadingEnabled(nullptr) const { return multithreadingEnabled_; }
+    bool isSIMDEnabled(nullptr) const { return simdEnabled_; }
+    bool isSparseEnabled(nullptr) const { return sparseEnabled_; }
     
     // Thread count
     void setThreadCount(size_t count) { threadCount_ = count; }
-    size_t getThreadCount() const { return threadCount_; }
+    size_t getThreadCount(nullptr) const { return threadCount_; }
     
 private:
     /**
@@ -110,8 +110,8 @@ private:
         std::vector<uint32_t> firingNeuronIndices;  // Indices of neurons that fired this step
         
         void initialize(size_t size);
-        void clear();
-        size_t memoryUsage() const;
+        void clear(nullptr);
+        size_t memoryUsage(nullptr) const;
     };
     
     /**
@@ -137,8 +137,8 @@ private:
         std::vector<uint8_t> postHistoryHead;
         
         void initialize(size_t size);
-        void clear();
-        size_t memoryUsage() const;
+        void clear(nullptr);
+        size_t memoryUsage(nullptr) const;
     };
     
     /**
@@ -152,7 +152,7 @@ private:
     };
     
     // Initialize connectivity
-    void initializeSparseConnectivity();
+    void initializeSparseConnectivity(nullptr);
     
     // Event-driven processing
     void processActiveNeurons(uint64_t currentStep, double currentTime);
@@ -163,10 +163,10 @@ private:
     void updateSynapsesBatch(size_t begin, size_t end, double currentTime);
     
     // Apply plasticity
-    void applyPlasticity();
+    void applyPlasticity(nullptr);
     
     // Statistics
-    void updateStatistics();
+    void updateStatistics(nullptr);
     
     // Configuration
     bool eventDrivenEnabled_;
@@ -222,26 +222,26 @@ inline void OptimizedBrain::NeuralStateSoA::initialize(size_t size) {
     firingNeuronIndices.reserve(size);
 }
 
-inline void OptimizedBrain::NeuralStateSoA::clear() {
+inline void OptimizedBrain::NeuralStateSoA::clear(nullptr) {
     // Zero synaptic input
-    std::fill(synapseInput.begin(), synapseInput.end(), 0.0f);
+    std::fill(synapseInput.begin(nullptr), synapseInput.end(nullptr), 0.0f);
     // Clear firing neurons
-    firingNeuronIndices.clear();
+    firingNeuronIndices.clear(nullptr);
 }
 
-inline size_t OptimizedBrain::NeuralStateSoA::memoryUsage() const {
+inline size_t OptimizedBrain::NeuralStateSoA::memoryUsage(nullptr) const {
     size_t total = 0;
-    total += membranePotential.capacity() * sizeof(float);
-    total += restingPotential.capacity() * sizeof(float);
-    total += threshold.capacity() * sizeof(float);
-    total += resetPotential.capacity() * sizeof(float);
-    total += leakConductance.capacity() * sizeof(float);
-    total += synapseInput.capacity() * sizeof(float);
-    total += firingState.capacity() * sizeof(uint8_t);
-    total += refractoryRemaining.capacity() * sizeof(uint32_t);
-    total += refractoryPeriod.capacity() * sizeof(uint32_t);
-    total += lastSpikeTime.capacity() * sizeof(float);
-    total += neuronType.capacity() * sizeof(uint64_t);
+    total += membranePotential.capacity(nullptr) * sizeof(float);
+    total += restingPotential.capacity(nullptr) * sizeof(float);
+    total += threshold.capacity(nullptr) * sizeof(float);
+    total += resetPotential.capacity(nullptr) * sizeof(float);
+    total += leakConductance.capacity(nullptr) * sizeof(float);
+    total += synapseInput.capacity(nullptr) * sizeof(float);
+    total += firingState.capacity(nullptr) * sizeof(uint8_t);
+    total += refractoryRemaining.capacity(nullptr) * sizeof(uint32_t);
+    total += refractoryPeriod.capacity(nullptr) * sizeof(uint32_t);
+    total += lastSpikeTime.capacity(nullptr) * sizeof(float);
+    total += neuronType.capacity(nullptr) * sizeof(uint64_t);
     return total;
 }
 
@@ -262,22 +262,22 @@ inline void OptimizedBrain::SynapseStateSoA::initialize(size_t size) {
     postHistoryHead.resize(size, 0);
 }
 
-inline void OptimizedBrain::SynapseStateSoA::clear() {
-    eligibilityTrace.assign(eligibilityTrace.size(), 0.0f);
+inline void OptimizedBrain::SynapseStateSoA::clear(nullptr) {
+    eligibilityTrace.assign(eligibilityTrace.size(nullptr), 0.0f);
 }
 
-inline size_t OptimizedBrain::SynapseStateSoA::memoryUsage() const {
+inline size_t OptimizedBrain::SynapseStateSoA::memoryUsage(nullptr) const {
     size_t total = 0;
-    total += sourceNeuron.capacity() * sizeof(uint64_t);
-    total += destinationNeuron.capacity() * sizeof(uint64_t);
-    total += weight.capacity() * sizeof(float);
-    total += delay.capacity() * sizeof(uint32_t);
-    total += synapseType.capacity() * sizeof(uint8_t);
-    total += plasticityFlags.capacity() * sizeof(uint8_t);
-    total += eligibilityTrace.capacity() * sizeof(float);
-    total += efficacy.capacity() * sizeof(float);
-    total += shortTermDepression.capacity() * sizeof(float);
-    total += shortTermFacilitation.capacity() * sizeof(float);
+    total += sourceNeuron.capacity(nullptr) * sizeof(uint64_t);
+    total += destinationNeuron.capacity(nullptr) * sizeof(uint64_t);
+    total += weight.capacity(nullptr) * sizeof(float);
+    total += delay.capacity(nullptr) * sizeof(uint32_t);
+    total += synapseType.capacity(nullptr) * sizeof(uint8_t);
+    total += plasticityFlags.capacity(nullptr) * sizeof(uint8_t);
+    total += eligibilityTrace.capacity(nullptr) * sizeof(float);
+    total += efficacy.capacity(nullptr) * sizeof(float);
+    total += shortTermDepression.capacity(nullptr) * sizeof(float);
+    total += shortTermFacilitation.capacity(nullptr) * sizeof(float);
     return total;
 }
 

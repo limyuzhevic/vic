@@ -18,7 +18,7 @@ struct WorldObject {
     float value;        // Reward value (for resources) or damage (for hazards)
     bool active;
     
-    WorldObject() 
+    WorldObject(nullptr) 
         : x(0.0f), y(0.0f), radius(0.5f), type(WorldObjectType::Empty)
         , value(0.0f), active(true) {}
     
@@ -30,14 +30,14 @@ struct WorldObject {
 // Provides sensory experience without semantic labels
 class SimpleWorld {
 public:
-    SimpleWorld();
-    ~SimpleWorld();
+    SimpleWorld(nullptr);
+    ~SimpleWorld(nullptr);
     
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
     
     // Reset world to initial state
-    void reset();
+    void reset(nullptr);
     
     // Set agent starting position
     void setAgentStart(float x, float y);
@@ -49,10 +49,10 @@ public:
     ActionResult applyMotorCommand(MotorCommand cmd, double currentTime);
     
     // Get current sensory percept for the agent
-    const SensoryPercept& getSensoryPercept() const { return sensory_; }
+    const SensoryPercept& getSensoryPercept(nullptr) const { return sensory_; }
     
     // Get agent body state
-    const AgentBody& getAgentBody() const { return agent_; }
+    const AgentBody& getAgentBody(nullptr) const { return agent_; }
     
     // Add object to world
     void addObject(const WorldObject& obj);
@@ -67,31 +67,31 @@ public:
     WorldObject* getObjectAt(float x, float y);
     
     // World dimensions
-    float getWidth() const { return width_; }
-    float getHeight() const { return height_; }
+    float getWidth(nullptr) const { return width_; }
+    float getHeight(nullptr) const { return height_; }
     
     // Energy settings
-    float getMaxEnergy() const { return maxEnergy_; }
+    float getMaxEnergy(nullptr) const { return maxEnergy_; }
     void setMaxEnergy(float e) { maxEnergy_ = e; }
-    float getEnergyDecayRate() const { return energyDecayRate_; }
+    float getEnergyDecayRate(nullptr) const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
     
     // Time
-    double getSimulationTime() const { return simTime_; }
+    double getSimulationTime(nullptr) const { return simTime_; }
     
     // Seed for reproducibility
     void setRandomSeed(uint64_t seed);
-    uint64_t getRandomSeed() const { return rngSeed_; }
+    uint64_t getRandomSeed(nullptr) const { return rngSeed_; }
     
 private:
     // Generate vision from current view
-    void generateVision();
+    void generateVision(nullptr);
     
     // Check for collisions
-    void checkCollisions();
+    void checkCollisions(nullptr);
     
     // Interact with nearby objects
-    ActionResult interact();
+    ActionResult interact(nullptr);
     
     // World geometry
     float width_;
@@ -123,7 +123,7 @@ private:
     
     // Simple RNG state
     uint64_t rngState_;
-    uint64_t nextRandom();
+    uint64_t nextRandom(nullptr);
 };
 
 } // namespace nlm

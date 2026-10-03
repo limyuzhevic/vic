@@ -33,7 +33,7 @@ namespace nlm {
 struct MemPoolNode {
     std::atomic<MemPoolNode*> next;
     
-    MemPoolNode() : next(nullptr) {}
+    MemPoolNode(nullptr) : next(nullptr) {}
 };
 
 /**
@@ -52,7 +52,7 @@ public:
      */
     explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4);
     
-    ~MemoryPool();
+    ~MemoryPool(nullptr);
     
     // Disable copying
     MemoryPool(const MemoryPool&) = delete;
@@ -62,7 +62,7 @@ public:
      * Allocate an object from the pool
      * Lock-free operation
      */
-    T* allocate();
+    T* allocate(nullptr);
     
     /**
      * Return an object to the pool
@@ -73,22 +73,22 @@ public:
     /**
      * Check if pool is empty
      */
-    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
+    bool empty(nullptr) const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
     
     /**
      * Get number of allocated objects
      */
-    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
+    size_t allocatedCount(nullptr) const { return allocatedCount_.load(std::memory_order_relaxed); }
     
     /**
      * Get number of available objects
      */
-    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
+    size_t availableCount(nullptr) const { return availableCount_.load(std::memory_order_relaxed); }
     
     /**
      * Total memory used by pool (bytes)
      */
-    size_t memoryUsage() const;
+    size_t memoryUsage(nullptr) const;
     
     /**
      * Pre-allocate objects
@@ -104,12 +104,12 @@ private:
         explicit Block(size_t objectSize, size_t count);
         
         T* getObject(size_t index, size_t objectSize) {
-            return reinterpret_cast<T*>(data.data() + index * objectSize);
+            return reinterpret_cast<T*>(data.data(nullptr) + index * objectSize);
         }
     };
     
     // Add a new block to the pool
-    void addBlock();
+    void addBlock(nullptr);
     
     // Slab size for each object (rounded up to alignment)
     size_t slabSize_;
@@ -162,30 +162,30 @@ MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
     
     // Pre-allocate initial blocks
     for (size_t i = 0; i < initialBlocks; ++i) {
-        addBlock();
+        addBlock(nullptr);
     }
 }
 
 template<typename T>
-MemoryPool<T>::~MemoryPool() {
+MemoryPool<T>::~MemoryPool(nullptr) {
     // Blocks are automatically freed via unique_ptr
 }
 
 template<typename T>
-void MemoryPool<T>::addBlock() {
+void MemoryPool<T>::addBlock(nullptr) {
     auto block = std::make_unique<Block>(slabSize_, blockSize_);
     
     // Chain existing blocks
     Block* expected = nullptr;
-    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
+    if (!currentBlock_.compare_exchange_strong(expected, block.get(nullptr))) {
         // Another thread already added a block, add to chain
         block->nextBlock = expected;
     } else {
-        block.release();
+        block.release(nullptr);
     }
     
     // Initialize free list for this block
-    Block* b = block.get();
+    Block* b = block.get(nullptr);
     for (size_t i = 0; i < blockSize_; ++i) {
         T* obj = b->getObject(i, slabSize_);
         MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
@@ -198,7 +198,7 @@ void MemoryPool<T>::addBlock() {
 }
 
 template<typename T>
-T* MemoryPool<T>::allocate() {
+T* MemoryPool<T>::allocate(nullptr) {
     // Try to get from free list first (lock-free pop)
     MemPoolNode* node = freeList_.load(std::memory_order_acquire);
     
@@ -215,10 +215,10 @@ T* MemoryPool<T>::allocate() {
     }
     
     // Free list empty, add a new block
-    addBlock();
+    addBlock(nullptr);
     
     // Try again
-    return allocate();
+    return allocate(nullptr);
 }
 
 template<typename T>
@@ -240,10 +240,10 @@ void MemoryPool<T>::deallocate(T* obj) {
 }
 
 template<typename T>
-size_t MemoryPool<T>::memoryUsage() const {
+size_t MemoryPool<T>::memoryUsage(nullptr) const {
     size_t total = 0;
     for (const auto& block : blocks_) {
-        total += block->data.capacity() * sizeof(uint8_t);
+        total += block->data.capacity(nullptr) * sizeof(uint8_t);
     }
     return total;
 }
@@ -251,18 +251,18 @@ size_t MemoryPool<T>::memoryUsage() const {
 template<typename T>
 void MemoryPool<T>::reserve(size_t count) {
     while (availableCount_.load(std::memory_order_relaxed) < count) {
-        addBlock();
+        addBlock(nullptr);
     }
 }
 
 // NeuronPool - Specialized pool for neurons with cache-aligned states
 class NeuronPool {
 public:
-    NeuronPool();
-    ~NeuronPool();
+    NeuronPool(nullptr);
+    ~NeuronPool(nullptr);
     
     // Allocate a neuron with its state
-    NeuronId allocate();
+    NeuronId allocate(nullptr);
     
     // Deallocate a neuron
     void deallocate(NeuronId id);
@@ -272,10 +272,10 @@ public:
     Member* getState(NeuronIndex index);
     
     // Get total count
-    size_t size() const { return size_; }
+    size_t size(nullptr) const { return size_; }
     
     // Memory usage
-    size_t memoryUsage() const;
+    size_t memoryUsage(nullptr) const;
     
 private:
     static constexpr size_t CACHE_LINE = 64;
@@ -301,7 +301,7 @@ private:
         // Per-neuron current injection (not in NeuronState, but needed for hot path)
         std::vector<float> synapticInput;
         
-        NeuronBlock() {}
+        NeuronBlock(nullptr) {}
     };
     
     size_t size_;
@@ -316,8 +316,8 @@ private:
 // SynapsePool - Specialized pool for synapses
 class SynapsePool {
 public:
-    SynapsePool();
-    ~SynapsePool();
+    SynapsePool(nullptr);
+    ~SynapsePool(nullptr);
     
     // Allocate a synapse
     SynapseId allocate(NeuronId source, NeuronId destination);
@@ -334,10 +334,10 @@ public:
     NeuronId getDestination(SynapseIndex index) const;
     
     // Total count
-    size_t size() const { return size_; }
+    size_t size(nullptr) const { return size_; }
     
     // Memory usage
-    size_t memoryUsage() const;
+    size_t memoryUsage(nullptr) const;
     
 private:
     static constexpr size_t CACHE_LINE = 64;
@@ -363,7 +363,7 @@ private:
         // Synaptic efficacy
         std::vector<float> efficacy;
         
-        SynapseBlock() {}
+        SynapseBlock(nullptr) {}
     };
     
     size_t size_;

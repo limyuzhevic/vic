@@ -73,7 +73,7 @@ public:
     /**
      * Check if SIMD is available
      */
-    static bool isSIMDAvailable() {
+    static bool isSIMDAvailable(nullptr) {
 #if defined(NLM_SIMD_AVX512) || defined(NLM_SIMD_AVX2) || defined(NLM_SIMD_SSE)
         return true;
 #else
@@ -84,7 +84,7 @@ public:
     /**
      * Get SIMD type name
      */
-    static const char* getSIMDType() {
+    static const char* getSIMDType(nullptr) {
 #if defined(NLM_SIMD_AVX512)
         return "AVX-512";
 #elif defined(NLM_SIMD_AVX2)
@@ -99,7 +99,7 @@ public:
     /**
      * Get optimal memory alignment for SIMD loads/stores
      */
-    static constexpr size_t alignment() {
+    static constexpr size_t alignment(nullptr) {
 #if defined(NLM_SIMD_AVX512)
         return 64;
 #elif defined(NLM_SIMD_AVX2) || defined(NLM_SIMD_SSE)
@@ -135,7 +135,7 @@ struct VectorizedLIF {
     float dt;            // Timestep (ms)
     float refractoryDecay;  // Refractory period decay
     
-    VectorizedLIF()
+    VectorizedLIF(nullptr)
         : V_rest(-70.0f), V_reset(-70.0f), V_threshold(-55.0f)
         , tau(20.0f), C(1.0f), dt(1.0f), refractoryDecay(1.0f) {}
     
@@ -161,7 +161,7 @@ struct VectorizedSynapse {
     float tau_depression;     // Depression time constant
     float U_max;             // Max utilization
     
-    VectorizedSynapse()
+    VectorizedSynapse(nullptr)
         : tau_facilitation(100.0f), tau_depression(200.0f), U_max(1.0f) {}
     
     /**
@@ -184,7 +184,7 @@ struct VectorizedSTDP {
     float w_max;      // Max weight
     float w_min;      // Min weight
     
-    VectorizedSTDP()
+    VectorizedSTDP(nullptr)
         : tau_plus(20.0f), tau_minus(20.0f), A_plus(0.01f), A_minus(0.012f)
         , w_max(1.0f), w_min(-1.0f) {}
     
@@ -331,7 +331,7 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         __m512 vRefractory = _mm512_load_ps(refractoryFloat);
         
         // Create mask for neurons still in refractory
-        __m512 maskRefractory = _mm512_cmp_ps(vRefractory, _mm512_setzero_ps(), _CMP_GT_OQ);
+        __m512 maskRefractory = _mm512_cmp_ps(vRefractory, _mm512_setzero_ps(nullptr), _CMP_GT_OQ);
         
         // Calculate leak term: (V_rest - V) / tau
         __m512 vLeak = _mm512_mul_ps(_mm512_sub_ps(vmRest, vV), vLeakCoeff);
@@ -420,7 +420,7 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
             refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
         }
         __m256 vRefractory = _mm256_load_ps(refractoryFloat);
-        __m256 maskRefractory = _mm256_cmp_ps(vRefractory, _mm256_setzero_ps(), _CMP_GT_OQ);
+        __m256 maskRefractory = _mm256_cmp_ps(vRefractory, _mm256_setzero_ps(nullptr), _CMP_GT_OQ);
         
         // LIF update
         __m256 vLeak = _mm256_mul_ps(_mm256_sub_ps(vmRest, vV), vLeakCoeff);
@@ -493,7 +493,7 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
             refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
         }
         __m128 vRefractory = _mm_load_ps(refractoryFloat);
-        __m128 maskRefractory = _mm_cmpgt_ps(vRefractory, _mm_setzero_ps());
+        __m128 maskRefractory = _mm_cmpgt_ps(vRefractory, _mm_setzero_ps(nullptr));
         
         __m128 vLeak = _mm_mul_ps(_mm_sub_ps(vmRest, vV), vLeakCoeff);
         __m128 vInput = _mm_mul_ps(vI, vInputCoeff);

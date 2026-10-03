@@ -15,7 +15,7 @@ public:
     // Create population with ID and size
     NeuralPopulation(PopulationId id, size_t size);
     
-    ~NeuralPopulation();
+    ~NeuralPopulation(nullptr);
     
     // Disable copying, enable moving
     NeuralPopulation(const NeuralPopulation&) = delete;
@@ -24,11 +24,11 @@ public:
     NeuralPopulation& operator=(NeuralPopulation&&) noexcept;
     
     // Identity
-    PopulationId getId() const;
+    PopulationId getId(nullptr) const;
     
     // Size
-    size_t getSize() const;
-    bool isEmpty() const;
+    size_t getSize(nullptr) const;
+    bool isEmpty(nullptr) const;
     
     // Neuron access
     Neuron* getNeuron(NeuronIndex index);
@@ -38,17 +38,17 @@ public:
     void addNeuron(Neuron* neuron);
     
     // Get all neurons
-    const std::vector<Neuron*>& getNeurons() const;
+    const std::vector<Neuron*>& getNeurons(nullptr) const;
     
     // Population type (all neurons in population share same type)
-    NeuronType getNeuronType() const;
+    NeuronType getNeuronType(nullptr) const;
     void setNeuronType(NeuronType type);
     
     // Statistics
-    size_t getActiveCount() const;
-    size_t getFiringCount() const;
-    float getAverageFiringRate() const;
-    float getActivityLevel() const;  // fraction of active neurons
+    size_t getActiveCount(nullptr) const;
+    size_t getFiringCount(nullptr) const;
+    float getAverageFiringRate(nullptr) const;
+    float getActivityLevel(nullptr) const;  // fraction of active neurons
     
     // Initialize all neurons randomly
     void initializeRandom(class RandomGenerator& rng);
@@ -57,15 +57,15 @@ public:
     void step(Timestamp currentTime);
     
     // Reset all neurons
-    void reset();
+    void reset(nullptr);
     
     // Get neuron IDs in this population
-    std::vector<NeuronId> getNeuronIds() const;
+    std::vector<NeuronId> getNeuronIds(nullptr) const;
     
     // Statistics tracking
-    void recordActivity();  // Record current state for statistics
-    float getMeanMembranePotential() const;
-    float getVarianceMembranePotential() const;
+    void recordActivity(nullptr);  // Record current state for statistics
+    float getMeanMembranePotential(nullptr) const;
+    float getVarianceMembranePotential(nullptr) const;
     
 private:
     struct Impl;

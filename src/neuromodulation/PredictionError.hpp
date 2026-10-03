@@ -9,14 +9,14 @@ namespace nlm {
 
 class PredictionError {
 public:
-    PredictionError();
-    ~PredictionError();
+    PredictionError(nullptr);
+    ~PredictionError(nullptr);
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
     // Get error value
-    float getError() const;
+    float getError(nullptr) const;
     
     // Compute prediction error
     void computeError(float predicted, float actual);
@@ -25,11 +25,11 @@ public:
     void updatePrediction(float newPrediction);
     
     // Get history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    const std::vector<float>& getHistory(nullptr) const;
+    void clearHistory(nullptr);
     
     // Get error magnitude for neuromodulation
-    float getMagnitude() const;
+    float getMagnitude(nullptr) const;
     
 private:
     struct Impl;

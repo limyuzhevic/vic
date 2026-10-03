@@ -10,32 +10,32 @@ namespace nlm {
 
 class StructuralPlasticity {
 public:
-    StructuralPlasticity();
-    ~StructuralPlasticity();
+    StructuralPlasticity(nullptr);
+    ~StructuralPlasticity(nullptr);
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // TODO: PHASE 2 - Implement real synapse creation
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // TODO: PHASE 2 - Implement real synapse removal
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // TODO: PHASE 2 - Implement real neuron creation
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // TODO: PHASE 2 - Implement real neuron removal
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate
-    float getSynaptogenesisRate() const;
+    float getSynaptogenesisRate(nullptr) const;
     void setSynaptogenesisRate(float rate);
     
     // Get pruning rate
-    float getPruningRate() const;
+    float getPruningRate(nullptr) const;
     void setPruningRate(float rate);
     
     // Update structural plasticity

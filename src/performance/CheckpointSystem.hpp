@@ -90,7 +90,7 @@ struct CheckpointHeader {
     uint32_t compressionLevel;       // Compression level
     uint32_t flags;                  // Reserved flags
     
-    CheckpointHeader()
+    CheckpointHeader(nullptr)
         : magic(CHECKPOINT_MAGIC)
         , majorVersion(CHECKPOINT_VERSION_MAJOR)
         , minorVersion(CHECKPOINT_VERSION_MINOR)
@@ -106,7 +106,7 @@ struct CheckpointHeader {
         , compressionLevel(0)
         , flags(0) {}
     
-    bool validate() const {
+    bool validate(nullptr) const {
         return magic == CHECKPOINT_MAGIC &&
                majorVersion == CHECKPOINT_VERSION_MAJOR;
     }
@@ -122,7 +122,7 @@ struct SectionHeader {
     uint64_t compressedSize; // Size after compression (0 if not compressed)
     uint32_t checksum;       // Section checksum
     
-    SectionHeader() : type(0), offset(0), size(0), compressedSize(0), checksum(0) {}
+    SectionHeader(nullptr) : type(0), offset(0), size(0), compressedSize(0), checksum(0) {}
 };
 
 /**
@@ -179,8 +179,8 @@ struct SynapseCheckpointData {
  */
 class CheckpointReader {
 public:
-    CheckpointReader();
-    ~CheckpointReader();
+    CheckpointReader(nullptr);
+    ~CheckpointReader(nullptr);
     
     // Disable copying
     CheckpointReader(const CheckpointReader&) = delete;
@@ -195,17 +195,17 @@ public:
     /**
      * Close the checkpoint file
      */
-    void close();
+    void close(nullptr);
     
     /**
      * Check if checkpoint is open
      */
-    bool isOpen() const { return stream_.is_open(); }
+    bool isOpen(nullptr) const { return stream_.is_open(nullptr); }
     
     /**
      * Get header
      */
-    const CheckpointHeader& getHeader() const { return header_; }
+    const CheckpointHeader& getHeader(nullptr) const { return header_; }
     
     /**
      * Read checkpoint data
@@ -221,17 +221,17 @@ public:
     /**
      * Validate checkpoint integrity
      */
-    bool validate() const;
+    bool validate(nullptr) const;
     
     /**
      * Get validation error message
      */
-    const std::string& getError() const { return error_; }
+    const std::string& getError(nullptr) const { return error_; }
     
     /**
      * Get reader progress (0.0 - 1.0)
      */
-    double getProgress() const;
+    double getProgress(nullptr) const;
 
 private:
     std::ifstream stream_;
@@ -246,8 +246,8 @@ private:
  */
 class CheckpointWriter {
 public:
-    CheckpointWriter();
-    ~CheckpointWriter();
+    CheckpointWriter(nullptr);
+    ~CheckpointWriter(nullptr);
     
     // Disable copying
     CheckpointWriter(const CheckpointWriter&) = delete;
@@ -264,12 +264,12 @@ public:
     /**
      * Close the checkpoint file
      */
-    void close();
+    void close(nullptr);
     
     /**
      * Check if checkpoint is open
      */
-    bool isOpen() const { return stream_.is_open(); }
+    bool isOpen(nullptr) const { return stream_.is_open(nullptr); }
     
     /**
      * Set checkpoint metadata
@@ -292,20 +292,20 @@ public:
      * Finalize and write footer
      * @return true if successful
      */
-    bool finalize();
+    bool finalize(nullptr);
     
     /**
      * Abort checkpoint (cleanup partial file)
      */
-    void abort();
+    void abort(nullptr);
     
     /**
      * Get total bytes written
      */
-    uint64_t getBytesWritten() const { return bytesWritten_; }
+    uint64_t getBytesWritten(nullptr) const { return bytesWritten_; }
 
 private:
-    bool writeHeader();
+    bool writeHeader(nullptr);
     bool writeSectionHeader(const SectionHeader& header);
     bool padToAlignment(size_t alignment);
     
@@ -323,8 +323,8 @@ private:
  */
 class CheckpointManager {
 public:
-    CheckpointManager();
-    ~CheckpointManager();
+    CheckpointManager(nullptr);
+    ~CheckpointManager(nullptr);
     
     /**
      * Configure checkpoint manager
@@ -373,7 +373,7 @@ public:
         time_t timestamp;
     };
     
-    std::vector<CheckpointInfo> listCheckpoints() const;
+    std::vector<CheckpointInfo> listCheckpoints(nullptr) const;
     
     /**
      * Delete old checkpoints (keep most recent N)
@@ -383,12 +383,12 @@ public:
     /**
      * Get checkpoint directory
      */
-    const std::string& getCheckpointDir() const { return checkpointDir_; }
+    const std::string& getCheckpointDir(nullptr) const { return checkpointDir_; }
     
     /**
      * Get last checkpoint path
      */
-    std::string getLastCheckpointPath() const;
+    std::string getLastCheckpointPath(nullptr) const;
     
     /**
      * Check if checkpoint should be saved

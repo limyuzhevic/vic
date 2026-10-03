@@ -3,6 +3,9 @@
 
 namespace nlm {
 
+// Implementation details for RandomGenerator
+// Implementation details for RandomGenerator
+// Implementation details for RandomGenerator
 struct RandomGenerator::Impl {
     std::mt19937_64 gen;
     uint64_t currentSeed;
@@ -12,9 +15,9 @@ struct RandomGenerator::Impl {
 
 RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
 
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
+RandomGenerator::RandomGenerator(nullptr) : pImpl(new Impl(std::random_device{}())) {}
 
-RandomGenerator::~RandomGenerator() = default;
+RandomGenerator::~RandomGenerator(nullptr) = default;
 
 RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -34,7 +37,7 @@ void RandomGenerator::seed(uint64_t seed) {
     pImpl->currentSeed = seed;
 }
 
-uint64_t RandomGenerator::getSeed() const {
+uint64_t RandomGenerator::getSeed(nullptr) const {
     return pImpl->currentSeed;
 }
 
@@ -101,11 +104,11 @@ double RandomGenerator::exponential(double lambda) {
     return dist(pImpl->gen);
 }
 
-bool RandomGenerator::randomBool() {
+bool RandomGenerator::randomBool(nullptr) {
     return bernoulli(0.5);
 }
 
-uint32_t RandomGenerator::randomBit() {
+uint32_t RandomGenerator::randomBit(nullptr) {
     return uniformInt(0, 1);
 }
 
@@ -123,11 +126,11 @@ void RandomGenerator::fillBytes(void* data, size_t size) {
     }
 }
 
-std::mt19937_64& RandomGenerator::engine() {
+std::mt19937_64& RandomGenerator::engine(nullptr) {
     return pImpl->gen;
 }
 
-const std::mt19937_64& RandomGenerator::engine() const {
+const std::mt19937_64& RandomGenerator::engine(nullptr) const {
     return pImpl->gen;
 }
 

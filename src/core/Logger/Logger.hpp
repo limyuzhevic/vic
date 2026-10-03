@@ -31,30 +31,30 @@ struct LogEntry {
 // Logger interface
 class ILogger {
 public:
-    virtual ~ILogger() = default;
+    virtual ~ILogger(nullptr) = default;
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
-    virtual LogLevel getLevel() const = 0;
+    virtual LogLevel getLevel(nullptr) const = 0;
 };
 
 // Console logger implementation
 class ConsoleLogger : public ILogger {
 public:
-    ConsoleLogger();
+    ConsoleLogger(nullptr);
     explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
+    ~ConsoleLogger(nullptr) override;
     
     void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
-    LogLevel getLevel() const override;
+    LogLevel getLevel(nullptr) const override;
     
     // Enable/disable colors
     void setUseColors(bool useColors);
-    bool getUseColors() const;
+    bool getUseColors(nullptr) const;
     
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
+    void closeOutputFile(nullptr);
     
 private:
     struct Impl;
@@ -67,8 +67,8 @@ private:
 // Main Logger class
 class Logger {
 public:
-    Logger();
-    ~Logger();
+    Logger(nullptr);
+    ~Logger(nullptr);
     
     // Disable copying
     Logger(const Logger&) = delete;
@@ -78,7 +78,7 @@ public:
     void addLogger(std::shared_ptr<ILogger> logger);
     
     // Remove all loggers
-    void clearLoggers();
+    void clearLoggers(nullptr);
     
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
@@ -99,7 +99,7 @@ public:
     bool isEnabled(LogLevel level) const;
     
     // Get global logger instance
-    static Logger& getGlobal();
+    static Logger& getGlobal(nullptr);
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
@@ -110,17 +110,17 @@ private:
 };
 
 // Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal(nullptr).debug(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal(nullptr).info(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal(nullptr).warning(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal(nullptr).error(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal(nullptr).critical(msg, __FILE__, __LINE__, __func__)
 
 // Stream-style logging helper
 class LogStream {
 public:
     LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
+    ~LogStream(nullptr);
     
     template<typename T>
     LogStream& operator<<(const T& value) {

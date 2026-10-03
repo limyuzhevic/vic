@@ -38,7 +38,7 @@ struct ConfigEntry {
     ConfigSource source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry(nullptr) : key(nullptr), value(nullptr), source(ConfigSource::Default), description(nullptr) {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
@@ -46,8 +46,8 @@ struct ConfigEntry {
 // Main configuration class
 class Config {
 public:
-    Config();
-    ~Config();
+    Config(nullptr);
+    ~Config(nullptr);
     
     // Disable copying, enable moving
     Config(const Config&) = delete;
@@ -85,13 +85,16 @@ public:
     void remove(const std::string& key);
     
     // Get all keys
-    std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeys(nullptr) const;
     
     // Clear all
-    void clear();
+    void clear(nullptr);
     
     // Get configuration summary
-    std::string summary() const;
+    std::string summary(nullptr) const;
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
     
 private:
     struct Impl;

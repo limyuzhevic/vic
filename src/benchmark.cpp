@@ -42,10 +42,10 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
+    brain->initialize(nullptr);
     
     // Run simulation
-    auto startTime = std::chrono::high_resolution_clock::now();
+    auto startTime = std::chrono::high_resolution_clock::now(nullptr);
     
     for (size_t step = 0; step < steps; ++step) {
         // Inject some random input
@@ -56,17 +56,17 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
         brain->step(step, step * 0.001);
     }
     
-    auto endTime = std::chrono::high_resolution_clock::now();
-    double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+    auto endTime = std::chrono::high_resolution_clock::now(nullptr);
+    double totalTime = std::chrono::duration<double>(endTime - startTime).count(nullptr);
     
     // Collect results
     BenchmarkResult result;
-    result.neurons = brain->getTotalNeuronCount();
-    result.synapses = brain->getTotalSynapseCount();
+    result.neurons = brain->getTotalNeuronCount(nullptr);
+    result.synapses = brain->getTotalSynapseCount(nullptr);
     result.steps = steps;
     result.totalTime = totalTime;
     result.stepsPerSecond = steps / totalTime;
-    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
+    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount(nullptr)) / steps;
     result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
     
     std::cout << " Done!" << std::endl;
@@ -98,7 +98,7 @@ void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
     std::cout << std::endl;
 }
 
-int main() {
+int main(nullptr) {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║

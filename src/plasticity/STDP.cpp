@@ -5,6 +5,9 @@
 
 namespace nlm {
 
+// Implementation details for STDP
+// Implementation details for STDP
+// Implementation details for STDP
 struct STDP::Impl {
     float ltpWeight;      // A+ for potentiation
     float ltdWeight;      // A- for depression
@@ -12,13 +15,13 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
+    Impl(nullptr) : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP(nullptr) : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+STDP::~STDP(nullptr) = default;
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
@@ -52,7 +55,7 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || preSpikes.empty(nullptr) || postSpikes.empty(nullptr)) {
         return;
     }
     
@@ -81,14 +84,14 @@ void STDP::update(Synapse* synapse,
     // Apply weight change with bounds
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
+        float efficacy = synapse->getEfficacy(nullptr);
         totalDelta *= efficacy;
         
         // Apply weight change
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
+        float currentTrace = synapse->getEligibilityTrace(nullptr);
         synapse->setEligibilityTrace(currentTrace + totalDelta);
     }
 }
@@ -97,12 +100,12 @@ void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
     // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
+    float newWeight = synapse->getWeight(nullptr) + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
 }
 
-const char* STDP::getName() const {
+const char* STDP::getName(nullptr) const {
     return "STDP";
 }
 
@@ -110,7 +113,7 @@ void STDP::setLTPWeight(float weight) {
     pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
 }
 
-float STDP::getLTPWeight() const {
+float STDP::getLTPWeight(nullptr) const {
     return pImpl->ltpWeight;
 }
 
@@ -118,7 +121,7 @@ void STDP::setLTDWeight(float weight) {
     pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
 }
 
-float STDP::getLTDWeight() const {
+float STDP::getLTDWeight(nullptr) const {
     return pImpl->ltdWeight;
 }
 
@@ -126,7 +129,7 @@ void STDP::setTimeConstant(float tau) {
     pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
 }
 
-float STDP::getTimeConstant() const {
+float STDP::getTimeConstant(nullptr) const {
     return pImpl->timeConstant;
 }
 

@@ -17,9 +17,9 @@ public:
     explicit RandomGenerator(uint64_t seed);
     
     // Create with time-based seed (not deterministic)
-    RandomGenerator();
+    RandomGenerator(nullptr);
     
-    ~RandomGenerator();
+    ~RandomGenerator(nullptr);
     
     // Disable copying
     RandomGenerator(const RandomGenerator&) = delete;
@@ -31,7 +31,7 @@ public:
     
     // Seed operations
     void seed(uint64_t seed);
-    uint64_t getSeed() const;
+    uint64_t getSeed(nullptr) const;
     
     // Random number generation
     // Uniform integer in [min, max]
@@ -56,10 +56,10 @@ public:
     double exponential(double lambda);
     
     // Random boolean
-    bool randomBool();
+    bool randomBool(nullptr);
     
     // Random bit
-    uint32_t randomBit();
+    uint32_t randomBit(nullptr);
     
     // Shuffle container
     template<typename Container>
@@ -76,15 +76,15 @@ public:
     void fillBytes(void* data, size_t size);
     
     // Get underlying engine for advanced use
-    std::mt19937_64& engine();
-    const std::mt19937_64& engine() const;
+    std::mt19937_64& engine(nullptr);
+    const std::mt19937_64& engine(nullptr) const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min(nullptr) { return std::mt19937_64::min(nullptr); }
+    static constexpr result_type max(nullptr) { return std::mt19937_64::max(nullptr); }
     
     // Operator for compatibility with std functions
-    result_type operator()() { return static_cast<result_type>(engine()()); }
+    result_type operator(nullptr)() { return static_cast<result_type>(engine(nullptr)()); }
     
 private:
     struct Impl;
@@ -94,16 +94,16 @@ private:
 // Template implementations
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
+    std::shuffle(container.begin(nullptr), container.end(nullptr), engine(nullptr));
 }
 
 template<typename Container>
 auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
+    if (container.empty(nullptr)) {
         throw std::runtime_error("Cannot pick from empty container");
     }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
+    auto it = container.begin(nullptr);
+    std::advance(it, pickRandomIndex(container.size(nullptr)));
     return *it;
 }
 

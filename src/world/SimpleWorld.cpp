@@ -17,7 +17,7 @@ static float urand(uint64_t& state, float min, float max) {
     return min + normalized * (max - min);
 }
 
-SimpleWorld::SimpleWorld()
+SimpleWorld::SimpleWorld(nullptr)
     : width_(20.0f)
     , height_(20.0f)
     , visionWidth_(16)
@@ -29,10 +29,10 @@ SimpleWorld::SimpleWorld()
     , rngSeed_(42)
     , rngState_(42)
 {
-    agent_.reset();
+    agent_.reset(nullptr);
 }
 
-SimpleWorld::~SimpleWorld() = default;
+SimpleWorld::~SimpleWorld(nullptr) = default;
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
     width_ = width;
@@ -46,15 +46,15 @@ void SimpleWorld::setRandomSeed(uint64_t seed) {
     rngState_ = seed;
 }
 
-void SimpleWorld::reset() {
+void SimpleWorld::reset(nullptr) {
     simTime_ = 0.0;
-    agent_.reset();
+    agent_.reset(nullptr);
     agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
     agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
     agent_.energy = maxEnergy_;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
-    objects_.clear();
+    objects_.clear(nullptr);
     
     // Place some resource objects (positive reward when touched)
     for (int i = 0; i < 5; ++i) {
@@ -70,7 +70,7 @@ void SimpleWorld::reset() {
         objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
     }
     
-    generateVision();
+    generateVision(nullptr);
 }
 
 void SimpleWorld::setAgentStart(float x, float y) {
@@ -106,13 +106,13 @@ void SimpleWorld::update(double timestep) {
     agent_.age += timestep;
     
     // Generate vision
-    generateVision();
+    generateVision(nullptr);
     
     // Check collisions
-    checkCollisions();
+    checkCollisions(nullptr);
 }
 
-uint64_t SimpleWorld::nextRandom() {
+uint64_t SimpleWorld::nextRandom(nullptr) {
     return lcg(rngState_);
 }
 
@@ -195,7 +195,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
             
         case MotorCommand::Interact:
-            result = interact();
+            result = interact(nullptr);
             break;
             
         case MotorCommand::Wait:
@@ -214,7 +214,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     return result;
 }
 
-ActionResult SimpleWorld::interact() {
+ActionResult SimpleWorld::interact(nullptr) {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
@@ -298,7 +298,7 @@ void SimpleWorld::removeObject(float x, float y) {
     }
 }
 
-void SimpleWorld::generateVision() {
+void SimpleWorld::generateVision(nullptr) {
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     
@@ -392,7 +392,7 @@ void SimpleWorld::generateVision() {
     sensory_.setAudio({});
 }
 
-void SimpleWorld::checkCollisions() {
+void SimpleWorld::checkCollisions(nullptr) {
     // Passive collision check (for damage when moving into objects)
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {

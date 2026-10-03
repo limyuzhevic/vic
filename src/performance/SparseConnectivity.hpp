@@ -46,7 +46,7 @@ struct SynapseRecord {
     uint8_t flags;          // Packed plasticity flags (1 byte)
     uint16_t padding;       // Alignment padding
     
-    SynapseRecord() : sourceNeuron(0), destNeuron(0), weight(0.0f), 
+    SynapseRecord(nullptr) : sourceNeuron(0), destNeuron(0), weight(0.0f), 
                       delay(1), synapseType(0), flags(0), padding(0) {}
     
     SynapseRecord(uint64_t src, uint64_t dst, float w, uint32_t d, 
@@ -83,8 +83,8 @@ public:
         float inhibitoryRatio;
     };
     
-    SparseConnectivity();
-    ~SparseConnectivity();
+    SparseConnectivity(nullptr);
+    ~SparseConnectivity(nullptr);
     
     // Disable copying (use move instead)
     SparseConnectivity(const SparseConnectivity&) = delete;
@@ -138,12 +138,12 @@ public:
     /**
      * Get total synapse count
      */
-    size_t getSynapseCount() const { return synapses_.size(); }
+    size_t getSynapseCount(nullptr) const { return synapses_.size(nullptr); }
     
     /**
      * Get neuron count
      */
-    size_t getNeuronCount() const { return numNeurons_; }
+    size_t getNeuronCount(nullptr) const { return numNeurons_; }
     
     /**
      * Get synapses with delay <= maxDelay (for efficient event processing)
@@ -153,17 +153,17 @@ public:
     /**
      * Get statistics
      */
-    Stats getStats() const;
+    Stats getStats(nullptr) const;
     
     /**
      * Clear all synapses
      */
-    void clear();
+    void clear(nullptr);
     
     /**
      * Memory usage in bytes
      */
-    size_t memoryUsage() const;
+    size_t memoryUsage(nullptr) const;
     
     /**
      * Iterate over all synapses (for bulk processing)
@@ -177,8 +177,8 @@ public:
     /**
      * Get raw synapse array (for SoA processing)
      */
-    const std::vector<SynapseRecord>& getSynapses() const { return synapses_; }
-    std::vector<SynapseRecord>& getSynapses() { return synapses_; }
+    const std::vector<SynapseRecord>& getSynapses(nullptr) const { return synapses_; }
+    std::vector<SynapseRecord>& getSynapses(nullptr) { return synapses_; }
 
 private:
     // Outgoing adjacency: source neuron -> vector of synapse indices
@@ -202,10 +202,10 @@ private:
 
 // Inline implementations
 
-inline SparseConnectivity::SparseConnectivity()
+inline SparseConnectivity::SparseConnectivity(nullptr)
     : numNeurons_(0), maxNeuronId_(0) {}
 
-inline SparseConnectivity::~SparseConnectivity() = default;
+inline SparseConnectivity::~SparseConnectivity(nullptr) = default;
 
 inline SparseConnectivity::SparseConnectivity(SparseConnectivity&& other) noexcept
     : outgoing_(std::move(other.outgoing_))
@@ -250,12 +250,12 @@ inline size_t SparseConnectivity::addSynapse(uint64_t sourceNeuron, uint64_t des
     
     // Reuse free'd index if available
     size_t index;
-    if (!freeList_.empty()) {
-        index = freeList_.back();
-        freeList_.pop_back();
+    if (!freeList_.empty(nullptr)) {
+        index = freeList_.back(nullptr);
+        freeList_.pop_back(nullptr);
         synapses_[index] = SynapseRecord(sourceNeuron, destNeuron, weight, delay, synapseType, 0);
     } else {
-        index = synapses_.size();
+        index = synapses_.size(nullptr);
         synapses_.emplace_back(sourceNeuron, destNeuron, weight, delay, synapseType, 0);
     }
     
@@ -267,17 +267,17 @@ inline size_t SparseConnectivity::addSynapse(uint64_t sourceNeuron, uint64_t des
 }
 
 inline void SparseConnectivity::removeSynapse(size_t synapseIndex) {
-    if (synapseIndex >= synapses_.size()) return;
+    if (synapseIndex >= synapses_.size(nullptr)) return;
     
     const auto& syn = synapses_[synapseIndex];
     
     // Remove from outgoing list
     auto& outList = outgoing_[syn.sourceNeuron];
-    outList.erase(std::remove(outList.begin(), outList.end(), synapseIndex), outList.end());
+    outList.erase(std::remove(outList.begin(nullptr), outList.end(nullptr), synapseIndex), outList.end(nullptr));
     
     // Remove from incoming list
     auto& inList = incoming_[syn.destNeuron];
-    inList.erase(std::remove(inList.begin(), inList.end(), synapseIndex), inList.end());
+    inList.erase(std::remove(inList.begin(nullptr), inList.end(nullptr), synapseIndex), inList.end(nullptr));
     
     // Mark as free (don't actually erase to keep indices stable)
     freeList_.push_back(synapseIndex);
@@ -296,8 +296,8 @@ inline std::vector<std::pair<size_t, SynapseRecord*>>
 SparseConnectivity::getSynapsesFrom(uint64_t sourceNeuron) {
     std::vector<std::pair<size_t, SynapseRecord*>> result;
     auto it = outgoing_.find(sourceNeuron);
-    if (it != outgoing_.end()) {
-        result.reserve(it->second.size());
+    if (it != outgoing_.end(nullptr)) {
+        result.reserve(it->second.size(nullptr));
         for (size_t idx : it->second) {
             if (synapses_[idx].sourceNeuron != UINT64_MAX) {  // Skip freed
                 result.emplace_back(idx, &synapses_[idx]);
@@ -311,8 +311,8 @@ inline std::vector<std::pair<size_t, const SynapseRecord*>>
 SparseConnectivity::getSynapsesFrom(uint64_t sourceNeuron) const {
     std::vector<std::pair<size_t, const SynapseRecord*>> result;
     auto it = outgoing_.find(sourceNeuron);
-    if (it != outgoing_.end()) {
-        result.reserve(it->second.size());
+    if (it != outgoing_.end(nullptr)) {
+        result.reserve(it->second.size(nullptr));
         for (size_t idx : it->second) {
             if (synapses_[idx].sourceNeuron != UINT64_MAX) {
                 result.emplace_back(idx, &synapses_[idx]);
@@ -326,8 +326,8 @@ inline std::vector<std::pair<size_t, SynapseRecord*>>
 SparseConnectivity::getSynapsesTo(uint64_t destNeuron) {
     std::vector<std::pair<size_t, SynapseRecord*>> result;
     auto it = incoming_.find(destNeuron);
-    if (it != incoming_.end()) {
-        result.reserve(it->second.size());
+    if (it != incoming_.end(nullptr)) {
+        result.reserve(it->second.size(nullptr));
         for (size_t idx : it->second) {
             if (synapses_[idx].sourceNeuron != UINT64_MAX) {
                 result.emplace_back(idx, &synapses_[idx]);
@@ -341,8 +341,8 @@ inline std::vector<std::pair<size_t, const SynapseRecord*>>
 SparseConnectivity::getSynapsesTo(uint64_t destNeuron) const {
     std::vector<std::pair<size_t, const SynapseRecord*>> result;
     auto it = incoming_.find(destNeuron);
-    if (it != incoming_.end()) {
-        result.reserve(it->second.size());
+    if (it != incoming_.end(nullptr)) {
+        result.reserve(it->second.size(nullptr));
         for (size_t idx : it->second) {
             if (synapses_[idx].sourceNeuron != UINT64_MAX) {
                 result.emplace_back(idx, &synapses_[idx]);
@@ -354,7 +354,7 @@ SparseConnectivity::getSynapsesTo(uint64_t destNeuron) const {
 
 inline size_t SparseConnectivity::getSynapseCountFrom(uint64_t sourceNeuron) const {
     auto it = outgoing_.find(sourceNeuron);
-    if (it != outgoing_.end()) {
+    if (it != outgoing_.end(nullptr)) {
         size_t count = 0;
         for (size_t idx : it->second) {
             if (synapses_[idx].sourceNeuron != UINT64_MAX) ++count;
@@ -366,7 +366,7 @@ inline size_t SparseConnectivity::getSynapseCountFrom(uint64_t sourceNeuron) con
 
 inline size_t SparseConnectivity::getSynapseCountTo(uint64_t destNeuron) const {
     auto it = incoming_.find(destNeuron);
-    if (it != incoming_.end()) {
+    if (it != incoming_.end(nullptr)) {
         size_t count = 0;
         for (size_t idx : it->second) {
             if (synapses_[idx].sourceNeuron != UINT64_MAX) ++count;
@@ -378,7 +378,7 @@ inline size_t SparseConnectivity::getSynapseCountTo(uint64_t destNeuron) const {
 
 inline std::vector<size_t> SparseConnectivity::getSynapsesWithDelay(uint32_t maxDelay) const {
     std::vector<size_t> result;
-    for (size_t i = 0; i < synapses_.size(); ++i) {
+    for (size_t i = 0; i < synapses_.size(nullptr); ++i) {
         if (synapses_[i].sourceNeuron != UINT64_MAX && synapses_[i].delay <= maxDelay) {
             result.push_back(i);
         }
@@ -386,10 +386,10 @@ inline std::vector<size_t> SparseConnectivity::getSynapsesWithDelay(uint32_t max
     return result;
 }
 
-inline SparseConnectivity::Stats SparseConnectivity::getStats() const {
+inline SparseConnectivity::Stats SparseConnectivity::getStats(nullptr) const {
     Stats stats{};
     stats.numNeurons = numNeurons_;
-    stats.numSynapses = synapses_.size() - freeList_.size();
+    stats.numSynapses = synapses_.size(nullptr) - freeList_.size(nullptr);
     
     size_t totalSynapses = 0;
     size_t maxOut = 0;
@@ -420,7 +420,7 @@ inline SparseConnectivity::Stats SparseConnectivity::getStats() const {
         maxIn = std::max(maxIn, validCount);
     }
     
-    stats.totalSynapseMemory = sizeof(SynapseRecord) * synapses_.size();
+    stats.totalSynapseMemory = sizeof(SynapseRecord) * synapses_.size(nullptr);
     stats.avgSynapsesPerNeuron = numNeurons_ > 0 ? 
         static_cast<float>(totalSynapses) / numNeurons_ : 0.0f;
     stats.maxSynapsesFromNeuron = maxOut;
@@ -440,31 +440,31 @@ inline SparseConnectivity::Stats SparseConnectivity::getStats() const {
     return stats;
 }
 
-inline void SparseConnectivity::clear() {
-    outgoing_.clear();
-    incoming_.clear();
-    synapses_.clear();
-    freeList_.clear();
+inline void SparseConnectivity::clear(nullptr) {
+    outgoing_.clear(nullptr);
+    incoming_.clear(nullptr);
+    synapses_.clear(nullptr);
+    freeList_.clear(nullptr);
     numNeurons_ = 0;
     maxNeuronId_ = 0;
 }
 
-inline size_t SparseConnectivity::memoryUsage() const {
-    size_t total = sizeof(SynapseRecord) * synapses_.capacity();
-    total += sizeof(std::vector<size_t>) * (outgoing_.size() + incoming_.size());
+inline size_t SparseConnectivity::memoryUsage(nullptr) const {
+    size_t total = sizeof(SynapseRecord) * synapses_.capacity(nullptr);
+    total += sizeof(std::vector<size_t>) * (outgoing_.size(nullptr) + incoming_.size(nullptr));
     for (const auto& pair : outgoing_) {
-        total += sizeof(size_t) * pair.second.capacity();
+        total += sizeof(size_t) * pair.second.capacity(nullptr);
     }
     for (const auto& pair : incoming_) {
-        total += sizeof(size_t) * pair.second.capacity();
+        total += sizeof(size_t) * pair.second.capacity(nullptr);
     }
-    total += sizeof(size_t) * freeList_.capacity();
+    total += sizeof(size_t) * freeList_.capacity(nullptr);
     return total;
 }
 
 template<typename Func>
 inline void SparseConnectivity::forEachSynapse(Func&& func) {
-    for (size_t i = 0; i < synapses_.size(); ++i) {
+    for (size_t i = 0; i < synapses_.size(nullptr); ++i) {
         if (synapses_[i].sourceNeuron != UINT64_MAX) {
             func(i, synapses_[i]);
         }
@@ -473,7 +473,7 @@ inline void SparseConnectivity::forEachSynapse(Func&& func) {
 
 template<typename Func>
 inline void SparseConnectivity::forEachSynapse(Func&& func) const {
-    for (size_t i = 0; i < synapses_.size(); ++i) {
+    for (size_t i = 0; i < synapses_.size(nullptr); ++i) {
         if (synapses_[i].sourceNeuron != UINT64_MAX) {
             func(i, synapses_[i]);
         }

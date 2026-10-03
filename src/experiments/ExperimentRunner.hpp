@@ -11,8 +11,8 @@ namespace nlm {
 // ExperimentRunner: Runs experiments and collects data
 class ExperimentRunner {
 public:
-    ExperimentRunner();
-    ~ExperimentRunner();
+    ExperimentRunner(nullptr);
+    ~ExperimentRunner(nullptr);
     
     // Create new experiment
     std::shared_ptr<Experiment> createExperiment(const std::string& name);
@@ -31,13 +31,13 @@ public:
         SimulationStep maxSteps);
     
     // Get all experiments
-    const std::vector<std::shared_ptr<Experiment>>& getExperiments() const;
+    const std::vector<std::shared_ptr<Experiment>>& getExperiments(nullptr) const;
     
     // Get experiment by name
     std::shared_ptr<Experiment> getExperiment(const std::string& name) const;
     
     // Clear all experiments
-    void clearExperiments();
+    void clearExperiments(nullptr);
     
     // Set random seed for reproducibility
     void setGlobalSeed(uint64_t seed);

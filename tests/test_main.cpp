@@ -6,38 +6,38 @@
 
 // Forward declarations of test functions
 namespace test_types {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_config {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_random {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_clock {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_neuron {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_synapse {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_stdp {
-    void runAll();
+    void runAll(nullptr);
 }
 
 namespace test_brain {
-    void runAll();
+    void runAll(nullptr);
 }
 
-int main() {
+int main(nullptr) {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
@@ -49,73 +49,73 @@ int main() {
     
     std::cout << "Running Types tests..." << std::endl;
     try {
-        test_types::runAll();
+        test_types::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running Config tests..." << std::endl;
     try {
-        test_config::runAll();
+        test_config::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running Random tests..." << std::endl;
     try {
-        test_random::runAll();
+        test_random::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running Clock tests..." << std::endl;
     try {
-        test_clock::runAll();
+        test_clock::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running Neuron tests..." << std::endl;
     try {
-        test_neuron::runAll();
+        test_neuron::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running Synapse tests..." << std::endl;
     try {
-        test_synapse::runAll();
+        test_synapse::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running STDP tests..." << std::endl;
     try {
-        test_stdp::runAll();
+        test_stdp::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     
     std::cout << "Running Brain tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_brain::runAll(nullptr);
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
+        std::cout << "  FAILED: " << e.what(nullptr) << std::endl;
         allPassed = false;
     }
     

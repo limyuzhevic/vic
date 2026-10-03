@@ -9,17 +9,17 @@ namespace nlm {
 
 class InternalSignalsProcessor {
 public:
-    InternalSignalsProcessor();
-    ~InternalSignalsProcessor();
+    InternalSignalsProcessor(nullptr);
+    ~InternalSignalsProcessor(nullptr);
     
     // Process internal signals
     void process(const InternalSignals& signals);
     
     // Get processed representation
-    const std::vector<float>& getProcessedSignals() const;
+    const std::vector<float>& getProcessedSignals(nullptr) const;
     
     // Get homeostasis signals
-    const std::vector<float>& getHomeostaticSignals() const;
+    const std::vector<float>& getHomeostaticSignals(nullptr) const;
     
 private:
     struct Impl;
