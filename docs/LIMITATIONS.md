@@ -10,7 +10,7 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 
 ### 1. Scale
 - Human brain: ~86 billion neurons, ~100 trillion synapses
-- NLM Phase 1 skeleton: ~1,000 neurons (placeholder)
+- NLM Phase 6: ~1,000 neurons (placeholder - much larger scale in full implementation)
 - Even Phase 5 targets: Millions of neurons (far below biological scale)
 
 ### 2. Neural Dynamics

@@ -11,12 +11,12 @@ Synaptic plasticity is the biological basis of learning. When neurons fire toget
 
 ### Computational Implementation
 - **Hebbian Learning**: "Neurons that fire together, wire together" - simple correlation-based weight changes
-- **STDP (Spike-Timing-Dependent Plasticity)**: Weight changes depend on the relative timing of pre- and post-synaptic spikes
+- **STDP (Spike-Timing-Dependent Plasticity)**: Weight changes depend on the relative timing of pre- and post-synaptic spikes (Phase 6 integrated with neuromodulation)
 
 ### Known Limitations
 - Real STDP involves complex molecular cascades (calcium signaling, NMDA receptors)
 - Weight changes depend on many factors not modeled (neuromodulators, synapse type, dendritic location)
-- Our implementation is a simplified approximation
+- Our implementation is a simplified approximation (Phase 6: enhanced with reward-modulated variants)
 
 ## Neural Dynamics
 
@@ -24,13 +24,15 @@ Synaptic plasticity is the biological basis of learning. When neurons fire toget
 Real neurons maintain membrane potentials, fire action potentials when threshold is reached, and have refractory periods.
 
 ### Computational Implementation
-- **Integrate-and-Fire**: Simple model where membrane potential integrates input until threshold
-- **Leaky Integration**: Membrane potential decays towards rest
+- **Integrate-and-Fire**: Simple model where membrane potential integrates input until threshold (Phase 2 baseline)
+- **Leaky Integration**: Membrane potential decays towards rest (Phase 2 baseline)
+- **Phase 6 Enhancements**: Enhanced with spike-frequency adaptation and neuromodulation effects
 
 ### Known Limitations
 - Real neurons have complex ion channel dynamics (Hodgkin-Huxley)
 - Detailed spike shapes and dendritic processing are not modeled
 - Metabolic constraints and energy efficiency not considered
+- **Phase 6**: Real-time plasticity interactions with neuromodulators
 
 ## Developmental Learning
 
@@ -38,6 +40,20 @@ Real neurons maintain membrane potentials, fire action potentials when threshold
 Brain development involves:
 - Synaptogenesis (formation of new synapses)
 - Pruning (removal of unused synapses)
+- Maturation (adult property development)
+- Experience-dependent plasticity (Phase 6 integrated with structural plasticity)
+
+### Computational Implementation
+- **Synaptogenesis**: New synapse formation based on activity
+- **Pruning**: Elimination of weak synapses through competition
+- **Maturation**: Gradual development of adult properties
+- **Phase 6 Integration**: Connected with neuromodulation and reward systems
+
+### Known Limitations
+- Real genetic programs and cell migration not modeled
+- Limited molecular cascade details
+- No experience-dependent critical period mechanisms
+- **Phase 6**: Enhanced with developmental stage-dependent plasticity rates
 - Critical periods (sensitive periods for learning)
 - Maturation (development of adult-level properties)
 

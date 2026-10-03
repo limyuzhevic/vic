@@ -137,34 +137,34 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ========== MEMORY SYSTEMS (Phase 6 Integrated) ==========
     
-    // Working memory - transient active information
+    // Working memory - transient active information (Phase 6 integrated)
     NeuralWorkingMemory* getWorkingMemory();
     
-    // Episodic memory - experience storage
+    // Episodic memory - experience storage (Phase 6 integrated)
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
+    // Associative memory - pattern associations (Phase 6 integrated)
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // ========== PREDICTION SYSTEM (Phase 6 Integrated) ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+    // ========== COGNITION SYSTEMS (Phase 6 Integrated) ==========
     
-    // Neural planner for action planning
+    // Neural planner for action planning (Phase 6 integrated)
     NeuralPlanner* getPlanner();
     
-    // Concept formation for pattern discovery
+    // Concept formation for pattern discovery (Phase 6 integrated)
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
+    // Attentional selection for focus (Phase 6 integrated)
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // ========== DEVELOPMENT SYSTEM (Phase 6 Integrated) ==========
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
