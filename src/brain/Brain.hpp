@@ -184,6 +184,18 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
+    
+    // Reward signal
+    Reward* getReward();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     

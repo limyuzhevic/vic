@@ -62,6 +62,15 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Enhance memory consolidation
+    void enhanceMemoryConsolidation();
+    
+    // Signal attention strength
+    void signalAttention(float strength);
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +82,15 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Signal arousal strength
+    void signalArousal(float strength);
+    
+    // Modulate attention threshold
+    void modulateAttentionThreshold();
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +102,18 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Signal mood strength
+    void signalMood(float mood);
+    
+    // Reduce impulsivity
+    void reduceImpulsivity();
+    
+    // Enhance social behavior
+    void enhanceSocialBehavior();
 };
 
 } // namespace nlm
