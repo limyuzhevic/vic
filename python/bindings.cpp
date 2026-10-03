@@ -416,6 +416,130 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // NLM Phase 6 Python Integration Manager
+    py::class_<NLMPhase6PythonManager>(m, "NLMPhase6PythonManager", R"pbdoc(NLM Phase 6 Integration Manager for advanced Python users)pbdoc")
+        .def(py::init<>())
+        .def_static("createAdvancedConfig", &NLMPhase6PythonManager::createAdvancedConfig,
+                    py::arg("maxSteps") = 5000u,
+                    py::arg("neuronCount") = 800u,
+                    py::arg("regionCount") = 2u,
+                    py::arg("connectionProbability") = 0.08f,
+                    py::arg("enableCheckpointing") = true,
+                    py::arg("enableReplay") = true,
+                    py::arg("enableDevelopment") = true,
+                    py::arg("checkpointPath") = "./checkpoint.bin",
+                    "Create advanced Phase 6 configuration with custom parameters")
+        .def("runFullIntegrationTest", &NLMPhase6PythonManager::runFullIntegrationTest,
+             "Run the complete integration test")
+        .def("quickVerification", &NLMPhase6PythonManager::quickVerification,
+             "Quick integration verification")
+        .def("testIndividualSystems", &NLMPhase6PythonManager::testIndividualSystems,
+             "Test individual systems")
+        .def("saveCheckpoint", &NLMPhase6PythonManager::saveCheckpoint,
+             py::arg("filepath"), "Save checkpoint")
+        .def("loadCheckpoint", &NLMPhase6PythonManager::loadCheckpoint,
+             py::arg("filepath"), "Load checkpoint")
+        .def_static("createConfigFromParams", &NLMPhase6PythonManager::createConfigFromParams,
+                    py::arg("name"), py::arg("maxSteps"), py::arg("neuronCount"),
+                    py::arg("regionCount"), py::arg("connectionProbability"),
+                    py::arg("enableCheckpointing"), py::arg("enableReplay"),
+                    py::arg("enableDevelopment"),
+                    "Create configuration from Python parameters")
+        .def_static("validateResults", &NLMPhase6PythonManager::validateResults,
+                    py::arg("result"), "Validate experiment results")
+        .def_static("printExperimentSummary", &NLMPhase6PythonManager::printExperimentSummary,
+                    py::arg("result"), "Print experiment summary")
+        .def("runExperimentWithSettings", &NLMPhase6PythonManager::runExperimentWithSettings,
+             py::arg("experimentName"), py::arg("steps"), py::arg("neurons"),
+             py::arg("checkpoint"), py::arg("replay"), py::arg("development"),
+             "Run experiment with custom settings");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Enhanced AgentBrain configuration functions
+    m.def("enableFeature", [](std::shared_ptr<AgentBrain> agent, const std::string& feature, bool enable) {
+        agent->enableFeature(feature, enable);
+    }, py::arg("agent"), py::arg("feature"), py::arg("enable"), "Enable or disable a feature in the agent brain");
+
+    m.def("createAgentConfig", [](const std::string& name) {
+        AgentConfig config;
+        config.name = name;
+        return config;
+    }, py::arg("name"), "Create a new agent configuration");
+
+    m.def("createExplorationConfig", &createExplorationConfig, "Create exploration-focused configuration");
+    m.def("createExploitationConfig", &createExploitationConfig, "Create exploitation-focused configuration");
+    m.def("createBalancedConfig", &createBalancedConfig, "Create balanced configuration");
+
+    m.def("createReinforcementLearningConfig", &createReinforcementLearningConfig, "Create reinforcement learning configuration");
+    m.def("createCuriosityDrivenConfig", &createCuriosityDrivenConfig, "Create curiosity-driven configuration");
+    m.def("createDevelopmentalConfig", &createDevelopmentalConfig, "Create developmental configuration");
+
+    m.def("calculateNovelty", &calculateNovelty, "Calculate novelty level for given states");
+    m.def("calculateCuriosity", &calculateCuriosity, "Calculate curiosity level");
+    m.def("suggestExplorationAction", &suggestExplorationAction, "Suggest an exploration action");
+
+    m.def("calculateSuccessRate", &calculateSuccessRate, "Calculate success rate from agent stats");
+    m.def("calculateLearningProgress", &calculateLearningProgress, "Calculate learning progress");
+    m.def("calculateEfficiency", &calculateEfficiency, "Calculate efficiency metrics");
+
+    m.def("getAvailableFeatures", &getAvailableFeatures, "Get list of available agent features");
+    m.def("getMotorCommandInfo", &getMotorCommandInfo, "Get information about a motor command");
+    m.def("calculateActionCost", &calculateActionCost, "Calculate cost of an action");
+    m.def("calculateExpectedReward", &calculateExpectedReward, "Calculate expected reward for action");
+
+    // NLM Phase 6 Python Integration Manager
+    py::class_<NLMPhase6PythonManager>(m, "NLMPhase6PythonManager", R"pbdoc(NLM Phase 6 Integration Manager for advanced Python users)pbdoc")
+        .def(py::init<>())
+        .def_static("createAdvancedConfig", &NLMPhase6PythonManager::createAdvancedConfig,
+                    py::arg("maxSteps") = 5000u,
+                    py::arg("neuronCount") = 800u,
+                    py::arg("regionCount") = 2u,
+                    py::arg("connectionProbability") = 0.08f,
+                    py::arg("enableCheckpointing") = true,
+                    py::arg("enableReplay") = true,
+                    py::arg("enableDevelopment") = true,
+                    py::arg("checkpointPath") = "./checkpoint.bin",
+                    "Create advanced Phase 6 configuration with custom parameters")
+        .def("runFullIntegrationTest", &NLMPhase6PythonManager::runFullIntegrationTest,
+             "Run the complete integration test")
+        .def("quickVerification", &NLMPhase6PythonManager::quickVerification,
+             "Quick integration verification")
+        .def("testIndividualSystems", &NLMPhase6PythonManager::testIndividualSystems,
+             "Test individual systems")
+        .def("saveCheckpoint", &NLMPhase6PythonManager::saveCheckpoint,
+             py::arg("filepath"), "Save checkpoint")
+        .def("loadCheckpoint", &NLMPhase6PythonManager::loadCheckpoint,
+             py::arg("filepath"), "Load checkpoint")
+        .def_static("createConfigFromParams", &NLMPhase6PythonManager::createConfigFromParams,
+                    py::arg("name"), py::arg("maxSteps"), py::arg("neuronCount"),
+                    py::arg("regionCount"), py::arg("connectionProbability"),
+                    py::arg("enableCheckpointing"), py::arg("enableReplay"),
+                    py::arg("enableDevelopment"),
+                    "Create configuration from Python parameters")
+        .def_static("validateResults", &NLMPhase6PythonManager::validateResults,
+                    py::arg("result"), "Validate experiment results")
+        .def_static("printExperimentSummary", &NLMPhase6PythonManager::printExperimentSummary,
+                    py::arg("result"), "Print experiment summary")
+        .def("runExperimentWithSettings", &NLMPhase6PythonManager::runExperimentWithSettings,
+             py::arg("experimentName"), py::arg("steps"), py::arg("neurons"),
+             py::arg("checkpoint"), py::arg("replay"), py::arg("development"),
+             "Run experiment with custom settings");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

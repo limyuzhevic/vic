@@ -127,6 +127,18 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Quick test executable
+add_executable(nlm_convenience_test
+    src/brain/BrainConvenience.cpp
+)
+target_link_libraries(nlm_convenience_test PUBLIC nlm_core nlm_agent nlm_world)
+
+# Documentation examples executable
+add_executable(nlm_documentation
+    src/brain/DocumentationExamples.cpp
+)
+target_link_libraries(nlm_documentation PUBLIC nlm_core nlm_agent nlm_world)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
@@ -138,6 +150,13 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 Python manager executable
+add_executable(nlm_phase6_python_manager
+    src/experiments/Phase6Demo.cpp
+    src/experiments/NLMPhase6PythonManager.cpp
+)
+target_link_libraries(nlm_phase6_python_manager PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
