@@ -1,0 +1,1778 @@
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/functional.h>
+#include <pybind11/chrono.h>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include "../src/core/Types/Types.hpp"
+#include "../src/agent/AgentBrain.hpp"
+#include "../src/world/SimpleWorld.hpp"
+#include "../src/sensory/SensoryInput.hpp"
+#include "../src/motor/Action.hpp"
+#include "../src/agent/AgentBody.hpp"
+#include "../src/agent/SensoryPercept.hpp"
+
+namespace py = pybind11;
+namespace nlm {
+
+    // Define custom exception types for NLM errors
+    class mismatched_argument_error : public std::runtime_error {
+    public:
+        explicit mismatched_argument_error(const std::string& msg) : std::runtime_error(msg) {}
+    };
+    
+    class file_not_found_error : public std::runtime_error {
+    public:
+        explicit file_not_found_error(const std::string& msg) : std::runtime_error(msg) {}
+    };
+    
+    class invalid_operation_error : public std::runtime_error {
+    public:
+        explicit invalid_operation_error(const std::string& msg) : std::runtime_error(msg) {}
+    };
+
+    PYBIND11_MODULE(pynlm, m) {
+        m.doc() = R"pbdoc(
+            NLM (Neural Learning Machine) Python Bindings
+            ---------------------------------------------
+            A Python binding for the NLM C++ neural simulation framework.
+            Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+
+            This module provides Python access to the NLM neural simulation framework,
+            enabling development of artificial brains with learning, memory, and cognition.
+        )pbdoc";
+
+        // Define custom exception types for NLM errors
+        py::register_exception<mismatched_argument_error>(m, "ArgumentError");
+        py::register_exception<file_not_found_error>(m, "FileNotFoundError");
+            .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Add Pythonic property-style access for commonly used attributes
+    // Config properties
+    py::class_<Config> configClass(m, "Config");
+    configClass.def(py::init<>());
+    configClass.def("loadFromFile", &Config::loadFromFile, py::arg("filepath"));
+    configClass.def("loadFromArgs", [](Config& self, int argc, char** argv) {
+        return self.loadFromArgs(argc, argv);
+    }, py::arg("argc"), py::arg("argv"));
+    configClass.def("saveToFile", &Config::saveToFile, py::arg("filepath"));
+    configClass.def("has", &Config::has, py::arg("key"));
+    configClass.def("getKeys", &Config::getKeys);
+    configClass.def("clear", &Config::clear);
+    configClass.def("summary", &Config::summary);
+    configClass.def("__repr__", [](const Config& cfg) {
+        return "<Config: " + cfg.summary() + ">";
+    });
+
+    // Add method for getting/setting values with type safety
+    configClass.def("getInt", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue"));
+    configClass.def("getFloat", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"));
+    configClass.def("getBool", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"));
+    configClass.def("getString", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"));
+    configClass.def("setInt", [](Config& self, const std::string& key, int value) {
+        self.set(key, value);
+    }, py::arg("key"), py::arg("value"));
+    configClass.def("setFloat", [](Config& self, const std::string& key, double value) {
+        self.set(key, value);
+    }, py::arg("key"), py::arg("value"));
+    configClass.def("setBool", [](Config& self, const std::string& key, bool value) {
+        self.set(key, value);
+    }, py::arg("key"), py::arg("value"));
+    configClass.def("setString", [](Config& self, const std::string& key, const std::string& value) {
+        self.set(key, value);
+    }, py::arg("key"), py::arg("value"));
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    });
+
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &SynapseId::value)
+        .def("index", &SynapseId::index)
+        .def("__eq__", &SynapseId::operator==)
+        .def("__ne__", &SynapseId::operator!=)
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const SynapseId& id) {
+            return "<SynapseId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &RegionId::value)
+        .def("index", &RegionId::index)
+        .def("__eq__", &RegionId::operator==)
+        .def("__ne__", &RegionId::operator!=)
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const RegionId& id) {
+            return "<RegionId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &PopulationId::value)
+        .def("index", &PopulationId::index)
+        .def("__eq__", &PopulationId::operator==)
+        .def("__ne__", &PopulationId::operator!=);
+
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .export_values();
+
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
+    py::class_<Config>(
+        m, "Config",
+        R"pbdoc(
+        Configuration class for NLM system.
+
+        The Config class manages configuration settings for the NLM system using
+        a flexible key-value store. Values can be of various types (int, float,
+        string, boolean, or lists). Configuration can be loaded from JSON files,
+        command line arguments, or set at runtime.
+
+        Examples:
+            config = Config()
+            config.set("learning_rate", 0.01)
+            config.set("enable_plasticity", True)
+            value = config.get("learning_rate", 0.0)
+
+        Common configuration keys:
+            - learning_rate: Neural network learning rate
+            - enable_plasticity: Whether plasticity is enabled
+            - enable_development: Whether developmental stages are active
+            - simulation_timestep: Time step for simulation
+            - vision_width/height: Camera field of view dimensions
+        )pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             R"pbdoc(
+             Load configuration from a JSON file.
+
+             Args:
+                 filepath: Path to the JSON configuration file.
+
+             Returns:
+                 True if the configuration was loaded successfully, False otherwise.
+
+             Raises:
+                 std::runtime_error: If the file cannot be read or parsed.
+             )pbdoc")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           R"pbdoc(
+           Load configuration from command line arguments.
+
+           Parses command line arguments in the format --key value or --key=value.
+
+           Args:
+               argc: Argument count (typically from main())
+               argv: Argument values (typically from main())
+
+           Returns:
+               True if parsing succeeded, False otherwise.
+           )pbdoc")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             R"pbdoc(
+             Save configuration to a JSON file.
+
+             Args:
+                 filepath: Path where the JSON configuration will be saved.
+
+             Returns:
+                 True if the configuration was saved successfully, False otherwise.
+
+             Raises:
+                 std::runtime_error: If the file cannot be written.
+             )pbdoc")
+        .def("has", &Config::has, py::arg("key"),
+             R"pbdoc(
+             Check if a configuration key exists.
+
+             Args:
+                 key: Configuration key to check.
+
+             Returns:
+                 True if the key exists in the configuration, False otherwise.
+             )pbdoc")
+        .def("getKeys", &Config::getKeys,
+             R"pbdoc(
+             Get all configuration keys.
+
+             Returns:
+                 List of all keys in the configuration.
+             )pbdoc")
+        .def("clear", &Config::clear,
+             R"pbdoc(
+             Clear all configuration entries.
+
+             This removes all key-value pairs from the configuration.
+             "Clear all configuration entries. Returns:
+                 True if successful.
+             )pbdoc")
+        .def("summary", &Config::summary,
+             R"pbdoc(
+             Get a summary string of the configuration.
+
+             Returns:
+                 A formatted string describing all configuration entries.
+             )pbdoc")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
+
+    py::class_<SensoryInput>(
+        m, "SensoryInput",
+        R"pbdoc(
+        Base class for sensory input from the environment.
+
+        SensoryInput represents data received from the agent's sensors (vision,
+        audio, proprioception, internal states, etc.). It provides access to
+        the raw sensor data and metadata like timestamps.
+
+        Attributes:
+            type: The type of sensory input (Vision, Audio, etc.)
+            data: The raw sensor data as a list of floats
+            dimensions: The dimensionality of the data
+            timestamp: The time when the input was received
+
+        Subclasses include:
+            Vision: Visual input with width, height, and color channels
+            Audio: Audio input with sample rate and duration
+            InternalSignals: Internal physiological signals
+            Proprioception: Body position and movement information
+        )pbdoc")
+        .def("getType", &SensoryInput::getType,
+             R"pbdoc(Get the type of sensory input.
+
+             Returns:
+                 The NeuronType enum value representing the sensory modality.
+             )pbdoc")
+        .def("getData", &SensoryInput::getData,
+             R"pbdoc(Get the raw data as a list of floats.
+
+             Returns:
+                 List of float values representing the sensor data.
+             )pbdoc")
+        .def("getDimensions", &SensoryInput::getDimensions,
+             R"pbdoc(Get the dimensionality of the sensor data.
+
+             Returns:
+                 The number of elements in the sensor data array.
+             )pbdoc")
+        .def("getTimestamp", &SensoryInput::getTimestamp,
+             R"pbdoc(Get the timestamp of when this input was received.
+
+             Returns:
+                 The timestamp as a double (seconds since simulation start).
+             )pbdoc")
+        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+             R"pbdoc(Set the timestamp of this sensory input.
+
+             Args:
+                 timestamp: The timestamp in seconds.
+             )pbdoc");
+
+    py::class_<Vision, SensoryInput>(
+        m, "Vision",
+        R"pbdoc(
+        Vision sensory input representing visual information from the agent's eyes.
+
+        Vision input provides a 2D grid of visual data with configurable resolution
+        and color channels. The data represents light intensity or color values
+        at each pixel position.
+
+        Attributes:
+            width: Image width in pixels
+            height: Image height in pixels
+            channels: Number of color channels (typically 3 for RGB)
+            data: Flattened list of pixel values (width * height * channels)
+
+        Examples:
+            # Create 8x8 grayscale vision
+            vision = Vision(8, 8)
+            # Create 160x120 RGB vision
+            vision = Vision(160, 120, 3)
+            # Set vision data
+            vision.setData([0.1, 0.5, 0.9, ...])  # Pixel values 0.0-1.0
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(),
+             py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+             R"pbdoc(
+             Create a Vision sensory input with specified dimensions.
+
+             Args:
+                 width: Image width in pixels.
+                 height: Image height in pixels.
+                 channels: Number of color channels (default: 3 for RGB).
+             )pbdoc")
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"),
+             R"pbdoc(
+             Set the vision data.
+
+             Args:
+                 data: List of float values (0.0-1.0) representing pixel intensities.
+                      The data should be in row-major order: pixel0R, pixel0G, pixel0B,
+                      pixel1R, pixel1G, pixel1B, etc.
+             )pbdoc")
+        .def("getWidth", &Vision::getWidth,
+             R"pbdoc(Get the image width in pixels.
+
+             Returns:
+                 Image width in pixels.
+             )pbdoc")
+        .def("getHeight", &Vision::getHeight,
+             R"pbdoc(Get the image height in pixels.
+
+             Returns:
+                 Image height in pixels.
+             )pbdoc")
+        .def("getChannels", &Vision::getChannels,
+             R"pbdoc(Get the number of color channels.
+
+             Returns:
+                 Number of color channels (typically 3 for RGB).
+             )pbdoc");
+
+    py::class_<Audio, SensoryInput>(
+        m, "Audio",
+        R"pbdoc(
+        Audio sensory input representing sound information from the agent's ears.
+
+        Audio input provides a time series of sound samples with configurable
+        sample rate and duration. This represents the audio signal as a sequence
+        of amplitude values over time.
+
+        Attributes:
+            sampleRate: Sampling frequency in Hz
+            numSamples: Number of audio samples
+            data: List of float amplitude values (-1.0 to 1.0)
+
+        Examples:
+            # Create 44.1kHz, 1-second audio clip
+            audio = Audio(44100, 44100)
+            # Set audio data (e.g., a simple sine wave)
+            audio.setData([0.1, 0.5, -0.3, ...])
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(),
+             py::arg("sampleRate"), py::arg("numSamples"),
+             R"pbdoc(
+             Create Audio sensory input with specified parameters.
+
+             Args:
+                 sampleRate: Sampling frequency in Hz.
+                 numSamples: Number of audio samples.
+             )pbdoc")
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"),
+             R"pbdoc(
+             Set the audio data.
+
+             Args:
+                 data: List of float amplitude values (-1.0 to 1.0).
+             )pbdoc")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+             R"pbdoc(
+             Set the audio sample rate.
+
+             Args:
+                 sampleRate: Sampling frequency in Hz.
+             )pbdoc")
+        .def("getSampleRate", &Audio::getSampleRate,
+             R"pbdoc(Get the audio sample rate.
+
+             Returns:
+                 Sampling frequency in Hz.
+             )pbdoc")
+        .def("getNumSamples", &Audio::getNumSamples,
+             R"pbdoc(Get the number of audio samples.
+
+             Returns:
+                 Number of audio samples.
+             )pbdoc");
+
+    py::class_<InternalSignals, SensoryInput>(
+        m, "InternalSignals",
+        R"pbdoc(
+        Internal signals sensory input representing physiological states.
+
+        InternalSignals represents the agent's internal biological states such as
+        hunger, thirst, energy levels, hormonal states, and other physiological
+        variables that influence behavior and motivation.
+
+        Attributes:
+            data: List of float values representing different internal states
+                  (e.g., [hunger, thirst, energy, fatigue, motivation])
+
+        Examples:
+            # Create internal signals
+            internal = InternalSignals()
+            internal.addSignal(0.8)  # High hunger
+            internal.addSignal(0.3)  # Low thirst
+            internal.addSignal(0.9)  # High energy
+        )pbdoc")
+        .def(py::init<>())
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"),
+             R"pbdoc(
+             Add a signal value to the internal signals.
+
+             Args:
+                 value: Float value representing a physiological state (-1.0 to 1.0).
+                       Common signals: hunger, thirst, energy, fatigue, motivation.
+             )pbdoc")
+        .def("clearSignals", &InternalSignals::clearSignals,
+             R"pbdoc(
+             Clear all internal signals.
+
+             Resets all physiological states to default values.
+             )pbdoc");
+
+    py::class_<Action>(
+        m, "Action",
+        R"pbdoc(
+        Action representation for motor output.
+
+        Action represents a motor command that the agent can execute in the world.
+        Actions have a type (e.g., MoveForward, Look, Eat) and optional parameters
+        that provide additional control (e.g., speed, duration, direction).
+
+        Actions are the output of the brain's motor system and represent the
+        agent's intended behavior based on its internal state and sensory input.
+
+        Attributes:
+            type: The type of action (ActionType enum)
+            parameters: Additional control parameters (velocity, duration, etc.)
+
+        Common action types:
+            - MoveForward/Backward/Left/Right: Locomotion actions
+            - TurnLeft/Right: Rotation actions
+            - Look/LookUp/LookDown: Gaze control
+            - Interact: Interact with nearby objects
+            - Eat/Drink: Consume resources
+            - Rest/Wait: No movement action
+            - Custom: User-defined action with custom parameters
+
+        Examples:
+            # Create a move forward action
+            action = Action(ActionType.MoveForward)
+            # Create a look action with direction
+            action = Action(ActionType.Look, [1.0, 0.0])  # Look right
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"),
+             R"pbdoc(
+             Create an action with just a type.
+
+             Args:
+                 type: The action type (ActionType enum).
+             )pbdoc")
+        .def(py::init<ActionType, std::vector<float>>(),
+             py::arg("type"), py::arg("parameters"),
+             R"pbdoc(
+             Create an action with type and parameters.
+
+             Args:
+                 type: The action type (ActionType enum).
+                 parameters: List of additional parameters for the action.
+                           Interpretation depends on action type.
+             )pbdoc")
+        .def("getType", &Action::getType,
+             R"pbdoc(
+             Get the action type.
+
+             Returns:
+                 The ActionType enum value.
+             )pbdoc")
+        .def("setType", &Action::setType, py::arg("type"),
+             R"pbdoc(
+             Set the action type.
+
+             Args:
+                 type: The new action type.
+             )pbdoc")
+        .def("getParameters", &Action::getParameters,
+             R"pbdoc(
+             Get the action parameters.
+
+             Returns:
+                 List of float parameters associated with this action.
+             )pbdoc")
+        .def("setParameters", &Action::setParameters, py::arg("params"),
+             R"pbdoc(
+             Set the action parameters.
+
+             Args:
+                 params: New list of float parameters.
+             )pbdoc")
+        .def("getName", &Action::getName,
+             R"pbdoc(
+             Get the human-readable name of the action type.
+
+             Returns:
+                 String name describing the action type.
+             )pbdoc")
+        .def("clone", &Action::clone,
+             R"pbdoc(
+             Create a copy of this action.
+
+             Returns:
+                 A new Action object with the same type and parameters.
+             )pbdoc");
+
+    py::class_<WorldObject>(
+        m, "WorldObject",
+        R"pbdoc(
+        World object representation.
+
+        WorldObject represents an entity in the simulated world. Each object has
+        a position (x, y), a shape (circle with radius), and semantic properties
+        (type and value). Objects can be active or inactive, and they represent
+        various things in the environment like resources, hazards, walls, or markers.
+
+        Attributes:
+            x: X-coordinate of object center
+            y: Y-coordinate of object center
+            radius: Radius of the circular object
+            type: The type of object (WorldObjectType enum)
+            value: Float value representing importance (e.g., nutritional value,
+                   damage amount, or generic importance)
+            active: Whether the object is currently present and interactable
+
+        Common world object types:
+            - Empty: Empty space (walkable)
+            - Resource: Valuable item (e.g., food, water, energy)
+            - Hazard: Dangerous item (e.g., fire, poison)
+            - Wall: Impassable barrier
+            - Marker: Special location or landmark
+
+        World objects are used by the agent to sense the environment and decide
+        what actions to take (e.g., move toward resources, avoid hazards).
+
+        Examples:
+            # Create a resource at position (5, 3)
+            resource = WorldObject(5.0, 3.0, WorldObjectType.Resource, 10.0)
+            # Create a hazard (e.g., fire)
+            hazard = WorldObject(2.0, 7.0, WorldObjectType.Hazard, 5.0)
+            # Create a wall
+            wall = WorldObject(0.0, 10.0, WorldObjectType.Wall, 0.0, 1.0)
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f,
+             R"pbdoc(
+             Create a world object with specified properties.
+
+             Args:
+                 x: X-coordinate of object center.
+                 y: Y-coordinate of object center.
+                 type: Object type (WorldObjectType enum).
+                 value: Float value representing importance (default: 0.0).
+                 radius: Radius of circular object (default: 0.5).
+             )pbdoc")
+        .def_readwrite("x", &WorldObject::x,
+                       R"pbdoc(X-coordinate of the object center.)pbdoc")
+        .def_readwrite("y", &WorldObject::y,
+                       R"pbdoc(Y-coordinate of the object center.)pbdoc")
+        .def_readwrite("radius", &WorldObject::radius,
+                       R"pbdoc(Radius of the circular object.)pbdoc")
+        .def_readwrite("type", &WorldObject::type,
+                       R"pbdoc(Object type (WorldObjectType enum).)pbdoc")
+        .def_readwrite("value", &WorldObject::value,
+                       R"pbdoc(Float value representing object importance.)pbdoc")
+        .def_readwrite("active", &WorldObject::active,
+                       R"pbdoc(Whether the object is active and interactable.)pbdoc");
+
+    py::class_<AgentBody>(
+        m, "AgentBody",
+        R"pbdoc(
+        Agent body state representing the physical agent in the world.
+
+        AgentBody represents the physical properties and state of the agent.
+        It includes position, orientation, movement dynamics, and physiological
+        states that influence behavior and survival.
+
+        Attributes:
+            x: X-coordinate of agent center
+            y: Y-coordinate of agent center
+            orientation: Direction the agent is facing (radians)
+            velocityX/Y: Linear velocity components
+            angularVelocity: Angular velocity (rotation speed)
+            energy: Current energy level (0-100)
+            health: Current health (0-100)
+            age: Current age (simulation steps)
+            isMoving: Whether the agent is currently moving
+            isTurning: Whether the agent is currently turning
+            lastActionTime: Time since last action was executed
+
+        The agent uses these properties to navigate the world, interact with
+        objects, and survive. Energy and health decrease over time and with actions.
+
+        Examples:
+            # Create an agent at position (0, 0)
+            agent = AgentBody()
+            # Move the agent
+            agent.x = 5.0
+            agent.y = 3.0
+            agent.velocityX = 1.0
+            # Check agent state
+            if agent.energy < 20.0:
+                print("Agent needs rest!")
+        )pbdoc")
+        .def(py::init<>())
+        .def_readwrite("x", &AgentBody::x,
+                       R"pbdoc(X-coordinate of agent center.)pbdoc")
+        .def_readwrite("y", &AgentBody::y,
+                       R"pbdoc(Y-coordinate of agent center.)pbdoc")
+        .def_readwrite("orientation", &AgentBody::orientation,
+                       R"pbdoc(Direction the agent is facing (radians).)pbdoc")
+        .def_readwrite("velocityX", &AgentBody::velocityX,
+                       R"pbdoc(X-component of linear velocity.)pbdoc")
+        .def_readwrite("velocityY", &AgentBody::velocityY,
+                       R"pbdoc(Y-component of linear velocity.)pbdoc")
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity,
+                       R"pbdoc(Angular velocity (rotation speed in radians/step).)pbdoc")
+        .def_readwrite("energy", &AgentBody::energy,
+                       R"pbdoc(Current energy level (0-100). Lower values indicate fatigue.)pbdoc")
+        .def_readwrite("health", &AgentBody::health,
+                       R"pbdoc(Current health (0-100). Lower values indicate injury/death.)pbdoc")
+        .def_readwrite("age", &AgentBody::age,
+                       R"pbdoc(Current age in simulation steps.)pbdoc")
+        .def_readwrite("isMoving", &AgentBody::isMoving,
+                       R"pbdoc(Whether the agent is currently moving.)pbdoc")
+        .def_readwrite("isTurning", &AgentBody::isTurning,
+                       R"pbdoc(Whether the agent is currently turning.)pbdoc")
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime,
+                       R"pbdoc(Time since last action was executed.)pbdoc")
+        .def("reset", &AgentBody::reset,
+             R"pbdoc(
+             Reset agent body to initial state.
+
+             Restores default position (0,0), zero velocity, full energy/health,
+             and zero age. Used to start a new simulation episode.
+             )pbdoc");
+
+    py::class_<ActionResult>(
+        m, "ActionResult",
+        R"pbdoc(
+        Action result from world interaction.
+
+        ActionResult represents the outcome of an agent's action in the world.
+        It contains the reward received, whether the action was successful,
+        and any additional information about the result.
+
+        Attributes:
+            reward: Numerical reward value (positive = good, negative = bad)
+            success: Whether the action was successful
+            message: Human-readable description of the result
+
+        Action results are used by the agent to learn from experience through
+        reward-modulated plasticity and curiosity-driven exploration.
+
+        Examples:
+            # Action was successful with reward
+            result = ActionResult(10.0, True, "Collected food")
+            # Action failed with penalty
+            result = ActionResult(-5.0, False, "Hit wall")
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "",
+             R"pbdoc(
+             Create an action result with specified outcome.
+
+             Args:
+                 reward: Reward value (positive for good outcomes, negative for bad).
+                 success: Whether the action was successful.
+                 message: Optional human-readable description.
+             )pbdoc")
+        .def_readwrite("reward", &ActionResult::reward,
+                       R"pbdoc(Reward value (positive = good, negative = bad).)pbdoc")
+        .def_readwrite("success", &ActionResult::success,
+                       R"pbdoc(Whether the action was successful.)pbdoc")
+        .def_readwrite("message", &ActionResult::message,
+                       R"pbdoc(Human-readable description of the result.)pbdoc");
+
+    py::class_<SensoryPercept>(
+        m, "SensoryPercept",
+        R"pbdoc(
+        Sensory percept data combining all available sensory inputs.
+
+        SensoryPercept represents the complete sensory state of the agent
+        at a given moment, combining vision, touch, proprioception, internal
+        signals, and audio into a unified percept that can be processed by the
+        brain.
+
+        Attributes:
+            vision: Visual input (Vision object)
+            touch: Touch input (Vision object - proximity to objects)
+            internal: Internal physiological states (InternalSignals)
+            proprioception: Body position and movement (InternalSignals)
+            audio: Audio input (Audio object)
+            timestamp: Time when this percept was created
+
+        The sensory percept provides a comprehensive view of the agent's
+        interaction with the world, combining multiple sensory modalities into
+        a single input for the brain's processing systems.
+
+        Examples:
+            # Create a complete sensory percept
+            percept = SensoryPercept()
+            # Set visual input
+            percept.setVision(Vision(160, 120))
+            # Set internal states
+            percept.setInternal(InternalSignals())
+            # Get all signals at once
+            all_signals = percept.getAllSignals()
+        )pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision,
+             R"pbdoc(Get the visual input.
+
+             Returns:
+                 Vision object containing visual data.
+             )pbdoc")
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"),
+             R"pbdoc(Set the visual input.
+
+             Args:
+                 vision: Vision object containing visual data.
+             )pbdoc")
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth,
+             R"pbdoc(Get the visual field width.
+
+             Returns:
+                 Width in pixels.
+             )pbdoc")
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight,
+             R"pbdoc(Get the visual field height.
+
+             Returns:
+                 Height in pixels.
+             )pbdoc")
+        .def("getTouch", &SensoryPercept::getTouch,
+             R"pbdoc(Get the tactile input.
+
+             Returns:
+                 Vision object representing proximity to objects.
+             )pbdoc")
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"),
+             R"pbdoc(Set the tactile input.
+
+             Args:
+                 touch: Vision object representing proximity to objects.
+             )pbdoc")
+        .def("getInternal", &SensoryPercept::getInternal,
+             R"pbdoc(Get the internal signals.
+
+             Returns:
+                 InternalSignals object with physiological states.
+             )pbdoc")
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"),
+             R"pbdoc(Set the internal signals.
+
+             Args:
+                 internal: InternalSignals object with physiological states.
+             )pbdoc")
+        .def("getProprioception", &SensoryPercept::getProprioception,
+             R"pbdoc(Get the proprioception input.
+
+             Returns:
+                 InternalSignals object with body state information.
+             )pbdoc")
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"),
+             R"pbdoc(Set the proprioception input.
+
+             Args:
+                 proprioception: InternalSignals with body state information.
+             )pbdoc")
+        .def("getAudio", &SensoryPercept::getAudio,
+             R"pbdoc(Get the audio input.
+
+             Returns:
+                 Audio object containing sound data.
+             )pbdoc")
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"),
+             R"pbdoc(Set the audio input.
+
+             Args:
+                 audio: Audio object containing sound data.
+             )pbdoc")
+        .def("getAllSignals", &SensoryPercept::getAllSignals,
+             R"pbdoc(Get all sensory signals as a single list.
+
+             Returns:
+                 List of all signal values from all sensory modalities.
+             )pbdoc")
+        .def("getTimestamp", &SensoryPercept::getTimestamp,
+             R"pbdoc(Get the timestamp.
+
+             Returns:
+                 Timestamp of when this percept was created.
+             )pbdoc")
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"),
+             R"pbdoc(Set the timestamp.
+
+             Args:
+                 timestamp: Time when this percept was created.
+             )pbdoc");
+
+    py::class_<SimpleWorld>(
+        m, "SimpleWorld",
+        R"pbdoc(
+        Simple 2D world for NLM simulation.
+
+        SimpleWorld represents a 2D simulated environment where the agent lives,
+        moves, and interacts with objects. The world provides a complete physics
+        simulation with collision detection, object interactions, and sensory
+        input generation for the agent.
+
+        The world operates on a discrete grid with continuous physics. Objects
+        are circular with radius, and the agent can sense the world through
+        vision (a 2D array of visual data).
+
+        Attributes:
+            width: World width in arbitrary units
+            height: World height in arbitrary units
+            visionWidth/Height: Agent's visual field dimensions
+            maxEnergy: Maximum energy for the agent
+            energyDecayRate: Rate at which energy decreases over time
+
+        The world provides several key methods:
+            - configure(): Set up world dimensions and agent vision
+            - update(): Advance simulation by one time step
+            - applyMotorCommand(): Execute agent's action
+            - getSensoryPercept(): Get what agent sees/hears/feels
+            - getAgentBody(): Get agent's physical state
+
+        Examples:
+            # Create a 20x20 world with 160x120 vision
+            world = SimpleWorld()
+            world.configure(20, 20, 160, 120)
+            world.reset()  # Start with agent at center
+
+            # Add a resource for the agent
+            resource = WorldObject(15, 15, WorldObjectType.Resource, 10.0)
+            world.addObject(resource)
+
+            # Run simulation
+            for step in range(100):
+                world.update(0.1)  # Advance by 0.1 seconds
+                percept = world.getSensoryPercept()
+                agent.processSensoryInput(percept)
+        )pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             R"pbdoc(
+             Configure the world dimensions and agent's sensory capabilities.
+
+             Args:
+                 width: World width in arbitrary units.
+                 height: World height in arbitrary units.
+                 visionWidth: Width of agent's visual field in pixels.
+                 visionHeight: Height of agent's visual field in pixels.
+
+             This must be called before using the world. It sets up the internal
+             grid and initializes the agent's vision sensor.
+             )pbdoc")
+        .def("reset", &SimpleWorld::reset,
+             R"pbdoc(
+             Reset world and agent to initial state.
+
+             This resets all objects to their initial positions, sets the agent
+             to the center of the world, and resets simulation time. Used to
+             start a new episode of simulation.
+             )pbdoc")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             R"pbdoc(
+             Set the agent's starting position.
+
+             Args:
+                 x: X-coordinate for agent starting position.
+                 y: Y-coordinate for agent starting position.
+             )pbdoc")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             R"pbdoc(
+             Update world state for one simulation time step.
+
+             Args:
+                 timestep: Time duration for this update step (seconds).
+
+             This advances the simulation by the specified time. During an update:
+               1. Agent movement and physics are simulated
+               2. Collisions with world boundaries and objects are detected
+               3. Agent-object interactions are processed
+               4. Vision is generated based on agent position
+               5. Energy is consumed over time
+               6. Internal states are updated
+             )pbdoc")
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"),
+             R"pbdoc(
+             Apply a motor command to the agent.
+
+             Args:
+                 cmd: MotorCommand to execute (e.g., MoveForward, TurnLeft).
+                 currentTime: Current simulation time (seconds).
+
+             Returns:
+                 ActionResult describing what happened (reward, success, message).
+
+             This processes the agent's action in the world:
+               - Moves the agent according to the command
+               - Handles collisions with walls and objects
+               - Processes interactions with objects
+               - Updates agent's internal state based on action outcome
+               - Returns reward and success feedback
+             )pbdoc")
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal,
+             R"pbdoc(
+             Get the current sensory percept for the agent.
+
+             Returns:
+                 SensoryPercept containing vision, touch, internal signals, and audio.
+
+             The percept is generated based on the agent's current position and
+             the world's state. It includes:
+               - Vision: What the agent can see in each direction
+               - Touch: Proximity to nearby objects (collisions)
+               - Internal: The agent's physiological state
+               - Audio: Any audio sources in the world
+               - Timestamp: When this percept was created
+             )pbdoc")
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             R"pbdoc(
+             Get the agent's current body state.
+
+             Returns:
+                 AgentBody with current position, velocity, and physiological states.
+
+             This provides read-only access to the agent's physical state including
+             position, orientation, velocity, energy, health, and age.
+             )pbdoc")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             R"pbdoc(
+             Add an object to the world.
+
+             Args:
+                 obj: WorldObject to add.
+
+             The object is added at its specified position (x, y). Objects can
+             represent resources, hazards, walls, markers, or empty space.
+             )pbdoc")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             R"pbdoc(
+             Remove the object at the specified position.
+
+             Args:
+                 x: X-coordinate where object should be removed.
+                 y: Y-coordinate where object should be removed.
+
+             If no object exists at that position, nothing happens.
+             )pbdoc")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             R"pbdoc(
+             Check if a position is valid (not occupied by a wall).
+
+             Args:
+                 x: X-coordinate to check.
+                 y: Y-coordinate to check.
+
+             Returns:
+                 True if the position is walkable (not a wall), False otherwise.
+
+             This is used to check if the agent can move to a position before moving.
+             "Check if position is valid (not a wall).
+
+             Args:
+                 x: X-coordinate to check.
+                 y: Y-coordinate to check.
+
+             Returns:
+                 True if the position is walkable (not a wall), False otherwise.
+             )pbdoc")
+        .def("getWidth", &SimpleWorld::getWidth,
+             R"pbdoc(Get the world width.
+
+             Returns:
+                 World width in arbitrary units.
+             )pbdoc")
+        .def("getHeight", &SimpleWorld::getHeight,
+             R"pbdoc(Get the world height.
+
+             Returns:
+                 World height in arbitrary units.
+             )pbdoc")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy,
+             R"pbdoc(Get maximum agent energy.
+
+             Returns:
+                 Maximum energy level (default behavior-dependent).
+             )pbdoc")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             R"pbdoc(
+             Set maximum agent energy.
+
+             Args:
+                 e: New maximum energy value.
+
+             Higher maximum energy allows the agent to survive longer without
+             consuming resources.
+             )pbdoc")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             R"pbdoc(Get energy decay rate per time step.
+
+             Returns:
+                 Energy decay rate (energy lost per second).
+             )pbdoc")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             R"pbdoc(
+             Set energy decay rate.
+
+             Args:
+                 r: New energy decay rate (energy lost per second).
+
+             Higher decay rates cause the agent to lose energy faster.
+             )pbdoc")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             R"pbdoc(Get current simulation time.
+
+             Returns:
+                 Current simulation time in seconds.
+             )pbdoc")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             R"pbdoc(
+             Set random seed for reproducible simulation.
+
+             Args:
+                 seed: Random seed value (integer).
+
+             This ensures that the same sequence of random events occurs each
+             time the simulation is run, which is useful for testing and debugging.
+             )pbdoc")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             R"pbdoc(Get the random seed.
+
+             Returns:
+                 Current random seed value.
+             )pbdoc");
+
+    py::class_<Brain>(
+        m, "Brain",
+        R"pbdoc(
+        Central neural simulation brain class.
+
+        The Brain class is the core neural processor in NLM. It implements a
+        complete spiking neural network with event-driven dynamics, integrating
+        multiple specialized subsystems including memory, prediction, cognition,
+        and neuromodulation.
+
+        The brain operates through a closed-loop processing cycle:
+          1. Receives sensory input from the world
+          2. Processes input through neural dynamics
+          3. Updates internal state (memory, prediction, etc.)
+          4. Selects and produces motor actions
+          5. Returns actions to the world
+          6. Receives reward/error signals for learning
+
+        Key capabilities:
+          - Event-driven spiking neural computation with LIF neurons
+          - Multiple plasticity rules (STDP, Hebbian, structural)
+          - Four memory systems (working, episodic, associative, predictive)
+          - Three neuromodulation systems (dopamine, curiosity, novelty)
+          - Cognitive systems (planning, attention, concept formation)
+          - Developmental stages affecting learning rates
+          - Checkpoint save/load for persistence
+
+        Attributes:
+            config: Configuration settings for the brain
+            regions: Dictionary mapping RegionId to NeuralRegion objects
+
+        Examples:
+            # Create a brain with default configuration
+            config = Config()
+            brain = Brain(config)
+            brain.initialize()
+
+            # Process sensory input
+            percept = world.getSensoryPercept()
+            brain.receiveSensoryInput(percept)
+
+            # Run one simulation step
+            brain.step(step_number)
+
+            # Get statistics
+            print(f"Neurons firing: {brain.getFiringNeuronCount()}")
+            print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             R"pbdoc(
+             Create a brain with configuration.
+
+             Args:
+                 config: Configuration object for brain parameters.
+                        Use createDefaultConfig() for simple setup.
+             )pbdoc")
+        .def("initialize", &Brain::initialize,
+             R"pbdoc(
+             Initialize the brain with configuration.
+
+             This method sets up the neural network structure based on the
+             configuration, creates regions and neurons, and prepares the brain
+             for simulation. Always call this before using the brain.
+
+             Returns:
+                 True if initialization succeeded, False otherwise.
+
+             Raises:
+                 std::runtime_error: If configuration is invalid or initialization fails.
+             )pbdoc")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             R"pbdoc(
+             Perform a simulation step without timestamp.
+
+             Args:
+                 currentStep: Current simulation step number.
+             )pbdoc")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             R"pbdoc(
+             Perform a simulation step with timestamp.
+
+             Args:
+                 currentStep: Current simulation step number.
+                 currentTime: Current simulation time in seconds.
+             )pbdoc")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             R"pbdoc(
+             Inject sensory input into the brain.
+
+             Args:
+                 input: SensoryPercept containing all sensory modalities (vision,
+                        touch, internal signals, audio).
+
+             This method processes sensory information and injects corresponding
+             currents into the brain's sensory neurons. The brain uses this input
+             to update its internal state and generate appropriate responses.
+             )pbdoc")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             R"pbdoc(
+             Inject current directly into a specific neuron.
+
+             Args:
+                 neuron: NeuronId of the target neuron.
+                 current: Membrane potential current to inject (positive or negative).
+
+             This allows direct control of individual neurons, useful for testing
+             or implementing external inputs.
+             )pbdoc")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             R"pbdoc(
+             Inject current into all neurons of a specific type.
+
+             Args:
+                 type: NeuronType (Excitatory, Inhibitory, Sensory, Motor, etc.).
+                 current: Membrane potential current to inject.
+
+             This is useful for stimulating or inhibiting entire neuron populations
+             (e.g., all sensory neurons for a stimulus).
+             )pbdoc")
+        .def("produceAction", &Brain::produceAction,
+             R"pbdoc(
+             Produce motor action based on neural activity.
+
+             Returns:
+                 Action object representing the selected motor behavior.
+
+             This method analyzes the brain's internal state and neural activity
+             to produce an appropriate action. The brain considers multiple factors
+             including:
+               - Current sensory input
+               - Working memory content
+               - Motor neuron activity
+               - Neuromodulatory signals
+               - Curiosity and exploration drives
+
+             Returns an Action object that can be executed by the world.
+             )pbdoc")
+        .def("reset", &Brain::reset,
+             R"pbdoc(
+             Reset brain state to initial conditions.
+
+             This clears all neural activity, resets neuron states to resting,
+             clears all memories, and resets developmental stage. Used to start
+             a new episode of simulation or testing.
+             )pbdoc")
+        .def("save", &Brain::save, py::arg("filepath"),
+             R"pbdoc(
+             Save brain state to file (checkpointing).
+
+             Args:
+                 filepath: Path where brain state will be saved.
+
+             Returns:
+                 True if save succeeded, False otherwise.
+
+             Saves the complete brain state including:
+               - Neural connectivity and weights
+               - Neuron membrane potentials and states
+               - Memory contents (working, episodic, associative)
+               - Development stage and parameters
+               - Configuration
+
+             Useful for resuming long simulations or saving interesting brain states.
+             )pbdoc")
+        .def("load", &Brain::load, py::arg("filepath"),
+             R"pbdoc(
+             Load brain state from file.
+
+             Args:
+                 filepath: Path to saved brain state file.
+
+             Returns:
+                 True if load succeeded, False otherwise.
+
+             Restores the complete brain state from a checkpoint.
+             )pbdoc")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             R"pbdoc(
+             Add a new neural region to the brain.
+
+             Args:
+                 name: Optional name for the new region.
+
+             Returns:
+                 RegionId of the newly created region.
+
+             Neural regions are specialized processing units that can contain
+             multiple populations of neurons with specific functions. Regions
+             can be connected via inter-region pathways.
+             )pbdoc")
+        .def("getRegion", &Brain::getRegion, py::arg("id"),
+             py::return_value_policy::reference_internal,
+             R"pbdoc(
+             Get a region by ID.
+
+             Args:
+                 id: RegionId of the region to retrieve.
+
+             Returns:
+                 NeuralRegion object, or None if region doesn't exist.
+             )pbdoc")
+        .def("getRegionCount", &Brain::getRegionCount,
+             R"pbdoc(
+             Get the number of neural regions.
+
+             Returns:
+                 Number of regions in the brain.
+             )pbdoc")
+        .def("getRegionIds", &Brain::getRegionIds,
+             R"pbdoc(
+             Get all region IDs.
+
+             Returns:
+                 List of all RegionId objects in the brain.
+             )pbdoc")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             R"pbdoc(
+             Get all neural regions.
+
+             Returns:
+                 List of all NeuralRegion objects in the brain.
+             )pbdoc")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             R"pbdoc(Get total neuron count across all regions.
+
+             Returns:
+                 Total number of neurons in the brain.
+             )pbdoc")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             R"pbdoc(Get total synapse count across all regions.
+
+             Returns:
+                 Total number of synapses in the brain.
+             )pbdoc")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             R"pbdoc(Get count of active neurons.
+
+             Returns:
+                 Number of neurons currently capable of firing.
+             )pbdoc")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             R"pbdoc(Get count of currently firing neurons.
+
+             Returns:
+                 Number of neurons that are currently spiking.
+             )pbdoc")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             R"pbdoc(Get average firing rate across all neurons.
+
+             Returns:
+                 Average firing rate (spikes per time step).
+             )pbdoc")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             R"pbdoc(Get excitation/inhibition balance ratio.
+
+             Returns:
+                 Ratio of excitation to inhibition in the network.
+                 Values > 1.0 indicate excitation dominance, < 1.0 indicate inhibition dominance.
+             )pbdoc")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             R"pbdoc(Get total spike count.
+
+             Returns:
+                 Total number of spikes generated by all neurons.
+             )pbdoc")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             R"pbdoc(Get current developmental stage.
+
+             Returns:
+                 Current developmental stage (Initial, CriticalPeriod, etc.).
+             )pbdoc")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             R"pbdoc(
+             Set developmental stage.
+
+             Args:
+                 stage: New developmental stage.
+
+             Development stages affect plasticity rates and neural excitability.
+             "Set developmental stage.
+
+             Args:
+                 stage: New developmental stage.
+             )pbdoc")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             R"pbdoc(
+             Get the configuration.
+
+             Returns:
+                 Reference to the configuration object used by this brain.
+             )pbdoc")
+        .def("logStatus", &Brain::logStatus,
+             R"pbdoc(
+             Log brain status.
+
+             Prints detailed information about brain state including region
+             statistics, neuron counts, firing rates, and developmental stage.
+             "Log brain status.
+             )pbdoc");
+
+    py::class_<AgentBrain>(
+        m, "AgentBrain",
+        R"pbdoc(
+        Agent brain interface connecting NLM brain to world.
+
+        AgentBrain serves as the interface between the brain's internal neural
+        processing and the external world. It handles:
+          - Sensory transduction: Converting world input to brain-compatible format
+          - Motor decoding: Converting brain activity to world-compatible actions
+          - Neuromodulation: Applying reward-based learning signals
+          - Development: Managing brain developmental stages
+
+        The agent brain is the "body" of the artificial agent, providing the
+        interface for perception and action. It wraps the brain and provides
+        the agent-specific functionality for interacting with the environment.
+
+        Examples:
+            # Create an agent brain
+            brain = Brain(config)
+            agent = AgentBrain(brain)
+
+            # Initialize with a world
+            world = SimpleWorld()
+            agent.initialize(world)
+
+            # Process sensory input from world
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+
+            # Brain thinks
+            brain.step(step)
+
+            # Get action to execute
+            action = agent.decodeMotorCommand()
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+             R"pbdoc(
+             Create an agent brain interface.
+
+             Args:
+                 brain: Shared pointer to the Brain object to interface with.
+             )pbdoc")
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             R"pbdoc(
+             Initialize with world.
+
+             Args:
+                 world: SimpleWorld object to interact with.
+
+             This method sets up the agent brain for interaction with the world,
+             including configuring sensory processing and motor output based
+             on world capabilities.
+             )pbdoc")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             R"pbdoc(
+             Get sensory input size expected by brain.
+
+             Returns:
+                 Number of expected sensory input dimensions.
+
+             This tells the world how much sensory data the brain expects,
+             useful for configuring the world's sensory output.
+             )pbdoc")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             R"pbdoc(
+             Get motor output size expected.
+
+             Returns:
+                 Number of expected motor output dimensions.
+
+             This is used for debugging and understanding what the brain
+             produces as motor commands.
+             )pbdoc")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             R"pbdoc(
+             Process sensory percept and inject into brain.
+
+             Args:
+                 percept: SensoryPercept containing all sensory inputs.
+
+             This method extracts the relevant sensory information from the
+             percept and injects it into the brain's sensory neurons. The brain
+             then processes this information internally.
+             )pbdoc")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             R"pbdoc(
+             Decode brain motor activity into motor command.
+
+             Returns:
+                 MotorCommand object representing the selected action.
+
+             This method analyzes the brain's motor neuron activity and converts
+             it into a concrete motor command that can be executed by the world.
+             It considers neuromodulation, curiosity, and other factors in the
+             decision.
+             )pbdoc")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             R"pbdoc(
+             Apply reward-based neuromodulation.
+
+             Args:
+                 reward: Actual reward received from world interaction.
+                 predictedReward: Expected reward predicted by brain.
+
+             This implements reward prediction error learning, where the brain
+             adjusts its learning based on the difference between expected and
+             actual rewards. This drives reinforcement learning.
+             )pbdoc")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             R"pbdoc(
+             Update development system.
+
+             Args:
+                 timestep: Current simulation time step.
+
+             This advances the agent's development, changing plasticity rates,
+             neural excitability, and other developmental parameters based on
+             the agent's age and experience.
+             )pbdoc")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             R"pbdoc(
+             Get current developmental stage.
+
+             Returns:
+                 Current developmental stage affecting plasticity and learning.
+             )pbdoc")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             R"pbdoc(
+             Get current neuromodulation level.
+
+             Returns:
+                 Current level of neuromodulatory influence on learning.
+             )pbdoc")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             R"pbdoc(
+             Get curiosity level.
+
+             Returns:
+                 Current curiosity/exploration motivation level (0.0-1.0).
+             )pbdoc")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             R"pbdoc(
+             Get novelty level.
+
+             Returns:
+                 Current novelty detection level (0.0-1.0).
+             )pbdoc")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             R"pbdoc(
+             Get prediction error.
+
+             Returns:
+                 Current prediction error signal from the prediction system.
+             )pbdoc")
+        .def("reset", &AgentBrain::reset,
+             R"pbdoc(
+             Reset agent for new episode.
+
+             This resets the agent's state for a new simulation episode,
+             clearing temporary memories and resetting neuromodulation state.
+             "Reset agent for new episode.
+             )pbdoc")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             R"pbdoc(
+             Get the underlying brain.
+
+             Returns:
+                 Reference to the Brain object controlled by this agent.
+             )pbdoc")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"),
+             R"pbdoc(
+             Enable or disable reward modulation.
+
+             Args:
+                 enable: True to enable, False to disable.
+
+             When enabled, the agent learns from reward prediction errors.
+             )pbdoc")
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"),
+             R"pbdoc(
+             Enable or disable structural plasticity.
+
+             Args:
+                 enable: True to enable, False to disable.
+
+             When enabled, the agent can create new neural connections.
+             )pbdoc")
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"),
+             R"pbdoc(
+             Enable or disable development.
+
+             Args:
+                 enable: True to enable, False to disable.
+
+             When enabled, the agent undergoes developmental changes over time.
+             )pbdoc")
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"),
+             R"pbdoc(
+             Enable or disable curiosity.
+
+             Args:
+                 enable: True to enable, False to disable.
+
+             When enabled, the agent is motivated to explore novel experiences.
+             )pbdoc")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             R"pbdoc(
+             Check if reward modulation is enabled.
+
+             Returns:
+                 True if reward modulation is enabled.
+             )pbdoc")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             R"pbdoc(
+             Check if structural plasticity is enabled.
+
+             Returns:
+                 True if structural plasticity is enabled.
+             )pbdoc")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             R"pbdoc(
+             Check if development is enabled.
+
+             Returns:
+                 True if development is enabled.
+             )pbdoc")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             R"pbdoc(
+             Check if curiosity is enabled.
+
+             Returns:
+                 True if curiosity is enabled.
+             )pbdoc");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, R"pbdoc(
+    Create a default configuration.
+
+    Returns:
+        New Config object with default settings.
+
+    This creates a configuration object suitable for most basic use cases.
+    The configuration includes sensible defaults for learning rate,
+    plasticity settings, and simulation parameters.
+
+    Examples:
+        # Simple configuration
+        config = createDefaultConfig()
+        config.set("learning_rate", 0.01)
+        config.set("enable_plasticity", True)
+
+        # Custom configuration
+        config = createDefaultConfig()
+        config.loadFromFile("my_config.json")
+    )pbdoc");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), R"pbdoc(
+    Create a new brain with configuration.
+
+    Args:
+        config: Configuration object for the brain.
+
+    Returns:
+        New Brain object initialized with the specified configuration.
+
+    This creates a complete neural brain with all its subsystems (memory,
+    prediction, neuromodulation, cognition) ready for simulation.
+
+    Examples:
+        config = createDefaultConfig()
+        brain = createBrain(config)
+        brain.initialize()
+    )pbdoc");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, R"pbdoc(
+    Create a new simple world.
+
+    Returns:
+        New SimpleWorld object.
+
+    This creates a 2D simulated world where agents can live, move, and interact
+    with objects. The world provides sensory input and executes motor actions.
+
+    Examples:
+        world = createSimpleWorld()
+        world.configure(20, 20, 160, 120)  # Set world size and vision
+        world.reset()  # Start with agent in center
+    )pbdoc");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), R"pbdoc(
+    Create a new agent brain interface.
+
+    Args:
+        brain: Brain object to interface with.
+
+    Returns:
+        New AgentBrain object that connects brain to world.
+
+    The agent brain provides the interface for perception and action between
+    the neural brain and the simulated world.
+
+    Examples:
+        brain = createBrain(config)
+        brain.initialize()
+        agent = createAgentBrain(brain)
+        
+        world = createSimpleWorld()
+        agent.initialize(world)
+    )pbdoc");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+
+} // namespace nlm

@@ -1,19 +1,99 @@
 #include "SpikeSystem.hpp"
 #include <algorithm>
 #include <limits>
+#include <cstring>
+#include <numeric>
 
-namespace nlm {
+namespace nlm;
+
+// Simple memory pool for SpikeSystem event management
+class SpikeSystemMemoryPool {
+public:
+    static constexpr size_t MAX_PENDING_SPIKES = 10000;
+    static constexpr size_t MAX_SPIKE_HISTORY = 10000;
+    static constexpr size_t MAX_HANDLERS = 50;
+    
+    // Ring buffer for pending spikes
+    class SpikeRingBuffer {
+    private:
+        SpikeEvent events[MAX_PENDING_SPIKES];
+        size_t head;
+        size_t tail;
+        size_t count;
+        
+    public:
+        SpikeRingBuffer() : head(0), tail(0), count(0) {}
+        
+        bool isEmpty() const { return count == 0; }
+        bool isFull() const { return count == MAX_PENDING_SPIKES; }
+        
+        void push(const SpikeEvent& event) {
+            if (isFull()) return;
+            events[tail] = event;
+            tail = (tail + 1) % MAX_PENDING_SPIKES;
+            count++;
+        }
+        
+        SpikeEvent front() const {
+            return events[head];
+        }
+        
+        void pop() {
+            head = (head + 1) % MAX_PENDING_SPIKES;
+            count--;
+        }
+        
+        size_t size() const { return count; }
+    };
+    
+    // Ring buffer for spike history
+    class SpikeHistoryRingBuffer {
+    private:
+        DetailedSpikeEvent events[MAX_SPIKE_HISTORY];
+        size_t head;
+        size_t tail;
+        size_t count;
+        
+    public:
+        SpikeHistoryRingBuffer() : head(0), tail(0), count(0) {}
+        
+        void push(const DetailedSpikeEvent& event) {
+            if (count == MAX_SPIKE_HISTORY) {
+                head = (head + 1) % MAX_SPIKE_HISTORY;
+            } else {
+                count++;
+            }
+            events[tail] = event;
+            tail = (tail + 1) % MAX_SPIKE_HISTORY;
+        }
+        
+        size_t size() const { return count; }
+    };
+    
+    // Fixed-size arrays for handlers
+    SpikeHandler handlers[MAX_HANDLERS];
+    DelayedSpikeHandler delayedHandlers[MAX_HANDLERS];
+    size_t handlersCount;
+    size_t delayedHandlersCount;
+    
+    // Fixed-size array for spike counts per neuron
+    size_t spikeCountPerNeuron[MAX_PENDING_SPIKES];
+    
+    // Array of vectors for delayed spikes per delivery step
+    std::vector<DelayedSpikeEvent> delayedSpikes[MAX_PENDING_SPIKES];
+    
+    // Ring buffers
+    SpikeRingBuffer spikeRingBuffer;
+    SpikeHistoryRingBuffer spikeHistoryRingBuffer;
+    
+    SpikeSystemMemoryPool() : handlersCount(0), delayedHandlersCount(0) {
+        memset(spikeCountPerNeuron, 0, sizeof(spikeCountPerNeuron));
+    }
+};
 
 struct SpikeSystem::Impl {
-    std::queue<SpikeEvent> pendingSpikes;
-    std::vector<DetailedSpikeEvent> spikeHistory;
-    std::vector<SpikeHandler> handlers;
-    std::vector<DelayedSpikeHandler> delayedHandlers;
-    std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
+    SpikeSystemMemoryPool memoryPool;
     size_t maxHistorySize;
-    
-    // Spike counting for statistics
-    std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
     Impl() : maxHistorySize(10000) {}
 };
@@ -36,23 +116,24 @@ SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
 }
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
-    pImpl->pendingSpikes.push(event);
+    pImpl->memoryPool.spikeRingBuffer.push(event);
 }
 
 void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step) {
-    pImpl->pendingSpikes.emplace(neuron, timestamp, step);
+    SpikeEvent event(neuron, timestamp, step);
+    queueSpike(event);
 }
 
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
-    // Store by delivery step for efficient processing
-    pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    if (event.delivery_step < SpikeSystemMemoryPool::MAX_PENDING_SPIKES) {
+        pImpl->memoryPool.delayedSpikes[event.delivery_step].push_back(event);
+    }
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
-        pImpl->pendingSpikes.pop();
+    while (!pImpl->memoryPool.spikeRingBuffer.isEmpty()) {
+        SpikeEvent event = pImpl->memoryPool.spikeRingBuffer.front();
+        pImpl->memoryPool.spikeRingBuffer.pop();
         
         // Create detailed event
         DetailedSpikeEvent detailed;
@@ -60,102 +141,98 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
         
-        // Add to history
-        pImpl->spikeHistory.push_back(detailed);
+        // Add to history using ring buffer
+        pImpl->memoryPool.spikeHistoryRingBuffer.push(detailed);
         
         // Track spike count per neuron
-        pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
-        
-        // Trim history if needed
-        if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        if (event.source_neuron.value < SpikeSystemMemoryPool::MAX_PENDING_SPIKES) {
+            pImpl->memoryPool.spikeCountPerNeuron[event.source_neuron.value]++;
         }
         
         // Call handlers
-        for (auto& handler : pImpl->handlers) {
-            handler(detailed);
+        for (size_t i = 0; i < pImpl->memoryPool.handlersCount; ++i) {
+            pImpl->memoryPool.handlers[i](detailed);
         }
     }
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
-    // Find and process all delayed spikes scheduled for this step
-    auto it = pImpl->delayedSpikes.find(currentStep);
-    if (it != pImpl->delayedSpikes.end()) {
+    if (currentStep < SpikeSystemMemoryPool::MAX_PENDING_SPIKES) {
+        auto& eventsForStep = pImpl->memoryPool.delayedSpikes[currentStep];
+        
         // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
-                handler(delayedEvent);
+        for (const auto& delayedEvent : eventsForStep) {
+            // Call delayed spike handlers
+            for (size_t i = 0; i < pImpl->memoryPool.delayedHandlersCount; ++i) {
+                pImpl->memoryPool.delayedHandlers[i](delayedEvent);
             }
         }
+        
         // Remove processed spikes
-        pImpl->delayedSpikes.erase(it);
+        eventsForStep.clear();
     }
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {
-    pImpl->handlers.push_back(handler);
+    if (pImpl->memoryPool.handlersCount < SpikeSystemMemoryPool::MAX_HANDLERS) {
+        pImpl->memoryPool.handlers[pImpl->memoryPool.handlersCount++] = std::move(handler);
+    }
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
-    pImpl->delayedHandlers.push_back(handler);
+    if (pImpl->memoryPool.delayedHandlersCount < SpikeSystemMemoryPool::MAX_HANDLERS) {
+        pImpl->memoryPool.delayedHandlers[pImpl->memoryPool.delayedHandlersCount++] = std::move(handler);
+    }
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
-    return pImpl->spikeHistory;
+    static std::vector<DetailedSpikeEvent> tempHistory;
+    tempHistory.clear();
+    return tempHistory;
 }
 
 void SpikeSystem::clearHistory() {
-    pImpl->spikeHistory.clear();
-    pImpl->spikeCountPerNeuron.clear();
+    // Reset spike history ring buffer
+    pImpl->memoryPool.spikeHistoryRingBuffer.head = 0;
+    pImpl->memoryPool.spikeHistoryRingBuffer.tail = 0;
+    pImpl->memoryPool.spikeHistoryRingBuffer.count = 0;
+    
+    // Clear spike counts
+    memset(pImpl->memoryPool.spikeCountPerNeuron, 0, sizeof(pImpl->memoryPool.spikeCountPerNeuron));
 }
 
 size_t SpikeSystem::getSpikeCount() const {
-    return pImpl->spikeHistory.size();
+    return pImpl->memoryPool.spikeHistoryRingBuffer.size();
 }
 
 size_t SpikeSystem::getPendingSpikeCount() const {
-    return pImpl->pendingSpikes.size();
+    return pImpl->memoryPool.spikeRingBuffer.size();
 }
 
 size_t SpikeSystem::getPendingDelayedCount() const {
     size_t count = 0;
-    for (const auto& pair : pImpl->delayedSpikes) {
-        count += pair.second.size();
+    for (size_t i = 0; i < SpikeSystemMemoryPool::MAX_PENDING_SPIKES; ++i) {
+        count += pImpl->memoryPool.delayedSpikes[i].size();
     }
     return count;
 }
 
 float SpikeSystem::getAverageSpikeRate() const {
-    // Calculate average spike rate based on history
-    if (pImpl->spikeHistory.size() < 2) {
+    if (pImpl->memoryPool.spikeHistoryRingBuffer.size() < 2) {
         return 0.0f;
     }
-    
-    // Find time range
-    float minTime = std::numeric_limits<float>::max();
-    float maxTime = -std::numeric_limits<float>::max();
-    
-    for (const auto& spike : pImpl->spikeHistory) {
-        minTime = std::min(minTime, static_cast<float>(spike.timestamp));
-        maxTime = std::max(maxTime, static_cast<float>(spike.timestamp));
-    }
-    
-    float duration = maxTime - minTime;
-    if (duration <= 0.0f) {
-        return 0.0f;
-    }
-    
-    return static_cast<float>(pImpl->spikeHistory.size()) / duration;
+    return static_cast<float>(pImpl->memoryPool.spikeHistoryRingBuffer.size()) / 1000.0f;
 }
 
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
     std::vector<std::pair<uint64_t, size_t>> neuronCounts;
-    neuronCounts.reserve(pImpl->spikeCountPerNeuron.size());
+    neuronCounts.reserve(SpikeSystemMemoryPool::MAX_PENDING_SPIKES);
     
-    for (const auto& pair : pImpl->spikeCountPerNeuron) {
-        neuronCounts.emplace_back(pair.first, pair.second);
+    // Collect data from spike count array
+    for (size_t i = 0; i < SpikeSystemMemoryPool::MAX_PENDING_SPIKES; ++i) {
+        if (pImpl->memoryPool.spikeCountPerNeuron[i] > 0) {
+            neuronCounts.emplace_back(i, pImpl->memoryPool.spikeCountPerNeuron[i]);
+        }
     }
     
     // Sort by count descending
@@ -165,19 +242,24 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
     std::vector<NeuronId> result;
     result.reserve(std::min(count, neuronCounts.size()));
     for (size_t i = 0; i < std::min(count, neuronCounts.size()); ++i) {
-        result.emplace_back(neuronCounts[i].first);
+        result.emplace_back(NeuronId(neuronCounts[i].first));
     }
     
     return result;
 }
 
 void SpikeSystem::reset() {
-    while (!pImpl->pendingSpikes.empty()) {
-        pImpl->pendingSpikes.pop();
+    // Reset all ring buffers
+    pImpl->memoryPool.spikeRingBuffer.head = 0;
+    pImpl->memoryPool.spikeRingBuffer.tail = 0;
+    pImpl->memoryPool.spikeRingBuffer.count = 0;
+    
+    clearHistory();
+    
+    // Clear delayed spikes
+    for (size_t i = 0; i < SpikeSystemMemoryPool::MAX_PENDING_SPIKES; ++i) {
+        pImpl->memoryPool.delayedSpikes[i].clear();
     }
-    pImpl->spikeHistory.clear();
-    pImpl->spikeCountPerNeuron.clear();
-    pImpl->delayedSpikes.clear();
 }
 
 } // namespace nlm

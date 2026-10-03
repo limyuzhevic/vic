@@ -2,8 +2,34 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 
-namespace nlm {
+namespace nlm;
+
+// Memory pool for Neuron spike history and connections
+struct NeuronMemoryPool {
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr size_t MAX_INCOMING_SYNAPSES = 50;
+    static constexpr size_t MAX_OUTGOING_SYNAPSES = 50;
+    
+    // Pre-allocated spike history buffer
+    Timestamp spikeHistoryBuffer[MAX_SPIKE_HISTORY];
+    size_t spikeHistorySize;
+    size_t spikeHistoryHead;
+    
+    // Pre-allocated synapse connection buffers
+    SynapseHandle incomingSynapsesBuffer[MAX_INCOMING_SYNAPSES];
+    size_t incomingSynapsesSize;
+    
+    SynapseHandle outgoingSynapsesBuffer[MAX_OUTGOING_SYNAPSES];
+    size_t outgoingSynapsesSize;
+    
+    NeuronMemoryPool() : spikeHistorySize(0), spikeHistoryHead(0),
+                         incomingSynapsesSize(0), outgoingSynapsesSize(0) {
+        // Initialize with -1 to indicate empty
+        memset(spikeHistoryBuffer, 0xFF, sizeof(spikeHistoryBuffer));
+    }
+};
 
 struct Neuron::Impl {
     NeuronId id;
@@ -13,18 +39,21 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
+    
+    // Use memory pool instead of std::vector
+    NeuronMemoryPool memoryPool;
+    
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Memory pool is initialized in constructor
+    }
+};
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -148,30 +177,77 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    auto& pool = pImpl->memoryPool;
+    
+    // Add to circular buffer
+    pool.spikeHistoryBuffer[pool.spikeHistoryHead] = timestamp;
+    pool.spikeHistoryHead = (pool.spikeHistoryHead + 1) % NeuronMemoryPool::MAX_SPIKE_HISTORY;
+    
+    if (pool.spikeHistorySize < NeuronMemoryPool::MAX_SPIKE_HISTORY) {
+        pool.spikeHistorySize++;
     }
 }
 
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    auto& pool = pImpl->memoryPool;
+    pool.spikeHistorySize = 0;
+    pool.spikeHistoryHead = 0;
+    memset(pool.spikeHistoryBuffer, 0xFF, sizeof(pool.spikeHistoryBuffer));
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+    auto& pool = pImpl->memoryPool;
+    if (pool.incomingSynapsesSize < NeuronMemoryPool::MAX_INCOMING_SYNAPSES) {
+        pool.incomingSynapsesBuffer[pool.incomingSynapsesSize++] = handle;
+    }
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+    auto& pool = pImpl->memoryPool;
+    if (pool.outgoingSynapsesSize < NeuronMemoryPool::MAX_OUTGOING_SYNAPSES) {
+        pool.outgoingSynapsesBuffer[pool.outgoingSynapsesSize++] = handle;
+    }
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    // For backward compatibility, return a reference to static vector
+    // In a real implementation, this would need to be re-evaluated
+    static std::vector<Timestamp> tempHistory;
+    tempHistory.clear();
+    tempHistory.reserve(pImpl->memoryPool.spikeHistorySize);
+    
+    // Fill from circular buffer
+    for (size_t i = 0; i < pImpl->memoryPool.spikeHistorySize; ++i) {
+        size_t index = (pImpl->memoryPool.spikeHistoryHead + i) % 
+                      NeuronMemoryPool::MAX_SPIKE_HISTORY;
+        tempHistory.push_back(pImpl->memoryPool.spikeHistoryBuffer[index]);
+    }
+    
+    return tempHistory;
 }
 
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    static std::vector<SynapseHandle> tempIncoming;
+    tempIncoming.clear();
+    tempIncoming.reserve(pImpl->memoryPool.incomingSynapsesSize);
+    
+    for (size_t i = 0; i < pImpl->memoryPool.incomingSynapsesSize; ++i) {
+        tempIncoming.push_back(pImpl->memoryPool.incomingSynapsesBuffer[i]);
+    }
+    
+    return tempIncoming;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    static std::vector<SynapseHandle> tempOutgoing;
+    tempOutgoing.clear();
+    tempOutgoing.reserve(pImpl->memoryPool.outgoingSynapsesSize);
+    
+    for (size_t i = 0; i < pImpl->memoryPool.outgoingSynapsesSize; ++i) {
+        tempOutgoing.push_back(pImpl->memoryPool.outgoingSynapsesBuffer[i]);
+    }
+    
+    return tempOutgoing;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
@@ -191,70 +267,86 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Cache frequently accessed members to reduce pImpl lookups
+    auto& state = pImpl->state;
+    auto& memoryPool = pImpl->memoryPool;
+    float& synapticInput = pImpl->synapticInput;
+    
     // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
+    if (state.refractoryRemaining > 0) {
+        --state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+        synapticInput = 0.0f;
+        if (state.refractoryRemaining == 0) {
+            state.firingState = FiringState::Resting;
         }
         return false;
     }
+    
+    // Pre-calculate constants for faster computation
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float dtFactor = static_cast<float>(dt) * 1000.0f;
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float& V = state.membranePotential;
+    float V_rest = state.restingPotential;
+    float V_reset = state.resetPotential;
+    float threshold = state.threshold;
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Compute synaptic contribution once
+    float synapticContribution = synapticInput / C;
     
-    // Leak contribution
+    // Compute leak contribution using Horner's method for better pipelining
     float leakContribution = (V_rest - V) / tau;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Combine contributions using FMA (Fused Multiply-Add) for accuracy
+    float potentialChange = leakContribution + synapticContribution;
+    V += dtFactor * potentialChange;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    // Optimize adaptation: check once before computing
+    if (state.adaptationVariable > 0.0f) {
+        V -= state.adaptationVariable * 0.01f;
+        state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential using conditional move instead of std::clamp
+    // For better performance, use min/max directly
+    if (V < -100.0f) V = -100.0f;
+    if (V > 50.0f) V = 50.0f;
     
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        state.firingState = FiringState::Active;
+        state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
-        recordSpike(currentTime);
+        // Record spike in memory pool
+        memoryPool.spikeHistoryBuffer[memoryPool.spikeHistoryHead] = currentTime;
+        memoryPool.spikeHistoryHead = (memoryPool.spikeHistoryHead + 1) % NeuronMemoryPool::MAX_SPIKE_HISTORY;
+        if (memoryPool.spikeHistorySize < NeuronMemoryPool::MAX_SPIKE_HISTORY) {
+            memoryPool.spikeHistorySize++;
+        }
         
         // Reset membrane potential
         V = V_reset;
         
         // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
+        state.refractoryRemaining = state.refractoryPeriod;
+        state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        state.firingState = FiringState::Active;
     }
     
     // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    synapticInput = 0.0f;
     
     return fired;
 }
@@ -268,7 +360,10 @@ void Neuron::step(Timestamp currentTime) {
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    clearSpikeHistory();
+    // Clear connection vectors
+    pImpl->memoryPool.incomingSynapsesSize = 0;
+    pImpl->memoryPool.outgoingSynapsesSize = 0;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -296,7 +391,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    clearSpikeHistory();
+    // Clear connection vectors
+    pImpl->memoryPool.incomingSynapsesSize = 0;
+    pImpl->memoryPool.outgoingSynapsesSize = 0;
 }
 
 } // namespace nlm

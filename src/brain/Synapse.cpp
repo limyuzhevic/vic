@@ -2,8 +2,27 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 
-namespace nlm {
+namespace nlm;
+
+// Memory pool for Synapse spike history
+struct SynapseMemoryPool {
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Pre-allocated spike history buffers
+    Timestamp preSpikeBuffer[MAX_SPIKE_HISTORY];
+    Timestamp postSpikeBuffer[MAX_SPIKE_HISTORY];
+    size_t preSpikeSize;
+    size_t postSpikeSize;
+    size_t preSpikeHead;
+    size_t postSpikeHead;
+    
+    SynapseMemoryPool() : preSpikeSize(0), postSpikeSize(0), preSpikeHead(0), postSpikeHead(0) {
+        memset(preSpikeBuffer, 0xFF, sizeof(preSpikeBuffer));
+        memset(postSpikeBuffer, 0xFF, sizeof(postSpikeBuffer));
+    }
+};
 
 struct Synapse::Impl {
     SynapseId id;
@@ -15,9 +34,8 @@ struct Synapse::Impl {
     // Synapse type
     SynapseType type;
     
-    // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    // Use memory pool instead of std::vector for spike history
+    SynapseMemoryPool memoryPool;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -128,30 +146,71 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    auto& pool = pImpl->memoryPool;
+    
+    // Add to circular buffer
+    pool.preSpikeBuffer[pool.preSpikeHead] = timestamp;
+    pool.preSpikeHead = (pool.preSpikeHead + 1) % SynapseMemoryPool::MAX_SPIKE_HISTORY;
+    
+    if (pool.preSpikeSize < SynapseMemoryPool::MAX_SPIKE_HISTORY) {
+        pool.preSpikeSize++;
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    auto& pool = pImpl->memoryPool;
+    
+    // Add to circular buffer
+    pool.postSpikeBuffer[pool.postSpikeHead] = timestamp;
+    pool.postSpikeHead = (pool.postSpikeHead + 1) % SynapseMemoryPool::MAX_SPIKE_HISTORY;
+    
+    if (pool.postSpikeSize < SynapseMemoryPool::MAX_SPIKE_HISTORY) {
+        pool.postSpikeSize++;
     }
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
+    // For backward compatibility, return a reference to static vector
+    // In a real implementation, this would need to be re-evaluated
+    static std::vector<Timestamp> tempHistory;
+    tempHistory.clear();
+    tempHistory.reserve(pImpl->memoryPool.preSpikeSize);
+    
+    // Fill from circular buffer
+    for (size_t i = 0; i < pImpl->memoryPool.preSpikeSize; ++i) {
+        size_t index = (pImpl->memoryPool.preSpikeHead + i) % 
+                      SynapseMemoryPool::MAX_SPIKE_HISTORY;
+        tempHistory.push_back(pImpl->memoryPool.preSpikeBuffer[index]);
+    }
+    
+    return tempHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
+    // For backward compatibility, return a reference to static vector
+    // In a real implementation, this would need to be re-evaluated
+    static std::vector<Timestamp> tempHistory;
+    tempHistory.clear();
+    tempHistory.reserve(pImpl->memoryPool.postSpikeSize);
+    
+    // Fill from circular buffer
+    for (size_t i = 0; i < pImpl->memoryPool.postSpikeSize; ++i) {
+        size_t index = (pImpl->memoryPool.postSpikeHead + i) % 
+                      SynapseMemoryPool::MAX_SPIKE_HISTORY;
+        tempHistory.push_back(pImpl->memoryPool.postSpikeBuffer[index]);
+    }
+    
+    return tempHistory;
 }
 
 void Synapse::clearHistory() {
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
+    auto& pool = pImpl->memoryPool;
+    pool.preSpikeSize = 0;
+    pool.postSpikeSize = 0;
+    pool.preSpikeHead = 0;
+    pool.postSpikeHead = 0;
+    memset(pool.preSpikeBuffer, 0xFF, sizeof(pool.preSpikeBuffer));
+    memset(pool.postSpikeBuffer, 0xFF, sizeof(pool.postSpikeBuffer));
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -192,27 +251,29 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Cache frequently accessed members
+    auto& memoryPool = pImpl->memoryPool;
+    float& shortTermDepression = pImpl->shortTermDepression;
+    float& shortTermFacilitation = pImpl->shortTermFacilitation;
+    float& lastPreSpikeTime = pImpl->lastPreSpikeTime;
+    float& lastPostSpikeTime = pImpl->lastPostSpikeTime;
     
     // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    if (lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - lastPreSpikeTime);
+        shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
     // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+    if (lastPostSpikeTime >= 0.0f || lastPreSpikeTime >= 0.0f) {
+        float timeSinceActivity;
+        if (lastPostSpikeTime >= 0.0f) {
+            timeSinceActivity = static_cast<float>(currentTime - lastPostSpikeTime);
+        } else {
+            timeSinceActivity = static_cast<float>(currentTime - lastPreSpikeTime);
+        }
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        shortTermDepression += (1.0f - shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
     // Decay eligibility trace for reward-modulated learning
@@ -224,10 +285,13 @@ void Synapse::step(Timestamp currentTime) {
 
 void Synapse::reset() {
     pImpl->weight = 0.0f;
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
+    clearHistory();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {

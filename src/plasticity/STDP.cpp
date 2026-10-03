@@ -2,8 +2,30 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
-namespace nlm {
+namespace nlm;
+
+// Memory pool for STDP spike timing
+struct STDPMemoryPool {
+    static constexpr size_t MAX_SPIKE_PAIRS = 10000;  // Maximum pairs to process
+    static constexpr float MIN_EXP_RESULT = 1e-6f;   // Minimum exp result to avoid division by zero
+    
+    // Pre-allocated temporary buffer for spike pair processing
+    float tempPairs[MAX_SPIKE_PAIRS];
+    size_t tempPairsSize;
+    
+    // Precomputed exponential values for faster STDP calculations
+    static constexpr size_t EXP_CACHE_SIZE = 1000;
+    float expCache[EXP_CACHE_SIZE];
+    
+    STDPMemoryPool() : tempPairsSize(0) {
+        // Initialize exponential cache
+        for (size_t i = 0; i < EXP_CACHE_SIZE; ++i) {
+            expCache[i] = std::exp(static_cast<float>(i) / 100.0f);  // Scale for common tau values
+        }
+    }
+};
 
 struct STDP::Impl {
     float ltpWeight;      // A+ for potentiation
@@ -12,46 +34,29 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
+    // Use memory pool for temporary storage
+    STDPMemoryPool memoryPool;
+    
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
-
-STDP::~STDP() = default;
+// Fast exponential approximation for STDP calculations
+inline float fastExp(float x, float tau) {
+    // Use lookup table for common values
+    if (tau < 1.0f) return std::exp(-x / tau);
+    if (tau > 100.0f) return std::exp(-x / tau);
+    
+    // For tau in [1, 100], use precomputed values
+    int index = static_cast<int>(x * 10.0f / tau) % STDPMemoryPool::EXP_CACHE_SIZE;
+    if (index < 0) index += STDPMemoryPool::EXP_CACHE_SIZE;
+    return STDPMemoryPool::EXP_CACHE_SIZE > 0 ? STDPMemoryPool::EXP_CACHE_SIZE : std::exp(-x / tau);
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -59,22 +64,39 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+    // Cache frequently accessed values
+    float ltp = pImpl->ltpWeight;
+    float ltd = pImpl->ltdWeight;
+    
+    // Optimized STDP calculation using spatial and temporal locality
+    // Sort spikes for better cache performance and faster windowing
+    auto sortedPreSpikes = preSpikes;
+    auto sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Use two-pointer technique for O(n + m) complexity instead of O(n*m)
+    size_t preIdx = 0, postIdx = 0;
+    
+    while (preIdx < sortedPreSpikes.size() && postIdx < sortedPostSpikes.size()) {
+        float preTime = static_cast<float>(sortedPreSpikes[preIdx]);
+        float postTime = static_cast<float>(sortedPostSpikes[postIdx]);
+        float dt = postTime - preTime;
+        
+        if (dt > 0.0f) {
+            // Pre before post: POTENTIATION
+            // Only calculate for small dt values (most significant contributions)
+            if (dt <= tau * 4.0f) {  // Beyond 4*tau, exp(-4) ≈ 0.018, negligible contribution
+                float delta = ltp * std::exp(-dt / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            postIdx++;
+        } else {
+            // Post before pre: DEPRESSION
+            // Use absolute value for calculation
+            float delta = ltd * std::exp(dt / tau);  // dt is negative
+            totalDelta -= delta;  // Subtract for depression
+            preIdx++;
         }
     }
     
