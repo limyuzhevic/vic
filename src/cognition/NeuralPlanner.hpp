@@ -1,12 +1,18 @@
-#pragma once
+#ifndef NLM_NEURAL_PLANNER_HPP
+#define NLM_NEURAL_PLANNER_HPP
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
+
+// Forward declarations
+class Brain;
 
 // PlanningCandidate: A possible action sequence considered during planning
 struct PlanningCandidate {
@@ -45,7 +51,7 @@ public:
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
-                                      const std::vector<float>& startState);
+                                       const std::vector<float>& startState);
 
     // Get number of steps to look ahead
     size_t getPlanningDepth() const { return planningDepth_; }
@@ -129,7 +135,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -252,3 +258,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_NEURAL_PLANNER_HPP

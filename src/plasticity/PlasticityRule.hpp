@@ -1,7 +1,10 @@
-#pragma once
+#ifndef NLM_PLASTICITY_RULE_HPP
+#define NLM_PLASTICITY_RULE_HPP
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -56,7 +59,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together
@@ -84,3 +87,5 @@ public:
 };
 
 } // namespace nlm
+
+#endif // NLM_PLASTICITY_RULE_HPP

@@ -1,9 +1,14 @@
-#pragma once
+#ifndef NLM_AGENT_BRAIN_HPP
+#define NLM_AGENT_BRAIN_HPP
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <memory>
 #include <vector>
 
@@ -115,3 +120,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_AGENT_BRAIN_HPP

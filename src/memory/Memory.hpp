@@ -1,21 +1,64 @@
-#pragma once
+#ifndef NLM_MEMORY_HPP
+#define NLM_MEMORY_HPP
 
 #include "../core/Types/Types.hpp"
 #include <vector>
-#include <functional>
+#include <string>
+#include <memory>
+#include <map>
+#include <algorithm>
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Forward declarations
+class Brain;
 
+// Neuron ID type
+using NeuronId = uint64_t;
+
+// Memory item
+struct MemoryItem {
+    NeuronId neuronId;
+    float value;
+    float timestamp;
+};
+
+// Episodic memory item
+struct EpisodicMemoryItem {
+    uint64_t timestamp;
+    float reward;
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
+};
+
+// Semantic memory fact
+struct SemanticFact {
+    std::string key;
+    std::string value;
+    float confidence;
+};
+
+// Procedural memory skill
+struct Skill {
+    std::string name;
+    std::vector<NeuronId> neuralPattern;
+    float proficiency;
+};
+
+// Forward declarations for pImpl pattern
+struct WorkingMemory::Impl;
+struct EpisodicMemory::Impl;
+struct SemanticMemory::Impl;
+struct ProceduralMemory::Impl;
+struct AssociativeMemory::Impl;
+
+// Working memory: temporary active storage of information
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -35,20 +78,17 @@ public:
     void decay(float decayRate);
     
 private:
-    struct Impl;
     Impl* pImpl;
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
-
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
+    float reward;
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    EpisodicMemoryItem() : timestamp(0), reward(0.0f) {}
 };
 
 class EpisodicMemory {
@@ -74,14 +114,18 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Get episodes for replay
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+    
+    // Replay episode
+    void replayEpisode(const EpisodicMemoryItem& episode);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
-
 class SemanticMemory {
 public:
     SemanticMemory();
@@ -104,12 +148,10 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
-
 struct Skill {
     std::string name;
     std::vector<NeuronId> neuralPattern;
@@ -140,12 +182,10 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
-
 class AssociativeMemory {
 public:
     AssociativeMemory();
@@ -168,7 +208,9 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
+
+#endif // NLM_MEMORY_HPP

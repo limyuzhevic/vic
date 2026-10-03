@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_NEURAL_WORKING_MEMORY_HPP
+#define NLM_NEURAL_WORKING_MEMORY_HPP
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
@@ -185,3 +186,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_NEURAL_WORKING_MEMORY_HPP

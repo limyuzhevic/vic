@@ -1,6 +1,9 @@
-#pragma once
+#ifndef NLM_NOVELTY_HPP
+#define NLM_NOVELTY_HPP
 
 #include "../core/Types/Types.hpp"
+#include <vector>
+#include <cmath>
 
 namespace nlm {
 
@@ -40,3 +43,5 @@ private:
 };
 
 } // namespace nlm
+
+#endif // NLM_NOVELTY_HPP
