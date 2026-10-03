@@ -121,6 +121,12 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Performance Infrastructure - Optimized Brain executable
+add_executable(nlm_optimized
+    src/performance/OptimizedBrainMain.cpp
+)
+target_link_libraries(nlm_optimized PUBLIC nlm_core)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
