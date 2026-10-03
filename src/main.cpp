@@ -340,31 +340,81 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+        // Enhanced Command-line parsing for config file and set commands
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        // Handle --config=config_file or --config-file=config_file
+        if ((arg.find("--config=") == 0 && arg.length() > 9) || 
+            (arg.find("--config-file=") == 0 && arg.length() > 13) ||
+            (arg.substr(0, 7) == "--config" && i + 1 < argc) ||
+            (arg.substr(0, 9) == "--config-file" && i + 1 < argc)) {
+            
             if (arg.find('=') != std::string::npos) {
+                // --config=value or --config-file=value
                 configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+            } else {
+                // --config value or --config-file value
                 configFile = argv[++i];
+            }
+        }
+        
+        // Handle -c=value or -f=value
+        if (arg.substr(0, 3) == "-c=" || arg.substr(0, 3) == "-f=") {
+            set_commands.push_back(arg.substr(2));
+        } else if (arg == "-c" && i + 1 < argc) {
+            set_commands.push_back("c=" + std::string(argv[++i]));
+        } else if (arg == "-f" && i + 1 < argc) {
+            set_commands.push_back("f=" + std::string(argv[++i]));
+        }
+    }
+    
+    // Process --set commands
+    for (const auto& set_cmd : set_commands) {
+        size_t pos = set_cmd.find('=');
+        if (pos != std::string::npos) {
+            std::string key = set_cmd.substr(0, pos);
+            std::string value_str = set_cmd.substr(pos + 1);
+            
+            // Try to convert to appropriate type
+            if (value_str == "true" || value_str == "false") {
+                config->set(key, value_str == "true", ConfigSource::CommandLine);
+            } else {
+                // Try to parse as integer, then float, otherwise treat as string
+                try {
+                    size_t pos_int;
+                    int64_t int_val = std::stoll(value_str, &pos_int);
+                    if (pos_int == value_str.length()) {
+                        config->set(key, int_val, ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    size_t pos_float;
+                    double float_val = std::stod(value_str, &pos_float);
+                    if (pos_float == value_str.length()) {
+                        config->set(key, float_val, ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                // Fall back to string
+                config->set(key, value_str, ConfigSource::CommandLine);
             }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Show help before processing
+    if (show_help) {
+        printUsage(argc, argv);
+        return 0;
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (show_version) {
+        printVersion();
+        return 0;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -381,6 +431,11 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+        // Add helper functions at the top of the file
+    // This is where we would add helper functions
+    
+    // For now, continue with the enhanced CLI processing
     
     // Log configuration summary
     NLM_LOG_INFO("");
