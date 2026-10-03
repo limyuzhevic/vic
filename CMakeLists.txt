@@ -29,12 +29,21 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain - refactored into smaller, focused files
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/BrainInitializer.cpp
+    src/brain/BrainStep.cpp
+    src/brain/BrainMemory.cpp
+    src/brain/BrainPrediction.cpp
+    src/brain/BrainCognition.cpp
+    src/brain/BrainNeuromodulation.cpp
+    src/brain/BrainDevelopment.cpp
+    src/brain/BrainCheckpoint.cpp
+    src/brain/BrainStatistics.cpp
+    src/brain/BrainIntegration.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp

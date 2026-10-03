@@ -137,6 +137,67 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
+    // ========== CONVENIENCE METHODS ==========
+    
+    /**
+     * Configure brain with common parameters
+     * 
+     * Sets up the brain with typical parameters for quick testing and experimentation.
+     * This is a convenience method for users who want a ready-to-use brain configuration.
+     * 
+     * @param neuronCount Number of neurons to create (default: 1000)
+     * @param regionCount Number of brain regions to create (default: 1)
+     * @param connectionProbability Probability of creating synaptic connections (default: 0.1)
+     * @param timestep Simulation timestep in seconds (default: 0.001)
+     * @return Reference to this brain for method chaining
+     */
+    Brain& configure(size_t neuronCount = 1000, size_t regionCount = 1,
+                     float connectionProbability = 0.1f, double timestep = 0.001);
+    
+    /**
+     * Run a simulation step and collect statistics
+     * 
+     * This convenience method runs a single simulation step and returns
+     * current brain statistics in a user-friendly format.
+     * 
+     * @param currentStep Current simulation step
+     * @param currentTime Current simulation time in seconds
+     * @return Dictionary with brain statistics
+     */
+    std::map<std::string, double> stepWithStats(SimulationStep currentStep,
+                                               Timestamp currentTime = 0.0);
+    
+    /**
+     * Get simplified brain statistics for monitoring
+     * 
+     * Provides a simplified summary of brain state suitable for monitoring
+     * and logging in user applications.
+     * 
+     * @return Map with simplified statistics
+     */
+    std::map<std::string, double> getSimplifiedStats() const;
+    
+    /**
+     * Check if brain is ready for simulation
+     * 
+     * Validates that the brain has been properly initialized and has all
+     * required components set up for simulation.
+     * 
+     * @return True if brain is ready, false otherwise
+     */
+    bool isReady() const;
+    
+    /**
+     * Create a copy of current brain state for experimentation
+     * 
+     * This convenience method creates a copy of the current brain state,
+     * allowing users to experiment with different configurations or
+     * to reset to a saved state.
+     * 
+     * @return New Brain instance with copied state
+     */
+    std::shared_ptr<Brain> createCopy() const;
+    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information

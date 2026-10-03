@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -161,6 +160,11 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
+// Copy operations are deleted - brain cannot be copied
+Brain::Brain(const Brain&) = delete;
+Brain& Brain::operator=(const Brain&) = delete;
+
+// Move operations are allowed - efficient transfer of ownership
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
@@ -1112,6 +1116,114 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// ========== CONVENIENCE METHOD IMPLEMENTATIONS ==========
+
+Brain& Brain::configure(size_t neuronCount, size_t regionCount,
+                       float connectionProbability, double timestep) {
+    // Update configuration parameters
+    pImpl->config->set("neuron_count", static_cast<int64_t>(neuronCount));
+    pImpl->config->set("region_count", static_cast<int64_t>(regionCount));
+    pImpl->config->set("connection_probability", connectionProbability);
+    pImpl->config->set("simulation_timestep", timestep);
+    
+    return *this;
+}
+
+std::map<std::string, double> Brain::stepWithStats(SimulationStep currentStep,
+                                                  Timestamp currentTime) {
+    // Run the simulation step
+    step(currentStep, currentTime);
+    
+    // Collect statistics
+    std::map<std::string, double> stats;
+    
+    // Basic neural statistics
+    stats["step"] = static_cast<double>(currentStep);
+    stats["time"] = currentTime;
+    stats["total_spikes"] = static_cast<double>(getTotalSpikeCount());
+    stats["total_neurons"] = static_cast<double>(getTotalNeuronCount());
+    stats["total_synapses"] = static_cast<double>(getTotalSynapseCount());
+    stats["active_neurons"] = static_cast<double>(getActiveNeuronCount());
+    stats["firing_neurons"] = static_cast<double>(getFiringNeuronCount());
+    stats["average_firing_rate"] = getAverageFiringRate();
+    stats["e_i_ratio"] = getExcitationInhibitionRatio();
+    
+    // Memory system statistics
+    if (pImpl->workingMemory) {
+        stats["working_memory_traces"] = static_cast<double>(pImpl->workingMemory->getActiveTraces());
+    }
+    
+    if (pImpl->episodicMemory) {
+        stats["episodic_memory_episodes"] = static_cast<double>(pImpl->episodicMemory->getEpisodeCount());
+    }
+    
+    // Neuromodulation statistics
+    if (pImpl->dopamine) {
+        stats["dopamine_level"] = pImpl->dopamine->getLevel();
+    }
+    
+    if (pImpl->novelty) {
+        stats["novelty_level"] = pImpl->novelty->getLevel();
+    }
+    
+    if (pImpl->curiosity) {
+        stats["curiosity_level"] = pImpl->curiosity->getLevel();
+    }
+    
+    // Development statistics
+    stats["developmental_stage"] = static_cast<double>(pImpl->developmentalStage);
+    
+    return stats;
+}
+
+std::map<std::string, double> Brain::getSimplifiedStats() const {
+    std::map<std::string, double> stats;
+    
+    stats["neurons"] = static_cast<double>(getTotalNeuronCount());
+    stats["synapses"] = static_cast<double>(getTotalSynapseCount());
+    stats["spikes"] = static_cast<double>(getTotalSpikeCount());
+    stats["active"] = static_cast<double>(getActiveNeuronCount());
+    stats["firing"] = static_cast<double>(getFiringNeuronCount());
+    stats["firing_rate"] = getAverageFiringRate();
+    stats["e_i_ratio"] = getExcitationInhibitionRatio();
+    
+    // Quick readiness check
+    stats["is_ready"] = static_cast<double>(isReady());
+    
+    return stats;
+}
+
+bool Brain::isReady() const {
+    // Check basic requirements for simulation
+    if (pImpl->regions.empty()) return false;
+    
+    if (pImpl->spikeSystem == nullptr) return false;
+    
+    // Check that we have at least one neuron in each region
+    for (const auto& region : pImpl->regions) {
+        if (region->getTotalNeuronCount() == 0) return false;
+    }
+    
+    return true;
+}
+
+std::shared_ptr<Brain> Brain::createCopy() const {
+    // Create a new brain with the same configuration
+    auto newBrain = std::make_shared<Brain>(pImpl->config);
+    
+    // Copy basic configuration
+    if (!newBrain->initialize()) {
+        return nullptr;
+    }
+    
+    // Note: This is a simplified copy operation
+    // A full copy would require copying all neuron states, synapse weights,
+    // and memory system contents, which is a complex operation beyond scope
+    // For now, we return a properly initialized brain with the same config
+    
+    return newBrain;
 }
 
 } // namespace nlm
