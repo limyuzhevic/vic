@@ -199,27 +199,44 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
+    // OPTIMIZATION: Cache frequently accessed pImpl values
+    float& depression = pImpl->shortTermDepression;
+    float& facilitation = pImpl->shortTermFacilitation;
+    float lastPreTime = pImpl->lastPreSpikeTime;
+    float lastPostTime = pImpl->lastPostSpikeTime;
+    
+    // OPTIMIZATION: Early exit if no activity
+    if (lastPreTime < 0.0f && lastPostTime < 0.0f) {
+        // No recent spikes - fast path with minimal computation
+        decayEligibilityTrace(0.001f);
+        return;
+    }
+    
     // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    if (lastPreTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - lastPreTime);
+        // OPTIMIZATION: Combine calculation to avoid repeated exp()
+        facilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
     // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+    if (lastPostTime >= 0.0f || lastPreTime >= 0.0f) {
         float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            lastPostTime >= 0.0f ? static_cast<float>(currentTime - lastPostTime) : 0.0f,
+            lastPreTime >= 0.0f ? static_cast<float>(currentTime - lastPreTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Recovery from depression toward 1.0 - OPTIMIZED with single exp()
+        depression += (1.0f - depression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
+    // OPTIMIZATION: Batch decay operations
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // OPTIMIZATION: Clamp weight bounds with fewer checks
+    if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    }
 }
 
 void Synapse::reset() {

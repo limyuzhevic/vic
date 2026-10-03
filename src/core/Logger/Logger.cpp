@@ -2,83 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <sstream>
-#include <mutex>
 
 namespace nlm {
-
-struct ConsoleLogger::Impl {
-    LogLevel level = LogLevel::Info;
-    bool useColors = true;
-    std::ofstream fileOut;
-    std::mutex mutex;
-};
-
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
-
-ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
-    pImpl->level = level;
-}
-
-ConsoleLogger::~ConsoleLogger() = default;
-
-void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
-        return;
-    }
-    
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
-    }
-}
-
-void ConsoleLogger::setLevel(LogLevel level) {
-    pImpl->level = level;
-}
-
-LogLevel ConsoleLogger::getLevel() const {
-    return pImpl->level;
-}
-
-void ConsoleLogger::setUseColors(bool useColors) {
-    pImpl->useColors = useColors;
-}
-
-bool ConsoleLogger::getUseColors() const {
-    return pImpl->useColors;
-}
-
-void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
-    }
-}
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
@@ -102,13 +27,43 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+void ConsoleLogger::setUseColors(bool useColors) {
+    pImpl->useColors = useColors;
+}
+
+bool ConsoleLogger::getUseColors() const {
+    return pImpl->useColors;
+}
+
+void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    pImpl->fileOut.open(filepath, std::ios::app);
+}
+
+void ConsoleLogger::closeOutputFile() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+void ConsoleLogger::setRotation(const RotationConfig& config) {
+    // This would be implemented in the Impl
+}
+
+void ConsoleLogger::enableAsynchronousOutput(bool enabled) {
+    // This would be implemented in the Impl
+}
+
+// Logger implementation
+
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::shared_ptr<LogFormatter> defaultFormatter;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->defaultFormatter = std::make_shared<SimpleFormatter>();
+}
 
 Logger::~Logger() = default;
 
@@ -130,7 +85,8 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+                 const std::string& file, int line, const std::string& function,
+                 const std::string& category) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -140,6 +96,7 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    entry.category = category.empty() ? LogCategory::Default : category;
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
@@ -166,6 +123,21 @@ void Logger::critical(const std::string& message, const std::string& file, int l
     log(LogLevel::Critical, message, file, line, function);
 }
 
+void Logger::logCategory(LogLevel level, const std::string& category, const std::string& message,
+                         const std::string& file, int line, const std::string& function) {
+    log(level, message, file, line, function, category);
+}
+
+void Logger::debugCategory(const std::string& category, const std::string& message,
+                           const std::string& file, int line, const std::string& function) {
+    logCategory(LogLevel::Debug, category, message, file, line, function);
+}
+
+void Logger::infoCategory(const std::string& category, const std::string& message,
+                          const std::string& file, int line, const std::string& function) {
+    logCategory(LogLevel::Info, category, message, file, line, function);
+}
+
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     for (auto& logger : pImpl->loggers) {
@@ -174,6 +146,10 @@ bool Logger::isEnabled(LogLevel level) const {
         }
     }
     return false;
+}
+
+bool Logger::isCategoryEnabled(const std::string& category) const {
+    return GlobalLogManager::isCategoryEnabled(category);
 }
 
 Logger& Logger::getGlobal() {
@@ -186,12 +162,122 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // In practice, we just use getGlobal() which is already static
 }
 
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+void Logger::logMemoryStats() {
+    // Log memory statistics
+    MemoryLogger memLogger;
+    memLogger.logMemoryStats();
 }
 
-} // namespace nlm
+void Logger::logPerformanceMetrics() {
+    // Log performance metrics
+    auto metrics = PerformanceMetrics::getMetrics();
+    
+    LogEntry entry;
+    entry.level = LogLevel::Info;
+    entry.message = PerformanceMetrics::getMetricsReport();
+    entry.category = LogCategory::Performance;
+    
+    Logger::getGlobal().log(entry);
+}
+
+void Logger::generateBacktrace(const std::string& context) {
+    Backtrace::generate(context);
+}
+
+void Logger::loadConfigFromFile(const std::string& configFile) {
+    // Load configuration from file
+}
+
+void Logger::initializeFromConfig(const std::string& configKey) {
+    // Initialize from configuration
+    GlobalLogManager::initializeFromConfig();
+}
+
+std::string Logger::sanitizeLogMessage(const std::string& message) {
+    // Basic sanitization - remove sensitive patterns
+    std::string sanitized = message;
+    
+    // Remove potential passwords
+    size_t pos = 0;
+    while ((pos = sanitized.find("password", pos)) != std::string::npos) {
+        size_t end = sanitized.find('\n', pos);
+        if (end != std::string::npos) {
+            sanitized.replace(pos, end - pos, "password=[REDACTED]");
+            pos += 18; // length of "password=[REDACTED]"
+        }
+    }
+    
+    // Remove potential API keys
+    pos = 0;
+    while ((pos = sanitized.find("api_key", pos)) != std::string::npos) {
+        size_t end = sanitized.find('\n', pos);
+        if (end != std::string::npos) {
+            sanitized.replace(pos, end - pos, "api_key=[REDACTED]");
+            pos += 17; // length of "api_key=[REDACTED]"
+        }
+    }
+    
+    return sanitized;
+}
+
+// Global functions
+
+void initializeLogging(const std::string& configFile) {
+    if (!configFile.empty()) {
+        Logger::loadConfigFromFile(configFile);
+    }
+    GlobalLogManager::initializeFromConfig();
+}
+
+void shutdownLogging() {
+    // Cleanup logging resources
+}
+
+void setGlobalLogLevel(LogLevel level) {
+    GlobalLogManager::setDefaultLevel(level);
+    Logger::getGlobal().setLevel(level);
+}
+
+LogLevel getGlobalLogLevel() {
+    return GlobalLogManager::getDefaultLevel();
+}
+
+void logEvent(const std::string& category, LogLevel level, const std::string& message) {
+    Logger::getGlobal().logCategory(level, category, message);
+}
+
+// Backtrace implementation
+
+namespace Backtrace {
+    std::string backtraceData;
+    bool enabled = false;
+    
+    void generate(const std::string& context) {
+        if (!enabled) {
+            return;
+        }
+        
+        // Generate backtrace (simplified implementation)
+        backtraceData = "Backtrace not implemented in this build\n";
+        if (!context.empty()) {
+            backtraceData += "Context: " + context + "\n";
+        }
+        
+        // Log the backtrace
+        Logger::getGlobal().logCategory(LogLevel::Error, LogCategory::Backtrace, 
+                                        "Error with backtrace: " + backtraceData);
+    }
+    
+    std::string getCurrentBacktrace() {
+        return backtraceData;
+    }
+    
+    void enableAutomaticGeneration(bool enabled) {
+        Backtrace::enabled = enabled;
+    }
+    
+    bool isEnabled() {
+        return enabled;
+    }
+}
+}

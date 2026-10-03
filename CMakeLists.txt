@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -28,6 +28,13 @@ add_library(nlm_core STATIC
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
+    src/core/Logger/AsyncLogger.cpp
+    src/core/Logger/FileLogger.cpp
+    src/core/Logger/MemoryLogger.cpp
+    src/core/Logger/StructLogger.cpp
+    src/core/Logger/NetworkLogger.cpp
+    src/core/Logger/SimpleFormatter.cpp
+    src/core/Logger/LoggerFactory.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
@@ -35,6 +42,10 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainCore.cpp
+    src/brain/BrainPlasticity.cpp
+    src/brain/BrainSystems.cpp
+    src/brain/plugin_integration.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -55,11 +66,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -71,26 +78,50 @@ add_library(nlm_core STATIC
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
     # Prediction
-    src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
+    src/prediction/PredictionSystem.cpp
     # Motor
     src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationInterfaceAdvanced.hpp
+    src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationEngine.hpp
+    src/visualization/VisualizationEngine.cpp
+    src/visualization/VisualizationScene.hpp
+    src/visualization/VisualizationScene.cpp
+    src/visualization/VisualizationRenderer.hpp
+    src/visualization/VisualizationRenderer.cpp
+    src/visualization/VisualizationController.hpp
+    src/visualization/VisualizationController.cpp
+    src/visualization/NLMIntegration.hpp
+    src/visualization/NLMIntegration.cpp
+    # Plugin system
+    src/plugin/IBrainPlugin.cpp
+    src/plugin/PluginSystem.cpp
+    src/plugin/example_plugins.cpp
+    src/plugin/DynamicPluginLoader.cpp
+    src/plugin/PluginDiscovery.cpp
+    src/plugin/PluginRegistry.cpp
+    src/plugin/SimpleBrainPlugin.cpp
+    src/plugin/plugin_demo.cpp.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Plugin system linking
+target_link_libraries(nlm_core PUBLIC dl)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -142,6 +173,7 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(test)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

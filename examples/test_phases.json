@@ -1,0 +1,134 @@
+{
+  "phaseName": "Phase 2: Real Neural Computation Tests",
+  "description": "Core neural computation and brain simulation tests",
+  "enabled": true,
+  "environment": "development",
+  "outputFormat": "json",
+  "parallelExecution": false,
+  "timeoutMultiplier": 2.0,
+
+  "testPhases": {
+    "initialization": {
+      "name": "System Initialization",
+      "description": "Test core system initialization and configuration",
+      "enabled": true,
+      "timeout": 30,
+      "priority": "high",
+      "dependencies": [],
+      "tests": [
+        "testClockCreation",
+        "testClockAdvance",
+        "testConfigCreation",
+        "testConfigSetAndGet",
+        "testTypesCreation"
+      ]
+    },
+
+    "neuron_system": {
+      "name": "Neuron System Tests",
+      "description": "Test neuron dynamics and properties",
+      "enabled": true,
+      "timeout": 60,
+      "priority": "high",
+      "dependencies": ["initialization"],
+      "tests": [
+        "testNeuronCreation",
+        "testNeuronMembranePotential",
+        "testNeuronSpikeGeneration",
+        "testNeuronRefractoriness"
+      ]
+    },
+
+    "synapse_system": {
+      "name": "Synapse System Tests",
+      "description": "Test synaptic transmission and plasticity",
+      "enabled": true,
+      "timeout": 90,
+      "priority": "high",
+      "dependencies": ["neuron_system"],
+      "tests": [
+        "testSynapseCreation",
+        "testSynapseWeight",
+        "testSynapseType",
+        "testSynapseDelay",
+        "testSynapseEligibilityTrace"
+      ]
+    },
+
+    "plasticity": {
+      "name": "Plasticity Rules Tests",
+      "description": "Test various plasticity mechanisms",
+      "enabled": true,
+      "timeout": 120,
+      "priority": "high",
+      "dependencies": ["synapse_system"],
+      "tests": [
+        "testSTDP",
+        "testHebbian",
+        "testRewardModulated",
+        "testStructuralPlasticity"
+      ]
+    },
+
+    "brain_simulation": {
+      "name": "Brain Simulation Tests",
+      "description": "Test complete brain simulation integration",
+      "enabled": true,
+      "timeout": 180,
+      "priority": "critical",
+      "dependencies": ["plasticity"],
+      "tests": [
+        "testBrainCreation",
+        "testBrainSimulation",
+        "testBrainPlasticity",
+        "testBrainDevelopment"
+      ]
+    }
+  },
+
+  "testParameters": {
+    "defaultTimestep": 0.001,
+    "simulationDuration": 100,
+    "neuronCount": 50,
+    "synapseDensity": 0.2,
+    "learningRate": 0.01,
+    "plasticityThreshold": 0.5,
+    "spikeThreshold": -55.0,
+    "resetPotential": -65.0
+  },
+
+  "performanceTargets": {
+    "minAccuracy": 0.95,
+    "maxExecutionTime": 300,
+    "minPassRate": 0.90,
+    "maxMemoryUsage": "2GB"
+  },
+
+  "skipConditions": [
+    "disablePlasticityTests",
+    "disableSimulationTests",
+    "limitedResourceMode"
+  ],
+
+  "includeConditions": [
+    "enableExperimentalFeatures",
+    "enablePerformanceTests"
+  ],
+
+  "testFixtures": {
+    "clockSetup": "clock.setTimestep(0.001); clock.reset();",
+    "neuronSetup": "// Initialize neuron network with random connectivity",
+    "synapseSetup": "// Initialize synaptic weights and plasticity rules",
+    "brainSetup": "// Create brain with default configuration",
+    "cleanup": "clock.reset(); // Reset all simulation state"
+  },
+
+  "reporting": {
+    "format": "detailed",
+    "includePerformanceMetrics": true,
+    "includeMemoryStats": true,
+    "includeTimingBreakdown": true,
+    "outputFile": "phase2_test_results.json",
+    "summaryThreshold": "failRate: 5%"
+  }
+}

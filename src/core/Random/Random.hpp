@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -37,6 +38,7 @@ public:
     // Uniform integer in [min, max]
     uint32_t uniformInt(uint32_t min, uint32_t max);
     uint64_t uniformInt(uint64_t min, uint64_t max);
+    uint64_t uniformInt64(uint64_t min, uint64_t max);
     
     // Uniform real in [min, max)
     double uniformReal(double min, double max);
@@ -78,17 +80,10 @@ public:
     // Get underlying engine for advanced use
     std::mt19937_64& engine();
     const std::mt19937_64& engine() const;
-    
-    // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
-    
-    // Operator for compatibility with std functions
-    result_type operator()() { return static_cast<result_type>(engine()()); }
-    
+
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations

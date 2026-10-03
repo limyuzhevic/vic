@@ -1,0 +1,126 @@
+{
+  "testSuite": {
+    "name": "NLM Core Tests",
+    "description": "Core NLM system tests for neural computation",
+    "category": "core",
+    "enabled": true,
+    "timeout": 30,
+    "parallel": false,
+    "outputFormat": "json",
+    "verbose": false
+  },
+  "testSuites": [
+    {
+      "name": "clock_tests",
+      "description": "Simulation clock and timing tests",
+      "category": "core",
+      "enabled": true,
+      "timeout": 30,
+      "parameters": {
+        "timestep": 0.001,
+        "maxSteps": 1000
+      }
+    },
+    {
+      "name": "config_tests", 
+      "description": "Configuration system tests",
+      "category": "core",
+      "enabled": true,
+      "timeout": 30,
+      "parameters": {
+        "schemaPath": "configs/default.schema.json"
+      }
+    },
+    {
+      "name": "types_tests",
+      "description": "Type system tests",
+      "category": "core", 
+      "enabled": true,
+      "timeout": 30
+    },
+    {
+      "name": "random_tests",
+      "description": "Random number generator tests",
+      "category": "core",
+      "enabled": true,
+      "timeout": 30
+    },
+    {
+      "name": "neuron_tests",
+      "description": "Neuron model tests",
+      "category": "brain",
+      "enabled": true,
+      "timeout": 60,
+      "parameters": {
+        "neuronType": "lif",
+        "learningRate": 0.01
+      }
+    },
+    {
+      "name": "synapse_tests",
+      "description": "Synapse model tests",
+      "category": "brain",
+      "enabled": true,
+      "timeout": 60,
+      "parameters": {
+        "plasticityEnabled": true,
+        "weightRange": ["-1.0", "1.0"]
+      }
+    },
+    {
+      "name": "stdp_tests",
+      "description": "Spike-Timing Dependent Plasticity tests",
+      "category": "plasticity",
+      "enabled": true,
+      "timeout": 90
+    },
+    {
+      "name": "brain_tests",
+      "description": "Brain simulation integration tests",
+      "category": "integration",
+      "enabled": true,
+      "timeout": 120,
+      "parameters": {
+        "simulationSteps": 100,
+        "populationSize": 50
+      }
+    }
+  ],
+  "testParameters": {
+    "defaultTimestep": 0.001,
+    "maxIterations": 1000,
+    "precision": 1e-6,
+    "seed": 42,
+    "memoryLimit": "1GB"
+  },
+  "testFixtures": [
+    {
+      "name": "clockSetup",
+      "type": "setup",
+      "description": "Setup simulation clock for testing",
+      "code": "clock.setTimestep(0.001); clock.reset();",
+      "timeout": 5
+    },
+    {
+      "name": "clockTeardown",
+      "type": "teardown", 
+      "description": "Cleanup after clock tests",
+      "code": "clock.reset();",
+      "timeout": 5
+    },
+    {
+      "name": "neuronSetup",
+      "type": "setup",
+      "description": "Setup neuron network for testing",
+      "code": "// Initialize neurons with random weights",
+      "timeout": 10
+    }
+  ],
+  "environment": "development",
+  "skipPatterns": ["^testSlow", "^testExperimental"],
+  "includePatterns": ["^testClock", "^testConfig", "^testNeuron"],
+  "performanceThresholds": {
+    "maxExecutionTime": 1000,
+    "minPassRate": 0.95
+  }
+}

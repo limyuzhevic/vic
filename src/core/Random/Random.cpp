@@ -60,6 +60,10 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     return dist(pImpl->gen);
 }
 
+uint64_t RandomGenerator::uniformInt64(uint64_t min, uint64_t max) {
+    return uniformInt(min, max);
+}
+
 double RandomGenerator::uniformReal(double min, double max) {
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
@@ -106,20 +110,20 @@ bool RandomGenerator::randomBool() {
 }
 
 uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
+    return static_cast<uint32_t>(uniformInt64(0, 1));
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
         throw std::invalid_argument("Cannot pick from zero items");
     }
-    return uniformInt(0, n - 1);
+    return uniformInt64(0, n - 1);
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
+        bytes[i] = static_cast<uint8_t>(uniformInt64(0, 255));
     }
 }
 
