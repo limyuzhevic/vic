@@ -34,6 +34,9 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Get recent observation history for analysis
+    const std::vector<std::unique_ptr<SensoryInput>>& getObservationHistory() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

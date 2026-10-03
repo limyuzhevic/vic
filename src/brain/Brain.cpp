@@ -407,14 +407,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
+    
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity with novelty and prediction error
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getNoveltyLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -425,18 +428,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        float attentionModulation = pImpl->dopamine->getAttentionModulation();
+        float memoryConsolidation = pImpl->dopamine->getMemoryConsolidationSignal();
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    float excitabilityMod = dopamineLevel * 0.5f * attentionModulation;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
             }
         }
+        
+        // Update working memory based on dopamine
+        if (pImpl->workingMemory && memoryConsolidation > 0.5f) {
+            // Strong dopamine signal consolidates working memory traces
+            pImpl->workingMemory->consolidate(0.1f * memoryConsolidation);
+        }
+    }
+    
+    // Apply acetylcholine effects on attention and working memory
+    if (pImpl->acetylcholine) {
+        // ACh effects on attention would be implemented here
+    }
+    
+    // Apply norepinephrine effects on arousal and novelty
+    if (pImpl->noradrenaline) {
+        // NE effects on arousal and novelty sensitivity
+    }
+    
+    // Apply serotonin effects on mood and social behavior
+    if (pImpl->serotonin) {
+        // 5-HT effects on mood and impulsivity
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -511,8 +538,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from input neurons
+        std::vector<float> sensoryState;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 256; ++i) {  // Limit to first 256 for vision encoding
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                sensoryState.push_back(
+                    std::abs(neuron->getState().membranePotential - 
+                           neuron->getState().restingPotential) / 20.0f);
+            }
+        }
+        
+        if (!sensoryState.empty()) {
+            // Train prediction system with current sensory state
+            auto dummySensory = std::make_unique<Vision>();
+            dummySensory->configure(16, 16, 1);
+            dummySensory->setData(sensoryState);
+            
+            pImpl->predictionSystem->train(*dummySensory);
+            
+            // Get prediction
+            auto prediction = pImpl->predictionSystem->predictNextState(*dummySensory);
+            
+            // Update with predicted vs actual (will be updated in next step)
+            // pImpl->predictionSystem->updatePredictions(prediction, *dummySensory);
+            
+            NLM_LOG_INFO("PredictionSystem: Processed sensory state, prediction error: " + 
+                         std::to_string(pImpl->predictionSystem->getPredictionError()) +
+                         ", confidence: " + std::to_string(pImpl->predictionSystem->getConfidence()));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +582,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use working memory contents to form abstract concepts
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Convert neural activity to pattern representation for concept formation
+                std::vector<float> pattern;
+                for (const auto& region : pImpl->regions) {
+                    for (const auto& pop : region->getPopulations()) {
+                        for (Neuron* neuron : pop->getNeurons()) {
+                            if (neuron->isFiring()) {
+                                pattern.push_back(
+                                    std::abs(neuron->getState().membranePotential - 
+                                           neuron->getState().restingPotential) / 20.0f);
+                            }
+                        }
+                    }
+                }
+                
+                if (!pattern.empty()) {
+                    // Form concept from current neural pattern
+                    size_t conceptId = pImpl->conceptFormation->presentExperience(pattern, {}, 0.0f, currentTime);
+                    
+                    NLM_LOG_INFO("ConceptFormation: Formed concept " + std::to_string(conceptId) + 
+                                 " from neural activity pattern");
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

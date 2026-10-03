@@ -25,9 +25,19 @@ ConceptFormation::ConceptFormation()
 ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("ConceptFormation: Cannot initialize with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("ConceptFormation initialized");
+    
+    // Initialize concept storage with biological constraints
+    // Human brains have roughly 70,000-100,000 concepts; start with 1000
+    concepts_.reserve(1000);
+    
+    NLM_LOG_INFO("ConceptFormation initialized with " + std::to_string(concepts_.size()) + " concepts");
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
