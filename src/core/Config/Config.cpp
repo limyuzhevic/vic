@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <string>
+#include <regex>
 
 namespace nlm {
 
@@ -19,16 +22,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first, then fall back to key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    // Check if it looks like JSON or YAML
+    bool isJson = false;
+    bool isYaml = false;
+    
+    // Simple detection based on content
+    if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+        isJson = true;
+    } else if (content.find(':') != std::string::npos && 
+               (content.find('- ') != std::string::npos || content.find('* ') != std::string::npos)) {
+        isYaml = true;
+    }
+    
+    if (isJson) {
+        return loadFromJson(content);
+    } else if (isYaml) {
+        return loadFromYaml(content);
+    } else {
+        return loadFromKeyValue(content);
+    }
+}
+
+bool Config::loadFromKeyValue(const std::string& content) {
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -51,8 +78,120 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
-    
     return true;
+}
+
+bool Config::loadFromJson(const std::string& jsonContent) {
+    // Simple JSON parser for key-value pairs
+    // This handles basic objects like {"key": "value", "number": 42}
+    try {
+        size_t start = 0;
+        while (start < jsonContent.size()) {
+            // Find next key
+            start = jsonContent.find('"', start);
+            if (start == std::string::npos) break;
+            
+            size_t keyEnd = jsonContent.find('"', start + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = jsonContent.substr(start + 1, keyEnd - start - 1);
+            
+            // Find value
+            size_t valueStart = jsonContent.find(':', keyEnd);
+            if (valueStart == std::string::npos) break;
+            
+            size_t valueEnd = findMatchingBracket(jsonContent, valueStart + 1, '{', '}');
+            if (valueEnd == std::string::npos) break;
+            
+            std::string valueStr = jsonContent.substr(valueStart + 1, valueEnd - valueStart - 1);
+            valueStr = trim(valueStr);
+            
+            // Parse value based on content
+            ConfigValue value;
+            if (valueStr.front() == '"' && valueStr.back() == '"') {
+                // String value
+                value = trim(valueStr.substr(1, valueStr.size() - 2));
+            } else if (std::isdigit(valueStr.front()) || (valueStr.front() == '-' && std::isdigit(valueStr[1]))) {
+                // Number value (float or int)
+                try {
+                    size_t decimalPos = valueStr.find('.');
+                    if (decimalPos != std::string::npos) {
+                        value = std::stod(valueStr);
+                    } else {
+                        value = std::stoll(valueStr);
+                    }
+                } catch (...) {
+                    value = valueStr;
+                }
+            } else if (valueStr == "true" || valueStr == "false") {
+                value = (valueStr == "true");
+            } else {
+                value = valueStr;
+            }
+            
+            set(key, value, ConfigSource::File);
+            start = valueEnd + 1;
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::loadFromYaml(const std::string& yamlContent) {
+    // Simple YAML parser for key-value pairs
+    // This handles basic YAML like key: value
+    try {
+        std::istringstream stream(yamlContent);
+        std::string line;
+        while (std::getline(stream, line)) {
+            // Trim whitespace
+            line = trim(line);
+            
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#' || line[0] == '%') {
+                continue;
+            }
+            
+            // Parse key: value format
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Parse boolean values
+                if (value == "true") {
+                    set(key, true, ConfigSource::File);
+                } else if (value == "false") {
+                    set(key, false, ConfigSource::File);
+                } else if (std::isdigit(value.front()) || (value.front() == '-' && std::isdigit(value[1]))) {
+                    // Number value
+                    try {
+                        size_t decimalPos = value.find('.');
+                        if (decimalPos != std::string::npos) {
+                            set(key, std::stod(value), ConfigSource::File);
+                        } else {
+                            set(key, std::stoll(value), ConfigSource::File);
+                        }
+                    } catch (...) {
+                        set(key, value, ConfigSource::File);
+                    }
+                } else {
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -186,30 +325,268 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+size_t Config::findMatchingBracket(const std::string& content, size_t start, char open, char close) const {
+    if (start >= content.size() || content[start] != open) {
+        return std::string::npos;
+    }
+    
+    int depth = 1;
+    size_t pos = start + 1;
+    
+    while (pos < content.size() && depth > 0) {
+        if (content[pos] == open) {
+            depth++;
+        } else if (content[pos] == close) {
+            depth--;
+        }
+        pos++;
+    }
+    
+    return (depth == 0) ? pos - 1 : std::string::npos;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::toString(const ConfigValue& value) const {
+    if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    } else if (std::holds_alternative<int>(value)) {
+        return std::to_string(std::get<int>(value));
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return std::to_string(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return std::to_string(std::get<double>(value));
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value) ? "true" : "false";
+    }
+    return "";
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Add validation method
+bool Config::validate() const {
+    // Basic validation rules
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [](const ConfigEntry& e) { return e.key.empty(); });
+    if (it != pImpl->entries.end()) {
+        return false;
+    }
+    
+    // Validate type consistency if needed
+    return true;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Add export functionality
+std::string Config::exportToJson() const {
+    std::ostringstream json;
+    json << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        json << "  \"" << entry.key << "\": ";
+        
+        if (std::holds_alternative<std::string>(entry.value)) {
+            json << "\"" << toString(entry.value) << "\"";
+        } else if (std::holds_alternative<int>(entry.value)) {
+            json << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            json << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            json << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            json << (std::get<bool>(entry.value) ? "true" : "false");
+        }
+        
+        if (i < pImpl->entries.size() - 1) {
+            json << ",\n";
+        } else {
+            json << "\n";
+        }
+    }
+    
+    json << "}\n";
+    return json.str();
+}
 
-} // namespace nlm
+std::string Config::exportToYaml() const {
+    std::ostringstream yaml;
+    yaml << "# Exported NLM Configuration\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        yaml << entry.key << ": ";
+        
+        if (std::holds_alternative<std::string>(entry.value)) {
+            yaml << "\"" << toString(entry.value) << "\"";
+        } else if (std::holds_alternative<int>(entry.value)) {
+            yaml << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            yaml << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            yaml << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            yaml << (std::get<bool>(entry.value) ? "true" : "false");
+        }
+        
+        yaml << "\n\n";
+    }
+    
+    return yaml.str();
+}
+
+// Add advanced configuration capabilities
+
+// Add method to validate configuration with more comprehensive rules
+bool Config::validateAdvanced() const {
+    // Comprehensive validation rules for advanced users
+    bool isValid = true;
+    
+    // Check for required keys
+    std::set<std::string> requiredKeys = {"random_seed", "simulation_timestep"};
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_WARNING("Missing required configuration key: " + key);
+            isValid = false;
+        }
+    }
+    
+    // Validate numeric ranges
+    if (has("neuron_count")) {
+        auto val = get<int64_t>("neuron_count");
+        if (val.has_value() && val.value() < 10) {
+            NLM_LOG_WARNING("neuron_count seems too small: " + std::to_string(val.value()));
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto val = get<float>("connection_probability");
+        if (val.has_value() && (val.value() < 0.0f || val.value() > 1.0f)) {
+            NLM_LOG_WARNING("connection_probability should be in [0, 1]: " + std::to_string(val.value()));
+        }
+    }
+    
+    // Check for deprecated keys
+    std::set<std::string> deprecatedKeys = {"plasticity_learning_rate"};
+    for (const auto& key : deprecatedKeys) {
+        if (has(key)) {
+            NLM_LOG_WARNING("Deprecated configuration key: " + key);
+        }
+    }
+    
+    return isValid;
+}
+
+// Add method for configuration profiling
+std::string Config::profile() const {
+    std::ostringstream profile;
+    profile << "=== NLM Configuration Profile ===\n";
+    profile << "Total entries: " << pImpl->entries.size() << "\n";
+    profile << "Sources:" << std::endl;
+    
+    int fileCount = 0, commandLineCount = 0, defaultCount = 0, otherCount = 0;
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::File: fileCount++; break;
+            case ConfigSource::CommandLine: commandLineCount++; break;
+            case ConfigSource::Default: defaultCount++; break;
+            case ConfigSource::Plugin: otherCount++; break;
+        }
+    }
+    
+    profile << "  File: " << fileCount << "\n";
+    profile << "  Command Line: " << commandLineCount << "\n";
+    profile << "  Default: " << defaultCount << "\n";
+    profile << "  Plugin: " << otherCount << "\n\n";
+    
+    // Profile by type
+    profile << "Entries by type:" << std::endl;
+    int stringCount = 0, intCount = 0, int64Count = 0, doubleCount = 0, boolCount = 0;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (std::holds_alternative<std::string>(entry.value)) stringCount++;
+        else if (std::holds_alternative<int>(entry.value)) intCount++;
+        else if (std::holds_alternative<int64_t>(entry.value)) int64Count++;
+        else if (std::holds_alternative<double>(entry.value)) doubleCount++;
+        else if (std::holds_alternative<bool>(entry.value)) boolCount++;
+    }
+    
+    profile << "  String: " << stringCount << "\n";
+    profile << "  Integer: " << intCount << "\n";
+    profile << "  Int64: " << int64Count << "\n";
+    profile << "  Double: " << doubleCount << "\n";
+    profile << "  Boolean: " << boolCount << "\n\n";
+    
+    // Identify potentially conflicting settings
+    profile << "Potential conflicts:" << std::endl;
+    if (has("stdp_ltp_weight") && has("stdp_ltd_weight")) {
+        auto ltp = get<float>("stdp_ltp_weight");
+        auto ltd = get<float>("stdp_ltd_weight");
+        if (ltp.has_value() && ltd.has_value() && ltp.value() >= ltd.value()) {
+            profile << "  Warning: STDP LTP weight (" << ltp.value() 
+                   << ") should be less than LTD weight (" << ltd.value() << ")\n";
+        }
+    }
+    
+    return profile.str();
+}
+
+// Add batch configuration operations
+void Config::batchSet(const std::map<std::string, ConfigValue>& values, ConfigSource source) {
+    for (const auto& [key, value] : values) {
+        set(key, value, source);
+    }
+}
+
+void Config::batchSet(const std::map<std::string, std::string>& values, ConfigSource source) {
+    for (const auto& [key, value] : values) {
+        set(key, value, source);
+    }
+}
+
+// Add configuration comparison
+bool Config::equals(const Config& other) const {
+    if (pImpl->entries.size() != other.pImpl->entries.size()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        auto otherIt = std::find_if(other.pImpl->entries.begin(), other.pImpl->entries.end(),
+            [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+        
+        if (otherIt == other.pImpl->entries.end()) {
+            return false;
+        }
+        
+        if (entry.value != otherIt->value) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+std::string Config::diff(const Config& other) const {
+    std::ostringstream diff;
+    diff << "=== Configuration Differences ===\n";
+    
+    // Find keys in this config but not in other
+    for (const auto& entry : pImpl->entries) {
+        auto otherIt = std::find_if(other.pImpl->entries.begin(), other.pImpl->entries.end(),
+            [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+        
+        if (otherIt == other.pImpl->entries.end()) {
+            diff << "+ " << entry.key << " = " << toString(entry.value) << "\n";
+        } else if (entry.value != otherIt->value) {
+            diff << "* " << entry.key << " changed from " 
+                 << toString(otherIt->value) << " to " << toString(entry.value) << "\n";
+        }
+    }
+    
+    // Find keys in other but not in this
+    for (const auto& entry : other.pImpl->entries) {
+        auto thisIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+        
+        if (thisIt == pImpl->entries.end()) {
+            diff << "- " << entry.key << " = " << toString(entry.value) << "\n";
+        }
+    }
+    
+    return diff.str();
+}
