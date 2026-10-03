@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <set>
+#include <functional>
 
 namespace nlm {
 
@@ -29,6 +32,30 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration validation result
+struct ConfigValidationResult {
+    bool isValid;
+    std::string errorMessage;
+    std::string path; // Configuration key path for nested configs
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    std::set<std::string> allowedTypes;
+    std::optional<std::string> defaultValue;
+    bool required;
+    std::string description;
+    std::function<bool(const ConfigValue&)> validator;
+    
+    ConfigSchema() : key(), required(false), description() {}
+    
+    ConfigSchema(const std::string& k, const std::set<std::string>& types, 
+                 bool req, const std::string& desc,
+                 const std::function<bool(const ConfigValue&)>& validator = nullptr)
+        : key(k), allowedTypes(types), required(req), description(desc), validator(validator) {}
 };
 
 // Configuration entry
@@ -61,7 +88,7 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (fixed to save actual values)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +120,16 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    static ConfigValidationResult validate(const Config& config, const std::vector<ConfigSchema>& schema);
+    static bool validateValue(const ConfigValue& value, const std::string& typeName);
+    static std::string typeToString(const ConfigValue& value);
+    
+    // Schema management
+    static void registerSchema(const std::string& category, const std::vector<ConfigSchema>& schema);
+    static std::vector<ConfigSchema> getSchema(const std::string& category);
+    static std::map<std::string, std::vector<ConfigSchema>> getAllSchemas();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +137,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isNumeric(const std::string& str, double& outValue);
+    static bool isInteger(const std::string& str, int64_t& outValue);
+    static bool isBoolean(const std::string& str, bool& outValue);
+    
+    // Schema validation helper
+    static ConfigValidationResult validateAgainstSchema(const ConfigEntry& entry, const ConfigSchema& schema);
 };
 
 } // namespace nlm

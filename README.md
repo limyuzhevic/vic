@@ -75,12 +75,112 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main Executable
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the complete NLM Phase 6 demonstration with all test modes.
+
+### Test Modes
+```bash
+# Basic connectivity test (quick)
+./nlm --test-mode basic
+
+# Plasticity learning experiment
+./nlm --test-mode plasticity
+
+# STDP verification
+./nlm --test-mode stdp
+
+# All tests (default)
+./nlm
+```
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo
+```
+
+## Command Line Options
+
+The main executable supports extensive configuration options:
+
+```
+--help                    Show help message and exit
+--version                 Show version information and exit
+--config <file>           Load configuration from file (default: configs/default.cfg)
+--neurons <N>             Number of neurons (default: 500)
+--regions <N>             Number of brain regions (default: 1)
+--timestep <ms>           Simulation timestep in milliseconds (default: 0.5)
+--seed <seed>             Random seed (default: 42)
+--test-mode <mode>        Test mode: basic, plasticity, stdp, all (default: all)
+--log-level <level>       Logging level: debug, info, warning, error (default: info)
+--logfile <file>           Write log output to file
+--save-state <file>        Save brain state to file after tests
+--no-colors               Disable colored console output
+```
+
+### Example Commands
+
+```bash
+# Basic test with custom configuration
+./nlm --test-mode basic --neurons 2000 --regions 3 --timestep 1.0
+
+# Save brain state after tests
+./nlm --save-state brain_checkpoint.chk
+
+# Custom log file
+./nlm --logfile nlm_detailed.log --log-level debug
+
+# Development mode
+./nlm --test-mode all --seed 12345
+```
+
+## Configuration
+
+### Default Configuration
+
+The project uses configuration files in the `configs/` directory:
+
+- `configs/default.cfg`: Comprehensive configuration for Phase 6
+
+Configuration files use a simple key=value format. Command line arguments override configuration file settings.
+
+### Configuration Format
+
+```
+# Key-value pairs
+key = value
+
+# Comments start with #
+# Types supported:
+# - integers (42)
+# - floats (3.14)
+# - booleans (true/false)
+# - strings ("hello world")
+# - arrays [1, 2, 3]
+```
+
+### Configuration Overrides
+
+Command line arguments override configuration file values:
+
+```bash
+# Override neuron count
+./nlm --neurons 1500
+
+# Override timestep
+./nlm --timestep 0.1
+
+# Use custom config file
+./nlm --config myconfig.cfg
+```
 
 ## Project Structure
 
@@ -88,7 +188,9 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── configs/              # Configuration files
+│   └── default.cfg
+├── docs/                 # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
@@ -110,8 +212,21 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── tests/              # Test framework
+└── python/             # Python bindings (if any)
+```
+
+## Testing
+
+The project includes a comprehensive test framework:
+
+```bash
+# Run tests
+mkdir build
+cd build
+cmake ..
+make
+ctest
 ```
 
 ## Phase Summary
@@ -228,3 +343,7 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Version
+
+0.1.0 (Phase 6 - Final Integration)

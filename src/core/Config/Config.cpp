@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,10 +51,19 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key format
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                NLM_LOG_WARNING("Invalid config key at line " + std::to_string(lineNumber) + ": " + key);
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config format at line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
+    NLM_LOG_INFO("Configuration loaded from: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
@@ -65,16 +77,36 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty() || key.find(' ') != std::string::npos) {
+                    NLM_LOG_WARNING("Invalid command line key: " + key);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key format
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                NLM_LOG_WARNING("Invalid command line key: " + key);
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_LOG_WARNING("Unknown command line argument ignored: " + arg);
         }
     }
+    
+    NLM_LOG_INFO("Command line arguments processed (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
@@ -86,7 +118,52 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert config value to string based on type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << value << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double to avoid scientific notation
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << std::fixed << value;
+                file << entry.key << " = " << oss.str() << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << value[i];
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    std::ostringstream oss;
+                    oss.precision(6);
+                    oss << std::fixed << value[i];
+                    file << oss.str();
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    file << "\"" << value[i] << "\"";
+                    if (i < value.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else {
+                // Fallback for unknown types
+                file << entry.key << " = " << "UNKNOWN_TYPE\n";
+            }
+        }, entry.value);
     }
     
     return true;
