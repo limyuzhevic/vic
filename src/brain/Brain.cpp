@@ -161,15 +161,11 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept : pImpl(std::exchange(other.pImpl, nullptr)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        std::swap(pImpl, other.pImpl);
     }
     return *this;
 }
@@ -780,7 +776,7 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
-        // Write neurons
+        // Write neurons - optimized: collect all neurons first, then serialize
         NeuronCheckpointData neuronData;
         neuronData.membranePotential.reserve(getTotalNeuronCount());
         neuronData.restingPotential.reserve(getTotalNeuronCount());
@@ -788,40 +784,71 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.resetPotential.reserve(getTotalNeuronCount());
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
+        // Optimized: pre-collect all neurons to avoid repeated region/population lookups
+        std::vector<const Neuron*> allNeurons;
+        allNeurons.reserve(getTotalNeuronCount());
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
+                const auto& neurons = pop->getNeurons();
+                allNeurons.insert(allNeurons.end(), neurons.begin(), neurons.end());
             }
         }
+        
+        // Serialize all neurons
+        for (const auto* neuron : allNeurons) {
+            const auto& state = neuron->getState();
+            neuronData.membranePotential.push_back(state.membranePotential);
+            neuronData.restingPotential.push_back(state.restingPotential);
+            neuronData.threshold.push_back(state.threshold);
+            neuronData.resetPotential.push_back(state.resetPotential);
+            neuronData.leakConductance.push_back(state.leakConductance);
+            neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+            neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
+            neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
+            neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+        }
+        // Clear vector to free memory early
+        allNeurons.clear();
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
             return false;
         }
         
-        // Write synapses
+        // Write synapses - optimized: collect all synapses first, then serialize
         SynapseCheckpointData synapseData;
+        synapseData.sourceNeuron.reserve(getTotalSynapseCount());
+        synapseData.destinationNeuron.reserve(getTotalSynapseCount());
+        synapseData.weight.reserve(getTotalSynapseCount());
+        synapseData.delay.reserve(getTotalSynapseCount());
+        synapseData.synapseType.reserve(getTotalSynapseCount());
+        synapseData.eligibilityTrace.reserve(getTotalSynapseCount());
+        synapseData.efficacy.reserve(getTotalSynapseCount());
+        synapseData.shortTermDepression.reserve(getTotalSynapseCount());
+        synapseData.shortTermFacilitation.reserve(getTotalSynapseCount());
+        
+        // Optimized: pre-collect all synapses to avoid repeated region lookups
+        std::vector<const Synapse*> allSynapses;
+        allSynapses.reserve(getTotalSynapseCount());
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
+            const auto& synapses = region->getSynapses();
+            allSynapses.insert(allSynapses.end(), synapses.begin(), synapses.end());
         }
+        
+        // Serialize all synapses
+        for (const auto* syn : allSynapses) {
+            synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+            synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+            synapseData.weight.push_back(syn->getWeight());
+            synapseData.delay.push_back(syn->getDelay());
+            synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+            synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            synapseData.efficacy.push_back(syn->getEfficacy());
+            synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+            synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+        }
+        // Clear vector to free memory early
+        allSynapses.clear();
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
@@ -853,58 +880,60 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
-        }
-        
-        // Read neurons
-        NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+        try {
+            if (!reader.validate()) {
+                NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+                return false;
+            }
+            
+            // Read neurons
+            NeuronCheckpointData neuronData;
+            if (!reader.readNeurons(neuronData)) {
+                NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+                return false;
+            }
+            
+            // Apply neuron states
+            size_t idx = 0;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (idx < neuronData.membranePotential.size()) {
+                            neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                            neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                            neuron->setThreshold(neuronData.threshold[idx]);
+                            neuron->setResetPotential(neuronData.resetPotential[idx]);
+                            neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                            if (idx < neuronData.firingState.size()) {
+                                neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                            }
+                            if (idx < neuronData.refractoryRemaining.size()) {
+                                neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            }
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+                        idx++;
                     }
-                    idx++;
                 }
             }
-        }
-        
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+            
+            // Read synapses
+            SynapseCheckpointData synapseData;
+            if (!reader.readSynapses(synapseData)) {
+                NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+                return false;
+            }
+            
+            // Apply synapse states - this is complex because we need to find matching synapses
+            // For now, just log the count
+            NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+            
+            NLM_LOG_INFO("Brain state loaded successfully");
+            return true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
             return false;
         }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
     }
 }
 

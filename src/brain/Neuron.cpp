@@ -271,7 +271,11 @@ void Neuron::reset() {
     pImpl->spikeHistory.clear();
 }
 
-void Neuron::initializeRandom(RandomGenerator& rng) {
+// Check pointer validity
+    if (!pImpl) {
+        return;
+    }
+    
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
@@ -293,6 +297,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Clear any residual state
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;

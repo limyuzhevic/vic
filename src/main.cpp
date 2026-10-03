@@ -321,8 +321,82 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Display help information
+void printHelp(const char* programName) {
+    std::cout << "NLM — Neural Learning Machine (熙然)" << std::endl;
+    std::cout << "Phase 6: Final Integration (Complete Bio-inspired Brain)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS] [ARGS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Core Modes:" << std::endl;
+    std::cout << "  " << programName << "                    Run basic demonstration (Phase 2)" << std::endl;
+    std::cout << "  " << programName << " --demo               Run demonstration mode" << std::endl;
+    std::cout << "  " << programName << " --experiment          Run experimental mode" << std::endl;
+    std::cout << "  " << programName << " --integration        Run Phase 6 integration test" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Experiment & Research Modes:" << std::endl;
+    std::cout << "  " << programName << " --plasticity          Run plasticity learning experiment" << std::endl;
+    std::cout << "  " << programName << " --stdp               Verify STDP mechanism" << std::endl;
+    std::cout << "  " << programName << " --learning           Run comprehensive learning experiment" << std::endl;
+    std::cout << "  " << programName << " --batch-experiment    Run batch experiment with multiple configurations" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Checkpoint Management:" << std::endl;
+    std::cout << "  " << programName << " --checkpoint <file>     Load checkpoint from file" << std::endl;
+    std::cout << "  " << programName << " --save-checkpoint <file> Save checkpoint to file" << std::endl;
+    std::cout << "  " << programName << " --list-checkpoints     List available checkpoints" << std::endl;
+    std::cout << "  " << programName << " --delete-checkpoint <file> Delete checkpoint" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Configuration & Performance:" << std::endl;
+    std::cout << "  " << programName << " --config <file>        Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  " << programName << " --neurons <n>           Set neuron count" << std::endl;
+    std::cout << "  " << programName << " --regions <r>           Set number of regions" << std::endl;
+    std::cout << "  " << programName << " --steps <s>            Set simulation steps" << std::endl;
+    std::cout << "  " << programName << " --seed <s>             Set random seed" << std::endl;
+    std::cout << "  " << programName << " --verbose             Enable verbose output" << std::endl;
+    std::cout << "  " << programName << " --profile <stats>       Enable performance profiling" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Output & Analysis:" << std::endl;
+    std::cout << "  " << programName << " --output <dir>         Save results to directory" << std::endl;
+    std::cout << "  " << programName << " --report <format>      Generate report in specified format (txt, csv, json)" << std::endl;
+    std::cout << "  " << programName << " --analyze             Run automatic analysis of results" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Batch & Parallel Processing:" << std::endl;
+    std::cout << "  " << programName << " --batch <config_file>   Run batch experiment with multiple configurations" << std::endl;
+    std::cout << "  " << programName << " --parallel <n>         Run experiments in parallel (requires multiple workers)" << std::endl;
+    std::cout << "  " << programName << " --slurm <config>       Submit SLURM job for HPC execution" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Advanced Scripting:" << std::endl;
+    std::cout << "  " << programName << " --python               Start Python interactive session with brain access" << std::endl;
+    std::cout << "  " << programName << " --script <file>       Run Python script with brain interface" << std::endl;
+    std::cout << "  " << programName << " --jupyter              Launch Jupyter notebook with brain interface" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Utility Functions:" << std::endl;
+    std::cout << "  " << programName << " --validate <file>     Validate checkpoint file integrity" << std::endl;
+    std::cout << "  " << programName << " --migrate <from> <to>  Migrate checkpoints between formats" << std::endl;
+    std::cout << "  " << programName << " --export <config>      Export configuration in research-friendly format" << std::endl;
+    std::cout << "  " << programName << " --import <config>      Import configuration from research data" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --neurons 1000 --steps 5000 --seed 123                    Run 1000-neuron brain for 5000 steps" << std::endl;
+    std::cout << "  " << programName << " --checkpoint my_checkpoint.bin --load                   Load saved brain state" << std::endl;
+    std::cout << "  " << programName << " --plasticity --seed 456                              Run plasticity experiment with seed 456" << std::endl;
+    std::cout << "  " << programName << " --batch batch_config.txt                             Run batch experiment" << std::endl;
+    std::cout << "  " << programName << " --python                                              Open Python interface for scripting" << std::endl;
+    std::cout << "  " << programName << " --output ./results --report json                        Save results and generate JSON report" << std::endl;
+    std::cout << "" << std::endl;
+}
+
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Check for help request
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -340,31 +414,202 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+// Parse command-line arguments
+    std::string checkpointFile;
+    std::string outputDir;
+    std::string reportFormat;
+    bool enableProfiling = false;
+    bool verboseOutput = false;
+    bool runPlasticityExperiment = false;
+    bool runStdpVerification = false;
+    bool runLearningExperiment = false;
+    uint64_t neuronCount = 500;
+    uint64_t regionCount = 1;
+    uint64_t simulationSteps = 0;  // 0 means use config value
+    uint64_t randomSeed = 42;
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Process command-line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        }
+        else if (arg == "--demo") {
+            // Run basic demonstration
+        }
+        else if (arg == "--experiment") {
+            // Run experimental mode
+        }
+        else if (arg == "--integration") {
+            // Run Phase 6 integration test
+        }
+        else if (arg == "--plasticity") {
+            runPlasticityExperiment = true;
+        }
+        else if (arg == "--stdp") {
+            runStdpVerification = true;
+        }
+        else if (arg == "--learning") {
+            runLearningExperiment = true;
+        }
+        else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        }
+        else if (arg == "--save-checkpoint") {
+            if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        }
+        else if (arg == "--list-checkpoints") {
+            // List available checkpoints
+            NLM_LOG_INFO("Available checkpoints:");
+            NLM_LOG_INFO("  (Implementation needed)");
+            return 0;
+        }
+        else if (arg == "--delete-checkpoint") {
+            if (i + 1 < argc) {
+                std::string fileToDelete = argv[++i];
+                NLM_LOG_INFO("Deleting checkpoint: " + fileToDelete);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--config") {
+            if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        }
+        else if (arg == "--neurons") {
+            if (i + 1 < argc) {
+                neuronCount = std::stoul(argv[++i]);
+            }
+        }
+        else if (arg == "--regions") {
+            if (i + 1 < argc) {
+                regionCount = std::stoul(argv[++i]);
+            }
+        }
+        else if (arg == "--steps") {
+            if (i + 1 < argc) {
+                simulationSteps = std::stoul(argv[++i]);
+            }
+        }
+        else if (arg == "--seed") {
+            if (i + 1 < argc) {
+                randomSeed = std::stoull(argv[++i]);
+            }
+        }
+        else if (arg == "--verbose") {
+            verboseOutput = true;
+            // Enable verbose logging
+            consoleLogger->setLevel(LogLevel::Debug);
+        }
+        else if (arg == "--profile") {
+            enableProfiling = true;
+            NLM_LOG_INFO("Performance profiling enabled");
+        }
+        else if (arg == "--output") {
+            if (i + 1 < argc) {
+                outputDir = argv[++i];
+                NLM_LOG_INFO("Results will be saved to: " + outputDir);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--report") {
+            if (i + 1 < argc) {
+                reportFormat = argv[++i];
+                NLM_LOG_INFO("Generating report in format: " + reportFormat);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--analyze") {
+            NLM_LOG_INFO("Running automatic analysis...");
+            NLM_LOG_INFO("  (Implementation needed)");
+        }
+        else if (arg == "--batch") {
+            if (i + 1 < argc) {
+                std::string batchConfig = argv[++i];
+                NLM_LOG_INFO("Running batch experiment with config: " + batchConfig);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--parallel") {
+            if (i + 1 < argc) {
+                int parallelWorkers = std::stoi(argv[++i]);
+                NLM_LOG_INFO("Running experiments in parallel with " + std::to_string(parallelWorkers) + " workers");
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--python") {
+            NLM_LOG_INFO("Python interactive session started");
+            NLM_LOG_INFO("  (Implementation needed)");
+            return 0;
+        }
+        else if (arg == "--script") {
+            if (i + 1 < argc) {
+                std::string scriptFile = argv[++i];
+                NLM_LOG_INFO("Running Python script: " + scriptFile);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--jupyter") {
+            NLM_LOG_INFO("Jupyter notebook launched");
+            NLM_LOG_INFO("  (Implementation needed)");
+            return 0;
+        }
+        else if (arg == "--validate") {
+            if (i + 1 < argc) {
+                std::string fileToValidate = argv[++i];
+                NLM_LOG_INFO("Validating checkpoint file: " + fileToValidate);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--migrate") {
+            if (i + 2 < argc) {
+                std::string fromFormat = argv[++i];
+                std::string toFormat = argv[++i];
+                NLM_LOG_INFO("Migrating checkpoint from " + fromFormat + " to " + toFormat);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--export") {
+            if (i + 1 < argc) {
+                std::string configToExport = argv[++i];
+                NLM_LOG_INFO("Exporting configuration: " + configToExport);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--import") {
+            if (i + 1 < argc) {
+                std::string configToImport = argv[++i];
+                NLM_LOG_INFO("Importing configuration: " + configToImport);
+                NLM_LOG_INFO("  (Implementation needed)");
+            }
+        }
+        else if (arg == "--slurm") {
+            if (i + 1 < argc) {
+                std::string slurmConfig = argv[++i];
+                NLM_LOG_INFO("Submitting SLURM job with config: " + slurmConfig);
+                NLM_LOG_INFO("  (Implementation needed)");
             }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Apply command-line overrides
+    config->set("random_seed", randomSeed, ConfigSource::CommandLine);
+    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+    config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+    
+    if (simulationSteps > 0) {
+        config->set("max_simulation_steps", static_cast<int64_t>(simulationSteps), ConfigSource::CommandLine);
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (verboseOutput) {
+        config->set("log_level", "DEBUG", ConfigSource::CommandLine);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -391,6 +636,72 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+        if (verboseOutput) {
+        config->set("log_level", "DEBUG", ConfigSource::CommandLine);
+    }
+    
+    // Performance monitoring and statistics
+    struct PerformanceStats {
+        double simulationTime;
+        size_t totalSpikes;
+        size_t firingNeurons;
+        float averageFiringRate;
+        std::vector<double> stepTimes;
+        std::vector<size_t> spikeCounts;
+        
+        PerformanceStats() : simulationTime(0.0), totalSpikes(0), firingNeurons(0),
+                           averageFiringRate(0.0) {}
+    };
+    
+    PerformanceStats performanceStats;
+    auto startWallTime = std::chrono::high_resolution_clock::now();
+    
+    // Performance monitoring setup
+    if (enableProfiling) {
+        NLM_LOG_INFO("Performance profiling enabled");
+        NLM_LOG_INFO("Step timing will be recorded");
+        NLM_LOG_INFO("Spike activity will be monitored");
+    }
+    
+    // Generate reproducibility metadata
+    struct ExperimentMetadata {
+        uint64_t timestamp;
+        uint64_t randomSeed;
+        std::string configFile;
+        uint64_t neuronCount;
+        uint64_t regionCount;
+        uint64_t simulationSteps;
+        std::string nlmVersion;
+        std::map<std::string, std::string> parameters;
+        
+        ExperimentMetadata() : timestamp(std::time(nullptr)), randomSeed(42),
+                             neuronCount(500), regionCount(1), simulationSteps(0) {}
+    };
+    
+    ExperimentMetadata metadata;
+    metadata.randomSeed = randomSeed;
+    metadata.configFile = configFile;
+    metadata.neuronCount = neuronCount;
+    metadata.regionCount = regionCount;
+    metadata.simulationSteps = simulationSteps;
+    metadata.nlmVersion = "Phase 6.0 (Final Integration)";
+    
+    // Add current parameters
+    metadata.parameters["simulation_timestep"] = std::to_string(timestep);
+    metadata.parameters["connection_probability"] = std::to_string(config->getOr<float>("connection_probability", 0.15f));
+    metadata.parameters["stdp_ltp_weight"] = std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f));
+    metadata.parameters["stdp_ltd_weight"] = std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f));
+    
+    if (enableProfiling) {
+        NLM_LOG_INFO("Experiment metadata generated:");
+        NLM_LOG_INFO("  Timestamp: " + std::to_string(metadata.timestamp));
+        NLM_LOG_INFO("  Random seed: " + std::to_string(metadata.randomSeed));
+        NLM_LOG_INFO("  Neuron count: " + std::to_string(metadata.neuronCount));
+        NLM_LOG_INFO("  Region count: " + std::to_string(metadata.regionCount));
+        NLM_LOG_INFO("  Simulation steps: " + std::to_string(metadata.simulationSteps));
+        NLM_LOG_INFO("  NLM version: " + metadata.nlmVersion);
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

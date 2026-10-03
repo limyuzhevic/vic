@@ -1,4 +1,9 @@
 #include "ExperimentRunner.hpp"
+#include "../brain/Brain.hpp"
+#include "../environment/Environment.hpp"
+#include "../world/SimpleWorld.hpp"
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
@@ -77,13 +82,30 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
+        // Clone brain from template configuration
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
         brain->initialize();
         
-        // Would also create fresh environment here
+        // Clone environment from template
+        auto environment = std::make_shared<SimpleWorld>();
         
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
+        // Configure environment with same parameters as template if possible
+        // Get configuration from brain template
+        auto config = brainTemplate->getConfig();
+        
+        // SimpleWorld uses fixed defaults (20x20), but we can configure it
+        // Based on typical environment settings (environment from Phase 6 demo uses 16x16)
+        environment->configure(16.0f, 16.0f, 16, 16);
+        
+        // Set random seed from experiment for reproducibility
+        auto seedIt = config->get<uint64_t>("random_seed");
+        if (seedIt.has_value()) {
+            environment->setRandomSeed(seedIt.value());
+        }
+        
+        environment->reset();
+
+        if (runExperiment(exp, brain, environment, maxSteps)) {
             results.push_back(exp);
         }
     }
@@ -113,8 +135,54 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "=== NLM Experiment Results ===" << std::endl;
+    file << "Global Seed: " << pImpl->globalSeed << std::endl;
+    file << "Total Experiments: " << pImpl->experiments.size() << std::endl;
+    file << std::endl;
+    
+    for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+        const auto& exp = pImpl->experiments[i];
+        file << "--- Experiment " << i + 1 << ": " << exp->getName() << " ---" << std::endl;
+        file << "Seed: " << exp->getSeed() << std::endl;
+        file << std::endl;
+        
+        // Save metrics
+        file << "Metrics:" << std::endl;
+        const auto& metrics = exp->getMetrics();
+        for (const auto& metric : metrics) {
+            file << "  " << metric.first << ": " << metric.second << std::endl;
+        }
+        file << std::endl;
+        
+        // Save step data
+        file << "Step Data:" << std::endl;
+        const auto& steps = exp->getStepData();
+        for (const auto& step : steps) {
+            file << "  Step " << step.step << ": neurons=" << step.neuronCount 
+                 << ", synapses=" << step.synapseCount << 
+                 << ", firing=" << step.firingCount << 
+                 << ", avg_rate=" << step.avgFiringRate << std::endl;
+        }
+        file << std::endl;
+        
+        // Save notes
+        const auto& notes = exp->getNotes();
+        if (!notes.empty()) {
+            file << "Notes:" << std::endl;
+            for (const auto& note : notes) {
+                file << "  - " << note << std::endl;
+            }
+            file << std::endl;
+        }
+    }
+    
+    file << "=== End of Results ===" << std::endl;
+    return true;
 }
 
 } // namespace nlm

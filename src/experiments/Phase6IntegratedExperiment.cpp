@@ -43,7 +43,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16.0f, 16.0f, 16, 16);
     
     // Create agent
     AgentBrain agent(brain);
