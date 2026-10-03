@@ -1,6 +1,3 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
-
 #include <iostream>
 #include <cassert>
 
@@ -43,6 +40,7 @@ int main() {
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Learning and Memory" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
