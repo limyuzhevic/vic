@@ -151,7 +151,7 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+              "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
