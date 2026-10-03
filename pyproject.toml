@@ -1,18 +1,18 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann_json>=3.11.0", "yaml-cpp>=0.7.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with advanced configuration and logging"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "configuration", "logging"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -33,6 +33,8 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "nlohmann_json>=3.11.0",
+    "yaml-cpp>=0.7.0",
 ]
 
 [project.urls]
@@ -47,6 +49,8 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DHAVE_NLOHMANN_JSON=ON",
+    "-DHAVE_YAML_CPP=ON",
 ]
 
 [tool.scikit-build.cmake.define]
@@ -55,3 +59,31 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+# NLM specific configuration
+tool.nlm]
+project_name = "NLM - Neural Learning Machine"
+version = "0.1.0"
+description = "An experimental artificial developmental brain with advanced configuration and logging capabilities"
+phase = "Phase 6: Final Integration"
+website = "https://nlm.readthedocs.io"
+
+# Enhancement configuration
+tool.nlm.enhancements]
+advanced_config = true
+async_logging = true
+structured_logging = true
+performance_logging = true
+json_yaml_support = true
+configuration_validation = true
+interpolation_support = true
+
+# Feature flags
+tool.nlm.features]
+async_logging = true
+structured_logging = true
+performance_logging = true
+configuration_interpolation = true
+advanced_formatting = true
+metadata_support = true
+statistics_monitoring = true
