@@ -3,12 +3,9 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
-
-// Forward declarations
-class Synapse;
-class RandomGenerator;
 
 // Neuron state structure for efficient storage
 struct NeuronState {

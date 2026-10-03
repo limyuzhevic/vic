@@ -6,17 +6,96 @@
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+## Quick Usage (2 Ways to Use)
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+### Method 1: Command Line Interface (NEW - Recommended for simulations)
+
+The enhanced CLI provides a modern, feature-rich interface:
+
+```bash
+# Default simulation (backward compatible)
+nlm
+
+# Enhanced Phase 2 with modern CLI
+nlm --mode phase2 --preset complex --neurons 1000 --steps 5000
+
+# Interactive exploration
+nlm --interactive
+
+# Export results
+nlm --json-export --output results.json
+
+# Run different phases
+nlm --mode phase3 --preset simple
+nlm --mode phase6
+
+# Get help
+nlm --help
+```
+
+### Method 2: Python API (Existing)
+
+```python
+import pynlm
+
+# Create and initialize a brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+```
+
+## Building
+
+### C++ Building (with enhanced CLI)
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Python Building
+
+```bash
+pip install .
+```
+
+## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── src/
+│   ├── core/           # Core utilities
+│   ├── brain/          # Neural components (integrated)
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── memory/        # Memory systems (integrated)
+│   ├── prediction/     # Prediction systems (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment/   # Environment interface
+│   ├── experiments/   # Experiment framework (Phase 6)
+│   └── visualization/  # Visualization
+├── tests/
+└── configs/
+```
 
 ## Current Phase
 
@@ -66,6 +145,8 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### C++ Building (with enhanced CLI)
+
 ```bash
 mkdir build
 cd build
@@ -73,14 +154,85 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+### Python Building
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+pip install .
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Run the Enhanced CLI
+
+After building, you can use the enhanced command-line interface:
+
+```bash
+# Default simulation (backward compatible)
+./nlm
+
+# Enhanced Phase 2 with modern CLI
+./nlm --mode phase2 --preset complex --neurons 1000 --steps 5000
+
+# Interactive exploration
+./nlm --interactive
+
+# Export results
+./nlm --json-export --output results.json
+
+# Run different phases
+./nlm --mode phase3 --preset simple
+./nlm --mode phase6
+
+# Get help
+./nlm --help
+```
+## Running
+
+### Enhanced CLI (Recommended)
+
+The enhanced CLI provides access to all NLM functionality:
+
+```bash
+# Default simulation (backward compatible)
+./nlm
+
+# Enhanced Phase 2 with modern CLI
+./nlm --mode phase2 --preset complex --neurons 1000 --steps 5000
+
+# Interactive exploration mode
+./nlm --interactive
+
+# Export results to JSON
+./nlm --json-export --output results.json
+
+# Run Phase 3 world interaction demo
+./nlm --mode phase3 --preset simple
+
+# Run Phase 4 cognition experiments
+./nlm --mode phase4 --steps 1000
+
+# Run Phase 6 integration test
+./nlm --mode phase6
+
+# Performance profiling with verbose output
+./nlm --verbose --profile --mode phase2
+
+# Get help and see all options
+./nlm --help
+```
+
+### Legacy Demos (Phase 3, Phase 4, Phase 6)
+
+For backward compatibility, the original Phase demos are still available:
+
+```bash
+# Phase 3 demo - World interaction
+./nlm_phase3_demo
+
+# Phase 4 demo - Cognition experiments  
+./nlm_phase4_demo
+
+# Phase 6 demo - Full integration test
+./nlm_phase6_demo
+```
 
 ## Project Structure
 
@@ -121,11 +273,15 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### Phase 2 (Complete - Enhanced)
+- **Real LIF neuron dynamics**
+- **Event-driven spike propagation with delays**
+- **STDP and Hebbian plasticity rules**
+- **Structural plasticity (synaptogenesis/pruning)**
+- **Enhanced CLI interface** (NEW)
+- **Modern command-line options** (NEW)
+- **Experiment presets** (NEW)
+- **Result export capabilities** (NEW)
 
 ### Phase 3 (Complete)
 - World interaction loop
@@ -161,6 +317,7 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- **Enhanced CLI Phase 2 access** (NEW)
 
 ## Scientific Limitations
 

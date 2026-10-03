@@ -12,6 +12,24 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+### Quick Command Line Usage (New!)
+
+If you want to use the enhanced command-line interface (recommended for simulations):
+
+```bash
+# Simple usage - run enhanced Phase 2 with default settings
+nlm
+
+# Quick simulation with preset
+nlm --preset simple --steps 500
+
+# Interactive exploration
+nlm --interactive
+
+# Export results
+nlm --json-export --output results.json
+```
+
 ---
 
 ## The 3 Things You Need to Know
@@ -287,11 +305,53 @@ print("Agent simulation complete!")
 
 ---
 
-## Next Steps
+## Command Line Interface (CLI)
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+If you prefer command-line usage instead of Python, NLM now has a powerful, modern CLI interface! 
 
-That's it! You're now ready to use NLM.
+## Quick Command Line Usage
+
+```bash
+# Simple usage - run enhanced Phase 2 with default settings
+nlm
+
+# Quick simulation with preset
+nlm --preset simple --steps 500
+
+# Interactive exploration
+nlm --interactive
+
+# Export results
+nlm --json-export --output results.json
+
+# Run different phases
+nlm --mode phase3 --preset simple
+nlm --mode phase4 --steps 1000
+nlm --mode phase6
+
+# Get help and see all options
+nlm --help
+```
+
+## CLI Features
+
+- **Enhanced Phase 2**: Real neural computation with modern CLI
+- **Multiple Modes**: Phase 2, Phase 3, Phase 4, Phase 6, Interactive, Integration
+- **Experiment Presets**: simple, medium, complex, debug
+- **Progress Indicators**: Real-time feedback during execution
+- **Result Export**: JSON, CSV formats for analysis
+- **Configuration Management**: File-based and command-line configuration
+- **Interactive Mode**: Real-time control over your brain simulation
+
+## Getting Started
+
+Try the simplest command first:
+```bash
+nlm
+```
+
+Then try with different presets:
+```bash
+nlm --preset simple --steps 1000
+nlm --preset debug
+```

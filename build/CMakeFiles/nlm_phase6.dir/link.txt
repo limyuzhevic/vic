@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_phase6.a CMakeFiles/nlm_phase6.dir/src/experiments/Phase6Demo.cpp.o
+/usr/bin/ranlib libnlm_phase6.a
