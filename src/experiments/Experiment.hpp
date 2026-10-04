@@ -4,8 +4,12 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
+
+// Forward declaration for ParameterSweep
+struct ParameterSweep;
 
 // Experiment: Records data from a single experimental run
 class Experiment {
@@ -64,9 +68,42 @@ public:
     void addNote(const std::string& note);
     const std::vector<std::string>& getNotes() const;
     
+    // Advanced experiment management
+    void exportData(const std::string& format, const std::string& filepath);
+    void importData(const std::string& filepath);
+    nlohmann::json getStatistics() const;
+    nlohmann::json analyzeResults() const;
+    
+    // Parameter sweep functionality
+    void runParameterSweep(const std::string& paramName, 
+                         const std::vector<double>& values,
+                         const std::string& type = "linear");
+    void runParameterSweep(const std::string& paramName,
+                         double minValue, double maxValue,
+                         int steps, const std::string& type = "linear");
+    
+    // Experiment export/import
+    void exportExperiment(const std::string& format, const std::string& filepath);
+    void exportToJSON(const std::string& filepath);
+    void exportToCSV(const std::string& filepath);
+    void importFromFile(const std::string& filepath);
+    
+    // Advanced features
+    void runMultiObjectiveOptimization(const std::vector<std::string>& objectives);
+    void setupReproducibility();
+    void enableParallelProcessing(int numThreads);
+    void enableDistributedComputing(const std::string& masterAddress);
+    void enableAdvancedVisualization();
+    
+    // Advanced statistics
+    nlohmann::json getAdvancedStatistics() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Advanced experiment data
+    std::vector<ParameterSweep> sweeps;
 };
 
 } // namespace nlm
