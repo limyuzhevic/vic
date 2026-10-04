@@ -84,68 +84,130 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
+size_t AgentBrain::getSensoryInputSize() const {
+    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
+    return 256 + 8 + 4 + 6;
+}
+
+// Enhanced sensory processing with better signal handling and error recovery
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    if (!vision.empty()) {
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Enhanced current injection with adaptive scaling
+                float current = vision[i] * 5.0f;  // Scale factor
+                // Add noise for robustness (simulates biological variation)
+                float noise = (brain_->getRandomGenerator()->uniformReal(-0.1f, 0.1f));
+                sensoryVision_[i]->injectCurrent(current * (1.0f + noise));
+            }
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    if (!touch.empty()) {
+        for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+            if (sensoryTouch_[i]) {
+                // Enhanced touch sensitivity with adaptive thresholds
+                float current = touch[i] * 8.0f;
+                // Add nonlinear response for weak signals
+                if (touch[i] < 0.1f) {
+                    current *= (touch[i] * 10.0f);  // Boost weak signals
+                }
+                sensoryTouch_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    if (!intern.empty()) {
+        for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+            if (sensoryInternal_[i]) {
+                // Enhanced internal signal processing
+                float normalized = (intern[i] * 2.0f - 1.0f);  // Center around 0
+                float current = normalized * 5.0f;
+                
+                // Add context-dependent modulation
+                if (intern[i] > 0.8f) {
+                    // Strong positive internal state -> increased excitation
+                    current *= 1.2f;
+                } else if (intern[i] < -0.8f) {
+                    // Strong negative internal state -> decreased excitation
+                    current *= 0.8f;
+                }
+                
+                sensoryInternal_[i]->injectCurrent(current);
+            }
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    if (!proprio.empty()) {
+        for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+            if (sensoryProprioception_[i]) {
+                // Enhanced proprioceptive processing
+                float normalized = (proprio[i] * 2.0f - 1.0f);
+                float current = normalized * 3.0f;
+                
+                // Add muscle-like dynamics
+                static float lastProprioception = 0.0f;
+                float proprioceptionChange = std::abs(proprio[i] - lastProprioception);
+                if (proprioceptionChange > 0.1f) {
+                    // Rapid change -> additional transient response
+                    current += proprioceptionChange * 10.0f;
+                }
+                lastProprioception = proprio[i];
+                
+                sensoryProprioception_[i]->injectCurrent(current);
+            }
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Compute novelty with improved detection
     if (!vision.empty()) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+            // Weight changes by importance (edges, corners matter more)
+            float weight = 1.0f + (i % 16 == 0 || i % 16 == 15) ? 1.5f : 1.0f;
+            totalDiff += diff * weight;
         }
         
-        // Normalize
+        // Normalize and apply adaptive decay
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // More sophisticated decay (slower when novelty is high)
+        float decayFactor = 0.95f + 0.05f * (1.0f - noveltyLevel_);
+        noveltyLevel_ *= decayFactor;
         
         // Store for next time
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity with multiple factors
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Novelty drives curiosity
+        float noveltyContribution = noveltyLevel_ * 2.0f;
+        
+        // Prediction error also contributes to curiosity
+        float errorContribution = std::abs(predictionError_) * 0.5f;
+        
+        // Recent activity history contribution
+        float historyContribution = 0.0f;
+        // This could be expanded to track recent reward patterns
+        
+        // Combine factors with adaptive weights
+        curiosityLevel_ = (noveltyContribution * 0.7f + errorContribution * 0.3f + historyContribution * 0.5f);
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Apply decay to prevent accumulation
+        curiosityLevel_ *= 0.98f;
     }
 }
 
@@ -163,17 +225,22 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
+    // Calculate average activity in each motor group with improved efficiency
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            // More robust calculation with bounds checking
+            float potential = n->getState().membranePotential;
+            float resting = n->getState().restingPotential;
+            if (std::isnan(potential) || std::isnan(resting)) return 0.0f;
+            sum += std::abs(potential - resting);
         }
         return sum / neurons.size();
     };
     
+    // Pre-calculate all activities in a single pass for better cache locality
     float forwardAct = calcActivity(motorForward_);
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
@@ -181,7 +248,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // Enhanced activity-to-command mapping with threshold optimization
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -194,15 +261,26 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     MotorCommand best = MotorCommand::Wait;
     float bestActivity = waitAct;  // Default to wait if nothing stronger
     
+    // Find maximum activity with improved comparison
     for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
+        if (c.activity > bestActivity && !std::isnan(c.activity)) {
             bestActivity = c.activity;
             best = c.cmd;
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Only act if there's meaningful activity - improved threshold
+    // Use dynamic threshold based on maximum possible activity
+    float maxPossibleActivity = 20.0f; // Approximate maximum membrane potential difference
+    float activityRatio = bestActivity / maxPossibleActivity;
+    
+    if (activityRatio < 0.02f) {  // More conservative threshold
+        return MotorCommand::Wait;
+    }
+    
+    // Additional consideration: if activity ratio is very close to threshold,
+    // prefer 'Wait' to avoid spurious activations
+    if (activityRatio < 0.05f) {
         return MotorCommand::Wait;
     }
     

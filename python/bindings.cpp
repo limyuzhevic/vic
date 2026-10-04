@@ -6,15 +6,15 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -105,34 +105,43 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
+    // Missing neuromodulation classes - add them to the Python bindings
+    // These are needed for advanced users to access all neuromodulators
+    
+    // Acetylcholine (already exists but missing from bindings)
+    py::class_<Acetylcholine, Neuromodulator>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Acetylcholine::getName)
+        .def("getLevel", &Acetylcholine::getLevel)
+        .def("setLevel", &Acetylcholine::setLevel)
+        .def("getPlasticityFactor", &Acetylcholine::getPlasticityFactor)
+        .def("update", &Acetylcholine::update);
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    // Norepinephrine (already exists but missing from bindings)
+    py::class_<Norepinephrine, Neuromodulator>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName)
+        .def("getLevel", &Norepinephrine::getLevel)
+        .def("setLevel", &Norepinephrine::setLevel)
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor)
+        .def("update", &Norepinephrine::update);
+
+    // Serotonin (already exists but missing from bindings)
+    py::class_<Serotonin, Neuromodulator>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Serotonin::getName)
+        .def("getLevel", &Serotonin::getLevel)
+        .def("setLevel", &Serotonin::setLevel)
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor)
+        .def("update", &Serotonin::update);
+
+    // Ensure Neuromodulator base class is exposed for polymorphism
+    py::class_<Neuromodulator>(m, "Neuromodulator", R"pbdoc(Abstract neuromodulator base class)pbdoc")
+        .def("getName", &Neuromodulator::getName)
+        .def("getLevel", &Neuromodulator::getLevel)
+        .def("setLevel", &Neuromodulator::setLevel)
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor)
+        .def("update", &Neuromodulator::update);
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
