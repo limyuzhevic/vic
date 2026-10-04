@@ -17,6 +17,7 @@ PredictionSystem::~PredictionSystem() = default;
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
+    // This will be enhanced to use NeuralPrediction system
     return currentState.clone();
 }
 

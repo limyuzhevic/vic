@@ -19,6 +19,8 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , attentionalGain_(1.0f)
+    , attentionalFocus_(1.0f)
 {
 }
 
@@ -545,4 +547,253 @@ void TemporalRelation::clear() {
     sequences_.clear();
 }
 
-} // namespace nlm
+void ConceptFormation::updateWithAttentionalContext(const AttentionalState& attentionalState) {
+    if (!brain_) return;
+    
+    // Modulate concept learning based on attentional state
+    float attentionalModulation = attentionalState.attentionStrength * attentionalState.excitationLevel;
+    float inhibitoryModulation = attentionalState.inhibitionLevel;
+    
+    // Enhance learning for attended concepts
+    attentionalGain_ = 1.0f + attentionalModulation * 0.5f;
+    attentionalFocus_ = 1.0f - inhibitoryModulation * 0.3f;
+    
+    // Update concept stability based on attentional relevance
+    for (auto& concept : concepts_) {
+        // Find instances that are being attended
+        float attendedRelevance = 0.0f;
+        size_t attendedCount = 0;
+        
+        for (const auto& instance : concept.instances) {
+            // Check if this instance is among attended neurons
+            bool isAttended = false;
+            for (const auto& attendedNeuron : attentionalState.attendedNeurons) {
+                if (attendedNeuron == instance.pattern) {  // Simplified comparison
+                    isAttended = true;
+                    break;
+                }
+            }
+            
+            if (isAttended) {
+                attendedRelevance += instance.attentionalRelevance;
+                attendedCount++;
+            }
+        }
+        
+        if (attendedCount > 0) {
+            // Boost stability of attended instances
+            for (auto& instance : concept.instances) {
+                bool isAttended = false;
+                for (const auto& attendedNeuron : attentionalState.attendedNeurons) {
+                    if (attendedNeuron == instance.pattern) {
+                        isAttended = true;
+                        break;
+                    }
+                }
+                
+                if (isAttended) {
+                    instance.stability = std::min(1.0f, instance.stability * attentionalModulation * 1.5f);
+                    instance.attentionalRelevance = attentionalModulation;
+                }
+            }
+            
+            // Increase overall concept stability based on attentional focus
+            concept.avgStability = std::min(1.0f, concept.avgStability * (1.0f + attentionalFocus_ * 0.3f));
+        }
+    }
+    
+    NLM_LOG_INFO("ConceptFormation: Updated with attentional context (strength: " + 
+                 std::to_string(attentionalState.attentionStrength) + ", gain: " + 
+                 std::to_string(attentionalGain_) + ")");
+}
+
+void ConceptFormation::processSensoryWithAttention(const std::vector<float>& sensoryState,
+                                                 const AttentionalState& attentionalState) {
+    if (!brain_) return;
+    
+    // Apply attentional filtering to sensory input
+    std::vector<float> attendedSensory;
+    
+    // Select sensory features that match attentional focus
+    for (size_t i = 0; i < sensoryState.size(); ++i) {
+        float salience = sensoryState[i];
+        
+        // Enhance features that are in attentional focus
+        for (const auto& attendedNeuron : attentionalState.attendedNeurons) {
+            if (i < attendedNeuron.size() && attendedNeuron[i] > 0.5f) {
+                salience *= attentionalState.attentionStrength * 1.5f;
+                break;
+            }
+        }
+        
+        // Apply inhibition from attended regions
+        if (attentionalState.inhibitionLevel > 0.5f) {
+            salience *= (1.0f - attentionalState.inhibitionLevel * 0.5f);
+        }
+        
+        attendedSensory.push_back(salience);
+    }
+    
+    // Process attended sensory input with enhanced learning
+    if (attentionalState.attentionStrength > 0.7f) {
+        // High attention = rapid concept formation
+        setFormationThreshold(0.5f + attentionalState.attentionStrength * 0.2f);
+        setStabilityThreshold(0.5f + attentionalState.attentionStrength * 0.3f);
+        
+        // Process with enhanced sensitivity
+        if (!attendedSensory.empty()) {
+            size_t matchingConcept = findConceptForPattern(attendedSensory);
+            if (matchingConcept > 0) {
+                // Get concept and update with high weight
+                DiscoveredConcept* concept = nullptr;
+                for (auto& c : concepts_) {
+                    if (c.id == matchingConcept) {
+                        concept = &c;
+                        break;
+                    }
+                }
+                
+                if (concept) {
+                    // Rapid update with attentional boost
+                    updatePrototype(matchingConcept, attendedSensory, attentionalState.attentionStrength * 2.0f);
+                }
+            } else {
+                // Form new concept quickly when attention is high
+                if (attentionalState.attentionStrength > 0.9f) {
+                    createConcept(attendedSensory, {}, 0.8f);  // High confidence reward
+                }
+            }
+        }
+    } else {
+        // Normal processing with attentional modulation
+        for (size_t i = 0; i < attendedSensory.size(); ++i) {
+            if (attendedSensory[i] > 0.1f) {
+                // Create feature vector with attentional weighting
+                std::vector<float> features = attendedSensory[i] * attentionalState.attentionStrength;
+                
+                // Present to concept formation with reward based on attentional match
+                float reward = attentionalState.attentionStrength * 0.5f;
+                size_t conceptId = presentExperience(attendedSensory, features, reward, 0);
+                
+                // Store attentional prediction for feedback
+                if (conceptId > 0 && conceptId <= concepts_.size()) {
+                    concepts_[conceptId - 1].attentionalPredictions.push_back(attendedSensory[i]);
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("ConceptFormation: Processed sensory input with attentional modulation (input size: " + 
+                 std::to_string(sensoryState.size()) + ", attended: " + 
+                 std::to_string(attentionalState.attendedNeurons.size()) + ")");
+}
+
+std::vector<float> ConceptFormation::getAttentionalPredictions() const {
+    std::vector<float> allPredictions;
+    
+    for (const auto& concept : concepts_) {
+        // Get predictions from attended concept instances
+        for (const auto& instance : concept.instances) {
+            if (instance.attentionalRelevance > 0.3f) {
+                allPredictions.push_back(instance.attentionalRelevance);
+            }
+        }
+    }
+    
+    return allPredictions;
+}
+
+void ConceptFormation::integrateAttentionalPredictions(const std::vector<float>& predictions) {
+    if (predictions.empty()) return;
+    
+    // Integrate attentional predictions into concept refinement
+    float avgPrediction = 0.0f;
+    for (float pred : predictions) avgPrediction += pred;
+    avgPrediction /= predictions.size();
+    
+    // Apply predictions to concept prototypes
+    for (auto& concept : concepts_) {
+        // Adjust prototype based on attentional predictions
+        if (avgPrediction > 0.7f) {
+            // High prediction confidence - strengthen prototype
+            for (auto& component : concept.prototype) {
+                component = std::min(1.0f, component * 1.1f);
+            }
+            concept.attentionalGain = std::min(1.0f, concept.attentionalGain * 1.2f);
+        } else if (avgPrediction < 0.3f) {
+            // Low prediction confidence - increase exploration
+            for (auto& component : concept.prototype) {
+                component = std::max(0.0f, component * 0.9f);
+            }
+            concept.attentionalFocus = std::max(0.1f, concept.attentionalFocus * 0.8f);
+        }
+    }
+    
+    NLM_LOG_INFO("ConceptFormation: Integrated attentional predictions (avg: " + 
+                 std::to_string(avgPrediction) + ", count: " + std::to_string(predictions.size()) + ")");
+}
+
+void ConceptFormation::enhanceLearningBasedOnAttention(float attentionStrength) {
+    // Dramatically enhance learning when attention is strong
+    if (attentionStrength > 0.8f) {
+        // Hyper-learning state
+        setFormationThreshold(0.3f + attentionStrength * 0.4f);
+        setStabilityThreshold(0.3f + attentionStrength * 0.5f);
+        
+        NLM_LOG_INFO("ConceptFormation: Entering hyper-learning state (attention: " + 
+                     std::to_string(attentionStrength) + ")");
+    } else if (attentionStrength > 0.5f) {
+        // Enhanced learning state
+        setFormationThreshold(0.5f + attentionStrength * 0.3f);
+        setStabilityThreshold(0.5f + attentionStrength * 0.4f);
+        
+        NLM_LOG_INFO("ConceptFormation: Enhanced learning state (attention: " + 
+                     std::to_string(attentionStrength) + ")");
+    }
+}
+
+void ConceptFormation::applyAttentionalFeedback(const AttentionalState& attentionalState) {
+    // Apply attentional feedback to concept updates
+    for (auto& concept : concepts_) {
+        // Update attentional modulation based on current attentional state
+        concept.attentionalGain = std::max(0.1f, concept.attentionalGain * (1.0f - attentionalState.inhibitionLevel * 0.5f));
+        concept.attentionalFocus = std::min(1.0f, concept.attentionalFocus + attentionalState.attentionStrength * 0.1f);
+        
+        // Accumulate prediction error
+        concept.accumulatedPredictionError += (1.0f - concept.attentionalFocus) * 0.1f;
+        concept.accumulatedPredictionError = std::min(1.0f, concept.accumulatedPredictionError);
+    }
+    
+    // Update instances with attentional feedback
+    for (auto& concept : concepts_) {
+        for (auto& instance : concept.instances) {
+            // Adjust instance attributes based on attentional feedback
+            if (attentionalState.attentionStrength > 0.6f) {
+                instance.stability = std::min(1.0f, instance.stability * 1.2f);
+                instance.attentionalRelevance = attentionalState.attentionStrength;
+            }
+            
+            instance.predictionError = std::abs(instance.stability - concept.attentionalFocus);
+        }
+    }
+    
+    NLM_LOG_INFO("ConceptFormation: Applied attentional feedback to " + 
+                 std::to_string(concepts_.size()) + " concepts");
+}
+
+float ConceptFormation::getAttentionalModulation(size_t conceptId) const {
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (concept) {
+        return concept->attentionalGain * concept->attentionalFocus;
+    }
+    return 0.0f;
+}
+
+void ConceptFormation::setAttentionalParameters(float gain, float focus) {
+    attentionalGain_ = std::clamp(gain, 0.1f, 2.0f);
+    attentionalFocus_ = std::clamp(focus, 0.1f, 2.0f);
+    
+    NLM_LOG_INFO("ConceptFormation: Set attentional parameters (gain: " + 
+                 std::to_string(attentionalGain_) + ", focus: " + 
+                 std::to_string(attentionalFocus_) + ")");
+}

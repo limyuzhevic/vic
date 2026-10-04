@@ -4,13 +4,17 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../memory/SleepConsolidationSystem.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
+// Forward declarations for sleep system
+enum class SleepState : uint8_t;
+
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding, plus sleep/rest cycle management
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,12 +73,34 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Sleep/rest state management
+    SleepState::State getSleepState() const { return sleepState_; }
+    float getSleepPressure() const { return sleepPressure_; }
+    float getHomeostaticBalance() const { return homeostaticBalance_; }
+    bool isSpontaneousReplayEnabled() const { return spontaneousReplayEnabled_; }
+    bool isSleepConsolidationActive() const { return sleepConsolidationActive_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Update sleep state and pressure
+    void updateSleepState();
+    
+    // Update attentional focus based on sensory salience
+    void updateAttentionalFocus(const std::vector<float>& vision,
+                               const std::vector<float>& touch,
+                               const std::vector<float>& internal,
+                               const std::vector<float>& proprioception);
+    
+    // Feed attentional focus back to memory systems
+    void feedAttentionToMemorySystems();
+    
+    // Provide attentional feedback to concept formation
+    void provideAttentionToConceptFormation();
     
     std::shared_ptr<Brain> brain_;
     
@@ -102,6 +128,24 @@ private:
     // Development state
     double developmentalAge_;
     float plasticityModifier_;
+    
+    // Additional neuromodulators for sleep-wake control
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;
+    
+    // Attentional state
+    float attentionStrength_;
+    float attentionFocus_;
+    float memoryAttentionalBias_;
+    
+    // Sleep/rest state
+    SleepState::State sleepState_;
+    float sleepPressure_;
+    float lastSleepTime_;
+    bool spontaneousReplayEnabled_;
+    bool sleepConsolidationActive_;
+    float homeostaticBalance_;
     
     // Configuration flags
     bool rewardModulationEnabled_;

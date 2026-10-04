@@ -1,11 +1,16 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/SleepConsolidationSystem.hpp"
+#include "../memory/PersistentMemorySystem.hpp"
+#include "../memory/ReplaySystem.hpp"
 #include <algorithm>
 #include <cmath>
-
-namespace nlm {
-
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+#include <unordered_map>
     : brain_(brain)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
@@ -19,6 +24,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , attentionStrength_(0.5f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , memoryAttentionalBias_(0.0f)
+    , sleepState_(SleepConsolidationSystem::SleepConsolidationSystem::SleepState::State::Awake)
+    , sleepPressure_(0.0f)
+    , lastSleepTime_(0.0)
+    , spontaneousReplayEnabled_(true)
+    , sleepConsolidationActive_(true)
+    , homeostaticBalance_(1.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -68,6 +83,22 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Initialize sleep state
+    sleepState_ = SleepConsolidationSystem::SleepConsolidationSystem::SleepState::State::Awake;
+    sleepPressure_ = 0.0f;
+    lastSleepTime_ = 0.0;
+    spontaneousReplayEnabled_ = true;
+    sleepConsolidationActive_ = true;
+    homeostaticBalance_ = 1.0f;
+    
+    // Initialize attentional modulation
+    attentionStrength_ = 0.5f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
+    attentionFocus_ = 0.0f;
+    memoryAttentionalBias_ = 0.0f;
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
@@ -93,6 +124,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
+            // Apply attentional modulation
+            float attentionalGain = 1.0f + attentionStrength_ * acetylcholineLevel_ * 0.5f;
+            current *= attentionalGain;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -102,6 +136,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            // Apply attentional modulation
+            float attentionalGain = 1.0f + attentionStrength_ * norepinephrineLevel_ * 0.3f;
+            current *= attentionalGain;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -111,6 +148,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            // Apply attentional modulation for internal processing
+            float attentionalGain = 1.0f + attentionStrength_ * acetylcholineLevel_ * 0.3f;
+            current *= attentionalGain;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -120,6 +160,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            // Apply attentional modulation
+            float attentionalGain = 1.0f + attentionStrength_ * norepinephrineLevel_ * 0.2f;
+            current *= attentionalGain;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -147,49 +190,86 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
-}
-
-MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Update sleep state and pressure
+    updateSleepState();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Update sleep state and pressure based on neuromodulatory signals and time
+void AgentBrain::updateSleepState() {
+    if (!brain_ || !brain_->getSleepConsolidationSystem()) {
+        return;
     }
     
-    return decoded;
-}
-
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    // Get current sleep state from the sleep consolidation system
+    const auto& sleepSystem = brain_->getSleepConsolidationSystem();
+    
+    // Update sleep pressure based on time awake and novelty
+    if (sleepState_ == SleepConsolidationSystem::SleepState::State::Awake) {
+        sleepPressure_ += 1.0f * (1.0f - serotoninLevel_) * 0.1f;  // Higher pressure without serotonin
+        sleepPressure_ += noveltyLevel_ * 0.05f;  // Novelty increases sleep pressure
+        sleepPressure_ = std::clamp(sleepPressure_, 0.0f, 1.0f);
+    } else {
+        // Reduce sleep pressure during sleep
+        sleepPressure_ *= 0.9f;
+        sleepPressure_ = std::max(0.0f, sleepPressure_ - 0.2f * homeostaticBalance_);
+    }
+    
+    // Update sleep state based on sleep pressure and neuromodulators
+    float sleepThreshold = 0.6f + (1.0f - acetylcholineLevel_) * 0.3f - 
+                          norepinephrineLevel_ * 0.2f + 
+                          sleepPressure_ * 0.4f;
+    
+    if (sleepState_ == SleepConsolidationSystem::SleepState::State::Awake && sleepPressure_ > sleepThreshold) {
+        // Enter sleep state
+        sleepState_ = SleepConsolidationSystem::SleepState::State::LightSleep;
+        lastSleepTime_ = developmentalAge_;
+        
+        // Enable sleep consolidation
+        if (sleepConsolidationActive_) {
+            brain_->getSleepConsolidationSystem()->enterSleep(SleepConsolidationSystem::SleepConsolidationSystem::SleepState::State::LightSleep, 
+                                                            acetylcholineLevel_ * 0.5f);
         }
-        return sum / neurons.size();
-    };
+        
+        NLM_LOG_INFO("Entering light sleep state due to high sleep pressure");
+    } else if (sleepState_ != SleepConsolidationSystem::SleepState::State::Awake) {
+        // Check if we should wake up
+        float wakeThreshold = 0.2f + serotoninLevel_ * 0.4f - 
+                             norepinephrineLevel_ * 0.1f;
+        
+        if (sleepPressure_ < wakeThreshold) {
+            // Wake up
+            brain_->getSleepConsolidationSystem()->exitSleep();
+            sleepState_ = SleepConsolidationSystem::SleepState::State::Awake;
+            
+            NLM_LOG_INFO("Woke up from sleep");
+        }
+    }
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    // Update homeostatic balance based on sleep quality
+    if (sleepState_ != SleepConsolidationSystem::SleepState::State::Awake) {
+        homeostaticBalance_ = (homeostaticBalance_ * 0.8f) + 0.2f;
+    } else {
+        homeostaticBalance_ = (homeostaticBalance_ * 0.9f) + (1.0f - sleepPressure_) * 0.1f;
+    }
+    homeostaticBalance_ = std::clamp(homeostaticBalance_, 0.5f, 1.5f);
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
+    // Apply sleep-related neuromodulatory effects
+    // Enhanced acetylcholine during sleep for memory consolidation
+    if (sleepState_ != SleepConsolidationSystem::SleepState::State::Awake) {
+        acetylcholineLevel_ = std::clamp(acetylcholineLevel_ + 0.01f, 0.2f, 0.8f);
+    } else {
+        // Lower acetylcholine during wake
+        acetylcholineLevel_ = std::clamp(acetylcholineLevel_ - 0.01f, 0.1f, 0.5f);
+    }
+    
+    // Update spontaneous replay based on sleep state
+    if (spontaneousReplayEnabled_ && sleepState_ != SleepConsolidationSystem::SleepState::State::Awake) {
+        brain_->getReplaySystem()->setReplayStatistics(
+            {{ "spontaneous_replay_enabled", 1.0f },
+             { "sleep_state", static_cast<float>(sleepState_) },
+             { "homeostatic_balance", homeostaticBalance_ }});
+    }
+}
     
     MotorCommand best = MotorCommand::Wait;
     float bestActivity = waitAct;  // Default to wait if nothing stronger
@@ -334,6 +414,230 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getAttentionStrength() const {
+    return attentionStrength_;
+}
+
+float AgentBrain::getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
+float AgentBrain::getAttentionFocus() const {
+    return attentionFocus_;
+}
+
+void AgentBrain::updateAttentionalFocus(const std::vector<float>& vision,
+                                      const std::vector<float>& touch,
+                                      const std::vector<float>& internal,
+                                      const std::vector<float>& proprioception) {
+    // Compute salience based on sensory input variance
+    float visionSalience = 0.0f;
+    if (!vision.empty()) {
+        float visionMean = 0.0f;
+        for (float v : vision) visionMean += v;
+        visionMean /= vision.size();
+        
+        float visionVariance = 0.0f;
+        for (float v : vision) {
+            float diff = v - visionMean;
+            visionVariance += diff * diff;
+        }
+        visionSalience = std::sqrt(visionVariance / vision.size()) * 2.0f;
+    }
+    
+    float touchSalience = 0.0f;
+    if (!touch.empty()) {
+        for (float t : touch) {
+            if (t > 0.5f) touchSalience += 1.0f;
+        }
+        touchSalience = std::min(touchSalience, 2.0f);
+    }
+    
+    float internalSalience = 0.0f;
+    if (!internal.empty()) {
+        for (float i : internal) {
+            internalSalience += std::abs(i);
+        }
+        internalSalience = std::min(internalSalience, 2.0f);
+    }
+    
+    // Combine saliences and apply neuromodulatory gains
+    float combinedSalience = visionSalience * 0.4f + touchSalience * 0.3f + 
+                             internalSalience * 0.3f;
+    
+    // Apply cholinergic enhancement
+    combinedSalience *= (1.0f + acetylcholineLevel_ * 1.5f);
+    
+    // Apply noradrenergic arousal modulation
+    combinedSalience *= (1.0f + norepinephrineLevel_ * 0.5f);
+    
+    // Smooth update to attention focus
+    attentionFocus_ = 0.9f * attentionFocus_ + 0.1f * std::clamp(combinedSalience, 0.0f, 1.0f);
+    
+    // Update attention strength based on neuromodulatory state
+    attentionStrength_ = 0.3f + 0.7f * acetylcholineLevel_ + 0.2f * norepinephrineLevel_;
+    attentionStrength_ = std::clamp(attentionStrength_, 0.1f, 1.0f);
+    
+    // Update neuromodulator levels based on attentional state
+    acetylcholineLevel_ = std::clamp(acetylcholineLevel_ + attentionFocus_ * 0.05f, 0.0f, 1.0f);
+    norepinephrineLevel_ = std::clamp(norepinephrineLevel_ + attentionFocus_ * 0.03f, 0.0f, 1.0f);
+}
+
+void AgentBrain::feedAttentionToMemorySystems() {
+    if (!brain_) return;
+    
+    // Apply attentional bias to working memory
+    memoryAttentionalBias_ = attentionFocus_ * 0.8f;
+    
+    // Get working memory system
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (workingMemory) {
+        // Strengthen memory traces that are currently attended
+        workingMemory->strengthenMemory(1.0f + memoryAttentionalBias_);
+        
+        // Apply attentional competition modulation
+        workingMemory->runCompetition();
+    }
+    
+    // Apply attentional focus to episodic memory encoding
+    auto* episodicMemory = brain_->getEpisodicMemory();
+    if (episodicMemory) {
+        // Enhanced encoding based on attention
+        if (attentionFocus_ > 0.7f) {
+            // Boost encoding efficiency
+            episodicMemory->boostEncodingEfficiency(1.2f + attentionFocus_ * 0.5f);
+        }
+    }
+}
+
+void AgentBrain::provideAttentionToConceptFormation() {
+    if (!brain_) return;
+    
+    auto* conceptFormation = brain_->getConceptFormation();
+    if (conceptFormation) {
+        // Provide attentional guidance to concept formation
+        // Higher attention focus increases sensitivity to patterns
+        if (attentionFocus_ > 0.5f) {
+            // Boost concept formation with attentional modulation
+            conceptFormation->setFormationThreshold(0.5f + attentionFocus_ * 0.3f);
+            
+            // Enhance pattern matching based on attention
+            conceptFormation->setStabilityThreshold(0.5f + attentionFocus_ * 0.4f);
+        }
+        
+        // Feedback attentional predictions to concept updates
+        if (predictionError_ > 0.0f && attentionFocus_ > 0.6f) {
+            conceptFormation->updateWithAttention(predictionError_, attentionFocus_);
+        }
+    }
+}
+
+void AgentBrain::applyNeuromodulation(const Neuromodulator& signal) {
+    if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Compute prediction error
+    predictionError_ = signal.getLevel(); // Simplified - normally would compare predicted vs actual reward
+    
+    // Update expected reward (exponential moving average)
+    expectedReward_ = 0.95f * expectedReward_ + 0.05f * signal.getLevel();
+    
+    // Neuromodulation based on signal type
+    if (signal.getName() == std::string("Acetylcholine")) {
+        acetylcholineLevel_ = signal.getLevel();
+    } else if (signal.getName() == std::string("Norepinephrine")) {
+        norepinephrineLevel_ = signal.getLevel();
+    } else if (signal.getName() == std::string("Dopamine")) {
+        dopamineLevel_ = signal.getLevel();
+    }
+    
+    // Clamp neuromodulator levels
+    acetylcholineLevel_ = std::clamp(acetylcholineLevel_, 0.0f, 1.0f);
+    norepinephrineLevel_ = std::clamp(norepinephrineLevel_, 0.0f, 1.0f);
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Apply neuromodulatory effects on neural excitability and plasticity
+    applyNeuromodulatoryEffects();
+    
+    // Update attentional strength based on neuromodulatory state
+    updateAttentionalStrength();
+}
+
+void AgentBrain::applyNeuromodulatoryEffects() {
+    if (!brain_) return;
+    
+    // Apply acetylcholine effects on memory encoding and attention
+    if (acetylcholineLevel_ > 0.3f) {
+        float achGain = acetylcholineLevel_ * 2.0f;
+        
+        // Enhance sensory processing
+        for (auto* neuron : brain_->getWorkingMemory()->getMemoryNeurons()) {
+            neuron->injectCurrent(0.5f * achGain);
+        }
+        
+        // Boost working memory capacity
+        brain_->getWorkingMemory()->setCapacity(
+            brain_->getWorkingMemory()->getCapacity() * (1.0f + acetylcholineLevel_ * 0.5f)
+        );
+    }
+    
+    // Apply norepinephrine effects on arousal and vigilance
+    if (norepinephrineLevel_ > 0.3f) {
+        float neGain = norepinephrineLevel_ * 1.5f;
+        
+        // Enhance signal-to-noise ratio
+        attentionStrength_ *= (1.0f + norepinephrineLevel_ * 0.8f);
+        
+        // Increase firing thresholds
+        attentionStrength_ = std::clamp(attentionStrength_, 0.1f, 1.0f);
+    }
+    
+    // Apply dopamine effects on reward prediction and motivation
+    if (dopamineLevel_ > 0.0f) {
+        float dopamineGain = std::max(0.0f, dopamineLevel_) * 2.0f;
+        
+        // Enhance concept formation for rewarding stimuli
+        auto* conceptFormation = brain_->getConceptFormation();
+        if (conceptFormation) {
+            // Modify concept formation based on reward prediction error
+            if (predictionError_ > 0.0f) {
+                conceptFormation->setFormationThreshold(
+                    conceptFormation->getFormationThreshold() * (1.0f - dopamineGain * 0.2f)
+                );
+            }
+        }
+    }
+}
+
+void AgentBrain::updateAttentionalStrength() {
+    // Integrate multiple neuromodulatory influences on attention
+    float neuromodulatoryInfluence = 0.4f * acetylcholineLevel_ + 
+                                   0.3f * norepinephrineLevel_ + 
+                                   0.3f * std::max(0.0f, dopamineLevel_);
+    
+    attentionStrength_ = 0.2f + neuromodulatoryInfluence * 0.8f;
+    attentionStrength_ = std::clamp(attentionStrength_, 0.1f, 1.0f);
+    
+    // Apply attention to memory systems
+    if (brain_->getWorkingMemory()) {
+        // Modulate working memory competition based on attentional strength
+        if (attentionStrength_ > 0.7f) {
+            // Enhanced competition - fewer winners, more selective
+            brain_->getWorkingMemory()->setCapacity(
+                brain_->getWorkingMemory()->getCapacity() * 0.8f
+            );
+        } else {
+            // Reduced competition - more inclusive retention
+            brain_->getWorkingMemory()->setCapacity(
+                brain_->getWorkingMemory()->getCapacity() * 1.2f
+            );
+        }
+    }
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -342,6 +646,21 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Reset sleep state
+    sleepState_ = SleepConsolidationSystem::SleepState::State::Awake;
+    sleepPressure_ = 0.0f;
+    lastSleepTime_ = 0.0;
+    spontaneousReplayEnabled_ = true;
+    sleepConsolidationActive_ = true;
+    homeostaticBalance_ = 1.0f;
+    
+    // Reset neuromodulator levels
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
+    attentionFocus_ = 0.0f;
+    memoryAttentionalBias_ = 0.0f;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);

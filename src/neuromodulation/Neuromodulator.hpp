@@ -57,33 +57,120 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Attention-specific methods
+    float getAttentionGain() const;
+    float getWorkingMemoryCapacity() const;
+    float getSignalToNoiseRatio() const;
+    
+    // Memory-specific methods
+    float getMemoryEncodingEfficiency() const;
+    float getMemoryConsolidationStrength() const;
+    float getMemoryRetrievalAccuracy() const;
+    
+    // Signal-based processing
+    void signalAttention(float attentionalDemand);
+    void signalMemory(float memoryLoad);
+    void signalEncoding(float encodingRate);
+    
+    // Reset
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Arousal-specific methods
+    float getNeuralGain() const;
+    float getAlertnessLevel() const;
+    float getResponsiveness() const;
+    
+    // Stress-response methods
+    float getStressSensitivity() const;
+    float getAnxietyLevel() const;
+    
+    // Signal-based processing
+    void signalArousal(float arousalLevel);
+    void signalStress(float stressLevel);
+    void signalAlertness(float alertness);
+    
+    // Reset
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Decision-making methods
+    float getDecisionBias() const;
+    float getImpulsivityLevel() const;
+    float getRewardProcessing() const;
+    
+    // Social behavior methods
+    float getSocialCohesion() const;
+    float getSocialRecognition() const;
+    float getAnxietyLevel() const;
+    
+    // Sleep/wake cycle methods
+    float getSleepReadiness() const;
+    float getWakeDrive() const;
+    
+    // Signal-based processing
+    void signalMood(float moodLevel);
+    void signalMotivation(float motivationLevel);
+    void signalSocialBehavior(float socialActivity);
+    
+    // Reset
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

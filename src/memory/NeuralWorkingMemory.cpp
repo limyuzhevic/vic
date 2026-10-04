@@ -424,3 +424,106 @@ void AttentionalSelection::reset() {
 }
 
 } // namespace nlm
+
+// WORKING MEMORY INTEGRATION METHODS
+
+void AttentionalSelection::integrateWorkingMemoryCompetition(const std::vector<NeuronId>& workingMemoryNeurons) {
+    // Integrate working memory traces into attentional selection
+    if (workingMemoryNeurons.empty()) return;
+    
+    // Store working memory neurons for integration
+    workingMemoryNeurons_ = workingMemoryNeurons;
+    
+    // Apply working memory activation as attentional bias
+    for (const auto& neuron : workingMemoryNeurons) {
+        float activation = 0.0f;
+        if (brain_) {
+            for (auto& region : brain_->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* n : *neurons) {
+                    if (n->getId() == neuron) {
+                        activation = std::abs(n->getState().membranePotential - n->getState().restingPotential);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (activation > 0.5f) {
+            // Strong working memory activation becomes attentional bias
+            applyTopDownBias(neuron, activation * 0.5f);
+        }
+    }
+}
+
+void AttentionalSelection::applyAttentionalFeedbackToWorkingMemory(float attentionalStrength) {
+    // Apply attentional feedback to working memory state
+    if (brain_ && brain_->getWorkingMemory()) {
+        // Modulate working memory based on attentional strength
+        float modulation = attentionalStrength * 0.5f;
+        
+        // Enhance working memory capacity when attention is strong
+        if (attentionalStrength > 0.7f) {
+            brain_->getWorkingMemory()->setCapacity(
+                brain_->getWorkingMemory()->getCapacity() * (1.0f + modulation)
+            );
+        }
+        
+        // Apply attentional bias to memory competition
+        brain_->getWorkingMemory()->runCompetition();
+    }
+}
+
+void AttentionalSelection::updateBasedOnWorkingMemoryState(const std::vector<NeuronId>& workingMemoryNeurons) {
+    // Update attentional state based on working memory contents
+    workingMemoryNeurons_ = workingMemoryNeurons;
+    
+    if (workingMemoryNeurons.empty()) {
+        workingMemoryAttentionalModulation_ = 0.0f;
+        return;
+    }
+    
+    // Calculate overall attentional modulation from working memory
+    float totalActivation = 0.0f;
+    for (const auto& neuron : workingMemoryNeurons) {
+        if (brain_) {
+            for (auto& region : brain_->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* n : *neurons) {
+                    if (n->getId() == neuron) {
+                        totalActivation += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    workingMemoryAttentionalModulation_ = std::min(1.0f, totalActivation / workingMemoryNeurons.size());
+    
+    // Integrate working memory into attentional selection
+    integrateWorkingMemoryCompetition(workingMemoryNeurons);
+}
+
+float AttentionalSelection::getWorkingMemoryAttentionalModulation(const std::vector<NeuronId>& workingMemoryNeurons) const {
+    // Calculate attentional modulation from working memory
+    if (workingMemoryNeurons.empty()) return 0.0f;
+    
+    float totalActivation = 0.0f;
+    if (brain_) {
+        for (const auto& neuron : workingMemoryNeurons) {
+            for (auto& region : brain_->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* n : *neurons) {
+                    if (n->getId() == neuron) {
+                        totalActivation += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    return std::min(1.0f, totalActivation / workingMemoryNeurons.size());
+}
+

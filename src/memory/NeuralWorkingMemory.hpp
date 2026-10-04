@@ -9,6 +9,40 @@
 
 namespace nlm {
 
+// AttentionalMemoryState: Current attentional context for working memory
+struct AttentionalMemoryState {
+    // Attentional strength (0-1)
+    float attentionStrength;
+    
+    // Currently attended neuronal populations
+    std::vector<NeuronId> attendedNeurons;
+    
+    // Attentional bias towards specific memory traces
+    std::unordered_map<NeuronId, float> attentionalBias;
+    
+    // Competition level from attentional selection
+    float competitionLevel;
+    
+    // Inhibition strength applied by attention
+    float inhibitionStrength;
+    
+    // Excitatory enhancement from attention
+    float excitationStrength;
+    
+    // Attentional predictions for memory updating
+    std::vector<float> attentionalPredictions;
+    
+    // Time since attentional shift
+    SimulationStep attentionalAge;
+    
+    // Neuromodulatory influence
+    float neuromodulatoryGain;
+    
+    AttentionalMemoryState()
+        : attentionStrength(0.0f), competitionLevel(0.5f), inhibitionStrength(0.0f),
+          excitationStrength(0.0f), attentionalAge(0), neuromodulatoryGain(1.0f) {}
+};
+
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
 //
@@ -17,6 +51,13 @@ namespace nlm {
 // - Recurrent synaptic connections for maintaining information
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
+//
+// INTEGRATION ATTRIBUTES:
+// - Attentional competition modulation for selective retention
+// - Attentional focus enhancement of memory maintenance
+// - Attentional-based memory strengthening
+// - Neuromodulatory control of attentional influence on memory
+// - Integration with concept formation for memory binding
 
 class NeuralWorkingMemory {
 public:
@@ -42,8 +83,8 @@ public:
     // Get activation level of a specific neuron in working memory
     float getNeuronActivation(NeuronId neuron) const;
 
-    // Update working memory (maintenance and decay)
-    void update(TimestepDuration dt);
+    // Update working memory (maintenance and decay) with attentional modulation
+    void update(TimestepDuration dt, const AttentionalMemoryState& attentionalState);
 
     // Clear working memory
     void clear();
@@ -65,8 +106,8 @@ public:
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 
-    // Competition between memory traces
-    void runCompetition();
+    // Competition between memory traces with attentional modulation
+    void runCompetition(const AttentionalMemoryState& attentionalState);
 
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;
@@ -74,15 +115,41 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // ATTRIBUTION MODULATION METHODS
+
+    // Update attentional competition modulation
+    void updateWithAttentionalState(const AttentionalMemoryState& attentionalState);
+
+    // Enhance memory maintenance based on attentional focus
+    void enhanceMemoryBasedOnAttention(const AttentionalMemoryState& attentionalState);
+
+    // Apply attentional-based memory strengthening
+    void applyAttentionalStrengthening(const AttentionalMemoryState& attentionalState);
+
+    // Get attentional modulation factors
+    float getAttentionalModulation() const;
+
+    // Set attentional parameters
+    void setAttentionalParameters(float strength, float bias);
+
+    // Get current attentional state
+    AttentionalMemoryState getCurrentAttentionalState() const;
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
+    // Update recurrent connections for maintenance with attentional modulation
+    void updateRecurrentConnections(const AttentionalMemoryState& attentionalState);
 
-    // Decay weak memory traces
-    void decayWeakTraces();
+    // Decay weak memory traces with attentional influence
+    void decayWeakTraces(const AttentionalMemoryState& attentionalState);
+
+    // Apply attentional enhancement to winning traces
+    void applyAttentionalEnhancement(const AttentionalMemoryState& attentionalState);
+
+    // Apply attentional bias to memory selection
+    void applyAttentionalBias(const AttentionalMemoryState& attentionalState);
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -104,7 +171,11 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
-};
+    
+    // Attentional modulation
+    float attentionalStrength_;
+    float attentionalBias_;
+};;
 
 // AttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation

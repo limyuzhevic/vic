@@ -1,0 +1,109 @@
+# Build directories
+build/
+
+# Editor temporary files
+*~.*.swp
+swp
+tmp/
+
+# OS-specific files
+.DS_Store
+.DS_Store**
+
+# IDE files
+.vscode/
+.idea/
+*.vscode
+*.swp
+
+# CMake cache files
+CMakeCache.txt
+CMakeFiles/
+
+# Editor backups
+*.bak
+*.orig
+
+# Output files
+*.o
+*.obj
+*.exe
+*.so
+*.dylib
+
+# Dynamic libraries
+*.dylib
+*.so
+
+# Shared libraries
+*.dll
+
+# Test output
+Testing/
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+
+# Documentation
+docs/
+doxygen/
+
+# Python files in build directory
+*.pyc
+__pycache__/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Runtime files
+*.runtime
+
+# Compiled Python modules
+*.pyc
+__pycache__/
+dist/
+*.egg-info/
+
+# Profiling files
+*.prof
+*.pstats
+
+# Package directories
+*.egg
+*.whl
+
+# Other temporary files
+*.temp
+*.cache
+
+# CI/CD generated files
+.coverage
+htmlcov/
+.pytest_cache/
+.nox/
+.coverage.*
+coverage.xml
+
+# IDE configuration
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# CMake-generated files
+install_manifest.txt
+
+# Package configuration files
+*.cmake
+
+# Generated documentation
+*.rst
+*.md
+
+# Output from tests
+output.txt

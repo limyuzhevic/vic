@@ -1,12 +1,139 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
-set(CMAKE_CXX_STANDARD 20)
+# C++26 standard (enable when ready)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# PGO support
+option(PGO_BUILD "Enable Profile-Guided Optimization build" OFF)
+option(PGO_GENERATE "Generate PGO profile data" OFF)
+option(PGO_USE "Use PGO profile data for optimization" OFF)
+
+# Optional feature flags
+option(USE_CCLANG_TIDY "Enable clang-tidy static analysis" OFF)
+option(USE_CPPCHECK "Enable cppcheck static analysis" OFF)
+option(USE_INCLUDE_WHAT_YOU_USE "Enable include-what-you-use header analysis" OFF)
+option(USE_VALGRIND "Enable valgrind memory debugging" OFF)
+option(USE_ASAN "Enable address sanitizer" OFF)
+option(USE_TSAN "Enable thread sanitizer" OFF)
+option(USE_PERF "Enable performance profiler (perf)" OFF)
+option(USE_CCACHE "Enable ccache for faster compilation" ON)
+option(USE_COVERAGE "Enable code coverage instrumentation" OFF)
+option(USE_DOXYGEN "Enable documentation generation with doxygen" OFF)
+option(USE_TESTS "Enable testing targets" ON)
+
+# Find tools and libraries
+include(GNUInstallDirs)
+
+# PGO configuration
+if(PGO_BUILD)
+    if(PGO_GENERATE)
+        add_compile_options(-fprofile-generate)
+        message(STATUS "PGO: Generating profile data with -fprofile-generate")
+    elseif(PGO_USE)
+        add_compile_options(-fprofile-use)
+        message(STATUS "PGO: Using profile data with -fprofile-use")
+    endif()
+elseif(NOT PGO_BUILD)
+    message(STATUS "PGO: Disabled (use -DPGO_BUILD=ON -DPGO_GENERATE=ON to generate profile data)")
+endif()
+
+# Development tools configuration
+if(USE_CCACHE)
+    find_program(CCACHE_FOUND ccache)
+    if(CCACHE_FOUND)
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_FOUND})
+        message(STATUS "CCACHE: Enabled for faster compilation")
+    else()
+        message(WARNING "CCACHE not found, skipping")
+    endif()
+endif()
+
+if(USE_COVERAGE)
+    add_compile_options(--coverage -fprofile-arcs -ftest-coverage)
+    add_link_options(--coverage)
+    message(STATUS "COVERAGE: Code coverage enabled (--coverage)")
+endif()
+
+if(USE_ASAN)
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+    message(STATUS "ASAN: Address sanitizer enabled")
+endif()
+
+if(USE_TSAN)
+    add_compile_options(-fsanitize=thread)
+    add_link_options(-fsanitize=thread)
+    message(STATUS "TSAN: Thread sanitizer enabled")
+endif()
+
+if(USE_VALGRIND)
+    find_program(VALGRIND valgrind)
+    if(VALGRIND)
+        message(STATUS "VALGRIND: valgrind found at ${VALGRIND}")
+    else()
+        message(WARNING "VALGRIND not found, valgrind tests will be disabled")
+    endif()
+endif()
+
+if(USE_PERF)
+    find_program(PERF perf)
+    if(PERF)
+        message(STATUS "PERF: perf found at ${PERF}")
+    else()
+        message(WARNING "PERF not found, perf tests will be disabled")
+    endif()
+endif()
+
+# Static analysis configuration
+if(USE_CCLANG_TIDY)
+    find_program(CLANGTIDY clang-tidy)
+    if(CLANGTIDY)
+        message(STATUS "CLANGTIDY: Found at ${CLANGTIDY}")
+    else()
+        message(WARNING "CLANGTIDY not found, skipping clang-tidy analysis")
+    endif()
+endif()
+
+if(USE_CPPCHECK)
+    find_program(CPPCHECK cppcheck)
+    if(CPPCHECK)
+        message(STATUS "CPPCHECK: Found at ${CPPCHECK}")
+    else()
+        message(WARNING "CPPCHECK not found, skipping cppcheck analysis")
+    endif()
+endif()
+
+if(USE_INCLUDE_WHAT_YOU_USE)
+    find_program(INCLUDE_WHAT_YOU_USE include-what-you-use)
+    if(INCLUDE_WHAT_YOU_USE)
+        message(STATUS "INCLUDE_WHAT_YOU_USE: Found at ${INCLUDE_WHAT_YOU_USE}")
+    else()
+        message(WARNING "INCLUDE_WHAT_YOU_USE not found, skipping include analysis")
+    endif()
+endif()
+
+# Doxygen documentation generation
+if(USE_DOXYGEN)
+    find_program(DOXYGEN doxygen)
+    if(DOXYGEN)
+        set(DOXYGEN_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        set(DOXYGEN_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/docs")
+        add_custom_target(doxygen_docs
+            COMMAND ${DOXYGEN} ${DOXYGEN_INPUT} --output-directory ${DOXYGEN_OUTPUT}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Generating API documentation with Doxygen"
+            VERBATIM
+        )
+        message(STATUS "DOXYGEN: Documentation generation enabled")
+    else()
+        message(WARNING "DOXYGEN not found, documentation generation will be disabled")
+    endif()
+endif()
+
+# Configure compiler and build type after all options are set
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -18,10 +145,11 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
-# Core library
+# Add PGO optimization flags
+if(PGO_BUILD)
+    add_compile_options(-fprofile-use)
+    add_link_options(-fprofile-use)
+endif()
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -50,6 +178,9 @@ add_library(nlm_core STATIC
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp

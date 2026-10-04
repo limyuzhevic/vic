@@ -25,9 +25,13 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Brain;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -150,8 +154,14 @@ public:
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Neural prediction system using spiking substrate
+    NeuralPrediction* getNeuralPrediction();
+    
+    // Action consequence predictor
+    ActionConsequencePredictor* getActionConsequencePredictor();
+    
+    // Prediction error signal for neuromodulation
+    PredictionErrorSignal* getPredictionErrorSignal();
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -174,6 +184,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
