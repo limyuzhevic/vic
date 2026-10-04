@@ -54,6 +54,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
+    ${NLM_SOURCE_DIR}/environment/Action.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
@@ -67,6 +68,16 @@ set(NLM_AGENT_SOURCES
 
 set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+    # Command System (Phase 2 Enhancement)
+    ${NLM_SOURCE_DIR}/command/Command.cpp
+    # Factory
+    ${NLM_SOURCE_DIR}/factory/BrainFactory.cpp
+    # Error Handling
+    ${NLM_SOURCE_DIR}/core/ErrorHandling.cpp
+    # Threading
+    ${NLM_SOURCE_DIR}/threading/ThreadSafeSimulationManager.cpp
+    # Topology
+    ${NLM_SOURCE_DIR}/topology/AdvancedTopologyManager.cpp
 )
 
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
@@ -87,8 +98,20 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+add_library(nlm_threading STATIC
+    ${NLM_SOURCE_DIR}/threading/ThreadSafeSimulationManager.cpp
+)
+target_include_directories(nlm_threading PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_threading PUBLIC nlm_core)
+
+add_library(nlm_topology STATIC
+    ${NLM_SOURCE_DIR}/topology/AdvancedTopologyManager.cpp
+)
+target_include_directories(nlm_topology PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_topology PUBLIC nlm_core)
+
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlm_threading nlm_topology)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)
