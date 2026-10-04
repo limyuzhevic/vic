@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <limits>
 
 namespace nlm {
 
@@ -55,14 +56,19 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON and simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file with enhanced serialization
     bool saveToFile(const std::string& filepath) const;
+    
+    // Internal parsing methods
+    bool loadFromJsonFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    void parseValueFromString(const std::string& key, const std::string& valueStr, ConfigSource source);
     
     // Get values
     template<typename T>

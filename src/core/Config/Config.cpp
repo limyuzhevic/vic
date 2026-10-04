@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <limits>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,9 +21,105 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Load configuration from file with enhanced parser support
+    // Supports both simple key=value format and JSON format
     
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Try to detect file format - if it starts with { or [, assume JSON
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Simple heuristic to detect JSON format
+    bool isJsonFormat = false;
+    if (!firstLine.empty() && (firstLine[0] == '{' || firstLine[0] == '[')) {
+        isJsonFormat = true;
+    }
+    
+    if (isJsonFormat) {
+        // JSON format parsing
+        return loadFromJsonFile(filepath);
+    } else {
+        // Legacy simple key=value format
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromJsonFile(const std::string& filepath) {
+    // Load configuration from JSON file
+    // For now, basic implementation - could be enhanced with proper JSON library
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // For now, implement simple JSON parsing
+    // In a full implementation, we would use a proper JSON library like nlohmann::json
+    // For this fix, we'll implement a basic parser that can handle simple key-value pairs in JSON format
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Simple JSON parsing - remove braces and parse key: value pairs
+    // This is a basic implementation that could be enhanced
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find value
+        size_t colonPos = content.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        size_t valueStart = content.find_first_not_of(" \t\n\r:\", colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        size_t valueEnd;
+        if (content[valueStart] == '"') {
+            // String value
+            valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+        } else if (content[valueStart] == '[') {
+            // Array value - simplified parsing
+            valueEnd = content.find(']', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+        } else if (content[valueStart] == '{') {
+            // Object - skip for now
+            valueEnd = content.find('}', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+        } else {
+            // Number or boolean - parse until comma or }
+            valueEnd = content.find_first_of(",}\", valueStart);
+            if (valueEnd == std::string::npos) break;
+        }
+        
+        std::string valueStr = content.substr(valueStart, valueEnd - valueStart);
+        
+        // Parse the value
+        parseValueFromString(key, valueStr, ConfigSource::File);
+        
+        // Move past this entry
+        pos = valueEnd;
+        // Skip to next comma or closing brace
+        while (pos < content.size() && content[pos] != ',' && content[pos] != '}') {
+            pos++;
+        }
+        if (pos < content.size() && content[pos] == ',') pos++;
+    }
+    
+    return true;
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,28 +129,102 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == \'#\' || line[0] == \'/\') {
             continue;
         }
         
         // Parse simple key=value pairs
-        size_t pos = line.find('=');
+        size_t pos = line.find(\'=\');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == \'"\' && value.back() == \'"\') ||
+                 (value.front() == \'\'\' && value.back() == \'\'\'))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            parseValueFromString(key, value, ConfigSource::File);
         }
     }
     
     return true;
+}
+
+void Config::parseValueFromString(const std::string& key, const std::string& valueStr, ConfigSource source) {
+    // Parse string representation of value and set it
+    if (valueStr == "true" || valueStr == "false") {
+        bool boolVal = (valueStr == "true");
+        set(key, boolVal, source);
+    } else {
+        // Try to parse as number
+        try {
+            // Try double first (includes int)
+            size_t pos;
+            double doubleVal = std::stod(valueStr, &pos);
+            if (pos == valueStr.size()) {
+                // Check if it would fit in int
+                size_t pos2;
+                long long intVal = std::stoll(valueStr, &pos2);
+                if (pos2 == valueStr.size() && intVal >= std::numeric_limits<int>::min() && 
+                    intVal <= std::numeric_limits<int>::max()) {
+                    set(key, static_cast<int>(intVal), source);
+                } else {
+                    set(key, doubleVal, source);
+                }
+                return;
+            }
+        } catch (...) {
+            // Not a number, treat as string
+            set(key, valueStr, source);
+        }
+    }
+}
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Load configuration from file with enhanced parser support
+    // Supports both simple key=value format and JSON format
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Try to detect file format - if it starts with { or [, assume JSON
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Simple heuristic to detect JSON format
+    bool isJsonFormat = false;
+    if (!firstLine.empty() && (firstLine[0] == '{' || firstLine[0] == '[')) {
+        isJsonFormat = true;
+    }
+    
+    if (isJsonFormat) {
+        // JSON format parsing
+        return loadFromJsonFile(filepath);
+    } else {
+        // Legacy simple key=value format
+        return loadFromSimpleFile(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +258,47 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the ConfigValue based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "unknown_type";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;

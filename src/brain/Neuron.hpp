@@ -134,7 +134,9 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    void step(Timestamp currentTime, TimestepDuration dt);
+    
+    // Update neuron for one simulation step using configured timestep
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -142,6 +144,12 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Get adaptation variable (for spike-frequency adaptation)
+    float getAdaptationVariable() const;
+    
+    // Get synaptic input (for debugging/monitoring)
+    MembranePotential getSynapticInput() const;
     
 private:
     struct Impl;
