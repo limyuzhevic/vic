@@ -7,18 +7,23 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Implements predictive coding with forward models
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
-    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    // Uses stored forward model to predict sensory consequences of actions
+    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState,
+                                                   const class Action& action);
     
     // Update predictions based on actual observation
+    // Computes prediction error and updates forward model
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
     // Get prediction error
@@ -34,9 +39,17 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Process sensory input - update predictions and store for learning
+    void processSensoryInput(const SensoryInput& input);
+    
+    // Get expected reward for predicted state
+    float getExpectedReward(const SensoryInput& predictedState) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
 };
 
 } // namespace nlm

@@ -61,6 +61,9 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
+    // Sensory input buffer for prediction system
+    SensoryInput currentSensoryState;
+    
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
@@ -410,11 +413,64 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Apply novelty to attention (novelty attracts attention)
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.1f) {
+            // Novelty increases attention to sensory input
+            // This is implemented in the cognitive systems
+            if (auto* attention = pImpl->attention) {
+                // Novelty-based attention (bottom-up)
+                attention->applyBottomUpSalience(
+                    NeuronId(99998),  // Special neuron for novelty
+                    noveltyLevel);
+            }
+        }
     }
     
-    // Update curiosity
+    // Update curiosity (exploration drive)
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get current novelty level
+        float noveltyLevel = 0.0f;
+        if (pImpl->novelty) {
+            noveltyLevel = pImpl->novelty->getLevel();
+        }
+        
+        // Get prediction error from prediction system
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        // Update curiosity based on novelty and prediction error
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
+        
+        // Apply curiosity effects on neural excitability and exploration
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        if (curiosityLevel > 0.5f) {
+            // High curiosity promotes exploration - inject current into sensory neurons
+            // to drive exploration behavior
+            for (size_t i = 0; i < std::min(size_t(3), pImpl->sensoryNeurons.size()); ++i) {
+                // Inject exploration current to drive novel inputs
+                pImpl->sensoryNeurons[i]->injectCurrent(curiosityLevel * 10.0f);
+            }
+            
+            // Curiosity affects decision-making through neuromodulation
+            if (auto* dopamine = pImpl->dopamine) {
+                // Curiosity can boost dopamine for exploration
+                float currentDopamine = dopamine->getLevel();
+                dopamine->setLevel(currentDopamine + curiosityLevel * 0.1f);
+            }
+        }
+        
+        // Curiosity affects plasticity - promotes exploration
+        if (pImpl->curiosity && pImpl->stdp) {
+            // Curiosity can enhance learning rates
+            float learningRate = pImpl->curiosity->getLevel() * 0.5f + 0.5f;
+            pImpl->stdp->setLTPWeight(0.01f * learningRate);
+            pImpl->stdp->setLTDWeight(0.012f * learningRate);
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -509,10 +565,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // Step 8: Update prediction system (predictive processing)
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state for prediction
+        // In a full implementation, this would be stored during receiveSensoryInput
+        static SensoryInput currentSensoryState;
+        
+        // Make predictions for next state based on current state and potential actions
+        // For now, just process current sensory input
+        pImpl->predictionSystem->processSensoryInput(currentSensoryState);
+        
+        // Get prediction error for use in attention and neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to attention system for better focus
+        if (pImpl->attention && predictionError > 0.1f) {
+            // High prediction error means we should pay more attention
+            pImpl->attention->applyTopDownBias(
+                NeuronId(99999),  // Special neuron for attention modulation
+                predictionError * 0.5f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +598,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Store current experience in episodic memory for concept formation
+    if (pImpl->episodicMemory && pImpl->conceptFormation) {
+        // Create a neural representation of current sensory state
+        std::vector<float> sensoryPattern;
+        
+        // Get current sensory activity from sensory neurons
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = neuron->getMembranePotential();
+            if (activation > 0.0f) {
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Create an episodic memory item from current experience
+            EpisodicMemoryItem episode;
+            episode.timestamp = pImpl->currentStep;
+            episode.sensoryState = sensoryPattern;
+            
+            // Get current action if any
+            episode.action = ActionType::Wait;  // Simplified
+            
+            // Store in episodic memory
+            pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Present to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                sensoryPattern,
+                sensoryPattern,  // Features = pattern for now
+                0.5f,  // Reward
+                pImpl->currentStep
+            );
+            
+            NLM_LOG_DEBUG(std::string("ConceptFormation: presented experience, got concept ID=") +
+                          std::to_string(conceptId));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -591,6 +695,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
+    
+    pImpl->currentSensoryState = input;  // Store for prediction system
     
     const auto& values = input.getData();
     if (values.empty()) return;
@@ -690,9 +796,31 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner for intelligent action selection
+    // This replaces the simple motor neuron activity-based selection
     
+    // Get current state for planning (simplified - would be more complex in real system)
+    std::vector<float> currentState;
+    if (pImpl->workingMemory) {
+        currentState = pImpl->workingMemory->retrieve();
+    }
+    
+    // Use NeuralPlanner to plan the best action
+    if (pImpl->planner) {
+        // Plan action based on current state and goals
+        // For now, use a simple reward target
+        ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+        
+        // Check if planner returned a reasonable action
+        if (plannedAction != ActionType::Wait) {
+            auto action = std::make_unique<Action>(plannedAction);
+            NLM_LOG_DEBUG(std::string("Planned action: ") + std::to_string(static_cast<int>(plannedAction)));
+            return action;
+        }
+    }
+    
+    // Fallback to simple motor neuron activity-based selection
+    // This is the old behavior
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
