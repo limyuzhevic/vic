@@ -60,10 +60,25 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
-)
+if(EXISTS ${NLM_SOURCE_DIR}/command/Command.cpp)
+    list(APPEND NLM_AGENT_SOURCES ${NLM_SOURCE_DIR}/command/Command.cpp)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/factory/BrainFactory.cpp)
+    list(APPEND NLM_AGENT_SOURCES ${NLM_SOURCE_DIR}/factory/BrainFactory.cpp)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/core/ErrorHandling.cpp)
+    list(APPEND NLM_AGENT_SOURCES ${NLM_SOURCE_DIR}/core/ErrorHandling.cpp)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/threading/ThreadSafeSimulationManager.cpp)
+    list(APPEND NLM_AGENT_SOURCES ${NLM_SOURCE_DIR}/threading/ThreadSafeSimulationManager.cpp)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/topology/AdvancedTopologyManager.cpp)
+    list(APPEND NLM_AGENT_SOURCES ${NLM_SOURCE_DIR}/topology/AdvancedTopologyManager.cpp)
+endif()
 
 set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
@@ -79,16 +94,77 @@ target_compile_options(nlm_core PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
-
 add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
+target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+if(EXISTS ${NLM_SOURCE_DIR}/command/Command.cpp)
+    add_library(nlm_command STATIC
+        ${NLM_SOURCE_DIR}/command/Command.cpp
+    )
+    target_include_directories(nlm_command PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_link_libraries(nlm_command PUBLIC nlm_core)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/factory/BrainFactory.cpp)
+    add_library(nlm_factory STATIC
+        ${NLM_SOURCE_DIR}/factory/BrainFactory.cpp
+    )
+    target_include_directories(nlm_factory PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_link_libraries(nlm_factory PUBLIC nlm_core)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/core/ErrorHandling.cpp)
+    add_library(nlm_error_handling STATIC
+        ${NLM_SOURCE_DIR}/core/ErrorHandling.cpp
+    )
+    target_include_directories(nlm_error_handling PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_link_libraries(nlm_error_handling PUBLIC nlm_core)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/threading/ThreadSafeSimulationManager.cpp)
+    add_library(nlm_threading STATIC
+        ${NLM_SOURCE_DIR}/threading/ThreadSafeSimulationManager.cpp
+    )
+    target_include_directories(nlm_threading PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_link_libraries(nlm_threading PUBLIC nlm_core)
+endif()
+
+if(EXISTS ${NLM_SOURCE_DIR}/topology/AdvancedTopologyManager.cpp)
+    add_library(nlm_topology STATIC
+        ${NLM_SOURCE_DIR}/topology/AdvancedTopologyManager.cpp
+    )
+    target_include_directories(nlm_topology PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    target_link_libraries(nlm_topology PUBLIC nlm_core)
+endif()
+
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+
+if(TARGET nlm_command)
+    target_link_libraries(pynlm PRIVATE nlm_command)
+endif()
+
+if(TARGET nlm_factory)
+    target_link_libraries(pynlm PRIVATE nlm_factory)
+endif()
+
+if(TARGET nlm_error_handling)
+    target_link_libraries(pynlm PRIVATE nlm_error_handling)
+endif()
+
+if(TARGET nlm_threading)
+    target_link_libraries(pynlm PRIVATE nlm_threading)
+endif()
+
+if(TARGET nlm_topology)
+    target_link_libraries(pynlm PRIVATE nlm_topology)
+endif()
+
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)

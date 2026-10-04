@@ -4,18 +4,19 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "2.0.0"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with advanced features including command system, factory patterns, thread-safe simulation, and neural topology support"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Research Team"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "AI", "cognitive", "neuroscience"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,44 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+# Core dependencies
+# NLM provides its own C++ core and memory management - no Python dependencies required
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.4",
+    "networkx>=2.6",
+    "jinja2>=3.0",
 ]
+
+advanced = [
+    # Advanced features that require additional Python libraries
+    "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.4",
+]
+
+# Legacy alias for backward compatibility
+advanced-features = ["advanced"]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issue Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Slack Community" = "https://nlm-project.slack.com"
+"Papers" = "https://github.com/nlm-project/nlm/papers"
+
+[project.scripts]
+# Command-line tools
+nlm-explore = "pynlm.cli:main"
+nlm-simulate = "pynlm.simulate:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,6 +72,7 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DENABLE_ADVANCED_FEATURES=ON",
 ]
 
 [tool.scikit-build.cmake.define]
@@ -54,4 +80,51 @@ NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+]
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pynlm", "pynlm.*"]
+exclude = ["tests.*", "tests"]
+
+# Package metadata for PyPI
+[metadata]
+name = "pynlm"
+version = "2.0.0"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+long_description = "file: README.md"
+long_description_content_type = "text/markdown"
+author = "NLM Research Team"
+license = "MIT"
+keywords = "neural simulation spiking brain learning AI cognitive neuroscience"
+classifiers =
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+project_urls =
+    Homepage = "https://github.com/nlm-project/nlm"
+    Documentation = "https://nlm.readthedocs.io"
+    Repository = "https://github.com/nlm-project/nlm.git"
+    "Issue Tracker" = "https://github.com/nlm-project/nlm/issues"
+    "Slack Community" = "https://nlm-project.slack.com"
+    "Papers" = "https://github.com/nlm-project/nlm/papers"
