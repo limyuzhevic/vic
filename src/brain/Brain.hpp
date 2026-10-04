@@ -1,12 +1,6 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
+#include "../performance/CheckpointSystem.hpp"
+#include <vector>
 #include <string>
 
 namespace nlm {
@@ -28,20 +22,95 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class NeuralRegion;
+class Action;
+class EpisodicMemoryItem;
+class ActionType;
 
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
+// Sleep/Consolidation Cycle Integration
+class SleepConsolidationCycle;
+
+// Checkpoint data structures for integrated systems
+struct WorkingMemoryCheckpointData {
+    std::vector<NeuronId> memoryNeurons;
+    std::vector<float> neuronActivations;
+    std::vector<float> memoryStrengths;
+};
+
+struct EpisodicMemoryCheckpointData {
+    std::vector<EpisodicMemoryItem> episodes;
+};
+
+struct AssociativeMemoryCheckpointData {
+    std::vector<std::pair<NeuronId, NeuronId>> associations;
+    std::vector<float> associationStrengths;
+};
+
+struct PredictionSystemCheckpointData {
+    std::vector<float> errorHistory;
+    std::vector<float> confidenceHistory;
+    std::vector<float> modelParameters;
+};
+
+struct CognitionSystemCheckpointData {
+    // NeuralPlanner data
+    std::vector<ActionType> plannerActionHistory;
+    std::vector<float> plannerConfidenceHistory;
     
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
+    // ConceptFormation data
+    std::vector<size_t> conceptIds;
+    std::vector<std::string> conceptCategoryHints;
+    std::vector<std::vector<float>> conceptPrototypes;
     
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+    // AttentionalSelection data
+    std::vector<NeuronId> attentionWinners;
+    std::vector<float> attentionSalience;
+    std::vector<float> attentionBiases;
+};
+
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float predictionErrorLevel;
+    float noveltyLevel;
+    std::vector<float> plasticityFactors;
+};
+
+struct DevelopmentSystemCheckpointData {
+    DevelopmentalStage developmentalStage;
+    double developmentalAge;
+    std::vector<float> plasticityModifiers;
+};
+
+struct AttentionSystemCheckpointData {
+    std::vector<NeuronId> winnerNeurons;
+    std::vector<float> winnerActivations;
+    std::vector<float> biases;
+    std::vector<float> saliences;
+};
+
+struct CheckpointManagerCheckpointData {
+    std::string checkpointDir;
+    uint64_t saveIntervalSteps;
+    size_t maxCheckpoints;
+    bool compress;
+    uint64_t lastSaveStep;
+};
+
+// Additional checkpoint data structures
+struct SimulationState {
+    uint64_t currentStep;
+    double currentTime;
+    DevelopmentalStage developmentalStage;
+};
+
+struct RandomState {
+    uint64_t seed;
+    std::vector<uint64_t> state;  // RNG state
 };
 
 // Brain: The central coordinator of the neural system
@@ -184,14 +253,44 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get sleep/consolidation state
+    bool isResting() const { return pImpl->isResting; }
+    float getSleepProgress() const;
+    bool shouldEnterSleep() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Sleep and memory consolidation
+    void sleepConsolidationCycle();
+    void enterSleep();
+    void exitSleep();
+    void consolidateMemoriesDuringSleep();
+    void replayMemoriesDuringSleep();
+    void resetNeuromodulationDuringSleep();
+    void developmentDuringSleep();
     
-    // Logging
-    void logStatus() const;
+    // Sleep state
+    void setSleepParameters(double checkInterval, double duration);
+    void setSleepTriggers(float minNovelty, size_t minMemoryLoad, float minStress);
+    
+    // Reset sleep system
+    void resetSleepConsolidation();
+    
+    // Sleep/Consolidation Cycle Integration
+    SleepConsolidationCycle sleepConsolidation_;
+    
+    // Sleep state variables
+    bool isSleeping_;
+    double sleepTimer_;
+    double lastSleepCheck_;
+    float preSleepNovelty_;
+    float preSleepDopamine_;
+    float preSleepCuriosity_;
+    
+    // Sleep parameters
+    double sleepInterval_;
+    double sleepDuration_;
+    float minNoveltyForSleep_;
+    size_t minMemoryLoadForSleep_;
+    float minStressForSleep_;
     
 private:
     struct Impl;

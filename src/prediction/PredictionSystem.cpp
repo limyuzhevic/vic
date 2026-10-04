@@ -54,7 +54,9 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // TODO PHASE 2: Train prediction model using neural substrate
+    // For now, just track observations
+    pImpl->errorHistory.push_back(0.0f);  // Track that we observed
 }
 
 } // namespace nlm
