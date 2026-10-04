@@ -36,6 +36,10 @@ public:
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
     
+    // Getters for vision dimensions
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
+    
     // Reset world to initial state
     void reset();
     

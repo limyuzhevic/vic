@@ -4,6 +4,12 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "MotorNeuronManager.hpp"
+#include "SensoryNeuronManager.hpp"
+#include "SensoryProcessor.hpp"
+#include "MotorCommandDecoder.hpp"
+#include "NeuromodulationManager.hpp"
+#include "DevelopmentManager.hpp"
 #include <memory>
 #include <vector>
 
@@ -11,6 +17,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Uses manager classes to separate concerns
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -59,59 +66,29 @@ public:
     Brain* getBrain() { return brain_.get(); }
     
     // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isRewardModulationEnabled() const { return neuromodulationManager_ && neuromodulationManager_->isRewardModulationEnabled(); }
+    bool isStructuralPlasticityEnabled() const { return developmentManager_ && developmentManager_->isStructuralPlasticityEnabled(); }
+    bool isDevelopmentEnabled() const { return developmentManager_ && developmentManager_->isDevelopmentEnabled(); }
+    bool isCuriosityEnabled() const { return sensoryProcessor_ && sensoryProcessor_->isCuriosityEnabled(); }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Manager instances for separation of concerns
+    std::unique_ptr<MotorNeuronManager> motorNeuronManager_;
+    std::unique_ptr<SensoryNeuronManager> sensoryNeuronManager_;
+    std::unique_ptr<SensoryProcessor> sensoryProcessor_;
+    std::unique_ptr<MotorCommandDecoder> motorCommandDecoder_;
+    std::unique_ptr<NeuromodulationManager> neuromodulationManager_;
+    std::unique_ptr<DevelopmentManager> developmentManager_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm
