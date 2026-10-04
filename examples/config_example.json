@@ -1,0 +1,277 @@
+# JSON Configuration Example
+# File: examples/config_example.json
+{
+    "nlm": {
+        "random_seed": 12345,
+        "simulation_timestep": 0.001,
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1,
+        "plasticity_learning_rate": 0.01,
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "stdp_time_constant": 20.0,
+        "development_synaptogenesis_rate": 0.001,
+        "development_pruning_rate": 0.0001,
+        "dopamine_baseline": 0.1,
+        "reward_discount_factor": 0.99,
+        "environment_name": "GridWorld",
+        "environment_width": 10,
+        "environment_height": 10,
+        "log_level": "INFO",
+        "log_to_file": false,
+        "log_filename": "nlm.log",
+        "max_simulation_steps": 10000,
+        "simulation_time_limit": 0.0,
+        "visualization_enabled": false,
+        "visualization_update_rate": 30.0,
+        "verbose": false,
+        "debug": false,
+        "experiment": "learning"
+    }
+}
+
+# YAML Configuration Example
+# File: examples/config_example.yaml
+nlm:
+  random_seed: 12345
+  simulation_timestep: 0.001
+  neuron_count: 1000
+  region_count: 2
+  connection_probability: 0.1
+  plasticity_learning_rate: 0.01
+  stdp_ltp_weight: 0.02
+  stdp_ltd_weight: 0.015
+  stdp_time_constant: 20.0
+  development_synaptogenesis_rate: 0.001
+  development_pruning_rate: 0.0001
+  dopamine_baseline: 0.1
+  reward_discount_factor: 0.99
+  environment_name: GridWorld
+  environment_width: 10
+  environment_height: 10
+  log_level: INFO
+  log_to_file: false
+  log_filename: nlm.log
+  max_simulation_steps: 10000
+  simulation_time_limit: 0.0
+  visualization_enabled: false
+  visualization_update_rate: 30.0
+  verbose: false
+  debug: false
+  experiment: learning
+
+# INI-style Configuration Example
+# File: examples/config_example.cfg
+# NLM Configuration File
+# This is a sample configuration for NLM
+
+# Random seed for reproducible experiments
+random_seed = 12345
+
+# Simulation timestep in seconds
+simulation_timestep = 0.001
+
+# Number of neurons in the brain
+neuron_count = 1000
+
+# Number of brain regions
+region_count = 2
+
+# Connection probability for random connectivity
+connection_probability = 0.1
+
+# Plasticity settings
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Development settings
+development_synaptogenesis_rate = 0.001
+development_pruning_rate = 0.0001
+
+# Neuromodulation settings
+dopamine_baseline = 0.1
+
+# Reward settings
+reward_discount_factor = 0.99
+
+# Environment settings
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+
+# Logging settings
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
+
+# Simulation settings
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
+
+# Visualization settings
+visualization_enabled = false
+visualization_update_rate = 30.0
+
+# Debug and experiment settings
+verbose = false
+debug = false
+experiment = learning
+
+# Command Line Usage Examples
+# File: examples/usage_examples.txt
+# Example 1: Run with default config
+# nlm
+#
+# Example 2: Load JSON config
+# nlm --config=examples/config_example.json
+#
+# Example 3: Override parameters
+# nlm --config=examples/config_example.json --neuron_count=2000 --debug
+#
+# Example 4: Run specific experiment
+# nlm --experiment=learning --verbose
+#
+# Example 5: Save current config to JSON
+# nlm --verbose --debug | tee nlm_output.log
+#
+# Example 6: Load YAML config and export as JSON
+# nlm --config=examples/config_example.yaml --verbose
+
+# Configuration Schema Definition
+# File: examples/config_schema.json
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NLM Configuration Schema",
+    "type": "object",
+    "properties": {
+        "random_seed": {
+            "type": "integer",
+            "description": "Random seed for reproducible experiments",
+            "minimum": 0
+        },
+        "simulation_timestep": {
+            "type": "number",
+            "description": "Simulation timestep in seconds",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+        },
+        "neuron_count": {
+            "type": "integer",
+            "description": "Number of neurons in the brain",
+            "minimum": 1
+        },
+        "region_count": {
+            "type": "integer",
+            "description": "Number of brain regions",
+            "minimum": 1
+        },
+        "connection_probability": {
+            "type": "number",
+            "description": "Connection probability for random connectivity",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "plasticity_learning_rate": {
+            "type": "number",
+            "description": "Plasticity learning rate",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "stdp_ltp_weight": {
+            "type": "number",
+            "description": "STDP long-term potentiation weight"
+        },
+        "stdp_ltd_weight": {
+            "type": "number",
+            "description": "STDP long-term depression weight"
+        },
+        "stdp_time_constant": {
+            "type": "number",
+            "description": "STDP time constant",
+            "minimum": 0.0
+        },
+        "development_synaptogenesis_rate": {
+            "type": "number",
+            "description": "Development synaptogenesis rate",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "development_pruning_rate": {
+            "type": "number",
+            "description": "Development pruning rate",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "dopamine_baseline": {
+            "type": "number",
+            "description": "Dopamine baseline value"
+        },
+        "reward_discount_factor": {
+            "type": "number",
+            "description": "Reward discount factor",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "environment_name": {
+            "type": "string",
+            "description": "Environment name"
+        },
+        "environment_width": {
+            "type": "integer",
+            "description": "Environment width",
+            "minimum": 1
+        },
+        "environment_height": {
+            "type": "integer",
+            "description": "Environment height",
+            "minimum": 1
+        },
+        "log_level": {
+            "type": "string",
+            "description": "Log level (DEBUG, INFO, WARN, ERROR)"
+        },
+        "log_to_file": {
+            "type": "boolean",
+            "description": "Whether to log to file"
+        },
+        "log_filename": {
+            "type": "string",
+            "description": "Log filename"
+        },
+        "max_simulation_steps": {
+            "type": "integer",
+            "description": "Maximum simulation steps",
+            "minimum": 0
+        },
+        "simulation_time_limit": {
+            "type": "number",
+            "description": "Simulation time limit in seconds",
+            "minimum": 0.0
+        },
+        "visualization_enabled": {
+            "type": "boolean",
+            "description": "Whether visualization is enabled"
+        },
+        "visualization_update_rate": {
+            "type": "number",
+            "description": "Visualization update rate in Hz",
+            "minimum": 0.0
+        },
+        "verbose": {
+            "type": "boolean",
+            "description": "Enable verbose output"
+        },
+        "debug": {
+            "type": "boolean",
+            "description": "Enable debug output"
+        },
+        "experiment": {
+            "type": "string",
+            "description": "Specify experiment to run"
+        }
+    },
+    "required": ["random_seed", "simulation_timestep", "neuron_count", "region_count"]
+}

@@ -1,0 +1,135 @@
+# Configuration Schema Definition
+# File: examples/config_schema.json
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NLM Configuration Schema",
+    "type": "object",
+    "properties": {
+        "random_seed": {
+            "type": "integer",
+            "description": "Random seed for reproducible experiments",
+            "minimum": 0
+        },
+        "simulation_timestep": {
+            "type": "number",
+            "description": "Simulation timestep in seconds",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+        },
+        "neuron_count": {
+            "type": "integer",
+            "description": "Number of neurons in the brain",
+            "minimum": 1
+        },
+        "region_count": {
+            "type": "integer",
+            "description": "Number of brain regions",
+            "minimum": 1
+        },
+        "connection_probability": {
+            "type": "number",
+            "description": "Connection probability for random connectivity",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "plasticity_learning_rate": {
+            "type": "number",
+            "description": "Plasticity learning rate",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "stdp_ltp_weight": {
+            "type": "number",
+            "description": "STDP long-term potentiation weight"
+        },
+        "stdp_ltd_weight": {
+            "type": "number",
+            "description": "STDP long-term depression weight"
+        },
+        "stdp_time_constant": {
+            "type": "number",
+            "description": "STDP time constant",
+            "minimum": 0.0
+        },
+        "development_synaptogenesis_rate": {
+            "type": "number",
+            "description": "Development synaptogenesis rate",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "development_pruning_rate": {
+            "type": "number",
+            "description": "Development pruning rate",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "dopamine_baseline": {
+            "type": "number",
+            "description": "Dopamine baseline value"
+        },
+        "reward_discount_factor": {
+            "type": "number",
+            "description": "Reward discount factor",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "environment_name": {
+            "type": "string",
+            "description": "Environment name"
+        },
+        "environment_width": {
+            "type": "integer",
+            "description": "Environment width",
+            "minimum": 1
+        },
+        "environment_height": {
+            "type": "integer",
+            "description": "Environment height",
+            "minimum": 1
+        },
+        "log_level": {
+            "type": "string",
+            "description": "Log level (DEBUG, INFO, WARN, ERROR)"
+        },
+        "log_to_file": {
+            "type": "boolean",
+            "description": "Whether to log to file"
+        },
+        "log_filename": {
+            "type": "string",
+            "description": "Log filename"
+        },
+        "max_simulation_steps": {
+            "type": "integer",
+            "description": "Maximum simulation steps",
+            "minimum": 0
+        },
+        "simulation_time_limit": {
+            "type": "number",
+            "description": "Simulation time limit in seconds",
+            "minimum": 0.0
+        },
+        "visualization_enabled": {
+            "type": "boolean",
+            "description": "Whether visualization is enabled"
+        },
+        "visualization_update_rate": {
+            "type": "number",
+            "description": "Visualization update rate in Hz",
+            "minimum": 0.0
+        },
+        "verbose": {
+            "type": "boolean",
+            "description": "Enable verbose output"
+        },
+        "debug": {
+            "type": "boolean",
+            "description": "Enable debug output"
+        },
+        "experiment": {
+            "type": "string",
+            "description": "Specify experiment to run"
+        }
+    },
+    "required": ["random_seed", "simulation_timestep", "neuron_count", "region_count"]
+}

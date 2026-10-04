@@ -7,7 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
+#include "core/Config/ConfigImproved.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -341,15 +341,51 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     // Load configuration
-    auto config = std::make_shared<Config>();
+    auto config = std::make_shared<ConfigImproved>();
+    
+    // Define schema for validation
+    std::vector<ConfigSchemaEntry> schema = {
+        ConfigSchemaEntry("random_seed", "int", static_cast<int64_t>(42), 
+                         "Random seed for reproducible experiments", nullptr, false),
+        ConfigSchemaEntry("simulation_timestep", "double", 0.001, 
+                         "Simulation timestep in seconds", nullptr, false),
+        ConfigSchemaEntry("neuron_count", "int", static_cast<int64_t>(500), 
+                         "Number of neurons in the brain", nullptr, false),
+        ConfigSchemaEntry("region_count", "int", static_cast<int64_t>(1), 
+                         "Number of brain regions", nullptr, false),
+        ConfigSchemaEntry("connection_probability", "float", 0.15f, 
+                         "Connection probability for random connectivity", nullptr, false),
+        ConfigSchemaEntry("stdp_ltp_weight", "float", 0.02f, 
+                         "STDP long-term potentiation weight", nullptr, false),
+        ConfigSchemaEntry("stdp_ltd_weight", "float", 0.015f, 
+                         "STDP long-term depression weight", nullptr, false),
+        ConfigSchemaEntry("stdp_tau", "float", 20.0f, 
+                         "STDP time constant", nullptr, false),
+        ConfigSchemaEntry("synaptogenesis_rate", "float", 0.0001f, 
+                         "Structural plasticity synaptogenesis rate", nullptr, false),
+        ConfigSchemaEntry("pruning_rate", "float", 0.00001f, 
+                         "Structural plasticity pruning rate", nullptr, false),
+        ConfigSchemaEntry("verbose", "bool", false, 
+                         "Enable verbose output", nullptr, false),
+        ConfigSchemaEntry("debug", "bool", false, 
+                         "Enable debug output", nullptr, false),
+        ConfigSchemaEntry("experiment", "string", std::string(""), 
+                         "Specify experiment to run", nullptr, false),
+        ConfigSchemaEntry("log_level", "string", std::string("INFO"), 
+                         "Log level (DEBUG, INFO, WARN, ERROR)", nullptr, false),
+        ConfigSchemaEntry("max_simulation_steps", "int", static_cast<int64_t>(10000), 
+                         "Maximum simulation steps", nullptr, false)
+    };
+    
+    config->setSchema(schema);
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+        if (arg.find("--config=") == 0) {
+            if (arg.find("=") != std::string::npos) {
+                configFile = arg.substr(arg.find("=") + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
@@ -359,28 +395,21 @@ int main(int argc, char** argv) {
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        
+        // Validate loaded config
+        auto validation = config->validateAll();
+        if (!validation.valid) {
+            NLM_LOG_ERROR("Configuration validation failed: " + validation.errorMessage);
+            return 1;
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->loadFromArgs(argc, argv)) {
+        return 0;  // Help was displayed
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -391,11 +420,6 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
     // Initialize brain
     NLM_LOG_INFO("");
@@ -446,4 +470,5 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
 }

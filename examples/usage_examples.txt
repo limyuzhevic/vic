@@ -1,0 +1,20 @@
+# Command Line Usage Examples
+# File: examples/usage_examples.txt
+# Example 1: Run with default config
+# ./nlm
+#
+# Example 2: Load JSON config
+# ./nlm --config=examples/config_example.json
+#
+# Example 3: Override parameters
+# ./nlm --config=examples/config_example.json --neuron_count=2000 --debug
+#
+# Example 4: Run specific experiment
+# ./nlm --experiment=learning --verbose
+#
+# Example 5: Save current config to JSON
+# ./nlm --verbose --debug | tee nlm_output.log
+#
+# Example 6: Load YAML config and export as JSON
+# ./nlm --config=examples/config_example.yaml --verbose
+#
