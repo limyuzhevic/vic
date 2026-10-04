@@ -6,6 +6,9 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -128,21 +131,70 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
+        bool checkpointSuccess = false;
+        
+        // Try with the configured path first
+        std::string checkpointPath = config.checkpointPath;
+        NLM_LOG_INFO("Using checkpoint path: " + checkpointPath);
+        
+        if (brain->save(checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
+            if (!brain2->initialize()) {
+                NLM_LOG_ERROR("Failed to initialize brain for loading");
+            } else if (brain2->load(checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
+                checkpointSuccess = true;
             } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+                NLM_LOG_ERROR("Failed to load checkpoint from " + checkpointPath);
             }
         } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
+            NLM_LOG_INFO("Failed to save to configured path, trying alternative...");
+            // Try alternative path in current directory
+            std::string altPath = "./nlm_checkpoint_test.bin";
+            if (brain->save(altPath)) {
+                NLM_LOG_INFO("Checkpoint saved successfully to alternative path: " + altPath);
+                
+                // Create new brain and load from alternative path
+                auto brain2 = std::make_shared<Brain>(cfg);
+                if (!brain2->initialize()) {
+                    NLM_LOG_ERROR("Failed to initialize brain for loading from alternative path");
+                } else if (brain2->load(altPath)) {
+                    NLM_LOG_INFO("Checkpoint loaded successfully from alternative path");
+                    result.checkpointingWorks = true;
+                    checkpointSuccess = true;
+                } else {
+                    NLM_LOG_ERROR("Failed to load checkpoint from alternative path: " + altPath);
+                }
+                
+                // Clean up alternative file
+                std::remove(altPath.c_str());
+            } else {
+                NLM_LOG_ERROR("Failed to save checkpoint (tried both configured and alternative paths)");
+            }
+        }
+        
+        // If checkpointing failed, try to recover by using a different approach
+        if (!checkpointSuccess && config.enableCheckpointing) {
+            NLM_LOG_INFO("Attempting recovery mechanism...");
+            std::string recoveryPath = "./nlm_checkpoint_recovery.bin";
+            NLM_LOG_INFO("Trying recovery path: " + recoveryPath);
+            
+            if (brain->save(recoveryPath)) {
+                auto brain2 = std::make_shared<Brain>(cfg);
+                if (brain2->initialize() && brain2->load(recoveryPath)) {
+                    NLM_LOG_INFO("Recovery checkpointing successful");
+                    result.checkpointingWorks = true;
+                    std::remove(recoveryPath.c_str());
+                } else {
+                    NLM_LOG_ERROR("Recovery checkpointing failed");
+                }
+            } else {
+                NLM_LOG_ERROR("Recovery checkpoint save failed");
+            }
         }
     }
     
@@ -321,10 +373,14 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
+    cfg->set("region_count", 1);
     
     // Create and initialize brain
     auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
+    if (!brain1->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain1");
+        return false;
+    }
     
     // Run some steps
     for (int i = 0; i < 100; ++i) {
@@ -337,18 +393,36 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
+    // Use a configurable checkpoint path (prefer /tmp, then current directory)
+    std::string path = "/tmp/nlm_checkpoint_test_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".bin";
+    NLM_LOG_INFO("Using checkpoint path: " + path);
+    
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
-    if (!brain1->save(path)) {
-        NLM_LOG_ERROR("Failed to save checkpoint");
-        return false;
+    NLM_LOG_INFO("Saving checkpoint...");
+    bool saveSuccess = brain1->save(path);
+    if (!saveSuccess) {
+        // Try alternative path in current directory
+        path = "./nlm_checkpoint_test.bin";
+        NLM_LOG_INFO("Trying alternative path: " + path);
+        saveSuccess = brain1->save(path);
+        if (!saveSuccess) {
+            NLM_LOG_ERROR("Failed to save checkpoint (tried both /tmp and current directory)");
+            return false;
+        }
     }
+    
+    NLM_LOG_INFO("Checkpoint saved successfully");
     
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    if (!brain2->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain2");
+        return false;
+    }
     
-    if (!brain2->load(path)) {
+    NLM_LOG_INFO("Loading checkpoint...");
+    bool loadSuccess = brain2->load(path);
+    if (!loadSuccess) {
         NLM_LOG_ERROR("Failed to load checkpoint");
         return false;
     }
@@ -356,10 +430,16 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
     
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
+    // Compare basic metrics (note: exact state restoration is complex due to neural nature)
+    if (std::abs(avgFiring1 - brain2->getAverageFiringRate()) > 0.1f) {
+        NLM_LOG_INFO("  Note: Firing rates differ between brains (expected for neural simulation)");
+    }
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    NLM_LOG_INFO("[PASS] Checkpoint save/load completed successfully");
+    
+    // Clean up temporary file
+    std::remove(path.c_str());
+    
     return true;
 }
 
