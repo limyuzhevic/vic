@@ -103,6 +103,10 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Advanced global logger management
+    static std::shared_ptr<Logger> getGlobalPtr();
+    static void setGlobalPtr(std::shared_ptr<Logger> logger);
 
 private:
     struct Impl;

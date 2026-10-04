@@ -177,13 +177,31 @@ bool Logger::isEnabled(LogLevel level) const {
 }
 
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    // Check if a global logger has been set
+    if (auto globalInstance = getGlobalPtr()) {
+        return *globalInstance;
+    }
+    // Otherwise create and return default global logger
+    static Logger defaultLogger;
+    setGlobalPtr(std::make_shared<Logger>(defaultLogger));
+    return *getGlobalPtr();
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Replace the global logger instance
+    setGlobalPtr(logger);
+}
+
+std::shared_ptr<Logger> Logger::getGlobalPtr() {
+    // Get pointer to the global logger instance
+    static std::shared_ptr<Logger> globalInstance;
+    return globalInstance;
+}
+
+void Logger::setGlobalPtr(std::shared_ptr<Logger> logger) {
+    // Set global logger pointer
+    static std::shared_ptr<Logger> globalInstance;
+    globalInstance = logger;
 }
 
 // LogStream implementation

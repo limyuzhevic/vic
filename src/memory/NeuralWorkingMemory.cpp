@@ -44,10 +44,11 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
+        if (auto* region = brain_->getRegion(RegionId(neuron.getId() / 1000))) {
+            auto neurons = region->getAllNeurons();
+            for (auto* n : neurons) {
+                if (n && n->getId() == neuron) {
+                    n->injectCurrent(activation * 5.0f);
                     break;
                 }
             }
@@ -126,14 +127,16 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             brain_->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
-            memoryTimestamps_[i]++;
-            
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+            if (i < memoryTimestamps_.size()) {
+                memoryTimestamps_[i]++;
+                
+                // Check if trace is too old
+                if (memoryTimestamps_[i] > 1000) {
+                    activation *= (1.0f - decayRate_);
+                }
+                
+                memoryActivations_[i] = activation;
             }
-            
-            memoryActivations_[i] = activation;
         }
     }
     
@@ -167,7 +170,7 @@ void NeuralWorkingMemory::runCompetition() {
     float threshold = 0.3f;
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
+        if (i < memoryActivations_.size() && memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
     }
@@ -215,7 +218,9 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
         auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
         if (it != memoryNeurons_.end()) {
             size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
+            if (idx < memoryActivations_.size()) {
+                fromActivation = memoryActivations_[idx];
+            }
         }
         
         if (fromActivation > 0.1f && brain_) {
@@ -237,11 +242,27 @@ void NeuralWorkingMemory::decayWeakTraces() {
     }
     
     // Remove weak traces (in reverse order to maintain indices)
-    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    // Build new vectors with only strong traces to avoid iterator invalidation
+    std::vector<NeuronId> newNeurons;
+    std::vector<float> newActivations;
+    std::vector<SimulationStep> newTimestamps;
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (i < toRemove.size() && toRemove[i] == i) {
+            continue;  // Skip this trace
+        }
+        // Keep this trace
+        if (i < memoryNeurons_.size()) {
+            newNeurons.push_back(memoryNeurons_[i]);
+            newActivations.push_back(memoryActivations_[i]);
+            newTimestamps.push_back(memoryTimestamps_[i]);
+        }
     }
+    
+    // Update main memory vectors
+    memoryNeurons_.swap(newNeurons);
+    memoryActivations_.swap(newActivations);
+    memoryTimestamps_.swap(newTimestamps);
 }
 
 // AttentionalSelection Implementation
@@ -274,7 +295,7 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
                                                               float globalInhibition) {
     winners_.clear();
     
-    if (competitors.empty()) return winners_;
+    if (competitors.empty() || !brain_) return winners_;
     
     // Compute activity levels for competitors
     std::vector<float> activities(competitors.size(), 0.0f);
