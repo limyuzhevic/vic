@@ -139,13 +139,12 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# CLI executable
+add_executable(nlm_cli_exec
+    src/cli/main.cpp
+)
+target_link_libraries(nlm_cli_exec PUBLIC nlm_core nlm_agent nlm_world)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)

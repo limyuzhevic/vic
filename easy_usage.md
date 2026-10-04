@@ -287,11 +287,130 @@ print("Agent simulation complete!")
 
 ---
 
+## NEW: Command-Line Interface (CLI)
+
+The NLM project now includes a powerful command-line interface that makes it even easier to use and automate brain simulations.
+
+### Quick CLI Usage
+
+```bash
+# Show help
+nlm_cli_exec --help
+
+# Show version
+nlm_cli_exec --version
+
+# Create a new brain (1000 neurons, 1 region)
+nlm_cli_exec new --neurons 1000 --regions 1
+
+# Run a 2000-step simulation
+nlm_cli_exec run --steps 2000
+
+# Get brain status and statistics
+nlm_cli_exec status
+
+# Save current brain state to file
+nlm_cli_exec save /tmp/brain_state.bin
+
+# Load brain state from file
+nlm_cli_exec load /tmp/brain_state.bin
+
+# Export brain data to text format
+nlm_cli_exec export txt /tmp/brain_data.txt
+
+# Start interactive session for real-time control
+nlm_cli_exec interactive
+```
+
+### CLI Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `new` | Create a new brain | `nlm_cli_exec new --neurons 500 --regions 2` |
+| `run` | Run simulation | `nlm_cli_exec run --steps 1000` |
+| `status` | Show brain status | `nlm_cli_exec status` |
+| `save` | Save brain state | `nlm_cli_exec save my_brain.bin` |
+| `load` | Load brain state | `nlm_cli_exec load my_brain.bin` |
+| `export` | Export data | `nlm_cli_exec export txt data.txt` |
+| `interactive` | Start interactive mode | `nlm_cli_exec interactive` |
+| `help` | Show help | `nlm_cli_exec help new` |
+| `version` | Show version | `nlm_cli_exec --version` |
+
+### Integrating CLI with Python API
+
+You can combine the Python API for complex scripting with the CLI for quick operations:
+
+```python
+import pynlm
+import subprocess
+
+# Create and run simulation with Python
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Save to file
+brain.save("/tmp/temp_brain.bin")
+
+# Run continued simulation with CLI (if needed)
+# subprocess.run(["nlm_cli_exec", "load", "/tmp/temp_brain.bin"])
+# subprocess.run(["nlm_cli_exec", "run", "--steps", "500"])
+
+# Or use Python entirely for this example
+print("Python API usage demonstrated above.")
+print("CLI available for command-line operations.")
+```
+
+### Interactive Mode Features
+
+In interactive mode, you can:
+- Run commands like `run --steps 1000`
+- Get status with `status`
+- Save brains with `save filename`
+- Load brains with `load filename`
+- Change configuration with `set key value`
+- Exit with `exit` or `quit`
+
+### Configuration Options
+
+The CLI supports these configuration options:
+
+```bash
+nlm_cli_exec new [options]
+Options:
+  --neurons N     Number of neurons (default: 1000)
+  --regions R     Number of regions (default: 1)
+
+nlm_cli_exec run [options]
+Options:
+  --steps S       Number of simulation steps (default: 1000)
+  --config C      Configuration file path
+  --output O      Output file path
+
+nlm_cli_exec export FORMAT [filepath]
+Formats:
+  txt            Text format (default)
+  json           JSON format (not yet implemented)
+  bin            Binary checkpoint format
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for advanced usage details
+2. **Read `docs/ARCHITECTURE.md`** to understand system design
+3. **Experiment with different configurations** using CLI
+4. **Try the interactive mode** for real-time control
+5. **Combine Python API and CLI** for complex workflows
+6. **Use examples in `EXAMPLES.md`** for practical usage
+
+**The NLM project now offers the best of both worlds:**
+
+- **Python API**: For programmatic control and complex scripting
+- **Command-Line Interface**: For quick operations, automation, and interactive use
+- **Both work together**: Seamlessly for maximum flexibility
+
+That's it! You're now ready to use NLM with both powerful programming interfaces.
