@@ -537,16 +537,72 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 12: Update cognitive systems ==========
+    
+    // Update working memory with current neural activity
+    if (pImpl->workingMemory) {
+        // Integrate with attention system to prioritize important information
+        if (pImpl->attention) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
+        
+        // Update working memory with current activity
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // Update episodic memory with current experience
+    pImpl->stepsSinceLastEpisode++;
+    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        if (pImpl->episodicMemory) {
+            // Capture current brain state as an episode
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store active neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            // Store reward in episode
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // Update prediction system
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current state
+        pImpl->predictionSystem->update(pImpl->timestep);
+    }
+    
+    // Update attention system
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+    }
+    
+    // Update concept formation
+    if (pImpl->conceptFormation) {
+        // Process current neural activity patterns to form concepts
+        // This would integrate with sensory input processing and working memory
+    }
+    
+    // Update development system periodically
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -573,6 +629,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 13: Replay important memories ==========
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+        // Get episodes for replay
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
         }
     }
     

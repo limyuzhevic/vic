@@ -6,8 +6,24 @@
 
 namespace nlm {
 
+// Include actual JSON/YAML parser if available
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <chrono>
+
+// Forward declaration for JSON/YAML parsing helpers
+namespace nlm {
+    bool parseJSONFile(const std::string& filepath, std::map<std::string, ConfigValue>& entries);
+    bool parseYAMLFile(const std::string& filepath, std::map<std::string, ConfigValue>& entries);
+}
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // JSON/YAML parsing helpers
+    static bool loadFromJSON(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    static bool loadFromYAML(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    static bool loadFromSimpleFormat(const std::string& filepath, std::vector<ConfigEntry>& entries);
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,63 +35,200 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    bool success = false;
+    
+    if (ext == ".json" || ext == ".jsonc" || ext == ".json5") {
+        // Try to parse as JSON
+        success = Impl::loadFromJSON(filepath, pImpl->entries);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        // Try to parse as YAML
+        success = Impl::loadFromYAML(filepath, pImpl->entries);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        success = Impl::loadFromSimpleFormat(filepath, pImpl->entries);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    if (!success) {
+        // Try simple format as fallback (for backward compatibility)
+        return Impl::loadFromSimpleFormat(filepath, pImpl->entries);
     }
     
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+// JSON/YAML parsing implementation
+namespace nlm {
+    
+    bool parseJSONFile(const std::string& filepath, std::map<std::string, ConfigValue>& entries) {
+        try {
+            std::ifstream file(filepath);
+            if (!file.is_open()) return false;
+            
+            nlohmann::json j;
+            file >> j;
+            
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                const auto& value = it.value();
+                
+                ConfigValue configValue;
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    configValue = value.get<int64_t>();
+                } else if (value.is_number_unsigned()) {
+                    configValue = value.get<uint64_t>();
+                } else if (value.is_number_float()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Parse array
+                    std::vector<double> array;
+                    for (const auto& item : value) {
+                        array.push_back(item.get<double>());
+                    }
+                    configValue = array;
+                }
+                
+                entries[key] = configValue;
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            return true;
+        } catch (const std::exception&) {
+            return false;
         }
     }
-    return true;
+    
+    bool parseYAMLFile(const std::string& filepath, std::map<std::string, ConfigValue>& entries) {
+        try {
+            YAML::Node doc = YAML::LoadFile(filepath);
+            
+            for (const auto& node : doc) {
+                std::string key = node.first.as<std::string>();
+                const YAML::Node& value = node.second;
+                
+                ConfigValue configValue;
+                if (value.IsScalar()) {
+                    if (value.IsSequence()) {
+                        // This is an array
+                        std::vector<double> array;
+                        for (const auto& item : value) {
+                            array.push_back(item.as<double>());
+                        }
+                        configValue = array;
+                    } else if (value.IsDouble()) {
+                        configValue = value.as<double>();
+                    } else if (value.IsInt()) {
+                        configValue = value.as<int64_t>();
+                    } else if (value.IsBool()) {
+                        configValue = value.as<bool>();
+                    } else {
+                        configValue = value.as<std::string>();
+                    }
+                }
+                
+                entries[key] = configValue;
+            }
+            
+            return true;
+        } catch (const std::exception&) {
+            return false;
+        }
+    }
+    
+} // namespace nlm
+
+// Implementation of JSON/YAML loading helpers
+namespace nlm {
+    
+    bool Config::Impl::loadFromJSON(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+        std::map<std::string, ConfigValue> parsedEntries;
+        if (parseJSONFile(filepath, parsedEntries)) {
+            for (const auto& pair : parsedEntries) {
+                entries.emplace_back(pair.first, pair.second, ConfigSource::File);
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    bool Config::Impl::loadFromYAML(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+        std::map<std::string, ConfigValue> parsedEntries;
+        if (parseYAMLFile(filepath, parsedEntries)) {
+            for (const auto& pair : parsedEntries) {
+                entries.emplace_back(pair.first, pair.second, ConfigSource::File);
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    bool Config::Impl::loadFromSimpleFormat(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    }
+    
+} // namespace nlm
+
+void Config::printHelp() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "=" << std::string(50, '=') << std::endl;
+    std::cout << "\nUsage: nlm [--config <file>] [--key <value>]... [options]" << std::endl;
+    std::cout << "\nOptions:" << std::endl;
+    std::cout << "  --help, -h           Show this help message" << std::endl;
+    std::cout << "  --version            Show version information" << std::endl;
+    std::cout << "  --config <file>      Load configuration from file (JSON, YAML, or key=value)" << std::endl;
+    std::cout << "\nKey-value pairs (key=value or --key <value>):" << std::endl;
+    std::cout << "  --random_seed <num>      Random seed for reproducibility" << std::endl;
+    std::cout << "  --neuron_count <num>     Number of neurons in the brain" << std::endl;
+    std::cout << "  --region_count <num>     Number of brain regions" << std::endl;
+    std::cout << "  --connection_probability <float>  Probability of connections" << std::endl;
+    std::cout << "  --simulation_timestep <float>  Time step for simulation (seconds)" << std::endl;
+    std::cout << "\nConfiguration files support JSON, YAML, and key=value formats." << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --config config.json --neuron_count 2000" << std::endl;
+    std::cout << "  nlm --random_seed 42 --connection_probability 0.2" << std::endl;
+}
+
+void Config::printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0 (Phase 6 - Integrated Artificial Brain)" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Description: An experimental artificial developmental brain with real spiking neural computation." << std::endl;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
