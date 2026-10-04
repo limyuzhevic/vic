@@ -104,6 +104,160 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
+## Advanced Usage Examples
+
+### Example 1: Using Advanced Scenarios
+
+```python
+import pynlm
+from pynlm import AdvancedUtils
+
+# Create an exploration scenario (high novelty, learning-focused)
+brain = AdvancedUtils.create_advanced_scenario(
+    scenario_type="exploration",
+    neuron_count=2000,
+    region_count=3,
+    simulation_steps=1000
+)
+
+# Run simulation with batch processing
+from pynlm import BatchProcessor
+processor = AdvancedUtils.create_batch_processor(
+    num_steps=1000,
+    batch_size=100
+)
+
+for i in range(processor.get_total_batches()):
+    results = processor.process_batch(brain)
+    summary = results.get_summary()
+    print(f"Batch {i}: {summary}")
+```
+
+### Example 2: Performance Monitoring and Data Export
+
+```python
+import pynlm
+import tempfile
+import os
+
+# Create a complex brain with all systems enabled
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create performance monitor
+from pynlm import AdvancedUtils
+from pynlm import BatchProcessor
+
+processor = AdvancedUtils.create_batch_processor(num_steps=500, batch_size=50)
+
+print("Running simulation with performance monitoring...")
+for i in range(processor.get_total_batches()):
+    results = processor.process_batch(brain)
+    print(f"Batch {i}: {results.get_summary()}")
+
+# Export brain data
+with tempfile.TemporaryDirectory() as tmpdir:
+    data_file = os.path.join(tmpdir, "brain_data.csv")
+    AdvancedUtils.export_brain_data(brain, data_file, "csv")
+    print(f"Brain data exported to: {data_file}")
+```
+
+### Example 3: Debugging and Validation
+
+```python
+import pynlm
+from pynlm import DebugTools
+
+# Create and initialize brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Validate brain state
+validation_result = DebugTools.validate_brain_state(brain)
+print(validation_result.get_report())
+
+# Run a few simulation steps
+for step in range(50):
+    brain.step(step)
+
+# Validate again after simulation
+validation_result = DebugTools.validate_brain_state(brain)
+print("\nAfter simulation:")
+print(validation_result.get_report())
+```
+
+### Example 4: Scenario Comparison
+
+```python
+import pynlm
+from pynlm import ScenarioManager
+
+# Compare different scenario types
+scenario_types = ["exploration", "exploitation", "development", "stable", "balanced"]
+results = ScenarioManager.run_scenario_comparison(scenario_types)
+
+# Compare and save results
+comparison = ScenarioManager.compare_scenarios(
+    results, 
+    output_file="scenario_comparison.json"
+)
+
+print("Best performing scenario:", comparison["best_scenario"])
+print("Most stable scenario:", comparison["most_stable_scenario"])
+```
+
+### Example 5: Complete Agent with Advanced Features
+
+```python
+import pynlm
+from pynlm import AdvancedUtils
+
+# Setup complete agent with all features
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent.initialize(world)
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+print("Starting advanced agent simulation...")
+print(f"Initial neurons: {brain.getTotalNeuronCount()}")
+print(f"Initial developmental stage: {brain.getDevelopmentalStage()}")
+
+# Run simulation with performance monitoring
+from pynlm import BatchProcessor
+processor = AdvancedUtils.create_batch_processor(num_steps=1000, batch_size=100)
+
+for batch_idx in range(processor.get_total_batches()):
+    print(f"\n--- Batch {batch_idx + 1} ---")
+    results = processor.process_batch(brain, agent, world)
+    
+    summary = results.get_summary()
+    print(f"Spikes in batch: {summary['total_spike_increase']}")
+    print(f"Average firing change: {summary['average_firing_change']:.2f}")
+    print(f"Current developmental stage: {brain.getDevelopmentalStage()}")
+    
+    # Print brain status periodically
+    if batch_idx % 2 == 0:
+        brain.logStatus()
+
+print("\nSimulation complete!")
+print(f"Final spike count: {brain.getTotalSpikeCount()}")
+print(f"Final firing rate: {brain.getAverageFiringRate():.4f}")
+```
+
+---
+
 ## Common Patterns
 
 ### Pattern 1: Run a Simulation

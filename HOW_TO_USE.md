@@ -115,7 +115,7 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Enhanced NLM Python Library
 
 ### Basic Usage
 
@@ -137,6 +137,102 @@ brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
+
+### Advanced Usage
+
+#### Using Advanced Scenarios
+
+```python
+import pynlm
+from pynlm import AdvancedUtils
+
+# Create different scenario types
+exploration_brain = AdvancedUtils.create_advanced_scenario("exploration")
+exploitation_brain = AdvancedUtils.create_advanced_scenario("exploitation")
+development_brain = AdvancedUtils.create_advanced_scenario("development")
+
+print("Created advanced scenario brains")
+print(f"Exploration brain: {exploration_brain.getTotalNeuronCount()} neurons")
+print(f"Exploitation brain: {exploitation_brain.getTotalNeuronCount()} neurons")
+print(f"Development brain: {development_brain.getTotalNeuronCount()} neurons")
+```
+
+#### Batch Processing for Efficiency
+
+```python
+import pynlm
+from pynlm import BatchProcessor
+
+# Create brain and agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Create batch processor
+processor = BatchProcessor(num_steps=1000, batch_size=100)
+
+print("Running batch simulation...")
+for batch_idx in range(processor.get_total_batches()):
+    results = processor.process_batch(brain, agent, world)
+    summary = results.get_summary()
+    print(f"Batch {batch_idx}: {summary}")
+```
+
+#### Performance Monitoring and Data Export
+
+```python
+import pynlm
+from pynlm import AdvancedUtils, DebugTools
+
+# Create and validate brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Validate brain state
+validation = DebugTools.validate_brain_state(brain)
+print("Validation Report:")
+print(validation.get_report())
+
+# Run simulation
+for step in range(500):
+    brain.step(step)
+
+# Export data
+import tempfile
+import os
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    data_file = os.path.join(tmpdir, "brain_data.csv")
+    AdvancedUtils.export_brain_data(brain, data_file, "csv")
+    print(f"Data exported to: {data_file}")
+```
+
+#### Scenario Comparison
+
+```python
+import pynlm
+from pynlm import ScenarioManager
+
+# Compare different scenarios
+scenario_types = ["exploration", "exploitation", "development", "stable"]
+results = ScenarioManager.run_scenario_comparison(scenario_types)
+
+# Analyze results
+comparison = ScenarioManager.compare_scenarios(results)
+
+print(f"Best scenario: {comparison['best_scenario']}")
+print(f"Most stable: {comparison['most_stable_scenario']}")
 ```
 
 #### Running a Simulation
@@ -256,40 +352,113 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### Advanced API Usage
 
-#### Brain Class
+#### Accessing Internal Brain Systems
 
 ```python
-# Creation
-brain = pynlm.createBrain(config)
+import pynlm
 
-# Initialization
+# Create and initialize brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
+# Access internal systems (now available with enhanced bindings)
+spike_system = brain.getSpikeSystem()
+stdp = brain.getSTDP()
+hebbian = brain.getHebbian()
+structural_plasticity = brain.getStructuralPlasticity()
 
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+associative_memory = brain.getAssociativeMemory()
 
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
+prediction_system = brain.getPredictionSystem()
+planner = brain.getPlanner()
+concept_formation = brain.getConceptFormation()
+attention = brain.getAttention()
 
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+development_system = brain.getDevelopmentSystem()
+dopamine = brain.getDopamine()
+curiosity = brain.getCuriosity()
+novelty = brain.getNovelty()
+prediction_error = brain.getPredictionErrorSignal()
 
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+random_generator = brain.getRandomGenerator()
+
+# Log brain status (new API)
+brain.logStatus()
+```
+
+#### Using Enhanced API Classes
+
+```python
+import pynlm
+from pynlm import AdvancedUtils, DebugTools, ScenarioManager
+
+# Create different scenario types
+exploration_brain = AdvancedUtils.create_advanced_scenario("exploration")
+exploitation_brain = AdvancedUtils.create_advanced_scenario("exploitation")
+development_brain = AdvancedUtils.create_advanced_scenario("development")
+
+# Validate brain state
+validation = DebugTools.validate_brain_state(exploration_brain)
+print("Validation:", validation.get_report())
+
+# Compare scenarios
+scenario_types = ["exploration", "exploitation", "development"]
+results = ScenarioManager.run_scenario_comparison(scenario_types)
+```
+
+#### Advanced Agent Configuration
+
+```python
+import pynlm
+from pynlm import AdvancedUtils, BatchProcessor
+
+# Create configuration with advanced settings
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.15)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.curiosity.scale", 2.0)
+config.set("neuromod.novelty.enable", True)
+config.set("plasticity.structural.enable", True)
+
+# Create brain and agent
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+world.reset()
+
+agent.initialize(world)
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run batch simulation
+processor = AdvancedUtils.create_batch_processor(num_steps=2000, batch_size=200)
+
+print("Starting advanced simulation...")
+for batch_idx in range(processor.get_total_batches()):
+    results = processor.process_batch(brain, agent, world)
+    summary = results.get_summary()
+    print(f"Batch {batch_idx}: {summary}")
+
+# Export results
+import tempfile
+import os
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    data_file = os.path.join(tmpdir, "advanced_simulation.csv")
+    AdvancedUtils.export_brain_data(brain, data_file, "csv")
+    print(f"Results exported to: {data_file}")
 ```
 
 #### Config Class
