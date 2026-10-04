@@ -51,19 +51,12 @@ public:
     // Get number of active memory traces
     size_t getActiveTraces() const { return activeTraces_.size(); }
 
-    // Get capacity
-    size_t getCapacity() const { return capacity_; }
-    void setCapacity(size_t cap) { capacity_ = cap; }
-
-    // Decay rate for memory traces
-    float getDecayRate() const { return decayRate_; }
-    void setDecayRate(float rate) { decayRate_ = rate; }
-
-    // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
-
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
+    
+    // REST-BASED REINFORCEMENT
+    // Enhanced reinforcement during rest periods for memory consolidation
+    void reinforceDuringRest(TimestepDuration dt, float factor = 1.5f);
 
     // Competition between memory traces
     void runCompetition();
@@ -104,6 +97,10 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+    
+    // Rest state tracking
+    bool isResting_;
+    size_t restPeriodCount_;
 };
 
 // AttentionalSelection: Neural attention through competition

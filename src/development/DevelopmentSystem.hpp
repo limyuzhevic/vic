@@ -46,10 +46,25 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // ========== REST-BASED DEVELOPMENT ==========
+
+    // Accelerate development during rest periods
+    // During rest, development processes are accelerated for faster circuit refinement
+    void accelerateDevelopment();
+    
+    // Check if development is being accelerated (in rest)
+    bool isDevelopmentAccelerated() const { return developmentAccelerated_; }
+    
+    // Set development acceleration state
+    void setDevelopmentAccelerated(bool accelerated) { developmentAccelerated_ = accelerated; }
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    bool developmentAccelerated_;
 };
+
+// Maturation: Implements critical period and maturation processes
 
 } // namespace nlm

@@ -20,6 +20,8 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
+    , restPeriodCount_(0)
+    , isResting_(false)
 {
 }
 
@@ -272,6 +274,93 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
             // (In simulation, this would be steps)
         }
     }
+}
+
+// ========== REST-BASED CONSOLIDATION ==========
+
+void NeuralEpisodicMemory::consolidateRestEnhanced() {
+    // Enhanced consolidation during rest periods
+    // Consolidate more aggressively with lower threshold (0.3 instead of 0.5)
+    consolidate(0.3f);
+    
+    // Additional rest-specific consolidation
+    // Increase relevance of recent episodes during rest
+    if (!episodes_.empty()) {
+        // During rest, prioritize more recent episodes for stronger consolidation
+        size_t recentCount = std::min(static_cast<size_t>(5), episodes_.size());
+        for (size_t i = 0; i < recentCount; ++i) {
+            size_t index = episodes_.size() - 1 - i;
+            // Give higher weight to recent episodes during rest consolidation
+            // This could be implemented by increasing episode relevance
+            // For now, we just ensure they are consolidated
+        }
+    }
+    
+    NLM_LOG_INFO("Rest-enhanced episodic memory consolidation (lower threshold: 0.3)");
+}
+
+void NeuralEpisodicMemory::replayForConsolidation() {
+    // Rest-based replay specifically for consolidation
+    // This is different from normal replay - it's for strengthening connections
+    // Get episodes that are ready for consolidation during rest
+    std::vector<const EpisodicMemoryItem*> consolidationEpisodes;
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        const auto& ep = episodes_[i];
+        
+        // Select episodes for consolidation based on:
+        // 1. Recency (more recent episodes)
+        // 2. Higher reward (more valuable experiences)
+        // 3. Lower age (less consolidated already)
+        
+        float recencyScore = 1.0f / (ep.age + 1);
+        float rewardScore = ep.reward;
+        float ageScore = 1.0f - std::min(1.0f, static_cast<float>(ep.age) / 100.0f);
+        
+        float score = recencyScore * 0.4f + rewardScore * 0.4f + ageScore * 0.2f;
+        
+        if (score > 0.6f) {  // Threshold for consolidation episodes
+            consolidationEpisodes.push_back(&episodes_[i]);
+        }
+    }
+    
+    // Also include recent episodes even if they don't meet threshold
+    size_t recentCount = std::min(static_cast<size_t>(5), episodes_.size());
+    for (size_t i = 0; i < recentCount; ++i) {
+        size_t index = episodes_.size() - 1 - i;
+        // Check if we already included this episode
+        bool alreadyIncluded = false;
+        for (const auto* ep : consolidationEpisodes) {
+            if (ep == &episodes_[index]) {
+                alreadyIncluded = true;
+                break;
+            }
+        }
+        
+        if (!alreadyIncluded) {
+            consolidationEpisodes.push_back(&episodes_[index]);
+        }
+    }
+    
+    // Replay selected episodes for consolidation
+    for (const auto* episode : consolidationEpisodes) {
+        // Enhanced replay for consolidation (6x activation)
+        for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+            NeuronId neuron = episode->activeNeurons[i];
+            float activation = i < episode->neuronActivations.size() ? 
+                              episode->neuronActivations[i] : 0.5f;
+            
+            // Much stronger injection for consolidation (6x normal)
+            if (brain_) {
+                brain_->injectCurrent(neuron, activation * 6.0f);
+            }
+        }
+        
+        // Additional consolidation by updating relevance
+        updateRelevance(episode->timestamp, 0.5f);
+    }
+    
+    NLM_LOG_INFO("Rest-based replay for consolidation of " + std::to_string(constolidationEpisodes.size()) + " episodes");
 }
 
 float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,

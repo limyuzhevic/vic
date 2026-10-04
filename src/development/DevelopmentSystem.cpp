@@ -13,7 +13,7 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), developmentAccelerated_(false) {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
 
@@ -101,6 +101,26 @@ float DevelopmentSystem::getPlasticityModifier() const {
         case DevelopmentalStage::Adult: return 0.2f;
         case DevelopmentalStage::Aging: return 0.1f;
         default: return 0.5f;
+    }
+}
+
+// ========== REST-BASED DEVELOPMENT ==========
+
+void DevelopmentSystem::accelerateDevelopment() {
+    developmentAccelerated_ = true;
+    NLM_LOG_INFO("Development accelerated during rest period");
+}
+
+bool DevelopmentSystem::isDevelopmentAccelerated() const {
+    return developmentAccelerated_;
+}
+
+void DevelopmentSystem::setDevelopmentAccelerated(bool accelerated) {
+    developmentAccelerated_ = accelerated;
+    if (accelerated) {
+        NLM_LOG_INFO("Development acceleration enabled");
+    } else {
+        NLM_LOG_INFO("Development acceleration disabled");
     }
 }
 

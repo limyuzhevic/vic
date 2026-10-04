@@ -1,4 +1,4 @@
-#pragma once
+#include "../motor/Action.hpp"
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
@@ -123,6 +123,33 @@ public:
 
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
+    
+    // ========== REST-BASED CONOLIDATION ==========
+    
+    // Enhanced consolidation that specifically targets rest periods
+    // Consolidates more aggressively (lower threshold) during rest for better memory integration
+    void consolidateRestEnhanced();
+    
+    // Rest-based replay specifically for consolidation
+    // Replay episodes during rest periods to strengthen connections
+    void replayForConsolidation();
+    
+    // ========== REST-BASED STATISTICS ==========
+    
+    // Get current rest state
+    bool isResting() const { return isResting_; }
+    
+    // Set rest state
+    void setResting(bool resting) { isResting_ = resting; }
+    
+    // Get rest period count
+    size_t getRestPeriodCount() const { return restPeriodCount_; }
+    
+    // Increment rest period counter
+    void incrementRestPeriodCount() { restPeriodCount_++; }
+    
+    // Reset rest period counter
+    void resetRestPeriodCount() { restPeriodCount_ = 0; }
 
 private:
     // Compute similarity between query and stored episode
@@ -143,6 +170,10 @@ private:
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    
+    // Rest state tracking
+    bool isResting_;
+    size_t restPeriodCount_;
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences
@@ -189,13 +220,35 @@ public:
     std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern,
                                                      size_t steps = 2) const;
 
-    // Clear associations
-    void clear();
+    // Get episodes for replay (selection based on relevance and recency)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
-    // Get number of associations
-    size_t getAssociationCount() const { return associations_.size(); }
-
-private:
+    // Replay multiple episodes (for sleep-like consolidation)
+    void replaySequence(const std::vector<size_t>& episodeIds);
+    
+    // ========== REST-BASED CONOLIDATION ==========
+    
+    // Enhanced consolidation that specifically targets rest periods
+    // Consolidates more aggressively (lower threshold) during rest for better memory integration
+    void consolidateRestEnhanced();
+    
+    // Rest-based replay specifically for consolidation
+    // Replay episodes during rest periods to strengthen connections
+    void replayForConsolidation();
+    
+    // ========== REST-BASED STATISTICS ==========
+    
+    // Get current rest state
+    bool isResting() const { return isResting_; }
+    
+    // Get rest period count
+    size_t getRestPeriodCount() const { return restPeriodCount_; }
+    
+    // Increment rest period counter
+    void incrementRestPeriodCount() { restPeriodCount_++; }
+    
+    // Reset rest period counter
+    void resetRestPeriodCount() { restPeriodCount_ = 0; }
     // Find pattern neuron or create one
     NeuronId findPatternNeuron(const std::vector<float>& pattern);
 

@@ -37,6 +37,8 @@ struct Phase6IntegrationResult {
     bool developmentIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
+    bool episodicMemoryRichStorage;  // NEW: Tracks direct sensory experience storage
+    bool restBasedReplayActive;      // NEW: Tracks rest-based replay functionality
     
     // Metrics
     float totalReward;
@@ -46,6 +48,8 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float episodicMemoryQualityScore;  // NEW: Score for episodic memory richness
+    float restPeriodCount;            // NEW: Number of rest periods experienced
     
     // Timestamps
     time_t startTime;
@@ -60,6 +64,8 @@ struct Phase6IntegrationResult {
         , developmentIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , episodicMemoryRichStorage(false)
+        , restBasedReplayActive(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
@@ -67,6 +73,8 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , episodicMemoryQualityScore(0.0f)
+        , restPeriodCount(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -120,14 +128,9 @@ public:
     bool testMemoryIntegration();
     
     /**
-     * Test neuromodulation integration
+     * Test planner integration
      */
-    bool testNeuromodulationIntegration();
-    
-    /**
-     * Test checkpoint save/load
-     */
-    bool testCheckpointing();
+    bool testPlannerIntegration();
     
     /**
      * Test replay system

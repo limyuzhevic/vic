@@ -1,5 +1,7 @@
 #include "NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -28,41 +30,45 @@ void NeuralPlanner::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
-ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
-    // Generate possible action sequences
-    auto sequences = generateActionSequences(planningDepth_);
+ActionType NeuralPlanner::planAction(SimulationStep currentStep,
+                                        const std::vector<float>& currentState,
+                                        size_t totalSpikeCount,
+                                        const std::vector<float>& predictionData,
+                                        const std::vector<float>& neuromodulationData) {
+    // Enhanced planning with additional context for Phase 6 integration
+    // Uses neural state, prediction data, and neuromodulation for sophisticated planning
     
-    PlanningCandidate best;
-    best.expectedReward = -1000.0f;
+    // Create extended state representation for planning
+    std::vector<float> extendedState = currentState;
+    extendedState.push_back(static_cast<float>(totalSpikeCount) / 10000.0f);  // Neural activity
+    extendedState.push_back(0.5f);  // Default current position
     
-    // Evaluate each sequence
-    for (const auto& sequence : sequences) {
-        PlanningCandidate candidate = evaluateSequence(sequence, currentState);
-        
-        if (candidate.expectedReward > best.expectedReward) {
-            best = candidate;
+    // If prediction data is available, use it to inform planning
+    if (!predictionData.empty()) {
+        // Blend prediction data into state
+        for (size_t i = 0; i < std::min(predictionData.size(), size_t(5)); ++i) {
+            extendedState.push_back(predictionData[i]);
         }
     }
     
-    // Update confidence based on how consistent evaluations are
-    if (!sequences.empty()) {
-        planningConfidence_ = best.confidence;
-    }
-    
-    // Return first action of best sequence
-    if (!best.actions.empty()) {
-        // Record success/failure based on whether we achieved target
-        recentPlanSuccess_.push_back(best.expectedReward >= targetReward);
-        if (recentPlanSuccess_.size() > 10) {
-            recentPlanSuccess_.pop_front();
-        }
+    // If neuromodulation data is available, use it to influence planning
+    if (!neuromodulationData.empty()) {
+        // Extract neuromodulation signals
+        float predictionError = neuromodulationData.size() > 0 ? neuromodulationData[0] : 0.0f;
+        float curiosity = neuromodulationData.size() > 1 ? neuromodulationData[1] : 0.0f;
         
-        return best.actions[0];
+        // Adjust planning based on neuromodulation
+        if (predictionError > 0.5f) {
+            // High prediction error = explore different actions
+            setPlanningDepth(std::min(getPlanningDepth() + 2, 10u));
+        } else if (curiosity > 0.7f) {
+            // High curiosity = explore novel sequences
+            setPlanningDepth(8);
+        }
     }
     
-    // Default: wait if no good option
-    return ActionType::Wait;
+    // Plan using the basic method (target reward already configured)
+    return planAction(extendedState, targetReward_);
 }
 
 PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
@@ -218,22 +224,60 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
     return nextState;
 }
 
-void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                                     const std::vector<ActionType>& actualActions,
-                                     float actualReward) {
-    // Update action quality based on how well plan worked
-    size_t minLen = std::min(plannedActions.size(), actualActions.size());
+void NeuralPlanner::updatePlanningParameters(float predictionError, float rewardPrediction) {
+    // Update planner's internal parameters based on prediction error and reward prediction
+    // This adapts planning behavior based on prediction confidence and expected rewards
     
-    for (size_t i = 0; i < minLen; ++i) {
-        size_t actionIdx = static_cast<size_t>(actualActions[i]);
+    // Adjust planning depth based on prediction error
+    if (predictionError > 0.5f) {
+        // High prediction error = uncertain environment, plan more broadly
+        setPlanningDepth(std::min(getPlanningDepth() + 2, 10u));
+        planningConfidence_ = 0.3f * predictionError;  // Lower confidence with high error
+    } else if (predictionError < 0.1f) {
+        // Low prediction error = predictable environment, plan more efficiently
+        setPlanningDepth(3);
+        planningConfidence_ = 0.8f + 0.2f * rewardPrediction;  // High confidence
+    } else {
+        // Medium prediction error = balanced planning
+        setPlanningDepth(5);
+        planningConfidence_ = 0.5f;
+    }
+    
+    // Adjust target reward based on reward prediction
+    targetReward_ = 0.5f + 0.5f * rewardPrediction;
+}
+
+void NeuralPlanner::updateFromExperience(const std::vector<EpisodicMemoryItem>& episodes) {
+    // Learn from recent episodic memory to improve planning
+    // Extract learned patterns and strategies from past experiences
+    
+    if (episodes.empty()) return;
+    
+    // Analyze episode outcomes to update action quality
+    float totalReward = 0.0f;
+    size_t rewardCount = 0;
+    
+    for (const auto& episode : episodes) {
+        // Update action quality based on observed outcomes
+        size_t actionIdx = static_cast<size_t>(episode.action);
         if (actionIdx < actionQuality_.size()) {
-            // If action matched plan, positive update; else negative
-            float delta = (actualActions[i] == plannedActions[i]) ? 0.1f : -0.05f;
-            delta *= actualReward;
+            // Increase quality if episode had good reward
+            if (episode.reward > 0.5f) {
+                actionQuality_[actionIdx] = std::min(actionQuality_[actionIdx] + 0.1f, 1.0f);
+            } else if (episode.reward < 0.2f) {
+                // Decrease quality if episode had poor reward
+                actionQuality_[actionIdx] = std::max(actionQuality_[actionIdx] - 0.05f, -1.0f);
+            }
             
-            actionQuality_[actionIdx] = std::clamp(
-                actionQuality_[actionIdx] + delta, -1.0f, 1.0f);
+            totalReward += episode.reward;
+            rewardCount++;
         }
+    }
+    
+    if (rewardCount > 0) {
+        // Update current goal based on average reward
+        float avgReward = totalReward / rewardCount;
+        currentGoal_ = std::vector<float>(5, avgReward);  // Simple goal representation
     }
 }
 

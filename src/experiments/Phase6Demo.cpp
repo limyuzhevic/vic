@@ -35,8 +35,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Integration verification passed!" << std::endl << std::endl;
     
     // Test individual systems
-    std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    std::cout << "--- Planner Integration Test ---" << std::endl;
+    bool plannerIntegration = experiment.testPlannerIntegration();
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
@@ -68,6 +68,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Episodic memory quality score: " << result.episodicMemoryQualityScore << std::endl;
+    std::cout << "Rich episodic storage: " << (result.episodicMemoryRichStorage ? "ENABLED" : "DISABLED") << std::endl;
+    std::cout << "Rest-based replay: " << (result.restBasedReplayActive ? "ENABLED" : "DISABLED") << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;

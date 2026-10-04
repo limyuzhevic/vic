@@ -1,12 +1,8 @@
-#pragma once
+#include "motor/Action.hpp"
 
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
+#include "brain/Brain.hpp"
 
-namespace nlm {
+#include "memory/NeuralEpisodicMemory.hpp"
 
 // PlanningCandidate: A possible action sequence considered during planning
 struct PlanningCandidate {
@@ -37,10 +33,13 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Plan next action given current state and goal
-    // Returns the best action to take now
-    ActionType planAction(const std::vector<float>& currentState,
-                         float targetReward = 0.5f);
+// Plan next action with enhanced context for Phase 6 integration
+    // Returns the best action to take now, using enhanced context including neural state and neuromodulation
+    ActionType planAction(SimulationStep currentStep,
+                         const std::vector<float>& currentState,
+                         size_t totalSpikeCount,
+                         const std::vector<float>& predictionData,
+                         const std::vector<float>& neuromodulationData);
 
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
@@ -58,6 +57,12 @@ public:
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
+
+    // Update planner parameters based on prediction error and reward
+    void updatePlanningParameters(float predictionError, float rewardPrediction);
+
+    // Update planner from episodic memory experience
+    void updateFromExperience(const std::vector<EpisodicMemoryItem>& episodes);
 
     // Clear planning cache
     void clearCache();
@@ -80,10 +85,10 @@ private:
 
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
-
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
@@ -96,6 +101,9 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Target reward for planning
+    float targetReward_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

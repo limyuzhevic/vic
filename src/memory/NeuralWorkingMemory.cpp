@@ -63,7 +63,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
     }
     
-    // Create maintenance connections if needed
+        // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
@@ -423,4 +423,57 @@ void AttentionalSelection::reset() {
     pImpl->inhibitionLevel.clear();
 }
 
-} // namespace nlm
+void NeuralWorkingMemory::decayWeakTraces() {
+    std::vector<size_t> toRemove;
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        memoryActivations_[i] *= (1.0f - decayRate_);
+        
+        if (memoryActivations_[i] < 0.01f) {
+            toRemove.push_back(i);
+        }
+    }
+    
+    // Remove weak traces (in reverse order to maintain indices)
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
+        memoryActivations_.erase(memoryActivations_.begin() + *it);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    }
+}
+
+// ========== REST-BASED REINFORCEMENT ==========
+
+void NeuralWorkingMemory::reinforceDuringRest(TimestepDuration dt, float factor) {
+    // Enhanced reinforcement during rest periods for memory consolidation
+    // This is called by Brain::step() when isResting_ is true
+    
+    // Strengthen existing memory traces
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        // Apply stronger reinforcement during rest
+        memoryActivations_[i] *= (1.0f + factor * (0.5f / (i + 1)));
+        
+        // Extend memory lifetime during rest
+        if (i < memoryTimestamps_.size()) {
+            memoryTimestamps_[i] += dt * factor * 2.0f;  // Much longer persistence
+        }
+    }
+    
+    // Create additional maintenance connections during rest
+    if (brain_) {
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            for (size_t j = i + 1; j < memoryNeurons_.size(); ++j) {
+                // Stronger recurrent connections during rest
+                float strength = factor * 2.0f / (std::abs(static_cast<int>(i - j)) + 1);
+                createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[j], strength);
+            }
+        }
+    }
+    
+    // Run competition to select strongest traces during rest
+    runCompetition();
+    
+    NLM_LOG_INFO("Rest-based working memory reinforcement (factor: " + std::to_string(factor) + ")");
+}
+
+// AttentionalSelection Implementation
