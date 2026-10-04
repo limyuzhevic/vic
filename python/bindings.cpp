@@ -142,27 +142,144 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+             return "<Config: " + cfg.summary() + ">";
+         });
+
+    // Update Config class to include new JSON/YAML methods
+    py::class_<Config>(m, "Config", R"pbdoc(Advanced configuration class with JSON/YAML support)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from JSON/YAML file (format auto-detected)")
+        .def("loadFromString", &Config::loadFromString, py::arg("content"), py::arg("format") = "auto",
+             "Load configuration from JSON/YAML string")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+             return self.loadFromArgs(argc, argv);
+         }, py::arg("argc"), py::arg("argv"),
+             "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to file (format auto-detected)")
+        .def("saveAsJSON", &Config::saveAsJSON, py::arg("filepath"),
+             "Save configuration to JSON file")
+        .def("saveAsYAML", &Config::saveAsYAML, py::arg("filepath"),
+             "Save configuration to YAML file (placeholder)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def("validate", &Config::validate,
+             "Validate configuration")
+        .def("getValidationErrors", &Config::getValidationErrors,
+             "Get validation error messages")
+        .def("getEntryCount", &Config::getEntryCount,
+             "Get number of configuration entries")
+        .def("getKeysBySource", &Config::getKeysBySource, py::arg("source"),
+             "Get keys by configuration source")
+        .def("getFormatInfo", &Config::getFormatInfo,
+             "Get configuration format information")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+             self.set(key, value);
+         }, py::arg("key"), py::arg("value"),
+             "Set string configuration value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+             self.set(key, value);
+         }, py::arg("key"), py::arg("value"),
+             "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+             self.set(key, value);
+         }, py::arg("key"), py::arg("value"),
+             "Set double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+             self.set(key, value);
+         }, py::arg("key"), py::arg("value"),
+             "Set boolean configuration value")
+        .def("get", [](const Config& self, const std::string& key) -> std::optional<std::string> {
+             auto val = self.get<std::string>(key);
+             return val;
+         }, py::arg("key"),
+             "Get string configuration value")
+        .def("get", [](const Config& self, const std::string& key) -> std::optional<int> {
+             auto val = self.get<int>(key);
+             return val;
+         }, py::arg("key"),
+             "Get integer configuration value")
+        .def("get", [](const Config& self, const std::string& key) -> std::optional<double> {
+             auto val = self.get<double>(key);
+             return val;
+         }, py::arg("key"),
+             "Get double configuration value")
+        .def("get", [](const Config& self, const std::string& key) -> std::optional<bool> {
+             auto val = self.get<bool>(key);
+             return val;
+         }, py::arg("key"),
+             "Get boolean configuration value")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+             return self.getOr<std::string>(key, defaultValue);
+         }, py::arg("key"), py::arg("defaultValue"),
+             "Get string value with default")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+             return self.getOr<int>(key, defaultValue);
+         }, py::arg("key"), py::arg("defaultValue"),
+             "Get integer value with default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+             return self.getOr<double>(key, defaultValue);
+         }, py::arg("key"), py::arg("defaultValue"),
+             "Get double value with default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+             return self.getOr<bool>(key, defaultValue);
+         }, py::arg("key"), py::arg("defaultValue"),
+             "Get boolean value with default")
+        .def("hasMetadata", &Config::hasMetadata, py::arg("key"),
+             "Check if configuration has metadata")
+        .def("setMetadata", &Config::setMetadata, py::arg("key"), py::arg("metadata"),
+             "Set metadata for configuration key")
+        .def("getMetadata", &Config::getMetadata, py::arg("key"),
+             "Get metadata for configuration key")
+        .def("copyFrom", [](Config& self, const Config& other) {
+             self.clear();
+             for (const auto& entry : other.getKeys()) {
+                 auto val = other.get<std::string>(entry);
+                 if (val) {
+                     self.set(entry, *val);
+                 }
+             }
+         }, py::arg("other"),
+             "Copy configuration from another config object")
+        .def("mergeFrom", [](Config& self, const Config& other) {
+             for (const auto& entry : other.getKeys()) {
+                 auto val = other.get<std::string>(entry);
+                 if (val) {
+                     self.set(entry, *val);
+                 }
+             }
+         }, py::arg("other"),
+             "Merge configuration from another config object")
+        .def("diff", [](const Config& self, const Config& other) {
+             nlohmann::json diff = nlohmann::json::object();
+             for (const auto& key : self.getKeys()) {
+                 auto selfVal = self.get<std::string>(key);
+                 auto otherVal = other.get<std::string>(key);
+                 if (selfVal != otherVal) {
+                     diff[key] = *selfVal;
+                 }
+             }
+             return diff.dump(2);
+         }, py::arg("other"),
+             "Get difference between this and another config")
+        .def("clone", [](const Config& self) {
+             Config result;
+             result.copyFrom(self);
+             return result;
+         },
+             "Create a copy of the configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -289,69 +406,117 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+    // Complete Neuron class with all essential methods
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Individual neuron class implementing LIF dynamics)pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"),
+             "Create neuron with given ID")
+        .def("getId", &Neuron::getId,
+             "Get neuron ID")
+        .def("getType", &Neuron::getType,
+             "Get neuron type")
+        .def("setType", &Neuron::setType, py::arg("type"),
+             "Set neuron type")
+        .def("getState", &Neuron::getState,
+             "Get neuron state (const reference)")
+        .def("getState", &Neuron::getState, py::return_value_policy::reference_internal,
+             "Get neuron state (non-const reference)")
+        .def("getMembranePotential", &Neuron::getMembranePotential,
+             "Get membrane potential")
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("potential"),
+             "Set membrane potential")
+        .def("addToMembranePotential", &Neuron::addToMembranePotential, py::arg("delta"),
+             "Add to membrane potential")
+        .def("getThreshold", &Neuron::getThreshold,
+             "Get firing threshold")
+        .def("setThreshold", &Neuron::setThreshold, py::arg("threshold"),
+             "Set firing threshold")
+        .def("isFiring", &Neuron::isFiring,
+             "Check if neuron is currently firing")
+        .def("isRefractory", &Neuron::isRefractory,
+             "Check if neuron is in refractory period")
+        .def("setFiringState", &Neuron::setFiringState, py::arg("state"),
+             "Set neuron firing state")
+        .def("setRefractoryPeriod", &Neuron::setRefractoryPeriod, py::arg("steps"),
+             "Set refractory period in steps")
+        .def("decrementRefractory", &Neuron::decrementRefractory,
+             "Decrement refractory counter")
+        .def("getFiringRate", &Neuron::getFiringRate,
+             "Get firing rate")
+        .def("setFiringRate", &Neuron::setFiringRate, py::arg("rate"),
+             "Set firing rate")
+        .def("setLeakConductance", &Neuron::setLeakConductance, py::arg("conductance"),
+             "Set leak conductance")
+        .def("getLeakConductance", &Neuron::getLeakConductance,
+             "Get leak conductance")
+        .def("getRefractoryPeriod", &Neuron::getRefractoryPeriod,
+             "Get refractory period")
+        .def("setRestingPotential", &Neuron::setRestingPotential, py::arg("potential"),
+             "Set resting potential")
+        .def("getRestingPotential", &Neuron::getRestingPotential,
+             "Get resting potential")
+        .def("setResetPotential", &Neuron::setResetPotential, py::arg("potential"),
+             "Set reset potential")
+        .def("getResetPotential", &Neuron::getResetPotential,
+             "Get reset potential")
+        .def("checkThreshold", &Neuron::checkThreshold,
+             "Check if membrane potential exceeds threshold")
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime,
+             "Get timestamp of last spike")
+        .def("stepLIF", &Neuron::stepLIF, py::arg("currentTime"), py::arg("dt"),
+             "Perform LIF integration step, returns true if neuron fired")
+        .def("receiveExcitatoryInput", &Neuron::receiveExcitatoryInput, py::arg("amplitude"),
+             "Receive excitatory input (postsynaptic potential)")
+        .def("receiveInhibitoryInput", &Neuron::receiveInhibitoryInput, py::arg("amplitude"),
+             "Receive inhibitory input (postsynaptic potential)")
+        .def("receiveModulatoryInput", &Neuron::receiveModulatoryInput, py::arg("amplitude"),
+             "Receive modulatory input")
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"),
+             "Inject external current into neuron")
+        .def("getTotalCurrent", &Neuron::getTotalCurrent,
+             "Get total injected current")
+        .def("clearTotalCurrent", &Neuron::clearTotalCurrent,
+             "Clear total injected current")
+        .def("recordSpike", &Neuron::recordSpike, py::arg("timestamp"),
+             "Record a spike at given timestamp")
+        .def("getSpikeHistory", &Neuron::getSpikeHistory,
+             "Get spike history vector")
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory,
+             "Clear spike history")
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime,
+             "Get last spike time")
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("handle"),
+             "Add incoming synapse")
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("handle"),
+             "Add outgoing synapse")
+        .def("getIncomingSynapses", &Neuron::getIncomingSynapses,
+             "Get incoming synapses")
+        .def("getOutgoingSynapses", &Neuron::getOutgoingSynapses,
+             "Get outgoing synapses")
+        .def("getPlasticityFlags", &Neuron::getPlasticityFlags,
+             "Get plasticity flags")
+        .def("getPlasticityFlags", &Neuron::getPlasticityFlags, py::return_value_policy::reference_internal,
+             "Get plasticity flags (non-const reference)")
+        .def("enablePlasticity", &Neuron::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"),
+             "Enable plasticity mechanisms")
+        .def("setRegionId", &Neuron::setRegionId, py::arg("region"),
+             "Set region ID")
+        .def("getRegionId", &Neuron::getRegionId,
+             "Get region ID")
+        .def("setPopulationId", &Neuron::setPopulationId, py::arg("population"),
+             "Set population ID")
+        .def("getPopulationId", &Neuron::getPopulationId,
+             "Get population ID")
+        .def("step", &Neuron::step, py::arg("currentTime"),
+             "Update neuron for one simulation step")
+        .def("reset", &Neuron::reset,
+             "Reset neuron to initial state")
+        .def("initializeRandom", [](Neuron& self, std::shared_ptr<RandomGenerator> rng) {
+             self.initializeRandom(*rng);
+         }, py::arg("rng"),
+             "Initialize neuron with random parameters")
+        .def("__repr__", [](const Neuron& n) {
+             return "<Neuron id=" + std::to_string(n.getId().value) + " type=" + std::to_string(static_cast<int>(n.getType())) + ">";
+         });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
