@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <algorithm>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,12 +21,104 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Helper function to create configuration with preset values
+std::map<std::string, std::string> createPresetConfig(const std::string& presetName) {
+    std::map<std::string, std::string> config;
+    
+    if (presetName == "quick") {
+        config["neuron_count"] = "200";
+        config["region_count"] = "1";
+        config["connection_probability"] = "0.1";
+        config["simulation_timestep"] = "0.001";
+        config["stdp_ltp_weight"] = "0.01";
+        config["stdp_ltd_weight"] = "0.012";
+        config["synaptogenesis_rate"] = "0.0001";
+        config["pruning_rate"] = "0.00001";
+        config["plasticity.stdp.enable"] = "true";
+        config["plasticity.hebbian.enable"] = "false";
+        config["neuromod.dopamine.scale"] = "1.0";
+        config["neuromod.curiosity.enable"] = "true";
+        config["neuromod.novelty.enable"] = "true";
+        config["quick_experiment_steps"] = "1000";
+        config["connectivity_test_steps"] = "100";
+        config["plasticity_experiment_steps"] = "500";
+        config["phase6_integration_steps"] = "1000";
+        config["scaling_benchmark_steps"] = "2000";
+    } else if (presetName == "standard") {
+        config["neuron_count"] = "500";
+        config["region_count"] = "1";
+        config["connection_probability"] = "0.15";
+        config["simulation_timestep"] = "0.001";
+        config["stdp_ltp_weight"] = "0.02";
+        config["stdp_ltd_weight"] = "0.015";
+        config["synaptogenesis_rate"] = "0.0002";
+        config["pruning_rate"] = "0.00002";
+        config["plasticity.stdp.enable"] = "true";
+        config["plasticity.hebbian.enable"] = "true";
+        config["neuromod.dopamine.scale"] = "1.0";
+        config["neuromod.curiosity.enable"] = "true";
+        config["neuromod.novelty.enable"] = "true";
+        config["quick_experiment_steps"] = "2000";
+        config["connectivity_test_steps"] = "500";
+        config["plasticity_experiment_steps"] = "2000";
+        config["phase6_integration_steps"] = "3000";
+        config["scaling_benchmark_steps"] = "5000";
+    } else if (presetName == "full") {
+        config["neuron_count"] = "1000";
+        config["region_count"] = "2";
+        config["connection_probability"] = "0.2";
+        config["simulation_timestep"] = "0.001";
+        config["stdp_ltp_weight"] = "0.03";
+        config["stdp_ltd_weight"] = "0.025";
+        config["synaptogenesis_rate"] = "0.0005";
+        config["pruning_rate"] = "0.00005";
+        config["plasticity.stdp.enable"] = "true";
+        config["plasticity.hebbian.enable"] = "true";
+        config["neuromod.dopamine.scale"] = "1.0";
+        config["neuromod.curiosity.enable"] = "true";
+        config["neuromod.novelty.enable"] = "true";
+        config["quick_experiment_steps"] = "5000";
+        config["connectivity_test_steps"] = "1000";
+        config["plasticity_experiment_steps"] = "5000";
+        config["phase6_integration_steps"] = "10000";
+        config["scaling_benchmark_steps"] = "15000";
+    } else if (presetName == "benchmark") {
+        config["neuron_count"] = "5000";
+        config["region_count"] = "4";
+        config["connection_probability"] = "0.05";
+        config["simulation_timestep"] = "0.0005";
+        config["stdp_ltp_weight"] = "0.005";
+        config["stdp_ltd_weight"] = "0.004";
+        config["synaptogenesis_rate"] = "0.00001";
+        config["pruning_rate"] = "0.000001";
+        config["plasticity.stdp.enable"] = "true";
+        config["plasticity.hebbian.enable"] = "true";
+        config["neuromod.dopamine.scale"] = "0.5";
+        config["neuromod.curiosity.enable"] = "true";
+        config["neuromod.novelty.enable"] = "true";
+        config["quick_experiment_steps"] = "1000";
+        config["connectivity_test_steps"] = "200";
+        config["plasticity_experiment_steps"] = "1000";
+        config["phase6_integration_steps"] = "2000";
+        config["scaling_benchmark_steps"] = "50000";
+    }
+    
+    return config;
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Advanced features include:
+        - Configuration presets for quick setup
+        - Batch experiment utilities
+        - Result aggregation and analysis tools
+        - Experiment management utilities
+        - Performance profiling tools
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -142,7 +236,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system with advanced utilities)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -163,6 +257,186 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Configuration preset loading utility
+    m.def("createConfig", [](const std::string& preset) {
+        auto config = std::make_shared<Config>();
+        auto presetConfig = createPresetConfig(preset);
+        for (const auto& [key, value] : presetConfig) {
+            config->set(key, value, ConfigSource::Default);
+        }
+        return config;
+    }, py::arg("preset"), R"pbdoc(
+        Create a configuration with preset values.
+        
+        Args:
+            preset: One of "quick", "standard", "full", "benchmark"
+        
+        Returns:
+            Config object with preset values applied
+    )pbdoc");
+
+    // Batch experiment execution utilities
+    m.def("runBatch", [](std::shared_ptr<Config> config, 
+                        const std::vector<std::string>& experiments,
+                        const std::string& outputFormat) {
+        
+        std::map<std::string, ExperimentResult> results;
+        
+        for (const auto& exp : experiments) {
+            NLM_LOG_INFO("Running batch experiment: " + exp);
+            ExperimentResult result;
+            
+            if (exp == "quick") {
+                result = runQuickExperiment(config);
+            } else if (exp == "basic") {
+                result = runBasicConnectivityTest(config);
+            } else if (exp == "plasticity") {
+                result = runPlasticityExperiment(config);
+            } else if (exp == "stdp") {
+                result = runStdpVerification(config);
+            }
+            
+            results[exp] = result;
+        }
+        
+        return results;
+    }, py::arg("config"), py::arg("experiments"), py::arg("outputFormat") = "text",
+        R"pbdoc(
+        Run multiple experiments in batch mode.
+        
+        Args:
+            config: Configuration to use for all experiments
+            experiments: List of experiment names to run
+            outputFormat: Output format for results
+        
+        Returns:
+            Map of experiment names to their results
+    )pbdoc");
+
+    // Result aggregation utilities
+    m.def("aggregateResults", [](const std::map<std::string, ExperimentResult>& results) {
+        ExperimentResult aggregated;
+        aggregated.experimentType = "batch";
+        
+        double totalDuration = 0.0;
+        int64_t totalNeurons = 0;
+        int64_t totalSpikes = 0;
+        double totalFiringRate = 0.0;
+        int count = 0;
+        
+        for (const auto& [exp, result] : results) {
+            totalDuration += result.duration;
+            totalNeurons += result.neuronCount;
+            totalSpikes += result.totalSpikes;
+            totalFiringRate += result.averageFiringRate;
+            count++;
+        }
+        
+        if (count > 0) {
+            aggregated.duration = totalDuration / count;
+            aggregated.neuronCount = totalNeurons / count;
+            aggregated.totalSpikes = totalSpikes;
+            aggregated.averageFiringRate = totalFiringRate / count;
+        }
+        
+        return aggregated;
+    }, py::arg("results"), R"pbdoc(
+        Aggregate multiple experiment results into a single summary.
+        
+        Args:
+            results: Map of experiment names to their results
+        
+        Returns:
+            Aggregated ExperimentResult
+    )pbdoc");
+
+    // Configuration validation utilities
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        // Validate required configuration
+        if (!config->has("neuron_count")) {
+            errors.push_back("Missing required configuration: neuron_count");
+        }
+        
+        if (!config->has("simulation_timestep")) {
+            errors.push_back("Missing required configuration: simulation_timestep");
+        }
+        
+        // Validate parameter ranges
+        auto neuronCount = config->getOr<int64_t>("neuron_count", 0);
+        if (neuronCount <= 0) {
+            errors.push_back("Invalid neuron_count: must be positive");
+        } else if (neuronCount > 100000) {
+            errors.push_back("neuron_count too large: maximum 100000");
+        }
+        
+        double timestep = config->getOr<double>("simulation_timestep", 0.0);
+        if (timestep <= 0.0) {
+            errors.push_back("Invalid simulation_timestep: must be positive");
+        } else if (timestep > 1.0) {
+            errors.push_back("simulation_timestep too large: maximum 1.0 seconds");
+        }
+        
+        double connProb = config->getOr<double>("connection_probability", 0.0);
+        if (connProb < 0.0 || connProb > 1.0) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+        
+        return errors;
+    }, py::arg("config"), R"pbdoc(
+        Validate configuration for errors and warnings.
+        
+        Args:
+            config: Configuration to validate
+        
+        Returns:
+            List of error messages (empty if valid)
+    )pbdoc");
+
+    // Export utilities for data analysis
+    m.def("exportResults", [](const std::map<std::string, ExperimentResult>& results,
+                            const std::string& format,
+                            const std::string& filepath) {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open output file: " + filepath);
+        }
+        
+        if (format == "json") {
+            file << "{\n  \"experiments\": [";
+            bool first = true;
+            for (const auto& [exp, result] : results) {
+                if (!first) file << ",";
+                file << "\n    {\"name\": \"" << exp << "\", \"duration\": " 
+                     << result.duration << ", \"neurons\": " << result.neuronCount 
+                     << ", \"spikes\": " << result.totalSpikes << "}";
+                first = false;
+            }
+            file << "\n  ],\n  \"total_experiments\": " << results.size() << "\n}";
+        } else if (format == "csv") {
+            file << "experiment,duration,neurons,total_spikes,avg_firing_rate\n";
+            for (const auto& [exp, result] : results) {
+                file << exp << "," << result.duration << "," << result.neuronCount 
+                     << "," << result.totalSpikes << "," << result.averageFiringRate << "\n";
+            }
+        }
+        
+        file.close();
+        return true;
+    }, py::arg("results"), py::arg("format"), py::arg("filepath"),
+        R"pbdoc(
+        Export experiment results to a file in the specified format.
+        
+        Args:
+            results: Map of experiment names to their results
+            format: Output format ("json" or "csv")
+            filepath: Output file path
+        
+        Returns:
+            True if successful, throws exception on error
+    )pbdoc");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -400,26 +674,111 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // High-level convenience functions for common use cases
+    m.def("createExperimentBrain", [](const std::string& preset) {
+        auto config = createConfig(preset);
+        return createBrain(config);
+    }, py::arg("preset"), R"pbdoc(
+        Create a brain configured for common experiment presets.
+        
+        Args:
+            preset: One of "quick", "standard", "full", "benchmark"
+        
+        Returns:
+            Configured Brain object ready for simulation
+    )pbdoc");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createTrainingWorld", [](size_t width, size_t height) {
+        auto world = createSimpleWorld();
+        world->configure(width, height, 8, 8);
+        return world;
+    }, py::arg("width"), py::arg("height"),
+        R"pbdoc(
+        Create a standard training world for agent experiments.
+        
+        Args:
+            width: World width in units
+            height: World height in units
+        
+        Returns:
+            Configured SimpleWorld object
+    )pbdoc");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createAgentSetup", [](const std::string& preset) {
+        auto brain = createExperimentBrain(preset);
+        brain->initialize();
+        auto agent = createAgentBrain(brain);
+        return std::make_tuple(brain, agent);
+    }, py::arg("preset"), R"pbdoc(
+        Create a complete agent setup with brain and agent.
+        
+        Args:
+            preset: Configuration preset ("quick", "standard", "full", "benchmark")
+        
+        Returns:
+            Tuple of (Brain, AgentBrain) ready for world interaction
+    )pbdoc");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Utility functions for common operations
+    m.def("runQuickTest", []() {
+        auto config = createConfig("quick");
+        auto brain = createBrain(config);
+        brain->initialize();
+        
+        for (size_t step = 0; step < 100; ++step) {
+            brain->step(step);
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), 
+                              brain->getAverageFiringRate());
+    }, R"pbdoc(
+        Run a quick test with default "quick" configuration.
+        
+        Returns:
+            Tuple of (total_spikes, average_firing_rate)
+    )pbdoc");
+
+    m.def("comparePresets", [](const std::vector<std::string>& presets) {
+        std::map<std::string, double> results;
+        
+        for (const auto& preset : presets) {
+            auto config = createConfig(preset);
+            auto brain = createBrain(config);
+            brain->initialize();
+            
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            for (size_t step = 0; step < 100; ++step) {
+                brain->step(step);
+            }
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            double duration = std::chrono::duration<double>(endTime - startTime).count();
+            
+            results[preset] = brain->getTotalSpikeCount() / duration;
+        }
+        
+        return results;
+    }, py::arg("presets"), R"pbdoc(
+        Compare performance of different configuration presets.
+        
+        Args:
+            presets: List of preset names to compare
+        
+        Returns:
+            Map of preset names to performance (spikes per second)
+    )pbdoc");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Version and information attributes
+    m.attr("__version__") = "2.0.0";
+    m.attr("__description__") = "NLM Phase 2 Neural Learning Machine - Advanced Python Bindings";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__license__") = "MIT";
 }
 
 } // namespace nlm
