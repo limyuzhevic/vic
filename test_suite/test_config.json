@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""
+Configuration for Enhanced NLM Python API Test Suite
+
+This file defines the test configuration, framework setup, and dependencies
+required for running the comprehensive test suite.
+"""
+
+# Test Framework Configuration
+TEST_FRAMEWORK = {
+    "python": {
+        "framework": "pytest",
+        "version": "7.0.0",
+        "required": True,
+        "features": [
+            "test discovery",
+            "parameterized tests",
+            "fixture support",
+            "assertion rewriting",
+            "coverage integration"
+        ]
+    },
+    "cpp": {
+        "framework": "Google Test (gtest)",
+        "version": "1.10.0",
+        "required": True,
+        "features": [
+            "test macros",
+            "fixtures",
+            "param testing",
+            "test filters"
+        ]
+    },
+    "integration": {
+        "focus": "cross-language testing",
+        "python_cpp": True,
+        "performance": True,
+        "reliability": True
+    }
+}
+
+# Test Categories Configuration
+TEST_CATEGORIES = {
+    "core_python_api": {
+        "file": "python/test_core_api.py",
+        "framework": "pytest",
+        "description": "Core Python API functionality tests",
+        "coverage_target": 0.95,
+        "test_types": ["unit", "integration"]
+    },
+    "cpp_unit_tests": {
+        "file": "cpp/test_unit_tests.cpp",
+        "framework": "gtest",
+        "description": "C++ unit tests for neural components",
+        "coverage_target": 0.85,
+        "test_types": ["unit"]
+    },
+    "integration": {
+        "file": "python/test_integration.py",
+        "framework": "pytest",
+        "description": "Python-C++ integration tests",
+        "coverage_target": 0.90,
+        "test_types": ["integration", "system"]
+    },
+    "performance": {
+        "file": "python/test_performance.py",
+        "framework": "pytest",
+        "description": "Performance and stress tests",
+        "coverage_target": 0.80,
+        "test_types": ["performance", "stress"]
+    },
+    "pybind11": {
+        "file": "python/test_pybind11.py",
+        "framework": "pytest",
+        "description": "Python bindings integration tests",
+        "coverage_target": 0.95,
+        "test_types": ["unit", "integration"]
+    },
+    "configuration": {
+        "file": "python/test_configuration.py",
+        "framework": "pytest",
+        "description": "Configuration loading and validation tests",
+        "coverage_target": 0.90,
+        "test_types": ["unit", "integration"]
+    }
+}
+
+# Performance Requirements
+PERFORMANCE_REQUIREMENTS = {
+    "test_execution": {
+        "max_time_seconds": 300,  # 5 minutes
+        "recommended_time_seconds": 120  # 2 minutes
+    },
+    "memory_usage": {
+        "max_memory_mb": 1024,  # 1GB
+        "recommended_memory_mb": 512  # 512MB
+    },
+    "scalability": {
+        "neurons_test_count": 1000,
+        "synapses_test_count": 10000,
+        "max_test_objects": 100000
+    }
+}
+
+# Test Quality Requirements
+TEST_QUALITY = {
+    "determinism": {
+        "enabled": True,
+        "seed": 42,
+        "description": "All tests should use fixed random seeds"
+    },
+    "isolation": {
+        "enabled": True,
+        "description": "Each test should be independent with no side effects"
+    },
+    "repeatability": {
+        "enabled": True,
+        "description": "Tests should produce identical results across runs"
+    },
+    "coverage": {
+        "python_target": 0.90,
+        "cpp_target": 0.85,
+        "integration_target": 0.88,
+        "description": "Minimum code coverage targets"
+    }
+}
+
+# Test Environment Configuration
+TEST_ENVIRONMENT = {
+    "python": {
+        "version": ">=3.8",
+        "dependencies": ["pytest>=7.0", "numpy>=1.20"],
+        "optional_dependencies": ["pytest-cov", "pytest-asyncio"]
+    },
+    "cpp": {
+        "standard": "C++20",
+        "compiler": "g++ >=9.0",
+        "build_system": "CMake >=3.16",
+        "optimization": "Release"
+    }
+}
+
+# Testing Strategy Configuration
+TESTING_STRATEGY = {
+    "phase_1_unit": {
+        "name": "Unit Tests",
+        "focus": "individual components in isolation",
+        "mocking": True,
+        "description": "Test individual components with mocked dependencies"
+    },
+    "phase_2_integration": {
+        "name": "Integration Tests", 
+        "focus": "component interactions",
+        "mocking": False,
+        "description": "Test complete workflows and system-level behavior"
+    },
+    "phase_3_performance": {
+        "name": "Performance Tests",
+        "focus": "scalability and performance",
+        "mocking": False,
+        "description": "Test scalability and performance characteristics"
+    },
+    "phase_4_regression": {
+        "name": "Regression Tests",
+        "focus": "backward compatibility",
+        "mocking": False,
+        "description": "Maintain test suite for existing functionality"
+    }
+}
+
+# Test Data Configuration
+TEST_DATA = {
+    "config_samples": {
+        "small": {"neurons": 10, "synapses": 50},
+        "medium": {"neurons": 100, "synapses": 500},
+        "large": {"neurons": 1000, "synapses": 5000}
+    },
+    "performance_scenarios": {
+        "quick": {"steps": 100, "duration_seconds": 10},
+        "standard": {"steps": 1000, "duration_seconds": 60},
+        "extended": {"steps": 10000, "duration_seconds": 300}
+    }
+}
+
+# Reporting Configuration
+REPORTING = {
+    "formats": ["json", "text", "html"],
+    "output_dir": "./test_reports",
+    "include_coverage": True,
+    "include_performance": True,
+    "include_timing": True,
+    "generate_summary": True,
+    "generate_detailed_report": True
+}
+
+# Error Handling Configuration
+ERROR_HANDLING = {
+    "expected_exceptions": [
+        "runtime_error",
+        "invalid_argument", 
+        "out_of_range",
+        "logic_error",
+        "domain_error"
+    ],
+    "ignore_exceptions": [
+        "memory_error",  # May occur in stress tests
+        "bad_alloc"      # May occur in stress tests
+    ],
+    "test_recovery": True,
+    "cleanup_on_failure": True
+}
+
+# CI/CD Configuration
+CI_CD = {
+    "github_actions": {
+        "enabled": True,
+        "os": ["ubuntu-latest", "macos-latest"],
+        "python": ["3.8", "3.9", "3.10", "3.11", "3.12"],
+        "cpp_compiler": "g++"
+    },
+    "jenkins": {
+        "enabled": False,
+        "pipeline_stage": "build_and_test"
+    },
+    "azure_pipelines": {
+        "enabled": False,
+        "configuration": "Release"
+    }
+}
+
+# Default configuration
+def get_default_config():
+    """Get the default test suite configuration"""
+    return {
+        "framework": TEST_FRAMEWORK,
+        "categories": TEST_CATEGORIES,
+        "performance": PERFORMANCE_REQUIREMENTS,
+        "quality": TEST_QUALITY,
+        "environment": TEST_ENVIRONMENT,
+        "strategy": TESTING_STRATEGY,
+        "data": TEST_DATA,
+        "reporting": REPORTING,
+        "error_handling": ERROR_HANDLING,
+        "ci_cd": CI_CD
+    }
+
+# Example usage
+if __name__ == "__main__":
+    config = get_default_config()
+    
+    print("Enhanced NLM Test Suite Configuration")
+    print("=" * 50)
+    print(f"Python Framework: {config['framework']['python']['framework']} {config['framework']['python']['version']}")
+    print(f"C++ Framework: {config['framework']['cpp']['framework']} {config['framework']['cpp']['version']}")
+    print(f"Test Categories: {len(config['categories'])}")
+    print(f"Performance Target: {config['performance']['test_execution']['recommended_time_seconds']} seconds")
+    print(f"Code Coverage Target: {config['quality']['coverage']['python_target'] * 100}%")
+    print(f"CI/CD Support: GitHub Actions, Jenkins, Azure")
