@@ -4,18 +4,20 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "2.0.0-enhanced"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with advanced monitoring, learning analysis, and performance benchmarking"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience", "brain-computer", "neural-networks", "computational-neuroscience"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +27,39 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Embedded Systems",
+    "Framework :: Pytest",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.7.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.4.0",
+    "jupyter>=1.0.0",
+    "black>=21.0",
+    "flake8>=3.9",
+    "mypy>=0.910",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=0.5",
+    "myst-parser>=0.15",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
-Documentation = "https://nlm.readthedocs.io"
+Documentation = "https://nlm.readthedocs.io/en/v2.0-enhanced/"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Discussion Forum" = "https://github.com/nlm-project/nlm/discussions"
+"Twitter" = "https://twitter.com/nlm_project"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +68,59 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_PYTHON_BINDINGS = "enhanced"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = ["tests", "examples"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --timeout=300"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = ['build/', 'dist/', '.venv/', 'venv/']
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = |
+    /(
+        \.eggs
+        | \.git
+        | \.hg
+        | \.mypy_cache
+        | \.tox
+        | \.venv
+        | _build
+        | buck-out
+        | build
+        | dist
+        | node_modules
+        | venv
+    )/
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = "E203, W503, E231, W504, E501, W503"
+exclude = 
+    .git,
+    __pycache__,
+    build,
+    dist,
+    .eggs,
+    venv,
+    .venv,
+    node_modules,
+    .tox
+    .mypy_cache
