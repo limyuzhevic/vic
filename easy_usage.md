@@ -10,9 +10,151 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+# NLM - Easy Usage Guide for Beginners
 
----
+## What is NLM?
+
+NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+
+Think of it like this:
+- **Neurons** = Brain cells that send signals to each other
+- **Synapses** = Connections between brain cells
+- **Learning** = When connections get stronger or weaker based on what happens
+- **Memory** = The brain remembering patterns
+
+**NEW: Enhanced Features**
+
+NLM now includes enhanced versions of the core brain system with advanced monitoring and error handling:
+
+### Enhanced Brain (NLM Enhanced)
+
+The EnhancedBrain class provides:
+- **Performance monitoring**: Track execution times and memory usage
+- **Error detection**: Automatic error detection and system health monitoring
+- **Memory pools**: Enhanced memory management with leak detection
+- **SIMD profiling**: Advanced SIMD vectorization performance analysis
+- **System health monitoring**: Comprehensive system health status
+
+### Advanced Configuration
+
+Create an advanced configuration with optimized settings:
+
+```python
+import pynlm
+
+# Create an advanced configuration
+config = pynlm.createAdvancedConfig()
+
+# Modify settings
+config.set("brain.neuron_count", 10000)
+config.set("brain.connection_probability", 0.15)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+# Create enhanced brain
+brain = pynlm.createBrain(config)
+```
+
+### Performance Monitoring
+
+The enhanced brain provides detailed performance monitoring:
+
+```python
+# Create enhanced brain with monitoring
+brain = pynlm.createBrain(config)
+brain.enableMonitoring(True)  # Enable performance monitoring
+
+# Run simulation
+for i in range(1000):
+    brain.step(i)
+
+# Get performance statistics
+stats = brain.getPerformanceStats()
+print(stats)
+
+# Get system health
+health = brain.getSystemHealth()
+print("System status:", health.getStatusString())
+```
+
+### Memory Pool Statistics
+
+Monitor memory pool usage:
+
+```python
+# Get memory pool statistics
+memory_stats = brain.getMemoryPoolStats()
+print(memory_stats)
+```
+
+### Context Manager
+
+Use the enhanced brain with automatic cleanup:
+
+```python
+# Use enhanced brain with context manager
+with pynlm.BrainContext(config) as brain:
+    for i in range(100):
+        brain.step(i)
+    
+    print(f"Simulation completed: {brain.getTotalSpikeCount()} spikes")
+```
+
+### Quick Comparison
+
+| Feature | Basic Brain | Enhanced Brain |
+|---------|-------------|----------------|
+| Performance monitoring | ❌ | ✅ |
+| Error detection | ❌ | ✅ |
+| Memory pool monitoring | ❌ | ✅ |
+| SIMD profiling | ❌ | ✅ |
+| System health monitoring | ❌ | ✅ |
+
+### Example: Complete Enhanced Simulation
+
+```python
+import pynlm
+
+def runEnhancedSimulation(steps=1000):
+    # 1. Create configuration
+    config = pynlm.createAdvancedConfig()
+    
+    # 2. Create enhanced brain
+    brain = pynlm.createBrain(config)
+    brain.enableMonitoring(True)  # Enable monitoring
+    brain.enableErrorDetection(True)  # Enable error detection
+    
+    # 3. Initialize brain
+    brain.initialize()
+    
+    # 4. Run simulation with monitoring
+    for step in range(steps):
+        brain.step(step)
+        
+        # Optional: Check system health periodically
+        if step % 100 == 0:
+            health = brain.getSystemHealth()
+            if not health.isHealthy():
+                print(f"Warning: System health issue at step {step}")
+    
+    # 5. Print results
+    print(f"=== Enhanced Simulation Results ===")
+    print(f"Steps: {steps}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+    print(f"Average firing rate: {brain.getAverageFiringRate()} Hz")
+    
+    # 6. Print detailed performance report
+    print(brain.getPerformanceStats())
+    
+    # 7. Print memory pool statistics
+    print(brain.getMemoryPoolStats())
+    
+    return brain
+
+# Run enhanced simulation
+brain = runEnhancedSimulation(1000)
+```
 
 ## The 3 Things You Need to Know
 
@@ -20,7 +162,101 @@ That's it! NLM simulates all of this.
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
 
+### NEW: Enhanced Agent
+
+Create an enhanced agent with advanced capabilities:
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createAdvancedConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+agent.enableMonitoring(True)  # Enable monitoring
+
+# Run simulation
+for step in range(500):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process sensory input
+    agent.processSensoryInput(percept)
+    
+    # Run brain step
+    brain.step(step)
+    
+    # Get motor command
+    motor_cmd = agent.decodeMotorCommand()
+    
+    # Apply action to world
+    world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+    
+    # Periodically check system health
+    if step % 100 == 0:
+        health = agent.getSystemHealth()
+        if health.status != health.Status.HEALTHY:
+            print(f"Agent health warning: {health.status}")
+```
+
 ---
+
+## Quick Reference
+
+| What you want | Code |
+|--------------|------|
+| Create brain | `pynlm.createBrain(config)` |
+| Start brain | `brain.initialize()` |
+| Make brain think | `brain.step(step)` |
+| Create world | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
+
+**NEW: Enhanced Statistics**
+
+| What you want | Code |
+|--------------|------|
+| Performance stats | `brain.getPerformanceStats()` |
+| Memory pool stats | `brain.getMemoryPoolStats()` |
+| System health | `brain.getSystemHealth()` |
+| SIMD profiling | `simd_profiler.printPerformanceReport()` |
+
+---
+
+## Next Steps
+
+When you're comfortable:
+
+1. Read `HOW_TO_USE.md` for more details on advanced usage
+2. **NEW: Try Enhanced Brain features for production use**
+3. Experiment with different configuration options!
+
+**NEW: Enhanced Brain Features**
+
+- Performance monitoring for production simulations
+- Error detection and recovery
+- Memory leak detection and prevention
+- SIMD optimization analysis
+- System health monitoring
+- Comprehensive logging and statistics
+
+That's it! You're now ready to use NLM Enhanced with all the advanced features and monitoring capabilities.
+
+For the complete documentation of enhanced features, see the updated `HOW_TO_USE.md` file.
 
 ## Quick Start (Copy & Paste)
 

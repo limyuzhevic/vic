@@ -58,6 +58,13 @@ add_library(nlm_core STATIC
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
     src/memory/SemanticMemory.cpp
+    src/memory/AssociativeMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
+    src/memory/NeuralEpisodicMemory.cpp
+    # Enhanced memory pools
+    src/performance/EnhancedMemoryPool.cpp
+    src/performance/EnhancedNeuronPool.cpp
+    src/performance/EnhancedSynapsePool.cpp
     src/memory/ProceduralMemory.cpp
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
@@ -79,12 +86,10 @@ add_library(nlm_core STATIC
     src/environment/Environment.cpp
     src/environment/Observation.cpp
     src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    # Enhanced brain and performance
+    src/brain/EnhancedBrain.cpp
+    src/performance/EnhancedSIMDVectorization.cpp
+    src/performance/EnhancedSIMDUtils.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

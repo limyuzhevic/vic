@@ -25,7 +25,31 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides bindings for the Phase 6 integrated artificial brain system
+        with support for advanced neural computation, memory systems, and learning.
+        
+        Key features:
+        - Real-time neural simulation with LIF dynamics
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Prediction and planning capabilities
+        - Development and plasticity mechanisms
+        - Checkpoint persistence and replay
     )pbdoc";
+
+    // Module version for compatibility checking
+    m.attr("__version__") = "0.1.0";
+    m.attr("__build_date__") = "2026-10-04";
+    m.attr("__description__") = "Phase 6 Integrated Artificial Brain";
+    
+    // Custom exception types for better error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    
+    // Custom exception for NLM-specific errors
+    py::class_<std::runtime_error>(m, "NLMError");
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -39,6 +63,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -348,12 +375,61 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    // Context manager for automatic brain cleanup and resource management
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "BrainContext", R"pbdoc(Context manager for automatic brain cleanup and resource management)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("__enter__", [](std::shared_ptr<Brain> self) {
+            self->initialize();
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<Brain> self, py::args) {
+            self->reset();
+        })
+        .def("step", &Brain::step)
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount)
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount);
+
+    // Enhanced configuration with validation and serialization support
+    py::class_<Config, std::shared_ptr<Config>>(m, "AdvancedConfig", R"pbdoc(Advanced configuration with validation and serialization support)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("validate", &Config::getKeys,
+             "Validate configuration and return list of all keys")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            auto value = self.get<float>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get float configuration value with default")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto value = self.get<int64_t>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get int configuration value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get string configuration value with default");
+
+    // Performance monitoring and profiling
+    py::class_<std::shared_ptr<Brain>>(m, "BrainProfiler", R"pbdoc(Performance profiler for brain simulations)pbdoc")
+        .def("start", [](std::shared_ptr<Brain> brain) {
+            // Simple timing - could be enhanced with high-resolution timers
+            brain->logStatus();
+            return std::make_shared<std::chrono::steady_clock::time_point>(std::chrono::steady_clock::now());
+        })
+        .def("stop", [](std::shared_ptr<Brain> brain, const std::shared_ptr<std::chrono::steady_clock::time_point>& startTime) {
+            auto endTime = std::make_shared<std::chrono::steady_clock::time_point>(std::chrono::steady_clock::now());
+            auto duration = std::chrono::duration<double>(*endTime - **startTime);
+            std::stringstream ss;
+            ss << "Simulation completed in " << duration.count() << " seconds";
+            return ss.str();
+        });
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -420,6 +496,91 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Custom exception for NLM-specific errors
+    py::class_<std::runtime_error>(m, "NLMError");
+    
+    // Function for better error messages
+    m.def("getNLMError", [](const std::string& message) {
+        return std::runtime_error("NLM Error: " + message);
+    }, py::arg("message"), "Create an NLM error with custom message");
+    
+    // Performance monitoring utilities
+    m.def("getVersion", []() {
+        return std::make_tuple("0.1.0", "Phase 6 Integrated Brain", "2026-10-04");
+    }, "Get version information about NLM Python bindings");
+    
+    // Configuration utilities
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 10000, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.15f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create an advanced configuration with optimized settings for research");
+    
+    // Simulation utilities
+    m.def("runQuickSimulation", [](size_t steps) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("steps"), "Run a quick simulation and return spike count");
+    
+    // Statistics utilities
+    m.def("formatStatistics", [](const Brain& brain) {
+        std::stringstream ss;
+        ss << "=== NLM Statistics ===" << std::endl;
+        ss << "Neurons: " << brain.getTotalNeuronCount() << std::endl;
+        ss << "Synapses: " << brain.getTotalSynapseCount() << std::endl;
+        ss << "Firing neurons: " << brain.getFiringNeuronCount() << std::endl;
+        ss << "Average firing rate: " << brain.getAverageFiringRate() << " Hz" << std::endl;
+        ss << "Total spikes: " << brain.getTotalSpikeCount() << std::endl;
+        ss << "Excitation/Inhibition ratio: " << brain.getExcitationInhibitionRatio() << std::endl;
+        ss << "Development stage: " << static_cast<int>(brain.getDevelopmentalStage()) << std::endl;
+        return ss.str();
+    }, "Format brain statistics as a readable string");
+    
+    // Integration and validation utilities
+    m.def("validateConfiguration", [](const Config& config) {
+        std::vector<std::string> warnings;
+        if (config.has("brain.neuron_count")) {
+            size_t neuronCount = config.getOr<size_t>("brain.neuron_count", 1000);
+            if (neuronCount < 100) {
+                warnings.push_back("Low neuron count may limit simulation complexity");
+            }
+        }
+        return warnings;
+    }, "Validate configuration and return warnings");
+    
+    // Debug and profiling utilities
+    m.def("enableDebugLogging", []() {
+        auto logger = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Debug);
+        logger->addLogger(consoleLogger);
+        Logger::setGlobal(logger);
+        return true;
+    }, "Enable debug-level logging for detailed output");
+    
+    // Advanced agent utilities
+    m.def("createAdvancedAgent", [](std::shared_ptr<Brain> brain, const std::shared_ptr<SimpleWorld>& world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all subsystems for advanced simulation
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an advanced agent with all subsystems enabled");
 }
 
 } // namespace nlm
