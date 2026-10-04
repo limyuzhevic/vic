@@ -1,25 +1,61 @@
+# NLM - Neural Learning Machine
+# Experimental artificial developmental brain project
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
-# Build type
+# Build type and options
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
+# Enable warnings and debugging
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast)
 endif()
+
+# Optimization levels
+option(NLM_ENABLE_OPTIMIZATION "Enable aggressive optimizations" ON)
+option(NLM_ENABLE_ASSERTIONS "Enable runtime assertions" OFF)
+option(NLM_ENABLE_PROFILING "Enable profiling support" OFF)
+option(NLM_ENABLE_TESTING "Enable unit testing" ON)
+
+if(NLM_ENABLE_OPTIMIZATION)
+    add_compile_options(-O3 -march=native -flto)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+if(NLM_ENABLE_ASSERTIONS)
+    add_compile_options(-DNDEBUG)
+endif()
+
+# Installation paths
+set(NLM_INCLUDE_INSTALL_DIR "include" CACHE PATH "Installation directory for headers")
+set(NLM_LIB_INSTALL_DIR "lib" CACHE PATH "Installation directory for libraries")
+set(NLM_BIN_INSTALL_DIR "bin" CACHE PATH "Installation directory for executables")
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Platform-specific configurations
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Linux-specific optimizations
+    add_compile_options(-pthread)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # macOS-specific optimizations
+    set(CMAKE_MACOSX_RPATH ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    # Windows-specific optimizations
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
 
 # Core library
 add_library(nlm_core STATIC
@@ -92,6 +128,25 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Core library configuration
+target_compile_definitions(nlm_core PUBLIC
+    $<$<BOOL:${NLM_ENABLE_ASSERTIONS}>:NLM_ENABLE_ASSERTIONS>
+)
+
+# Create configuration header
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Add configuration header generation
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/Config/Config.hpp.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/nlm_config.hpp"
+    @ONLY
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -121,6 +176,13 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -138,6 +200,51 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
+
+# Python bindings support
+option(NLM_ENABLE_PYTHON "Enable Python bindings" OFF)
+if(NLM_ENABLE_PYTHON)
+    # Find Python
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+    
+    # Add pybind11 target if not found
+    if(NOT TARGET pybind11::module)
+        find_package(pybind11 REQUIRED)
+    endif()
+    
+    # Python module
+    pybind11_add_module(pynlm
+        src/python/PyNLM.cpp
+        src/python/PyBrain.cpp
+        src/python/PyNeuron.cpp
+        src/python/PySynapse.cpp
+    )
+    target_link_libraries(pynlm PRIVATE nlm_core)
+    set_target_properties(pynlm PROPERTIES
+        OUTPUT_NAME "pynlm"
+        PREFIX ""
+        SUFFIX "$(PYTHON_MODULE_EXTENSION)"
+    )
+endif()
+
+# CLI interface (optional)
+option(NLM_ENABLE_CLI "Enable command-line interface" ON)
+if(NLM_ENABLE_CLI)
+    add_executable(nlm_cli
+        src/cli/CLI.cpp
+    )
+    target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+    set_target_properties(nlm_cli PROPERTIES
+        OUTPUT_NAME "nlm-cli"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+endif()
 
 # Testing
 enable_testing()
