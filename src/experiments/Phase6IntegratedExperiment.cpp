@@ -61,8 +61,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - check if brain has regions first
+        const NeuralRegion* firstRegion = nullptr;
+        if (agent.getBrain()) {
+            const auto& regions = agent.getBrain()->getRegions();
+            if (!regions.empty()) {
+                firstRegion = regions[0].get();
+            }
+        }
+        
+        if (!firstRegion) {
+            NLM_LOG_ERROR("No brain regions available for observation");
+            break;
+        }
+        
+        SensoryPercept percept = world.observe(firstRegion);
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -73,11 +86,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply action to world - use the same firstRegion
+        world.applyAction(firstRegion, cmd);
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward - use the same firstRegion
+        float reward = world.computeReward(firstRegion);
         totalReward += reward;
         
         // Apply reward modulation
