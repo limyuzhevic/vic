@@ -64,7 +64,9 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+## Build Instructions
+
+### Basic Build
 
 ```bash
 mkdir build
@@ -73,14 +75,95 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Build Options
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Build with optimizations
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+# Install to custom prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+```
+
+### Build Systems
+
+NLM uses CMake for building with multiple build types and platform support. For comprehensive build instructions, see [BUILD_GUIDE.md](BUILD_GUIDE.md).
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the Phase 6 final integration demo, testing all brain systems together:
+- Memory systems (working & episodic memory)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction system
+- Development (synaptogenesis, pruning, maturation)
+- Cognition (planning, attention, concepts)
+- Replay & consolidation
+- Checkpoint save/load
+
+### Phase 2 Experiments (Legacy)
+For those who want to see the original Phase 2 neural computation experiments:
+```bash
+./nlm --phase2
+```
+
+This runs the basic neural computation tests (LIF neurons, STDP, Hebbian plasticity).
+
+### Running Options
+
+The main executable `nlm` supports the following command line options:
+
+```bash
+# Phase 6 integration demo (default)
+./nlm
+
+# Phase 2 legacy experiments
+./nlm --phase2
+
+# Verbose output (can be combined with --phase2)
+./nlm --verbose
+
+# Run with checkpointing (default for Phase 6)
+./nlm --checkpoint
+
+# Show help
+./nlm --help
+```
+
+## Running
+
+### Phase 6 Demo (Integration Test)
+```bash
+./nlm
+```
+
+This runs the Phase 6 final integration demo, testing all brain systems together:
+- Memory systems (working & episodic memory)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction system
+- Development (synaptogenesis, pruning, maturation)
+- Cognition (planning, attention, concepts)
+- Replay & consolidation
+- Checkpoint save/load
+
+### Phase 2 Experiments (Legacy)
+For those who want to see the original Phase 2 neural computation experiments:
+```bash
+./nlm --phase2
+```
+
+This runs the basic neural computation tests (LIF neurons, STDP, Hebbian plasticity).
 
 ## Project Structure
 

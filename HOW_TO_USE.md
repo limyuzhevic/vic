@@ -40,6 +40,51 @@ make -j$(nproc)
 ctest --output-on-failure
 ```
 
+### Build Systems and Options
+
+NLM uses CMake for building with multiple build configurations. For detailed build instructions including platform-specific builds, performance optimizations, and troubleshooting, see:
+
+- [BUILD_GUIDE.md](BUILD_GUIDE.md) - Complete build reference
+- `easy_usage.md` - Simple build commands for beginners
+- CMake configuration examples in the build directory
+
+### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable (Phase 6) |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_test` | Executable | Unit test suite |
+
+### Build Options
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Install to custom prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+
+# Build with optimizations
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+# Enable SIMD instructions
+cmake .. -DENABLE_AVX2=ON -DENABLE_SSE4_2=ON
+
+# Enable OpenMP parallelization
+cmake .. -DENABLE_OPENMP=ON
+```
+
 ### Build Outputs
 
 After successful compilation, you will have:

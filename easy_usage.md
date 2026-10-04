@@ -12,6 +12,46 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Quick Build
+
+### Simple Build
+
+```bash
+# Build NLM (Phase 6 integration demo)
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run the demo
+./nlm
+```
+
+### Build Script
+
+Create a `build.sh` script for quick builds:
+
+```bash
+#!/bin/bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . --config Release -- -j$(nproc)
+./nlm
+```
+
+### Build Options
+
+```bash
+# Debug version (with symbols)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Optimized version
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# For specific platforms, see BUILD_GUIDE.md
+```
+
 ---
 
 ## The 3 Things You Need to Know
@@ -287,6 +327,46 @@ print("Agent simulation complete!")
 
 ---
 
+## Build Information
+
+### Build NLM
+
+To build the NLM simulation:
+
+```bash
+# Create build directory and run CMake
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build with parallel jobs
+make -j$(nproc)
+
+# Run the Phase 6 integration demo
+./nlm
+```
+
+### Other Executables
+
+After building, you'll have several executables:
+
+- `./nlm` - Main Phase 6 integration demo
+- `./nlm_phase3_demo` - Phase 3 experiments  
+- `./nlm_phase4_demo` - Phase 4 experiments
+- `./nlm_test` - Unit test suite
+
+### Build Options
+
+```bash
+# Debug build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Optimized build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# For advanced build options, see BUILD_GUIDE.md
+```
+
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +374,24 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
+## Build Script
+
+Save this as `build.sh` for quick builds:
+
+```bash
+#!/bin/bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . --config Release -- -j$(nproc)
+./nlm
+```
+
+```bash
+chmod +x build.sh
+./build.sh
+```
+
 That's it! You're now ready to use NLM.
+
+---
