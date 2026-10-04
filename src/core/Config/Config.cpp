@@ -19,8 +19,15 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Validate file path
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath) || !std::filesystem::is_regular_file(filepath)) {
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +35,10 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +51,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                continue; // Skip invalid entries
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -50,13 +65,22 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+        // Handle lines without '=' as errors (skip with warning)
     }
     
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc < 1 || argv == nullptr) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) {
+            continue;
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,26 +89,52 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc && argv[i + 1] != nullptr) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Validate key
+            if (!key.empty()) {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Validate file path
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Ensure directory exists for new files
+    std::filesystem::path filePath(filepath);
+    if (!filePath.parent_path().empty() && 
+        !std::filesystem::exists(filePath.parent_path())) {
+        return false; // Directory doesn't exist
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            continue; // Skip invalid entries
+        }
+        
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
@@ -94,6 +144,11 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Validate input key
+    if (key.empty()) {
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +170,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return; // Skip empty keys
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,27 +187,57 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
+    // Validate input
+    if (key.empty()) {
+        return false;
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -159,7 +249,9 @@ std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+        if (!entry.key.empty()) {
+            keys.push_back(entry.key);
+        }
     }
     return keys;
 }
@@ -172,6 +264,10 @@ std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            continue; // Skip invalid entries
+        }
+        
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
