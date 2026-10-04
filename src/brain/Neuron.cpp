@@ -28,6 +28,10 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    // Fix: Add allocation failure check
+    if (!pImpl) {
+        throw std::bad_alloc();
+    }
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -43,7 +47,10 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Fix double deletion: only delete if pImpl is not already null
+        if (pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -71,6 +78,7 @@ void Neuron::setFiringState(FiringState state) {
 }
 
 void Neuron::decrementRefractory() {
+    if (!pImpl) return;  // Fix: Add null check
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {

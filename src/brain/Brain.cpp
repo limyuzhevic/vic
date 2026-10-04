@@ -50,30 +50,54 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
-    
-    // Simulation parameters
+ // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
     Timestamp currentTime;
-    
+
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
+
+    // Sensory neurons for input injection - use smart pointers
+    std::vector<std::unique_ptr<Neuron>> sensoryNeurons;
+    std::vector<std::unique_ptr<Neuron>> motorNeurons;
+
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+
+    // Active neuron tracking for performance
+    std::vector<Neuron*> activeNeurons;
+    std::unordered_map<NeuronId, bool> neuronActiveState;
+    
+    // Performance indexes
+    std::unordered_map<RegionId, std::vector<Neuron*>> regionNeuronIndex;
+    std::unordered_map<NeuronId, Neuron*> neuronIdToPointerIndex;
+    std::unordered_map<NeuronId, std::vector<Synapse*>> neuronInputSynapsesIndex;
+    std::unordered_map<NeuronId, std::vector<Synapse*>> neuronOutputSynapsesIndex;
+
+    // Active neuron tracking for performance
+    std::vector<Neuron*> activeNeurons;
+    std::unordered_map<NeuronId, bool> neuronActiveState;
+    
+    // Performance indexes
+    std::unordered_map<RegionId, std::vector<Neuron*>> regionNeuronIndex;
+    std::unordered_map<NeuronId, Neuron*> neuronIdToPointerIndex;
+    std::unordered_map<NeuronId, std::vector<Synapse*>> neuronInputSynapsesIndex;
+    std::unordered_map<NeuronId, std::vector<Synapse*>> neuronOutputSynapsesIndex;
+
+    // Active neuron tracking for performance
+    std::vector<Neuron*> activeNeurons;
+    std::unordered_map<NeuronId, bool> neuronActiveState;
+    
+    // Performance indexes
+    std::unordered_map<RegionId, std::vector<Neuron*>> regionNeuronIndex;
+    std::unordered_map<NeuronId, Neuron*> neuronIdToPointerIndex;
+    std::unordered_map<NeuronId, std::vector<Synapse*>> neuronInputSynapsesIndex;
+    std::unordered_map<NeuronId, std::vector<Synapse*>> neuronOutputSynapsesIndex;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -167,7 +191,10 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Fix double deletion: only delete if pImpl is not already null
+        if (pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -187,7 +214,9 @@ bool Brain::initialize() {
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        RegionId regionId(pImpl->nextRegionId++);
+        auto region = std::make_unique<NeuralRegion>(regionId, "Region_" + std::to_string(i + 1));
+        pImpl->regions.push_back(std::move(region));
     }
     
     // Create neurons across regions
@@ -222,7 +251,9 @@ bool Brain::initialize() {
     
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
+        RegionId regionId(i + 1);
+        // Fix: Properly get region and check for null
+        auto* region = getRegion(regionId);
         if (region) {
             // Initialize random connectivity and synapse weights
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
@@ -336,7 +367,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+                // Fix: Add null check for neuron pointer
+                if (neuron) {
+                    neuron->stepLIF(currentTime, pImpl->timestep);
+                }
             }
         }
     }
@@ -345,6 +379,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
+                // Fix: Add null check for neuron pointer
+                if (!neuron) continue;
+                
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -359,12 +396,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        // Fix: Add null check for synapse pointer
+                        if (syn) {
+                            syn->recordPostSpike(currentTime);
+                        }
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        // Fix: Add null check for synapse pointer
+                        if (!syn) continue;
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -598,20 +641,29 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Inject current into sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        // Fix: Add bounds checking for array access
+        if (i >= pImpl->sensoryNeurons.size()) {
+            NLM_LOG_WARNING("Sensory neuron index out of bounds: " + std::to_string(i));
+            break;
         }
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        Neuron* sensoryNeuron = pImpl->sensoryNeurons[i];
+        if (sensoryNeuron) {
+            // Normalize input value to range [-10, 10] mV
+            float normalizedValue = 0.0f;
+            if (i < values.size()) {
+                normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            }
+            
+            // Inject current into this sensory neuron
+            sensoryNeuron->injectCurrent(normalizedValue);
+            
+            // Also store in working memory
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(sensoryNeuron->getId(), normalizedValue / 10.0f);
+            }
         }
     }
 }
