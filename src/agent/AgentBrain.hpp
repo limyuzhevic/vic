@@ -6,15 +6,37 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
+#include <stdexcept>
 
 namespace nlm {
 
+// Custom exception classes for AgentBrain
+class NLMValueError : public std::runtime_error {
+public:
+    explicit NLMValueError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMRuntimeError : public std::runtime_error {
+public:
+    explicit NLMRuntimeError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+// Forward declarations
+class AgentBrain;
+
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with enhanced features
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept = default;
+    AgentBrain& operator=(AgentBrain&&) noexcept = default;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -52,11 +74,18 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get expected reward
+    float getExpectedReward() const;
+    
+    // Get total reward accumulated
+    float getTotalReward() const;
+    
     // Reset agent for new episode
     void reset();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -68,6 +97,29 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Enhanced configuration
+    void setNeuromodulationParam(const std::string& param_name, float value);
+    void setPlasticityParam(const std::string& param_name, float value);
+    float getCuriosityScaling() const { return curiosityScaling_; }
+    float getNoveltyDecay() const { return noveltyDecay_; }
+    float getPredictionErrorWeight() const { return predictionErrorWeight_; }
+    float getSTDP LTPBase() const { return stdpLTPBase_; }
+    float getSTDP LTDBase() const { return stdpLTDBase_; }
+    float getStructuralPlasticityRate() const { return structuralPlasticityRate_; }
+    
+    // Performance and validation
+    std::vector<float> getPerformanceMetrics() const;
+    bool validateState() const;
+    
+    // Development and progression
+    double getDevelopmentalAge() const { return developmentalAge_; }
+    float getPlasticityModifier() const { return plasticityModifier_; }
+    int getTotalStepCount() const { return totalSteps_; }
+    
+    // Utility functions
+    template<typename T>
+    T validateRange(const T& value, const T& min, const T& max, const std::string& name) const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -103,6 +155,14 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
+    // Enhanced neuromodulation parameters
+    float curiosityScaling_;
+    float noveltyDecay_;
+    float predictionErrorWeight_;
+    float stdpLTPBase_;
+    float stdpLTDBase_;
+    float structuralPlasticityRate_;
+    
     // Configuration flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
@@ -112,6 +172,13 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Simulation tracking
+    int totalSteps_;
+    
+    // Helper methods
+    void setEntryDescription(const std::string& key);
+    float getTimeString(std::chrono::system_clock::time_point time_point) const;
 };
 
 } // namespace nlm

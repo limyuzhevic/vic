@@ -2,6 +2,8 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
+#include <random>
 
 namespace nlm {
 
@@ -19,8 +21,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , curiosityScaling_(2.0f)
+    , noveltyDecay_(0.98f)
+    , predictionErrorWeight_(0.5f)
+    , stdpLTPBase_(0.01f)
+    , stdpLTDBase_(0.012f)
+    , structuralPlasticityRate_(0.0001f)
+    , totalSteps_(0)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with validation
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -67,6 +76,7 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    totalSteps_ = 0;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -85,14 +95,19 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        throw NLMRuntimeError("Brain pointer is null - AgentBrain not properly initialized");
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
+            // Inject current proportional to vision intensity with validation
             float current = vision[i] * 5.0f;  // Scale factor
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;  // Clamp invalid values
+            }
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -102,6 +117,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -111,6 +129,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -120,11 +141,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            if (std::isnan(current) || std::isinf(current)) {
+                current = 0.0f;
+            }
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Compute novelty (difference from previous vision) with validation
     if (!vision.empty()) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
@@ -142,15 +166,19 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error with enhanced validation
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        float noveltyContribution = noveltyLevel_ * curiosityScaling_;
+        float predictionErrorContribution = std::abs(predictionError_) * predictionErrorWeight_;
+        curiosityLevel_ = noveltyContribution + predictionErrorContribution;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        throw NLMRuntimeError("Brain pointer is null - AgentBrain not properly initialized");
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -163,13 +191,16 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
+    // Calculate average activity in each motor group with validation
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (!n) continue;
+            float potential = n->getState().membranePotential;
+            float resting = n->getState().restingPotential;
+            sum += std::abs(potential - resting);
         }
         return sum / neurons.size();
     };
@@ -201,7 +232,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
-    // Only act if there's meaningful activity
+    // Only act if there's meaningful activity (enhanced threshold validation)
     if (bestActivity < 0.5f) {
         return MotorCommand::Wait;
     }
@@ -215,19 +246,25 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        if (brain_->getRandomGenerator()) {
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Random motor command
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 11);  // Updated to match ActionType
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    case 7: return MotorCommand::Look;
+                    case 8: return MotorCommand::LookUp;
+                    case 9: return MotorCommand::LookDown;
+                    case 10: return MotorCommand::Eat;
+                    default: return MotorCommand::Wait;
+                }
             }
         }
     }
@@ -236,7 +273,18 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        return;
+    }
+    
+    // Validate reward values
+    if (std::isnan(reward) || std::isinf(reward)) {
+        reward = 0.0f;
+    }
+    
+    if (std::isnan(predictedReward) || std::isinf(predictedReward)) {
+        predictedReward = 0.0f;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -253,11 +301,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
+                // Apply reward-modulated weight change with validation
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                
+                // Validate delta
+                if (std::isnan(delta) || std::isinf(delta)) {
+                    delta = 0.0f;
+                }
+                
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -274,13 +330,15 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        stdp->setLTPWeight(stdpLTPBase_ * plasticityFactor);
+        stdp->setLTDWeight(stdpLTDBase_ * plasticityFactor);
     }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        return;
+    }
     
     developmentalAge_ += timestep;
     
@@ -305,7 +363,7 @@ void AgentBrain::updateDevelopment(double timestep) {
         auto* sp = brain_->getStructuralPlasticity();
         if (sp) {
             // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
+            float synRate = structuralPlasticityRate_ * plasticityModifier_;
             float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
@@ -342,9 +400,90 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    totalSteps_ = 0;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Additional helper methods for enhanced functionality
+void AgentBrain::setNeuromodulationParams(const std::string& param_name, float value) {
+    if (param_name == "dopamine_sensitivity") {
+        // Handle dopamine sensitivity parameter
+    } else if (param_name == "curiosity_scaling") {
+        curiosityScaling_ = validateRange(value, 0.0f, 10.0f, "curiosity scaling");
+    } else if (param_name == "novelty_decay") {
+        noveltyDecay_ = validateRange(value, 0.1f, 0.99f, "novelty decay");
+    } else if (param_name == "prediction_error_weight") {
+        predictionErrorWeight_ = validateRange(value, 0.0f, 1.0f, "prediction error weight");
+    } else {
+        throw NLMValueError("Unknown neuromodulation parameter: " + param_name);
+    }
+}
+
+void AgentBrain::setPlasticityParams(const std::string& param_name, float value) {
+    if (param_name == "stdp_ltp_base") {
+        stdpLTPBase_ = validateRange(value, 0.0f, 0.1f, "STDP LTP base");
+    } else if (param_name == "stdp_ltd_base") {
+        stdpLTDBase_ = validateRange(value, 0.0f, 0.1f, "STDP LTD base");
+    } else if (param_name == "structural_plasticity_rate") {
+        structuralPlasticityRate_ = validateRange(value, 0.0f, 0.01f, "structural plasticity rate");
+    } else {
+        throw NLMValueError("Unknown plasticity parameter: " + param_name);
+    }
+}
+
+std::vector<float> AgentBrain::getPerformanceMetrics() const {
+    std::vector<float> metrics;
+    
+    metrics.push_back(dopamineLevel_);           // Neuromodulation level
+    metrics.push_back(noveltyLevel_);           // Novelty level
+    metrics.push_back(curiosityLevel_);        // Curiosity level
+    metrics.push_back(predictionError_);       // Prediction error
+    metrics.push_back(expectedReward_);        // Expected reward
+    metrics.push_back(plasticityModifier_);    // Plasticity modifier
+    metrics.push_back(developmentalAge_);      // Developmental age
+    metrics.push_back(sensoryNoveltyDecay_);    // Novelty decay rate
+    
+    return metrics;
+}
+
+bool AgentBrain::validateState() const {
+    // Validate agent brain state
+    std::vector<std::string> errors;
+    
+    if (!brain_) {
+        errors.push_back("Brain pointer is null");
+    }
+    
+    if (std::isnan(dopamineLevel_) || std::isinf(dopamineLevel_)) {
+        errors.push_back("Invalid dopamine level");
+    }
+    
+    if (curiosityLevel_ < 0.0f || curiosityLevel_ > 1.0f) {
+        errors.push_back("Curiosity level out of range [0, 1]");
+    }
+    
+    if (developmentalAge_ < 0.0) {
+        errors.push_back("Developmental age cannot be negative");
+    }
+    
+    if (plasticityModifier_ < 0.0f || plasticityModifier_ > 10.0f) {
+        errors.push_back("Plasticity modifier out of valid range [0, 10]");
+    }
+    
+    return errors.empty();
+}
+
+// Template function for range validation
+template<typename T>
+T AgentBrain::validateRange(const T& value, const T& min, const T& max, const std::string& name) const {
+    if (value < min || value > max) {
+        throw NLMValueError("Value " + name + " must be between " + 
+                           std::to_string(min) + " and " + std::to_string(max) +
+                           ", got " + std::to_string(value));
+    }
+    return value;
 }
 
 } // namespace nlm

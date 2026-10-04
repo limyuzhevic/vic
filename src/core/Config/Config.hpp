@@ -5,6 +5,20 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <chrono>
+#include <ctime>
+
+// JSON and YAML support - try to include external libraries
+#ifdef HAS_NLOHMANN_JSON
+    #include <nlohmann/json.hpp>
+    using json = nlohmann::json;
+#else
+    #ifdef HAS_YAML_CPP
+        #include <yaml-cpp/yaml.h>
+        using YAML = YAML::Node;
+    #endif
+#endif
 
 namespace nlm {
 
@@ -55,7 +69,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +107,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced validation and metadata
+    std::pair<bool, std::string> validate() const;
+    std::pair<std::vector<std::string>, std::vector<std::string>> getValidationReport() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +118,20 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getTimeString(std::chrono::system_clock::time_point time_point);
+    
+    // Enhanced helper functions
+    void setDefaultConfiguration();
+    void setEntryDescription(ConfigEntry& entry) const;
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(std::ifstream& file);
+    void saveToJSON(const std::string& filepath) const;
+    void saveToSimpleFormat(std::ofstream& file) const;
+    
+    // Helper functions for value conversion
+    json configValueToJSON(const ConfigValue& value) const;
+    std::string configValueToString(const ConfigValue& value) const;
 };
 
 } // namespace nlm
