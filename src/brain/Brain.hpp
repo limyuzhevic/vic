@@ -170,10 +170,13 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
