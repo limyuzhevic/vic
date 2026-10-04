@@ -19,9 +19,29 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    try {
+        auto entries = JSONParser::parseJSONFile(filepath);
+        for (const auto& entry : entries) {
+            set(entry.first, entry.second, ConfigSource::File);
+        }
+        return true;
+    } catch (const std::exception&) {
+        // Fallback to simple key=value format
+    }
     
+    // Try to parse as YAML
+    try {
+        auto entries = JSONParser::parseYAMLFile(filepath);
+        for (const auto& entry : entries) {
+            set(entry.first, entry.second, ConfigSource::File);
+        }
+        return true;
+    } catch (const std::exception&) {
+        // Fallback to simple key=value format
+    }
+    
+    // Original simple key=value format (for backward compatibility)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -79,17 +99,13 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Try to save as JSON first
+    if (JSONSerializer::toJSONFile(filepath, getEntries())) {
+        return true;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
+    // Fallback to YAML format
+    return JSONSerializer::toYAMLFile(filepath, getEntries());
 }
 
 template<typename T>
@@ -168,6 +184,10 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
+const std::vector<ConfigEntry>& Config::getEntries() const {
+    return pImpl->entries;
+}
+
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
@@ -184,19 +204,6 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
 }
 
 // Explicit template instantiations
