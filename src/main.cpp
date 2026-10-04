@@ -326,10 +326,14 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with error handling
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
+    
+    if (!logger->addLogger(consoleLogger)) {
+        std::cerr << "ERROR: Failed to initialize logger!" << std::endl;
+        return 1;
+    }
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
@@ -340,14 +344,21 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with error handling
     auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configLoaded = false;
+    
+    // Parse command line arguments for configuration file
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -359,12 +370,23 @@ int main(int argc, char** argv) {
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoaded = true;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Validate configuration
+    auto validationErrors = config->validate();
+    if (!validationErrors.empty()) {
+        NLM_LOG_ERROR("Configuration validation errors:");
+        for (const auto& error : validationErrors) {
+            NLM_LOG_ERROR("  - " + error);
+        }
+        NLM_LOG_WARN("Continuing with warnings...");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -397,7 +419,7 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
@@ -409,20 +431,38 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests with error handling
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting NLM Tests ===");
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    try {
+        // Run Test 1: Basic connectivity
+        NLM_LOG_INFO("Test 1: Basic Connectivity Test");
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        NLM_LOG_INFO("Test 2: Plasticity Learning Experiment");
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        NLM_LOG_INFO("Test 3: STDP Verification");
+        runStdpVerification(brain);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during test execution: " + std::string(e.what()));
+        brain->reset();
+        return 1;
+    } catch (...) {
+        NLM_LOG_ERROR("Unknown exception during test execution");
+        brain->reset();
+        return 1;
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -446,4 +486,45 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Helper functions for command-line interface
+void printHelp() {
+    std::cout << R"(
+NLM - Neural Learning Machine
+Phase 2: Real Neural Computation
+
+Usage: nlm [OPTIONS]
+
+Options:
+  -h, --help              Show this help message
+  --version               Show version information
+  --config FILE           Load configuration from file (default: configs/default.cfg)
+  --config=FILE           Same as --config FILE
+  --key=value             Set configuration key to value
+  -k value                Set configuration key (alternative to --key=value)
+
+Common configuration keys:
+  random_seed             Random seed for reproducible results
+  simulation_timestep     Time step for simulation (default: 0.001)
+  neuron_count            Number of neurons (default: 500)
+  region_count            Number of regions (default: 1)
+  connection_probability  Probability of connection between neurons (default: 0.15)
+
+Examples:
+  nlm                     Run with default configuration
+  nlm --config myconfig.cfg
+  nlm --random_seed=123 --neuron_count=1000
+  nlm -h                  Show help
+  nlm --version           Show version
+
+For more information, visit: https://github.com/nlm-project/nlm
+    )" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM - Neural Learning Machine v0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Built with C++20, scikit-build-core" << std::endl;
+    std::cout << "Copyright (c) 2026 NLM Authors. MIT License." << std::endl;
 }

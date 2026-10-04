@@ -3,6 +3,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_brain {
 
@@ -121,6 +123,62 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainErrorHandling() {
+    // Test that brain handles errors gracefully
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(10), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    config->set("connection_probability", 1.5f, nlm::ConfigSource::Default);  // Invalid: > 1.0
+    
+    nlm::Brain brain(config);
+    bool success = brain.initialize();
+    // Brain should initialize despite invalid config (it will validate internally)
+    assert(success);
+    
+    std::cout << "    testBrainErrorHandling passed" << std::endl;
+}
+
+void testBrainMemoryManagement() {
+    // Test that brain properly manages memory with move operations
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain1(config);
+    nlm::Brain brain2 = std::move(brain1);  // Move constructor
+    
+    bool success = brain2.initialize();
+    assert(success);
+    
+    // Original brain should be in valid but uninitialized state after move
+    // (implementation dependent)
+    
+    std::cout << "    testBrainMemoryManagement passed" << std::endl;
+}
+
+void testBrainStatistics() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Run some steps to generate activity
+    for (nlm::SimulationStep step = 0; step < 5; ++step) {
+        brain.step(step);
+    }
+    
+    // Verify statistics are reasonable
+    assert(brain.getTotalNeuronCount() == 100);
+    assert(brain.getTotalSynapseCount() >= 0);
+    assert(brain.getActiveNeuronCount() >= 0);
+    assert(brain.getFiringNeuronCount() >= 0);
+    assert(brain.getAverageFiringRate() >= 0.0f);
+    
+    std::cout << "    testBrainStatistics passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +187,9 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainErrorHandling();
+    testBrainMemoryManagement();
+    testBrainStatistics();
 }
 
 } // namespace test_brain

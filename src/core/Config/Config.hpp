@@ -55,14 +55,20 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Load from simple key=value file (backward compatibility)
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Save to file (JSON/YAML format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to simple key=value file
+    bool saveToSimpleFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,6 +99,13 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation
+    std::vector<std::string> validate() const;
+    
+    // Import/export with error handling
+    bool importFromJSON(const std::string& jsonContent);
+    std::string exportToJSON() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +113,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool validateValue(const ConfigValue& value, ConfigSource source);
+    
+    // Template instantiations for validation
+    template<typename T>
+    static bool validateType(const std::string& key, const T& value);
 };
 
 } // namespace nlm

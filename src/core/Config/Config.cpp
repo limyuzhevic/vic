@@ -19,9 +19,17 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Simple key=value format for backward compatibility
+    // TODO: Add JSON/YAML parser support (Phase 2)
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +94,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -199,17 +218,89 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Check for empty key
+        if (entry.key.empty()) {
+            errors.push_back("Empty key found");
+            continue;
+        }
+        
+        // Validate based on value type
+        bool valid = validateValue(entry.value, entry.source);
+        if (!valid) {
+            errors.push_back("Invalid value for key: " + entry.key);
+        }
+    }
+    
+    return errors;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::validateValue(const ConfigValue& value, ConfigSource source) {
+    return std::visit([source](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        // Type-specific validation
+        if constexpr (std::is_same_v<T, std::string>) {
+            return !arg.empty(); // Strings shouldn't be empty unless explicitly set
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return true; // Booleans are always valid
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return true; // Integers are always valid
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::isfinite(arg); // Must be finite (not NaN or infinity)
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return true; // Vector of ints is valid
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return true; // Vector of doubles is valid
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return true; // Vector of strings is valid
+        } else {
+            return true; // Default: assume valid
+        }
+    }, value);
+}
 
-} // namespace nlm
+bool Config::validateType(const std::string& key, const T& value) {
+    // Basic type validation - can be extended per configuration requirements
+    return true;
+}
+
+bool Config::importFromJSON(const std::string& jsonContent) {
+    // Placeholder for JSON import functionality
+    // TODO: Implement full JSON parser
+    return false;
+}
+
+std::string Config::exportToJSON() const {
+    // Export configuration to JSON format
+    std::ostringstream oss;
+    oss << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        oss << "  \"" << entry.key << "\": ";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        if (i < pImpl->entries.size() - 1) {
+            oss << ",\n";
+        } else {
+            oss << "\n";
+        }
+    }
+    oss << "}\n";
+    return oss.str();
+}
+
+bool Config::saveToSimpleFile(const std::string& filepath) const {
+    return saveToFile(filepath); // Use the enhanced saveToFile for simple format
+}
