@@ -14,14 +14,25 @@ struct Hebbian::Impl {
              covarianceThreshold(0.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+Hebbian::Hebbian() : pImpl(std::make_unique<Impl>()) {}
 
 Hebbian::~Hebbian() = default;
 
+// Move constructor
+Hebbian::Hebbian(Hebbian&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+// Move assignment operator
+Hebbian& Hebbian::operator=(Hebbian&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
+
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                     const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes,
+                     TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -101,6 +112,20 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::setMinWeight(float minWeight) {
+    pImpl->minWeight = std::clamp(minWeight, -10.0f, 0.0f);
+}
+
+float Hebbian::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
+void Hebbian::configure(float learningRate, float maxWeight, float minWeight) {
+    setLearningRate(learningRate);
+    setMaxWeight(maxWeight);
+    setMinWeight(minWeight);
 }
 
 } // namespace nlm

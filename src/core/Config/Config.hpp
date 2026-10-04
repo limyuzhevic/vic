@@ -1,13 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
@@ -55,14 +45,32 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from file (JSON format)
+    bool loadFromJson(const std::string& filepath);
+    
+    // Load from file (YAML format)
+    bool loadFromYaml(const std::string& filepath);
+    
+    // Load from simple key=value format (backward compatibility)
+    bool loadFromSimpleFormat(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON/YAML/simple format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to file (JSON format)
+    bool saveToJson(const std::string& filepath) const;
+    
+    // Save to file (YAML format)
+    bool saveToYaml(const std::string& filepath) const;
+    
+    // Save to simple key=value format
+    bool saveToSimpleFormat(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -75,6 +83,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -100,6 +109,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML helpers
+    void setFromJsonValue(const std::string& key, const nlohmann::json& value, ConfigSource source);
+    static std::string jsonValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm

@@ -16,9 +16,20 @@ struct STDP::Impl {
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP() : pImpl(std::make_unique<Impl>()) {}
 
 STDP::~STDP() = default;
+
+// Move constructor
+STDP::STDP(STDP&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+// Move assignment operator
+STDP& STDP::operator=(STDP&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,

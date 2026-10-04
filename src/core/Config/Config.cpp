@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,14 +22,76 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Implement proper JSON/YAML parser support
+    auto ext = std::filesystem::path(filepath).extension();
     
+    if (ext == ".json") {
+        return loadFromJson(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYaml(filepath);
+    } else {
+        // Fallback to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Flatten JSON structure to simple key=value pairs
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            setFromJsonValue(key, *it, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::loadFromYaml(const std::string& filepath) {
+    // For now, treat YAML as JSON-like (YAML is a superset of JSON)
+    // In a real implementation, you would use a YAML parser like YAML-cpp
+    return loadFromJson(filepath);
+}
+
+void Config::setFromJsonValue(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_array()) {
+        // Convert array to vector
+        std::vector<std::string> stringArray;
+        for (const auto& item : value) {
+            stringArray.push_back(item.dump());
+        }
+        set(key, ConfigValue(stringArray), source);
+    } else {
+        // Default to string representation
+        set(key, value.dump(), source);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    // Original simple key=value format implementation
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
-    
+
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -34,61 +99,93 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
-        
+
         // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
-            
+
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
-            
+
             set(key, value, ConfigSource::File);
         }
     }
-    
-    return true;
-}
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    auto ext = std::filesystem::path(filepath).extension();
+    
+    if (ext == ".json") {
+        return saveToJson(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return saveToYaml(filepath);
+    } else {
+        // Fallback to simple key=value format
+        return saveToSimpleFormat(filepath);
+    }
+}
+
+bool Config::saveToJson(const std::string& filepath) const {
+    try {
+        nlohmann::json jsonData;
+        
+        for (const auto& entry : pImpl->entries) {
+            // Add description as comment in JSON (though JSON doesn't support comments)
+            jsonData[entry.key] = jsonValueToString(entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Write with pretty formatting
+        file << std::setw(2) << jsonData << std::endl;
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::saveToYaml(const std::string& filepath) const {
+    // For now, use JSON format for YAML files
+    // In a real implementation, you would use a YAML formatter
+    return saveToJson(filepath);
+}
+
+std::string Config::jsonValueToString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
-    
+
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << jsonValueToString(entry.value) << "\n";
+        file << "\n";
     }
-    
+
     return true;
 }
 
