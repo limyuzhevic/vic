@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -28,6 +28,9 @@ add_library(nlm_core STATIC
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
+    src/core/Logger/FileLogger.cpp
+    src/core/Logger/AsyncLogger.cpp
+    src/core/Logger/PerformanceLogger.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
@@ -107,14 +110,27 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-# Phase 3 experiments
+# Experiments
+add_library(nlm_experiments STATIC
+    src/experiments/Experiment.cpp
+    src/experiments/ExperimentRunner.cpp
+    src/experiments/Metrics.cpp
+    src/experiments/LearningExperiment.cpp
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_experiments PUBLIC src)
+target_link_libraries(nlm_experiments PUBLIC nlm_core)
+
+# Phase 3 experiments (legacy)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 4 experiments
+# Phase 4 experiments (legacy)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
