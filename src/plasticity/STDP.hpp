@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// REALIZED with spike-timing-dependent plasticity using asymmetric Hebbian rules
 
 class STDP : public PlasticityRule {
 public:

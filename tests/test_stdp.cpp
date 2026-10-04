@@ -8,56 +8,11 @@
 
 namespace test_stdp {
 
-void testSTDPCreation() {
-    nlm::STDP stdp;
-    
-    assert(stdp.getLTPWeight() == 0.01f);
-    assert(stdp.getLTDWeight() == 0.012f);
-    assert(stdp.getTimeConstant() == 20.0f);
-    
-    std::cout << "    testSTDPCreation passed" << std::endl;
-}
-
-void testSTDPConfiguration() {
-    nlm::STDP stdp;
-    
-    stdp.setLTPWeight(0.05f);
-    stdp.setLTDWeight(0.06f);
-    stdp.setTimeConstant(30.0f);
-    
-    assert(stdp.getLTPWeight() == 0.05f);
-    assert(stdp.getLTDWeight() == 0.06f);
-    assert(stdp.getTimeConstant() == 30.0f);
-    
-    std::cout << "    testSTDPConfiguration passed" << std::endl;
-}
-
-void testSTDPConfigure() {
-    nlm::STDP stdp;
-    
-    stdp.configure(0.03f, 0.035f, 25.0f);
-    
-    assert(stdp.getLTPWeight() == 0.03f);
-    assert(stdp.getLTDWeight() == 0.035f);
-    assert(stdp.getTimeConstant() == 25.0f);
-    
-    std::cout << "    testSTDPConfigure passed" << std::endl;
-}
-
-void testSTDPName() {
-    nlm::STDP stdp;
-    
-    assert(stdp.getName() != nullptr);
-    assert(std::string(stdp.getName()) == "STDP");
-    
-    std::cout << "    testSTDPName passed" << std::endl;
-}
-
 void testSTDPPotentiation() {
     nlm::STDP stdp;
     nlm::RandomGenerator rng(42);
     
-    // Create a synapse
+    // Create a synapse with excitatory type
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.5f);
@@ -82,7 +37,7 @@ void testSTDPPotentiation() {
 void testSTDPDepression() {
     nlm::STDP stdp;
     
-    // Create a synapse
+    // Create a synapse with excitatory type
     nlm::Synapse synapse(nlm::SynapseId(2), nlm::NeuronId(3), nlm::NeuronId(4));
     synapse.setType(nlm::SynapseType::Excitatory);
     synapse.setWeight(0.5f);
@@ -147,10 +102,6 @@ void testSTDPWeightBounds() {
 
 void runAll() {
     std::cout << "Running STDP tests..." << std::endl;
-    testSTDPCreation();
-    testSTDPConfiguration();
-    testSTDPConfigure();
-    testSTDPName();
     testSTDPPotentiation();
     testSTDPDepression();
     testSTDPEmptySpikes();

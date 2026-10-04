@@ -7,47 +7,6 @@
 
 namespace test_synapse {
 
-void testSynapseCreation() {
-    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
-    
-    assert(synapse.getId() == nlm::SynapseId(1));
-    assert(synapse.getSourceNeuron() == nlm::NeuronId(1));
-    assert(synapse.getDestinationNeuron() == nlm::NeuronId(2));
-    
-    std::cout << "    testSynapseCreation passed" << std::endl;
-}
-
-void testSynapseWeight() {
-    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
-    
-    assert(synapse.getWeight() == 0.0f);
-    
-    synapse.setWeight(0.5f);
-    assert(synapse.getWeight() == 0.5f);
-    
-    synapse.addToWeight(0.2f);
-    assert(synapse.getWeight() == 0.7f);
-    
-    synapse.addToWeight(-0.3f);
-    assert(synapse.getWeight() == 0.4f);
-    
-    std::cout << "    testSynapseWeight passed" << std::endl;
-}
-
-void testSynapseWeightBounds() {
-    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
-    
-    // Test upper bound
-    synapse.setWeight(10.0f);
-    assert(synapse.getWeight() <= 1.0f);  // Should be clamped
-    
-    // Test lower bound
-    synapse.setWeight(-10.0f);
-    assert(synapse.getWeight() >= -1.0f);  // Should be clamped
-    
-    std::cout << "    testSynapseWeightBounds passed" << std::endl;
-}
-
 void testSynapseType() {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     

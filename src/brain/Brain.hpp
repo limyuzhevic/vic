@@ -28,6 +28,23 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SemanticMemory;
+class ProceduralMemory;
+
+// Inter-regional connection (long-range connectivity)
+struct InterRegionConnection {
+    RegionId sourceRegion;
+    RegionId targetRegion;
+    float weight;
+    Delay delay;
+    PlasticityFlags plasticityFlags;
+    
+    InterRegionConnection()
+        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
+    
+    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
+        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -93,6 +110,11 @@ public:
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
+    size_t getTotalNeuronCount() const;
+    size_t getTotalSynapseCount() const;
+    size_t getActiveNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    float getAverageFiringRate() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
@@ -130,13 +152,6 @@ public:
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
-    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
@@ -147,6 +162,14 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // SEMANTIC MEMORY - integrated knowledge representation
+    // Neuronal concepts as distributed patterns for gradual learning and generalization
+    SemanticMemory* getSemanticMemory();
+    
+    // PROCEDURAL MEMORY - learned skills and habits
+    // Sequential neural patterns for action execution and proficiency
+    ProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     

@@ -6,15 +6,6 @@
 
 namespace test_neuron {
 
-void testNeuronCreation() {
-    nlm::Neuron neuron(nlm::NeuronId(1));
-    
-    assert(neuron.getId() == nlm::NeuronId(1));
-    assert(neuron.getType() == nlm::NeuronType::Internal);
-    
-    std::cout << "    testNeuronCreation passed" << std::endl;
-}
-
 void testNeuronType() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     

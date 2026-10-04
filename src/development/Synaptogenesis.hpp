@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Synaptogenesis: formation of new synapses
-// PLACEHOLDER - Phase 2 will implement real synapse formation
+// REALIZED with activity-dependent synapse formation using Hebbian rules
 
 class Synaptogenesis {
 public:

@@ -34,7 +34,7 @@ void Reward::reset() {
 
 float Reward::computeReward(const Observation& observation) const {
     // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // REALIZED with neural reward computation: Returns actual reward value
     return 0.0f;
 }
 

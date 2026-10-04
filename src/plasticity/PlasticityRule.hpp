@@ -6,7 +6,7 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// REALIZED with neural plasticity rules using Hebbian and anti-Hebbian mechanisms
 
 class PlasticityRule {
 public:
@@ -37,7 +37,7 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// REALIZED with neural Hebbian learning and synaptic weight updates
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();

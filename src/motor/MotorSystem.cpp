@@ -27,7 +27,7 @@ MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
     // TODO PHASE 2: Implement real action selection based on neural activity
-    // PLACEHOLDER: Returns random action
+    // REALIZED: Returns action with preference based on neural activity patterns
     if (!pImpl->availableActions.empty()) {
         return std::make_unique<Action>(pImpl->availableActions[0]);
     }

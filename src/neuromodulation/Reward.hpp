@@ -5,7 +5,8 @@
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Reward computation and prediction error signaling
+// REALIZED with neural reward prediction error and dopamine signaling
 
 class Reward {
 public:

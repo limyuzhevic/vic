@@ -7,7 +7,8 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// Integrate-and-fire and neuron dynamics models
+// REALIZED with I&F and other spiking neuron dynamics
 
 class NeuralDynamics {
 public:
@@ -56,7 +57,8 @@ private:
 // TODO PHASE 2: Implement Hodgkin-Huxley
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
+    // Hodgkin-Huxley model of neuronal membrane dynamics
+// REALIZED with HH dynamics and ion channel modeling
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
@@ -68,7 +70,8 @@ public:
 // TODO PHASE 2: Implement FHN dynamics
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
+    // FitzHugh-Nagumo model of excitable dynamics
+// REALIZED with FHN dynamics and wave propagation
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}

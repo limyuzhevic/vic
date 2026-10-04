@@ -77,7 +77,7 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
+        // REALIZED: In real implementation, would clone neural networks from templates
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
         brain->initialize();
         

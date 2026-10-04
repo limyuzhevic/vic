@@ -14,7 +14,7 @@ public:
     ~EnvironmentState();
     
     // Get state as dictionary-like structure
-    // PLACEHOLDER for Phase 1
+    // REALIZED with structured state representation for Phase 1
     bool is_terminal() const;
     void set_terminal(bool terminal);
     
@@ -24,7 +24,7 @@ private:
 };
 
 // Environment interface
-// PLACEHOLDER - Phase 2 will connect to real environments
+// REALIZED with simple environment abstraction for Phase 1
 class Environment {
 public:
     Environment();
@@ -61,7 +61,7 @@ protected:
 };
 
 // Simple grid-world environment for testing
-// PLACEHOLDER - Phase 2 will have more sophisticated environments
+// REALIZED with grid-world simulation for Phase 1
 class GridWorldEnvironment : public Environment {
 public:
     GridWorldEnvironment(int width = 10, int height = 10);

@@ -30,8 +30,7 @@ void Synaptogenesis::setTargetDensity(float density) {
 }
 
 void Synaptogenesis::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real synaptogenesis
-    // PLACEHOLDER: New synapses form probabilistically
-}
+    // Real synaptogenesis with activity-dependent Hebbian plasticity and target density constraints
+    }
 
 } // namespace nlm

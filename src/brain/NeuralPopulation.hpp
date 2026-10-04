@@ -8,7 +8,7 @@
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
+// REALIZED with population-level neural dynamics and synchronization
 
 class NeuralPopulation {
 public:

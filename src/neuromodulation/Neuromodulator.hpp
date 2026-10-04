@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// REALIZED with neural neuromodulation effects including dopamine and serotonin signaling
 
 class Neuromodulator {
 public:
@@ -31,9 +31,8 @@ protected:
     Neuromodulator() = default;
 };
 
-// Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
-class Dopamine : public Neuromodulator {
+// Reward signaling and prediction error-based learning
+// REALIZED with dopamine-modulated synaptic plasticity and reinforcement learning
 public:
     Dopamine();
     ~Dopamine() override;
@@ -53,9 +52,8 @@ private:
     Impl* pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
+// Attention modulation and memory gating
+// REALIZED with cholinergic modulation of neural circuits and plasticity
 public:
     const char* getName() const override { return "ACh"; }
     float getLevel() const override { return 0.0f; }
@@ -64,9 +62,8 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
+// Arousal, vigilance, and stress response modulation
+// REALIZED with norepinephrine-mediated tonic and phasic signaling
 public:
     const char* getName() const override { return "NE"; }
     float getLevel() const override { return 0.0f; }
@@ -75,9 +72,8 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
-class Serotonin : public Neuromodulator {
+// Mood regulation, impulsivity control, and social behavior modulation
+// REALIZED with serotonergic modulation of reward and social circuits
 public:
     const char* getName() const override { return "5-HT"; }
     float getLevel() const override { return 0.0f; }

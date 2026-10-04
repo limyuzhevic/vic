@@ -3,11 +3,20 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <functional>
+#include <string>
+#include <unordered_map>
 
 namespace nlm {
 
+// Forward declarations for integration
+class Brain;
+class ConceptFormation;
+class NeuralPlanner;
+class NeuralPrediction;
+class Neuromodulator;
+
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// REALIZED with neural working memory (persistent activity and recurrent connections)
 
 class WorkingMemory {
 public:
@@ -15,7 +24,6 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -37,10 +45,11 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
-};
+}
+;
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// REALIZED with neural episodic memory (neural patterns and pattern completion)
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -79,18 +88,21 @@ private:
     Impl* pImpl;
 };
 
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Semantic memory: gradually acquired knowledge - NEURAL IMPLEMENTATION
+// Uses neural patterns and Hebbian clustering for concept formation
 
 class SemanticMemory {
 public:
     SemanticMemory();
     ~SemanticMemory();
     
-    // Store fact
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Store fact as neural pattern
     void storeFact(const std::string& key, const std::string& value);
     
-    // Retrieve fact
+    // Retrieve fact from neural pattern
     std::string retrieveFact(const std::string& key) const;
     
     // Check if fact exists
@@ -102,18 +114,28 @@ public:
     // Clear all
     void clear();
     
+    // Neural pattern operations
+    void storePattern(const std::vector<float>& pattern,
+                      const std::string& key,
+                      const std::string& value);
+    
+    size_t findMatchingConcept(const std::vector<float>& pattern) const;
+    float computePatternSimilarity(const std::vector<float>& a,
+                                  const std::vector<float>& b) const;
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Procedural memory: learned skills and habits - NEURAL IMPLEMENTATION
+// Uses sequential neural patterns and forward models for skill execution
 
 struct Skill {
     std::string name;
     std::vector<NeuronId> neuralPattern;
     float proficiency;
+    std::vector<float> sequencePattern;
     
     Skill() : proficiency(0.0f) {}
 };
@@ -123,7 +145,10 @@ public:
     ProceduralMemory();
     ~ProceduralMemory();
     
-    // Learn skill
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Learn skill as neural routine
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
     
     // Retrieve skill
@@ -138,13 +163,26 @@ public:
     // Clear all
     void clear();
     
+    // Neural skill operations
+    void createSkill(size_t skillIndex,
+                     const std::vector<float>& sequence,
+                     const std::vector<NeuronId>& neurons);
+    void createSkillConnections(size_t skillIndex,
+                                const std::vector<NeuronId>& neurons);
+    void initializeForwardModel(size_t skillIndex,
+                                const std::vector<float>& sequence);
+    size_t getSkillIndex(const std::string& name) const;
+    void registerSkillWithPlanner(const std::string& skillName,
+                                 size_t skillIndex);
+    
 private:
     struct Impl;
     Impl* pImpl;
+    std::vector<Skill> skills;  // Direct storage for skill instances
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// REALIZED with neural associations encoded in synaptic connectivity
 
 class AssociativeMemory {
 public:
@@ -172,3 +210,7 @@ private:
 };
 
 } // namespace nlm
+
+// Include neural implementations
+#include "SemanticMemory.cpp"
+#include "ProceduralMemory.cpp"

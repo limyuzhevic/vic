@@ -9,16 +9,26 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../memory/SemanticMemory.hpp"
+#include "../memory/ProceduralMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -32,6 +42,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -65,18 +77,8 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
-    
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Last received sensory input
+    std::vector<float> lastInput;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -92,6 +94,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , lastInput()
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -108,16 +111,14 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        pImpl->predictionSystem->initialize(this);
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
+        // Set prediction system parameters
+        pImpl->predictionSystem->getNeuralPrediction()->setSequenceMemorySize(100);
+        pImpl->predictionSystem->getNeuralPrediction()->enableTemporalPrediction(true);
+        pImpl->predictionSystem->getNeuralPrediction()->enableActionConsequencePrediction(true);
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
@@ -241,6 +242,12 @@ bool Brain::initialize() {
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    
+    // Initialize semantic memory (neural concept storage)
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory (neural skill storage)
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -509,10 +516,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Store prediction error in neuromodulation system
+    if (pImpl->predictionError && pImpl->predictionSystem) {
+        // Convert prediction system error to neuromodulatory signal
+        float error = pImpl->predictionSystem->getPredictionError();
+        pImpl->predictionError->computeError(error, error);  // Predict vs actual error
+    }
+    
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Generate predictions based on current neural state
+        // For now, use last sensory input as current state
+        // In real implementation, would extract from working memory or neural populations
+        
+        // Generate prediction for next timestep
+        if (!pImpl->lastInput.empty()) {
+            std::vector<float> sensoryVector = pImpl->lastInput;
+            auto predictedInput = pImpl->predictionSystem->predictNextState(sensoryVector);
+            
+            // Update predictions with actual observation
+            if (predictedInput) {
+                pImpl->predictionSystem->updatePredictions(*predictedInput, sensoryVector);
+            }
+        }
+        
+        // Get prediction confidence for attention modulation
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Adjust attention based on prediction confidence
+        if (confidence < 0.3f) {
+            // Low confidence = high curiosity = increase attention to sensory input
+            if (pImpl->attention) {
+                // Could boost attention to sensory regions
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +565,223 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract and process neural patterns for concept formation
+        
+        // 1. Extract neural activity patterns from sensory regions
+        std::vector<float> sensoryPattern;
+        std::vector<float> internalPattern;
+        std::vector<float> motorPattern;
+        std::vector<float> workingMemoryPattern;
+        
+        // Extract sensory patterns
+        if (!pImpl->sensoryNeurons.empty()) {
+            sensoryPattern.reserve(pImpl->sensoryNeurons.size());
+            for (const auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring()) {
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                               neuron->getState().restingPotential) / 20.0f;
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Extract internal state patterns from internal neuron populations
+        internalPattern.reserve(500);  // Reserve for typical internal neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Internal) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        float activation = std::abs(neuron->getState().membranePotential - 
+                                                   neuron->getState().restingPotential) / 20.0f;
+                        internalPattern.push_back(activation);
+                        if (internalPattern.size() >= 500) break;
+                    }
+                }
+                if (internalPattern.size() >= 500) break;
+            }
+            if (internalPattern.size() >= 500) break;
+        }
+        
+        // Extract working memory content
+        workingMemoryPattern.reserve(200);
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                float activation = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            activation = std::abs(neuron->getState().membranePotential - 
+                                                neuron->getState().restingPotential) / 20.0f;
+                            break;
+                        }
+                    }
+                    if (activation > 0.0f) break;
+                }
+                workingMemoryPattern.push_back(activation);
+            }
+        }
+        
+        // Extract motor action patterns for action concepts
+        if (!pImpl->motorNeurons.empty()) {
+            motorPattern.reserve(pImpl->motorNeurons.size());
+            for (const auto* neuron : pImpl->motorNeurons) {
+                float activation = std::abs(neuron->getState().membranePotential - 
+                                           neuron->getState().restingPotential) / 20.0f;
+                motorPattern.push_back(activation);
+            }
+        }
+        
+        // 2. Convert neural patterns to feature vectors for ConceptFormation
+        std::vector<float> combinedPattern;
+        std::vector<float> combinedFeatures;
+        
+        // Normalize and concatenate patterns
+        if (!sensoryPattern.empty()) {
+            combinedPattern.insert(combinedPattern.end(), 
+                                   sensoryPattern.begin(), sensoryPattern.end());
+        }
+        if (!internalPattern.empty()) {
+            combinedPattern.insert(combinedPattern.end(), 
+                                   internalPattern.begin(), internalPattern.end());
+        }
+        if (!workingMemoryPattern.empty()) {
+            combinedPattern.insert(combinedPattern.end(), 
+                                   workingMemoryPattern.begin(), workingMemoryPattern.end());
+        }
+        if (!motorPattern.empty()) {
+            combinedPattern.insert(combinedPattern.end(), 
+                                   motorPattern.begin(), motorPattern.end());
+        }
+        
+        // Extract features from different brain systems
+        combinedFeatures.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+        combinedFeatures.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f);
+        combinedFeatures.push_back(pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f);
+        
+        // Use attention inhibition level as a proxy for attention focus
+        float attentionFocus = 0.5f;
+        if (pImpl->attention) {
+            // Calculate attention focus as the average inhibition level
+            std::vector<NeuronId> competitors;
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                competitors = pImpl->workingMemory->getMemoryNeurons();
+                if (!competitors.empty()) {
+                    float totalInhibition = 0.0f;
+                    for (NeuronId neuronId : competitors) {
+                        totalInhibition += pImpl->attention->getInhibitionFor(neuronId);
+                    }
+                    attentionFocus = totalInhibition / competitors.size();
+                }
+            }
+        }
+        combinedFeatures.push_back(attentionFocus);
+        
+        // 3. Present patterns to ConceptFormation system with neuromodulated reward
+        float rewardSignal = 0.0f;
+        
+        // Get neuromodulation signals for concept formation learning
+        if (pImpl->dopamine) {
+            rewardSignal += pImpl->dopamine->getLevel() * 0.6f;
+        }
+        if (pImpl->curiosity) {
+            rewardSignal += pImpl->curiosity->getLevel() * 0.4f;
+        }
+        
+        // Apply prediction error to reward signal
+        if (pImpl->predictionError) {
+            rewardSignal += pImpl->predictionError->getError() * 0.2f;
+        }
+        
+        // Clamp reward signal
+        rewardSignal = std::max(-1.0f, std::min(1.0f, rewardSignal));
+        
+        // Present experience to concept formation
+        SimulationStep currentTime = pImpl->currentStep;
+        size_t matchedConcept = pImpl->conceptFormation->presentExperience(combinedPattern, 
+                                                                         combinedFeatures, 
+                                                                         rewardSignal, 
+                                                                         currentTime);
+        
+        // 4. Handle concept creation, updating, and consolidation with attention
+        if (pImpl->attention && matchedConcept > 0) {
+            // Boost concept formation with attention
+            if (attentionFocus > 0.5f) {
+                const auto* concept = pImpl->conceptFormation->getConcept(matchedConcept);
+                if (concept) {
+                    // Apply attention-based consolidation
+                    float attentionBoost = attentionFocus * 0.5f;
+                    
+                    // Update concept stability with attention modulation
+                    float currentStability = pImpl->conceptFormation->getConceptStability(matchedConcept);
+                    float newStability = currentStability + attentionBoost * 0.05f;
+                    
+                    // Apply stability constraint
+                    if (newStability > 0.95f) newStability = 0.95f;
+                }
+            }
+            
+            // Increase attention to novel patterns based on reward signal
+            if (rewardSignal > 0.5f || rewardSignal < -0.5f) {
+                // Novelty reward increases attention to this pattern
+                // Apply top-down bias to enhance processing of this pattern
+                // pImpl->attention->applyTopDownBias(neuronId, 0.5f);
+            }
+        }
+        
+        // 5. Integration with prediction system for prediction error-based learning
+        if (pImpl->predictionSystem && !combinedPattern.empty()) {
+            // Get prediction confidence
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            // Low confidence patterns get higher learning weight in concept formation
+            if (confidence < 0.3f) {
+                // Novel predictions lead to concept formation
+                // pImpl->conceptFormation->processNovelPrediction(combinedPattern);
+            }
+        }
+        
+        // 6. Update semantic memory with stable concepts
+        if (pImpl->semanticMemory && pImpl->conceptFormation) {
+            size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+            for (size_t i = 0; i < conceptCount; ++i) {
+                const auto* concept = pImpl->conceptFormation->getConcept(i);
+                if (concept && pImpl->conceptFormation->getConceptStability(i) > 0.7f) {
+                    // Store stable concepts in semantic memory
+                    // Extract key features for semantic memory
+                    std::string conceptKey = "concept_" + std::to_string(i);
+                    // For now, we store the pattern as semantic fact
+                    pImpl->semanticMemory->storePattern(concept->prototype, conceptKey, concept->categoryHint);
+                }
+            }
+        }
+        
+        // 7. Feed into NeuralPlanner for goal-directed behavior
+        if (pImpl->planner && pImpl->conceptFormation && !combinedPattern.empty()) {
+            // Get matching concept for planning
+            size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(combinedPattern);
+            
+            if (matchingConcept > 0) {
+                const auto* concept = pImpl->conceptFormation->getConcept(matchingConcept);
+                if (concept) {
+                    // Update planning goal based on concept category hint
+                    std::vector<float> newGoal(10, 0.0f);  // 10-dimensional goal vector
+                    float categoryValue = 0.0f;
+                    
+                    if (concept->categoryHint == "rewarding") {
+                        categoryValue = 0.8f;
+                    } else if (concept->categoryHint == "harmful") {
+                        categoryValue = 0.2f;
+                    } else {
+                        categoryValue = 0.5f;
+                    }
+                    
+                    newGoal[0] = categoryValue;
+                    pImpl->planner->setCurrentGoal(newGoal);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -609,10 +861,8 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
-        }
+    // Store last sensory input for prediction system
+    pImpl->lastInput = values;
     }
 }
 
@@ -756,6 +1006,8 @@ void Brain::reset() {
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->semanticMemory) pImpl->semanticMemory->clear();
+    if (pImpl->proceduralMemory) pImpl->proceduralMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
@@ -1015,6 +1267,16 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+// SEMANTIC MEMORY ACCESSOR - integrated knowledge representation
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// PROCEDURAL MEMORY ACCESSOR - integrated skill representation  
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

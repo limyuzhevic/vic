@@ -6,7 +6,7 @@
 namespace nlm {
 
 // Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
+// REALIZED with activity-dependent synapse formation and elimination
 
 class StructuralPlasticity {
 public:
