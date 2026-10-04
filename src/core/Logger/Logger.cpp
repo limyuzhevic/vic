@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include "ErrorHandling/Error.hpp"
+#include "ErrorHandlingSystem.hpp"
 
 namespace nlm {
 
@@ -130,7 +132,7 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -144,6 +146,25 @@ void Logger::log(LogLevel level, const std::string& message,
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
+}
+
+void Logger::errorWithContext(const std::string& message, ErrorCategory category,
+                             ErrorSeverity severity, const std::map<std::string, std::string>& context) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    LogEntry entry;
+    entry.level = LogLevel::Error;
+    entry.message = message;
+    entry.timestamp = std::chrono::system_clock::now();
+    
+    for (auto& logger : pImpl->loggers) {
+        logger->log(entry);
+    }
+    
+    // Use error handling system to log and potentially throw
+    ErrorHandlingSystem::getInstance().logError(
+        "Error: " + message, category, severity, context
+    );
 }
 
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
@@ -162,36 +183,21 @@ void Logger::error(const std::string& message, const std::string& file, int line
     log(LogLevel::Error, message, file, line, function);
 }
 
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
-}
-
-bool Logger::isEnabled(LogLevel level) const {
+void Logger::errorWithContext(const std::string& message, ErrorCategory category,
+                             ErrorSeverity severity, const std::map<std::string, std::string>& context) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    LogEntry entry;
+    entry.level = LogLevel::Error;
+    entry.message = message;
+    entry.timestamp = std::chrono::system_clock::now();
+    
     for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
-        }
+        logger->log(entry);
     }
-    return false;
+    
+    // Use error handling system to log and potentially throw
+    ErrorHandlingSystem::getInstance().logError(
+        "Error: " + message, category, severity, context
+    );
 }
-
-Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
-}
-
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
-}
-
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
-}
-
-} // namespace nlm

@@ -14,15 +14,15 @@ public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
-    virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
+    // Real Leaky Integrate-and-Fire dynamics with refractory period and adaptation
+    virtual void updateNeuron(Neuron* neuron, Timestamp currentTime, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Real synaptic dynamics with short-term plasticity and eligibility traces
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
-    virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
+    virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse, Timestamp currentTime) = 0;
     
     // Check if neuron should fire
     virtual bool shouldFire(const Neuron* neuron) const = 0;
@@ -37,9 +37,9 @@ public:
     IntegrateAndFireDynamics();
     ~IntegrateAndFireDynamics() override;
     
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateNeuron(Neuron* neuron, Timestamp currentTime, TimestepDuration dt) override;
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse, Timestamp currentTime) override;
     bool shouldFire(const Neuron* neuron) const override;
     void reset() override;
     

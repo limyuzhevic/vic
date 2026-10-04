@@ -68,6 +68,21 @@ const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
     return pImpl->neurons;
 }
 
+bool NeuralPopulation::removeNeuron(Neuron* neuron) {
+    if (!neuron) return false;
+    
+    // Find and remove the neuron from the population
+    auto it = std::find(pImpl->neurons.begin(), pImpl->neurons.end(), neuron);
+    if (it != pImpl->neurons.end()) {
+        pImpl->neurons.erase(it);
+        // Update size to reflect actual neuron count
+        pImpl->size = pImpl->neurons.size();
+        return true;
+    }
+    
+    return false;
+}
+
 NeuronType NeuralPopulation::getNeuronType() const {
     return pImpl->neuronType;
 }
@@ -79,7 +94,7 @@ void NeuralPopulation::setNeuronType(NeuronType type) {
     }
 }
 
-size_t NeuralPopulation::getActiveCount() const {
+ size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
     for (const auto* neuron : pImpl->neurons) {
         if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {

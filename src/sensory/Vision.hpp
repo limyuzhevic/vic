@@ -21,7 +21,35 @@ public:
     // Get feature dimensionality
     size_t getFeatureDimensions() const;
     
+    // Get vision-specific features
+    float getContrast() const;
+    float getSharpness() const;
+    float getEdgeDensity() const;
+    float getTextureComplexity() const;
+    float getMotionEnergy() const;
+    
 private:
+    // Helper functions for visual feature extraction
+    void extractVisualFeatures(const std::vector<float>& data, 
+                              size_t width, size_t height, 
+                              size_t channels);
+    void computeImageStatistics(const std::vector<float>& data,
+                               size_t width, size_t height, 
+                               size_t channels);
+    void extractEdgeFeatures(const std::vector<float>& data,
+                            size_t width, size_t height, 
+                            size_t channels);
+    void extractTextureFeatures(const std::vector<float>& data,
+                               size_t width, size_t height, 
+                               size_t channels);
+    void extractColorFeatures(const std::vector<float>& data,
+                             size_t width, size_t height, 
+                             size_t channels);
+    void extractMotionFeatures(const std::vector<float>& data,
+                              size_t width, size_t height, 
+                              size_t channels);
+    void aggregateFeatures();
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };

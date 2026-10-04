@@ -6,8 +6,12 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include "ErrorHandling/Error.hpp"
 
 namespace nlm {
+
+// Enhanced error handling system integration
+class ErrorHandlingSystem;
 
 // Log severity levels
 enum class LogLevel {

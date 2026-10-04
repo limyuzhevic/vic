@@ -6,6 +6,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+
 // Motor system: converts neural activity to actions
 // PLACEHOLDER - Phase 2 will implement real action selection
 
@@ -13,6 +16,9 @@ class MotorSystem {
 public:
     MotorSystem();
     ~MotorSystem();
+    
+    // Initialize with brain reference for neural integration
+    void initialize(Brain* brain);
     
     // Select action based on neural activity
     // TODO PHASE 2: Implement real action selection

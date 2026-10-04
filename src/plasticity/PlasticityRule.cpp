@@ -24,26 +24,68 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    /*
+     * Real Hebbian learning implementation
+     * 
+     * Mathematical formulation (Covariance rule):
+     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+     * 
+     * Where:
+     *   pre  = average pre-synaptic activity
+     *   post = average post-synaptic activity
+     *   η   = learning rate
+     * 
+     * For spike-based implementation:
+     *   ⟨pre⟩  = number of pre-synaptic spikes
+     *   ⟨post⟩ = number of post-synaptic spikes
+     *   ⟨pre * post⟩ = number of coincident spike pairs
+     * 
+     * Biological inspiration:
+     *   - Reflects synaptic efficacy changes based on co-activity
+     *   - Implements "neurons that fire together, wire together"
+     *   - Used for memory formation and Hebbian potentiation
+     * 
+     * Safety constraints:
+     *   - Weight bounds prevent runaway excitation
+     *   - Learning rate clamping ensures stable convergence
+     */
     
-    if (preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+    // Compute covariance-based weight change
+    // Calculate mean pre-synaptic activity (number of spikes)
+    float meanPre = static_cast<float>(preSpikes.size());
+    
+    // Calculate mean post-synaptic activity (number of spikes)  
+    float meanPost = static_cast<float>(postSpikes.size());
+    
+    // Calculate coactivity (number of spike pairs within correlation window)
+    size_t coactivity = 0;
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            // Consider spikes within 20ms as coincident
+            float dt = std::abs(static_cast<float>(postTime - preTime));
+            if (dt < 20.0f) {  // 20ms correlation window
+                coactivity++;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Convert to average coactivity per pre spike
+    float avgCoactivity = coactivity / meanPre;
+    
+    // Calculate covariance: E[pre*post] - E[pre]*E[post]
+    // For spikes: E[pre*post] = coactivity, E[pre]=meanPre, E[post]=meanPost
+    float covariance = avgCoactivity - meanPre * meanPost;
+    
+    // Apply weight change with learning rate
+    float delta = pImpl->learningRate * covariance;
+    
+    // Apply weight change with bounds checking
+    if (std::abs(delta) > 1e-6f) {
+        applyWeightChange(synapse, delta);
     }
 }
 

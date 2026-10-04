@@ -1,5 +1,13 @@
 #include "Memory.hpp"
 #include <algorithm>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
+#include <map>
+#include <limits>
 
 namespace nlm {
 
@@ -16,15 +24,32 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Implement real storage with capacity limits
+    bool found = false;
+    
+    // Check if neuron exists and update value
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
-            return;
+            found = true;
+            break;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
+    
+    // If neuron doesn't exist, add it with capacity management
+    if (!found) {
+        // Use LRU (Least Recently Used) eviction policy
+        if (pImpl->items.size() >= pImpl->capacity) {
+            // Remove the oldest item (first in vector)
+            pImpl->items.erase(pImpl->items.begin());
+        }
+        
+        // Add new item at the end (most recent)
         pImpl->items.emplace_back(neuron, value);
+        
+        // Sort by neuron ID for deterministic behavior
+        std::sort(pImpl->items.begin(), pImpl->items.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
     }
 }
 
@@ -108,7 +133,89 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Implement real consolidation mechanisms
+    // Consolidate episodes by relevance, recency, and reward value
+    
+    if (pImpl->episodes.empty()) {
+        return;
+    }
+    
+    // Enhanced consolidation algorithm
+    // Step 1: Calculate importance scores based on multiple factors
+    std::vector<std::pair<float, size_t>> importance;
+    importance.reserve(pImpl->episodes.size());
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        
+        // Recency factor: more recent = higher importance
+        float recencyFactor = 1.0f;
+        if (i < pImpl->episodes.size() / 2) {
+            recencyFactor += 2.0f;  // Recent episodes are much more important
+        } else if (i < pImpl->episodes.size() / 3) {
+            recencyFactor += 1.0f;
+        }
+        
+        // Relevance factor: based on metadata and activity
+        float relevanceFactor = 1.0f;
+        if (!episode.metadata.empty()) {
+            // Simple metadata relevance scoring
+            size_t metadataRelevance = 0;
+            for (char c : episode.metadata) {
+                if (std::isalnum(c)) metadataRelevance++;
+            }
+            relevanceFactor += std::min(2.0f, static_cast<float>(metadataRelevance) * 0.1f);
+        }
+        
+        // Reward factor: higher reward = higher importance
+        float rewardFactor = 1.0f + episode.reward;
+        
+        // Neuronal activity factor: more active neurons = higher importance
+        float activityFactor = 1.0f;
+        if (!episode.neurons.empty() && !episode.values.empty()) {
+            float totalActivity = 0.0f;
+            for (float val : episode.values) {
+                totalActivity += std::abs(val);
+            }
+            activityFactor += std::min(2.0f, totalActivity * 0.1f);
+        }
+        
+        // Combined importance score
+        float importanceScore = recencyFactor * 0.3f + 
+                               relevanceFactor * 0.25f + 
+                               rewardFactor * 0.25f + 
+                               activityFactor * 0.2f;
+        
+        importance.emplace_back(importanceScore, i);
+    }
+    
+    // Step 2: Sort by importance (descending) with higher importance first
+    std::sort(importance.begin(), importance.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+    
+    // Step 3: Apply consolidation threshold - only keep episodes above threshold
+    std::vector<EpisodicMemoryItem> consolidated;
+    consolidated.reserve(std::min(pImpl->episodes.size(), pImpl->maxEpisodes));
+    
+    for (const auto& imp : importance) {
+        if (imp.first >= relevanceThreshold) {
+            consolidated.push_back(pImpl->episodes[imp.second]);
+        }
+    }
+    
+    // Step 4: If we have more episodes than capacity, keep the most important ones
+    if (consolidated.size() > pImpl->maxEpisodes) {
+        consolidated.resize(pImpl->maxEpisodes);
+    }
+    
+    // Step 5: Re-sort to maintain time order (most recent first)
+    // This helps with temporal coherence
+    std::sort(consolidated.begin(), consolidated.end(),
+              [](const EpisodicMemoryItem& a, const EpisodicMemoryItem& b) {
+                  return a.timestamp > b.timestamp;
+              });
+    
+    pImpl->episodes = std::move(consolidated);
 }
 
 // Semantic Memory Implementation

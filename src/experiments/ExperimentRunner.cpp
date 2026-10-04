@@ -9,9 +9,14 @@ struct ExperimentRunner::Impl {
     Impl() : globalSeed(42) {}
 };
 
-ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
-
-ExperimentRunner::~ExperimentRunner() = default;
+#include "ExperimentRunner.hpp"
+#include "Experiment.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <iostream>
+#include <chrono>
+#include <iomanip>
 
 std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
     auto exp = std::make_shared<Experiment>(name);
@@ -113,8 +118,71 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Write experiment metadata
+    file << "# NLM Experiment Results" << std::endl;
+    file << "# Generated: " << getCurrentTimestamp() << std::endl;
+    file << "# Global Seed: " << pImpl->globalSeed << std::endl;
+    file << std::endl;
+    
+    // Write each experiment
+    for (const auto& experiment : pImpl->experiments) {
+        file << "[Experiment: " << experiment->getName() << "]" << std::endl;
+        file << "Seed: " << experiment->getSeed() << std::endl;
+        file << "Start Step: " << experiment->getStartStep() << std::endl;
+        file << "End Step: " << experiment->getEndStep() << std::endl;
+        file << std::endl;
+        
+        // Write metrics
+        file << "Metrics:" << std::endl;
+        const auto& metrics = experiment->getMetrics();
+        for (const auto& metric : metrics) {
+            file << "  " << metric.first << ": " << metric.second << std::endl;
+        }
+        file << std::endl;
+        
+        // Write step data
+        file << "Step Data:" << std::endl;
+        const auto& steps = experiment->getStepData();
+        file << "  Step,Neurons,Synapses,FiringCount,AvgFiringRate" << std::endl;
+        for (const auto& step : steps) {
+            file << "  " << step.step << ","
+                 << step.neuronCount << ","
+                 << step.synapseCount << ","
+                 << step.firingCount << ","
+                 << step.avgFiringRate << std::endl;
+        }
+        file << std::endl;
+        
+        // Write notes
+        const auto& notes = experiment->getNotes();
+        if (!notes.empty()) {
+            file << "Notes:" << std::endl;
+            for (const auto& note : notes) {
+                file << "  - " << note << std::endl;
+            }
+            file << std::endl;
+        }
+    }
+    
+    file.close();
+    return true;
+}
+
+std::string ExperimentRunner::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    ss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
 }
 
 } // namespace nlm

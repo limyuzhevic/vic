@@ -5,6 +5,22 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <stdexcept>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <cctype>
+#include <map>
+
+// nlohmann/json support for JSON parsing
+#include <nlohmann/json.hpp>
+
+// yaml-cpp support for YAML parsing
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -55,14 +71,28 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/key-value formats)
     bool loadFromFile(const std::string& filepath);
+    bool loadFromJSON(const std::string& content);
+    bool loadFromYAML(const std::string& content);
+    bool loadFromKeyValue(const std::string& content);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Internal parsing helpers
+    bool parseJSON(const nlohmann::json& jsonData);
+    bool parseYAML(const YAML::Node& yamlData);
+    bool parseKeyValue(const std::string& content);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Helper function to convert JSON to config value
+    static ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+    
+    // Helper function to convert YAML node to config value
+    static ConfigValue yamlToConfigValue(const YAML::Node& yamlNode);
+    
+    // Helper function to convert config value to string
+    static std::string configValueToString(const ConfigValue& value);
+    
+    // Helper function to convert string to config value
+    static std::optional<ConfigValue> stringToConfigValue(const std::string& str);
     
     // Get values
     template<typename T>
