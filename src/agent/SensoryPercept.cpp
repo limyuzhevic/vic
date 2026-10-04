@@ -14,6 +14,8 @@ SensoryPercept::SensoryPercept()
     audio_.resize(0, 0.0f);
 }
 
+SensoryPercept::~SensoryPercept() = default;
+
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
     
