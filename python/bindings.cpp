@@ -416,6 +416,55 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Factory functions for common configurations
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    // Utility functions for common operations
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                             std::shared_ptr<AgentBrain> agent, int numSteps) {
+        world->reset();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            
+            auto motorCmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motorCmd, step * 0.001);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete simulation with brain, world, and agent");
+
+    // Brain configuration shortcuts
+    m.def("configureBrainForExperiment", [](std::shared_ptr<Config> config, 
+                                           size_t neuronCount = 1000,
+                                           float connectionProb = 0.1f) {
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", connectionProb);
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", 0.001);
+        
+        // Enable key subsystems
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+    }, py::arg("config"), py::arg("neuronCount") = 1000, py::arg("connectionProb") = 0.1f,
+       "Configure brain for typical experiment settings");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

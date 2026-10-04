@@ -2,7 +2,6 @@
 
 #include "../core/Types/Types.hpp"
 #include <vector>
-#include <array>
 
 namespace nlm {
 

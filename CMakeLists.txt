@@ -133,11 +133,29 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Interactive exploration tool
+add_executable(nlm_explore
+    src/experiments/nlm_explore.cpp
+)
+target_link_libraries(nlm_explore PUBLIC nlm_core nlm_agent nlm_world)
+
+# Performance benchmark tool
+add_executable(nlm_benchmark
+    src/experiments/nlm_benchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core nlm_agent nlm_world)
 
 # Testing
 enable_testing()

@@ -2,18 +2,19 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 class RandomGenerator;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
@@ -28,6 +29,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Action;
+class SensoryInput;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
