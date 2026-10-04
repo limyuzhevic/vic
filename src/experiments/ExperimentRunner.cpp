@@ -9,9 +9,18 @@ struct ExperimentRunner::Impl {
     Impl() : globalSeed(42) {}
 };
 
-ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
+ExperimentRunner::ExperimentRunner() : pImpl(std::make_unique<Impl>()) {}
 
-ExperimentRunner::~ExperimentRunner() = default;
+ExperimentRunner::ExperimentRunner(const ExperimentRunner& other) : pImpl(std::make_unique<Impl>(*other.pImpl)) {}
+
+ExperimentRunner::ExperimentRunner(ExperimentRunner&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+ExperimentRunner& ExperimentRunner::operator=(ExperimentRunner&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
     auto exp = std::make_shared<Experiment>(name);

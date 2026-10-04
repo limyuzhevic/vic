@@ -24,10 +24,13 @@ struct ExperimentLogger::Impl {
     }
 };
 
-ExperimentLogger::ExperimentLogger(const std::string& filename) 
-    : pImpl(new Impl(filename)) {}
+Phase3Experiment::Phase3Experiment() : pImpl(std::make_unique<Impl>()) {}
 
-ExperimentLogger::~ExperimentLogger() = default;
+Phase3Experiment::~Phase3Experiment() = default;
+
+Phase3Experiment::Phase3Experiment(const Phase3Experiment& other) : pImpl(std::make_unique<Impl>(*other.pImpl)) {}
+
+Phase3Experiment::Phase3Experiment(Phase3Experiment&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 void ExperimentLogger::log(const std::string& message) {
     if (pImpl->isOpen) {

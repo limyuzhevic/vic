@@ -10,9 +10,18 @@ struct Metrics::Impl {
     std::map<std::string, std::vector<double>> metrics;
 };
 
-Metrics::Metrics() : pImpl(new Impl) {}
+Metrics::Metrics() : pImpl(std::make_unique<Impl>()) {}
+
+Metrics::Metrics(Metrics&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Metrics::~Metrics() = default;
+
+Metrics& Metrics::operator=(Metrics&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 void Metrics::record(const std::string& name, double value) {
     pImpl->metrics[name].push_back(value);

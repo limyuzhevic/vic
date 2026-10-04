@@ -4,18 +4,23 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "0.5.0-wave5-enhanced"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) neural simulation framework with comprehensive documentation, simplified beginner API, and modern Python features"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Project", email = "contact@nlm-project.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = [
+    "neural", "simulation", "spiking", "brain", "learning",
+    "artificial intelligence", "neuroscience", "machine learning",
+    "agent-based modeling", "neural networks"
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +30,36 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Education",
+    "Framework :: Pytest",
 ]
-
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=0.5",
+    "myst-parser>=0.13",
+    "black>=22.0",
+    "isort>=5.0",
+    "flake8>=4.0",
+    "mypy>=0.950",
+]
+examples = [
+    "matplotlib>=3.0",
+    "jupyter>=1.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issue Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Example Gallery" = "https://github.com/nlm-project/nlm/tree/main/examples"
+"Wave 5 Documentation" = "https://github.com/nlm-project/nlm/tree/main/examples/advanced.md"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +68,130 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_TESTS=ON",
+    "-DNLM_ENABLE_PYTHON_EXAMPLES=ON",
+    "-DNLM_ENABLE_DOCUMENTATION=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_BUILD_PYTHON_BINDINGS = "ON"
+NLM_BUILD_WAVE5_EXAMPLES = "ON"
+NLM_BUILD_PYTHON_DOCS = "ON"
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --tb=no"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | examples
+  | tests
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = '''
+.*/
+  (\.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | examples
+  | tests
+)/
+'''
+
+[tool.coverage.run]
+source = ["pynlm", "examples"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/examples/*",
+    "*/docs/*",
+    "*/wave5/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == '__main__':",
+    "if __name__ == '__main__':",
+    "if __name__ == \"__main__\":",
+    "if __name__ == \"__main__\":",
+    "if typing.TYPE_CHECKING:",
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "class.*Test",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.pylint.messages_control]
+disable = ""
+
+[tool.pydocstyle]
+convention = "numpy"
+ignore = "D203,D212,D404,D406,D407"
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = ["E", "F", "W", "C90"]
+ignore = ["E501", "E203", "W503", "C901"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C90", "N", "D"]
+ignore = ["E501", "E203", "W503", "C901", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pynlm", "examples"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+quotes = ["single", "double"]
+
+[tool.ruff.format]
+quote-style = "double"
+skip-magic-trailing-comma = false

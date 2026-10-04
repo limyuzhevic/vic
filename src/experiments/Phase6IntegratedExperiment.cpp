@@ -6,6 +6,9 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <expected>
+#include <span>
+#include <optional>
 
 namespace nlm {
 

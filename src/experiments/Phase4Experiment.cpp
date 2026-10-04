@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <expected>
+#include <span>
+#include <optional>
 
 namespace nlm {
 

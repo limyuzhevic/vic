@@ -12,6 +12,8 @@ namespace nlm {
 class ExperimentRunner {
 public:
     ExperimentRunner();
+    ExperimentRunner(const ExperimentRunner& other);
+    ExperimentRunner(ExperimentRunner&& other) noexcept;
     ~ExperimentRunner();
     
     // Create new experiment
