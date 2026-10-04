@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+This guide covers the basics of using NLM (熙然), the Neural Learning Machine framework. It starts with simple examples and gradually introduces more advanced features.
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -70,8 +72,6 @@ for step in range(50):
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
-
----
 
 ## Simple Analogy
 
@@ -256,6 +256,118 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Examples
+
+### Advanced Project 1: Learning Brain
+
+```python
+import pynlm
+
+# Create a learning brain
+config = pynlm.createConfigWithPresets("development")
+brain = pynlm.createAdvancedBrain(config)
+brain.initialize()
+
+# Run learning simulation with reward
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run learning episode
+for step in range(500):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    action = agent.decodeMotorCommand()
+    result = world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward-based learning
+    agent.applyRewardModulation(result.reward, agent.getPredictionError())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: Reward = {result.reward}, Firing rate = {brain.getAverageFiringRate():.2f}")
+
+print("Learning complete! Brain adapted to environment.")
+```
+
+### Advanced Project 2: Network Analysis
+
+```python
+import pynlm
+
+# Create and run a complex simulation
+brain = pynlm.createAdvancedBrain(pynlm.createConfigWithPresets("research"))
+brain.initialize()
+
+# Run simulation and collect statistics
+print("Running simulation and collecting statistics...")
+for step in range(1000):
+    brain.step(step)
+
+# Analyze the brain network
+analysis = pynlm.analyzeBrainNetwork(brain)
+
+print("\n=== Advanced Brain Analysis ===")
+print(f"Total Neurons: {brain.getTotalNeuronCount()}")
+print(f"Total Synapses: {brain.getTotalSynapseCount()}")
+print(f"Connectivity Density: {analysis['connectivity_density']:.6f}")
+print(f"Activity Level: {analysis['activity_level']:.2%}")
+print(f"Average Firing Rate: {analysis['average_firing_rate']:.2f} Hz")
+print(f"Firing Neurons: {brain.getFiringNeuronCount()}")
+print(f"Active Neurons: {brain.getActiveNeuronCount()}")
+print(f"Total Spikes: {brain.getTotalSpikeCount()}")
+
+# Get performance statistics
+stats = pynlm.getBrainPerformanceStats(brain)
+print(f"\nPerformance Statistics:")
+print(f"Speed: {stats['simulationSpeed']:.2f} steps/sec")
+print(f"Memory Usage: {stats['memoryUsage']:.2f}%")
+```
+
+### Advanced Project 3: Batch Processing
+
+```python
+import pynlm
+
+# Create multiple brains for batch processing
+brains = [pynlm.createAdvancedBrain(pynlm.createConfigWithPresets("research"))
+          for _ in range(5)]
+
+# Initialize all brains
+for i, brain in enumerate(brains):
+    brain.initialize()
+    print(f"Brain {i+1} initialized with {brain.getTotalNeuronCount()} neurons")
+
+# Run batch learning simulation
+def trainBatch(brain_list):
+    print("Running batch learning...")
+    for step in range(100):
+        for i, brain in enumerate(brain_list):
+            brain.step(step)
+            
+            # Log progress every 25 steps
+            if step % 25 == 0:
+                stats = pynlm.analyzeBrainNetwork(brain)
+                print(f"  Brain {i+1}: {stats['total_spikes']:.0f} spikes, {stats['activity_level']:.2%} active")
+
+trainBatch(brains)
+
+# Compare results
+print("\n=== Batch Results ===")
+for i, brain in enumerate(brains):
+    analysis = pynlm.analyzeBrainNetwork(brain)
+    print(f"Brain {i+1}: {analysis['total_spikes']:.0f} spikes, {analysis['activity_level']:.2%} activity")
+```
+
+---
+
 ## Quick Reference
 
 | What you want | Code |
@@ -285,13 +397,35 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"My simulation is too slow"**
+- Try using a production configuration: `pynlm.createConfigWithPresets("production")`
+- Reduce the number of neurons if possible
+- Monitor performance with `pynlm.getBrainPerformanceStats()`
+
+**"I need more features"**
+- Try the advanced examples above
+- Check the advanced usage guide for power user features
+- Consider using batch processing for multiple simulations
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for more detailed technical information
+2. **Read `docs/ARCHITECTURE.md`** to understand how it all works
+3. **Experiment with different configurations!**
+4. **Try the advanced examples** in the advanced usage guide
+5. **Join the research community** to share your discoveries
+
+## Safety and Best Practices
+
+- Always initialize brains before use
+- Monitor simulation time and memory usage
+- Use try-catch blocks for error handling
+- Save brain states periodically during long simulations
+- Validate configuration parameters before running
+- Test with small configurations first
+
+That's it! You're now ready to use NLM. Whether you're doing simple demonstrations, complex research, or building intelligent agents, NLM provides the tools you need for neural simulation and learning.
