@@ -353,6 +353,56 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 7) == "--seed") {
+            // Handle seed parameter
+            if (arg.find('=') != std::string::npos) {
+                int64_t seed = std::stoll(arg.substr(arg.find('=') + 1));
+                config->set("random_seed", seed, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                int64_t seed = std::stoll(argv[++i]);
+                config->set("random_seed", seed, ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 10) == "--neuron-count") {
+            // Handle neuron count
+            if (arg.find('=') != std::string::npos) {
+                size_t neuronCount = std::stoull(arg.substr(arg.find('=') + 1));
+                config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                size_t neuronCount = std::stoull(argv[++i]);
+                config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 10) == "--timestep") {
+            // Handle timestep
+            if (arg.find('=') != std::string::npos) {
+                double timestep = std::stod(arg.substr(arg.find('=') + 1));
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                double timestep = std::stod(argv[++i]);
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 10) == "--region-count") {
+            // Handle region count
+            if (arg.find('=') != std::string::npos) {
+                size_t regionCount = std::stoull(arg.substr(arg.find('=') + 1));
+                config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                size_t regionCount = std::stoull(argv[++i]);
+                config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 7) == "--help" || arg == "-h") {
+            printBanner();
+            std::cout << "\nUsage: " << argv[0] << " [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  --config=file.cfg    Load configuration from file\n";
+            std::cout << "  --config file.cfg    (alternative format)\n";
+            std::cout << "  --seed=NUMBER        Set random seed (default: 42)\n";
+            std::cout << "  --neuron-count=NUMBER Set number of neurons (default: 500)\n";
+            std::cout << "  --timestep=NUMBER    Set simulation timestep in seconds (default: 0.001)\n";
+            std::cout << "  --region-count=NUMBER Set number of brain regions (default: 1)\n";
+            std::cout << "  --help, -h           Show this help message\n\n";
+            std::cout << "Example:\n";
+            std::cout << "  " << argv[0] << " --config=myconfig.cfg --neuron-count=1000 --seed=123\n";
+            return 0;
         }
     }
     
@@ -366,21 +416,41 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (only if not already set from command line)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!config->has("stdp_ltp_weight")) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_ltd_weight")) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_tau")) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->has("synaptogenesis_rate")) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (!config->has("pruning_rate")) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

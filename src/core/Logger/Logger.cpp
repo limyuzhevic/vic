@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <ctime>
 
 namespace nlm {
 
@@ -32,9 +33,8 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add thread-safe timestamp
+    oss << getCurrentTimestamp() << " ";
     
     oss << " " << entry.message;
     
@@ -100,6 +100,32 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
         case LogLevel::Critical: return "\033[35m"; // Magenta
         default: return "\033[0m";
     }
+}
+
+// Thread-safe timestamp generation
+time_t getCurrentTime() {
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    return std::chrono::system_clock::to_time_t(now);
+}
+
+std::string getCurrentTimestamp() {
+    time_t now = getCurrentTime();
+    
+    // Thread-safe localtime conversion
+    // Use thread_local buffer to avoid static buffer issues
+    thread_local char buffer[100];
+    std::tm tm_buf;
+    
+    // Platform-specific thread-safe conversion
+#ifdef _WIN32
+    localtime_s(&tm_buf, &now);
+#else
+    // On non-Windows, use localtime_r for thread safety
+    localtime_r(&now, &tm_buf);
+#endif
+    
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm_buf);
+    return std::string(buffer);
 }
 
 // Logger class implementation
