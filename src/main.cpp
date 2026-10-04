@@ -159,17 +159,20 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain, bool verbose = false) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_INFO("  ERROR: No regions found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_INFO("  ERROR: No neurons found in region!");
         return;
     }
     
@@ -190,21 +193,47 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
+    if (verbose) {
+        NLM_LOG_INFO("  Neuron details (first 5):");
+        for (size_t i = 0; i < std::min(size_t(5), neurons.size()); ++i) {
+            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                        " thresh=" + std::to_string(neurons[i]->getThreshold()) +
+                        " refrac=" + std::to_string(neurons[i]->getRefractoryRemaining()) +
+                        " lastSpike=" + std::to_string(neurons[i]->getState().lastSpikeTime));
+        }
+    }
+    
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+        if (verbose) {
+            for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()) +
+                            " refrac=" + std::to_string(neurons[i]->getRefractoryRemaining()) +
+                            " lastSpike=" + std::to_string(neurons[i]->getState().lastSpikeTime));
+            }
         }
     }
+    
+    // Network statistics
+    size_t totalNeurons = brain->getTotalNeuronCount();
+    size_t firingNeurons = brain->getFiringNeuronCount();
+    NLM_LOG_INFO("  Network stats: total_neurons=" + std::to_string(totalNeurons) + 
+                 " firing_neurons=" + std::to_string(firingNeurons) +
+                 " (" + std::to_string(firingNeurons * 100.0 / totalNeurons) + "%)");
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runPlasticityExperiment(std::shared_ptr<Brain> brain, bool verbose = false) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    
+    if (verbose) {
+        NLM_LOG_INFO("Starting plasticity experiment with Hebbian and STDP mechanisms...");
+    }
     
     LearningExperiment experiment(brain, 42);
     
@@ -222,6 +251,10 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
+    if (verbose) {
+        NLM_LOG_INFO("Input pattern: injecting 30.0mV current to 20 sensory neurons every step");
+    }
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
@@ -235,6 +268,11 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            
+            if (verbose && step % 300 == 0) {
+                NLM_LOG_INFO("    Detailed activity: active neurons=" + std::to_string(brain->getActiveNeuronCount()) +
+                            " avg_firing_rate=" + std::to_string(brain->getAverageFiringRate()));
+            }
         }
     }
     
@@ -243,11 +281,19 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Compute and display statistics
     experiment.computeStatistics();
+    
+    if (verbose) {
+        NLM_LOG_INFO("Plasticity experiment completed with enhanced logging enabled.");
+    }
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void runStdpVerification(std::shared_ptr<Brain> brain, bool verbose = false) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    
+    if (verbose) {
+        NLM_LOG_INFO("Running STDP verification experiment with pre-before-post spike timing...");
+    }
     
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
@@ -259,6 +305,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         return;
     }
     
+    if (verbose) {
+        NLM_LOG_INFO("  Found " + std::to_string(synapses.size()) + " synapses in region");
+        NLM_LOG_INFO("  STDP configuration: LTP weight=0.02, LTD weight=0.015, tau=20ms");
+    }
+    
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
     // Record initial weights
@@ -267,12 +318,23 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
+        
+        if (verbose) {
+            NLM_LOG_INFO("      Plasticity flags: STDP=" + std::to_string(synapses[i]->getPlasticityFlags().stdp) +
+                        " Hebbian=" + std::to_string(synapses[i]->getPlasticityFlags().hebbian) +
+                        " Structural=" + std::to_string(synapses[i]->getPlasticityFlags().structural));
+        }
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
+    
+    if (verbose) {
+        NLM_LOG_INFO("  Experiment design: 50 trials of pre-before-post spike timing");
+        NLM_LOG_INFO("  Pre-synaptic neuron injects 60mV at time t, post-synaptic at t+1 timestep");
+    }
     
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
@@ -293,6 +355,12 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
             // Then post fires
             postNeuron->injectCurrent(60.0f);
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            
+            if (verbose && trial % 10 == 0) {
+                NLM_LOG_INFO("    Trial " + std::to_string(trial) + 
+                            " | Pre neuron V=" + std::to_string(preNeuron->getMembranePotential()) +
+                            " | Post neuron V=" + std::to_string(postNeuron->getMembranePotential()));
+            }
         }
     }
     
@@ -301,8 +369,20 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
+        
+        if (verbose) {
+            float currentWeight = synapses[i]->getWeight();
+            float normalizedWeight = (currentWeight + 1.0f) / 2.0f; // Normalize to [0,1]
+            if (normalizedWeight < 0.33f) {
+                NLM_LOG_INFO("      Weight status: LOW (<33% of range)");
+            } else if (normalizedWeight < 0.66f) {
+                NLM_LOG_INFO("      Weight status: MEDIUM (33-66% of range)");
+            } else {
+                NLM_LOG_INFO("      Weight status: HIGH (>66% of range)");
+            }
+        }
     }
     
     // Check if weights increased (LTP)
@@ -313,16 +393,87 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     NLM_LOG_INFO("");
     if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation (total Δ=" + std::to_string(totalDelta) + ")");
     } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+        NLM_LOG_INFO("  ! STDP reversed: Check parameters (total Δ=" + std::to_string(totalDelta) + ")");
     } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_INFO("  ! No change: STDP may not be triggering (total Δ=" + std::to_string(totalDelta) + ")");
+    }
+    
+    if (verbose) {
+        NLM_LOG_INFO("  STDP experiment completed with enhanced logging.");
+        if (std::abs(totalDelta) > 0.001f) {
+            NLM_LOG_INFO("  SUCCESS: Hebbian learning through spike timing demonstrated!");
+        } else {
+            NLM_LOG_INFO("  NOTE: May need additional trials or different parameters.");
+        }
+    }
+}
+
+void printUsage() {
+    std::cout << "Usage: nlm [options]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help, -h                 Show this help message\n";
+    std::cout << "  --test1-only              Run only basic connectivity test\n";
+    std::cout << "  --test2-only              Run only plasticity learning experiment\n";
+    std::cout << "  --test3-only              Run only STDP verification test\n";
+    std::cout << "  --all-tests               Run all tests (default)\n";
+    std::cout << "  --verbose, -v             Enable verbose output with detailed neuron information\n";
+    std::cout << "  --neuron-count N          Set number of neurons (default: 500)\n";
+    std::cout << "  --plasticity-steps N      Set plasticity experiment steps (default: 1000)\n";
+    std::cout << "  --stdp-steps N            Set STDP verification steps (default: 50)\n";
+    std::cout << "\nExamples:\n";
+    std::cout << "  nlm                           Run all tests with verbose output\n";
+    std::cout << "  nlm --test1-only --verbose    Run only basic connectivity test with details\n";
+    std::cout << "  nlm --neuron-count 2000       Use larger network for testing\n";
+}
+
+void parseCommandLineArgs(int argc, char** argv, bool& test1, bool& test2, bool& test3, bool& verbose) {
+    // Default: run all tests
+    test1 = test2 = test3 = true;
+    verbose = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Boolean flags
+        if (arg == "--test1-only") {
+            test1 = true;
+            test2 = test3 = false;
+        } else if (arg == "--test2-only") {
+            test2 = true;
+            test1 = test3 = false;
+        } else if (arg == "--test3-only") {
+            test3 = true;
+            test1 = test2 = false;
+        } else if (arg == "--all-tests") {
+            test1 = test2 = test3 = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--help" || arg == "-h") {
+            // Will be handled in main()
+            return;
+        }
     }
 }
 
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Parse command line arguments
+    bool test1 = true, test2 = true, test3 = true;
+    bool verbose = false;
+    
+    // Check for help first
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+    }
+    
+    parseCommandLineArgs(argc, argv, test1, test2, test3, verbose);
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -410,19 +561,19 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    runBasicConnectivityTest(brain, verbose);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    runPlasticityExperiment(brain, verbose);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
-    runStdpVerification(brain);
+    runStdpVerification(brain, verbose);
     
     // Final brain status
     NLM_LOG_INFO("");
