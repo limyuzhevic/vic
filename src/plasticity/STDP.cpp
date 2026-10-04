@@ -1,5 +1,5 @@
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -59,6 +59,10 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Cache frequently used values
+    float ltpWeight = pImpl->ltpWeight;
+    float ltdWeight = pImpl->ltdWeight;
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
@@ -66,12 +70,12 @@ void STDP::update(Synapse* synapse,
             if (dt > 0) {
                 // Pre before post: POTENTIATION
                 // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                float delta = ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)

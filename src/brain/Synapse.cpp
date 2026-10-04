@@ -197,7 +197,8 @@ void Synapse::step(Timestamp currentTime) {
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Timestep parameter not used in current implementation
+    TimestepDuration dt = 0.001f;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
@@ -205,15 +206,16 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Decay short-term depression - optimized calculation
+    float timeSinceActivity = 0.0f;
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        timeSinceActivity = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+    } else if (pImpl->lastPreSpikeTime >= 0.0f) {
+        timeSinceActivity = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
     }
+    
+    // Single exponential decay calculation
+    pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
@@ -248,7 +250,7 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(static_cast<uint32_t>(1), static_cast<uint32_t>(5)));
     
     // Initialize short-term plasticity state
     pImpl->shortTermDepression = 1.0f;  // Fully recovered

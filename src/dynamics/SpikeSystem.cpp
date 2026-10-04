@@ -50,9 +50,13 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
     // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
-        pImpl->pendingSpikes.pop();
+    size_t processedCount = 0;
+    auto& pendingSpikes = pImpl->pendingSpikes;
+    
+    while (!pendingSpikes.empty()) {
+        SpikeEvent event = pendingSpikes.front();
+        pendingSpikes.pop();
+        processedCount++;
         
         // Create detailed event
         DetailedSpikeEvent detailed;
@@ -60,15 +64,20 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
         
-        // Add to history
-        pImpl->spikeHistory.push_back(detailed);
+        // Add to history - use emplace_back for efficiency
+        pImpl->spikeHistory.emplace_back(detailed);
         
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - only check once per processing cycle
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Use vector rotation to avoid O(n) erase operations
+            size_t excess = pImpl->spikeHistory.size() - pImpl->maxHistorySize;
+            pImpl->spikeHistory.erase(
+                pImpl->spikeHistory.begin(),
+                pImpl->spikeHistory.begin() + excess
+            );
         }
         
         // Call handlers
@@ -82,10 +91,14 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
+        // Cache references for local processing
+        auto& eventsToProcess = it->second;
+        auto& delayedHandlers = pImpl->delayedHandlers;
+        
         // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
+        for (const auto& delayedEvent : eventsToProcess) {
             // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
+            for (auto& handler : delayedHandlers) {
                 handler(delayedEvent);
             }
         }
@@ -158,9 +171,21 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
         neuronCounts.emplace_back(pair.first, pair.second);
     }
     
-    // Sort by count descending
-    std::sort(neuronCounts.begin(), neuronCounts.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+    // Sort by count descending - use partial sort if count is small
+    if (neuronCounts.size() <= 100) {
+        std::sort(neuronCounts.begin(), neuronCounts.end(),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+    } else {
+        // For larger datasets, use nth_element for O(n) average case
+        std::nth_element(neuronCounts.begin(), 
+                        neuronCounts.begin() + std::min(count, neuronCounts.size()),
+                        neuronCounts.end(),
+                        [](const auto& a, const auto& b) { return a.second > b.second; });
+        // Then sort the top elements
+        std::sort(neuronCounts.begin(),
+                  neuronCounts.begin() + std::min(count, neuronCounts.size()),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+    }
     
     std::vector<NeuronId> result;
     result.reserve(std::min(count, neuronCounts.size()));

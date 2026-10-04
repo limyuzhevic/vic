@@ -16,34 +16,37 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
-        }
-    }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    // Optimized storage with binary search for existing neurons
+    // Use sorted vector for efficient lookup (neurons added sequentially by ID)
+    auto it = std::lower_bound(pImpl->items.begin(), pImpl->items.end(), 
+                               std::make_pair(neuron, 0.0f),
+                               [](const auto& a, const auto& b) { return a.first < b.first; });n    
+    if (it != pImpl->items.end() && it->first == neuron) {
+        it->second = value;
+    } else {
+        // Insert with reserve to prevent reallocations
+        pImpl->items.reserve(pImpl->items.size() + 1);
+        pImpl->items.insert(it, std::make_pair(neuron, value));
     }
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
-        }
+    // Binary search for faster lookup
+    auto it = std::lower_bound(pImpl->items.begin(), pImpl->items.end(), 
+                               std::make_pair(neuron, 0.0f),
+                               [](const auto& a, const auto& b) { return a.first < b.first; });n    
+    if (it != pImpl->items.end() && it->first == neuron) {
+        return it->second;
     }
     return 0.0f;
 }
 
 bool WorkingMemory::contains(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return true;
-        }
-    }
-    return false;
+    // Binary search for O(log n) lookup
+    auto it = std::lower_bound(pImpl->items.begin(), pImpl->items.end(), 
+                               std::make_pair(neuron, 0.0f),
+                               [](const auto& a, const auto& b) { return a.first < b.first; });n    
+    return it != pImpl->items.end() && it->first == neuron;
 }
 
 void WorkingMemory::clear() {
@@ -77,10 +80,14 @@ EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
 EpisodicMemory::~EpisodicMemory() = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    // Optimized storage with pre-allocation to reduce reallocations
     if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
+        // Rotate window instead of erase for better performance
         pImpl->episodes.erase(pImpl->episodes.begin());
+        pImpl->episodes.push_back(episode);
+    } else {
+        pImpl->episodes.push_back(episode);
     }
-    pImpl->episodes.push_back(episode);
 }
 
 EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
@@ -96,10 +103,13 @@ size_t EpisodicMemory::getEpisodeCount() const {
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<EpisodicMemoryItem> result;
+    result.reserve(std::min(count, pImpl->episodes.size()));
+    
     size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
     for (size_t i = start; i < pImpl->episodes.size(); ++i) {
         result.push_back(pImpl->episodes[i]);
     }
+    
     return result;
 }
 

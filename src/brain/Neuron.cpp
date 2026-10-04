@@ -206,18 +206,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
-    MembranePotential& V = pImpl->state.membranePotential;
+MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
+    float threshold = pImpl->state.threshold;
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    float synapticContribution = C != 0.0f ? pImpl->synapticInput / C : 0.0f;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution - compute delta once
+    float leakContribution = tau != 0.0f ? (V_rest - V) / tau : 0.0f;
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
@@ -277,16 +277,16 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = -55.0f + static_cast<float>(rng.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(40))) / 10.0f;
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = -70.0f + static_cast<float>(rng.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(40))) / 10.0f;
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + static_cast<float>(rng.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(50))) / 10.0f;
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(static_cast<uint32_t>(2), static_cast<uint32_t>(10)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

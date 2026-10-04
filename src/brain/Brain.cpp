@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -879,7 +878,7 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.firingState.size()) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
+                        if (idx < neuronData.refractoryRemaining.size() && idx < neuronData.refractoryPeriod.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
                     }
