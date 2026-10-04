@@ -5,19 +5,20 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include <iostream>
 
 namespace py = pybind11;
 namespace nlm {
+
+// Forward declarations for helper functions
+py::dict getBrainStats(const Brain& brain);
+py::dict getIntegrationStatus(const Brain& brain);
+std::shared_ptr<Brain> createAdvancedBrain(const std::shared_ptr<Config>& config, 
+                                           const py::dict& options);
+void demonstrateAdvancedLearning(std::shared_ptr<Brain>& brain, 
+                                 std::shared_ptr<SimpleWorld>& world,
+                                 std::shared_ptr<AgentBrain>& agent,
+                                 size_t steps);
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -29,6 +30,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // === BASIC IDENTIFIER CLASSES ===
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,6 +75,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // === ENUMERATIONS ===
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -142,6 +145,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // === CONFIGURATION SYSTEM ===
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -164,6 +168,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // === SENSORY INPUT ===
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +203,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // === MOTOR ===
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -209,6 +215,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getName", &Action::getName)
         .def("clone", &Action::clone);
 
+    // === WORLD ===
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
         .def(py::init<float, float, WorldObjectType, float, float>(),
@@ -245,6 +252,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    // === PERCEPTUAL SYSTEM ===
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -289,6 +297,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // === BRAIN ===
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,8 +360,13 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("getLearningStatistics", &getBrainStats,
+             "Get comprehensive brain statistics")
+        .def("getIntegrationStatus", &getIntegrationStatus,
+             "Get integration status of all brain systems");
 
+    // === AGENT BRAIN ===
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,6 +414,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // === FACTORY FUNCTIONS ===
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -407,6 +422,10 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createAdvancedBrain", &createAdvancedBrain,
+         py::arg("config"), py::arg("options") = py::dict(),
+         "Create a brain with advanced configuration and optimizations");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -416,10 +435,151 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // === UTILITY FUNCTIONS ===
+    m.def("demonstrateLearning", &demonstrateAdvancedLearning,
+         py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 1000,
+         "Run a comprehensive learning demonstration");
+
+    m.def("runPhase6Demo", &demonstrateAdvancedLearning,
+          py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 1000,
+          "Run Phase 6 integration demo (equivalent to ./nlm_phase6_demo)");
+
+    // === CONSTANTS ===
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // === ERROR HANDLING ===
+    py::register_exception_translator([](std::exception& e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+    });
+}
+
+// === HELPER FUNCTIONS ===
+
+py::dict getBrainStats(const Brain& brain) {
+    py::dict stats;
+    stats["total_neurons"] = brain.getTotalNeuronCount();
+    stats["total_synapses"] = brain.getTotalSynapseCount();
+    stats["active_neurons"] = brain.getActiveNeuronCount();
+    stats["firing_neurons"] = brain.getFiringNeuronCount();
+    stats["average_firing_rate"] = brain.getAverageFiringRate();
+    stats["total_spikes"] = brain.getTotalSpikeCount();
+    stats["excitatory_inhibition_ratio"] = brain.getExcitationInhibitionRatio();
+    stats["developmental_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+    return stats;
+}
+
+py::dict getIntegrationStatus(const Brain& brain) {
+    py::dict status;
+    status["memory_system"] = brain.getWorkingMemoryStats();
+    status["prediction_system"] = brain.getPredictionSystemStats();
+    status["cognition_system"] = brain.getCognitionSystemStats();
+    status["neuromodulation_system"] = brain.getNeuromodulationStats();
+    status["plasticity_systems"] = brain.getPlasticitySystemStats();
+    status["development_system"] = brain.getDevelopmentSystemStats();
+    status["overall_integration"] = brain.getIntegrationScore();
+    return status;
+}
+
+std::shared_ptr<Brain> createAdvancedBrain(const std::shared_ptr<Config>& config, 
+                                           const py::dict& options) {
+    auto brain = std::make_shared<Brain>(config);
+    
+    // Apply advanced configuration options
+    if (options.contains("enable_reward_modulation")) {
+        bool enable = options["enable_reward_modulation"].cast<bool>();
+        if (auto agentBrain = brain->getAgentBrain()) {
+            agentBrain->enableRewardModulation(enable);
+        }
+    }
+    
+    if (options.contains("enable_structural_plasticity")) {
+        bool enable = options["enable_structural_plasticity"].cast<bool>();
+        if (auto agentBrain = brain->getAgentBrain()) {
+            agentBrain->enableStructuralPlasticity(enable);
+        }
+    }
+    
+    if (options.contains("enable_development")) {
+        bool enable = options["enable_development"].cast<bool>();
+        if (auto agentBrain = brain->getAgentBrain()) {
+            agentBrain->enableDevelopment(enable);
+        }
+    }
+    
+    if (options.contains("enable_curiosity")) {
+        bool enable = options["enable_curiosity"].cast<bool>();
+        if (auto agentBrain = brain->getAgentBrain()) {
+            agentBrain->enableCuriosity(enable);
+        }
+    }
+    
+    if (options.contains("num_regions")) {
+        size_t numRegions = options["num_regions"].cast<size_t>();
+        for (size_t i = 0; i < numRegions; ++i) {
+            brain->addRegion("Region_" + std::to_string(i));
+        }
+    }
+    
+    return brain;
+}
+
+void demonstrateAdvancedLearning(std::shared_ptr<Brain>& brain, 
+                                 std::shared_ptr<SimpleWorld>& world,
+                                 std::shared_ptr<AgentBrain>& agent,
+                                 size_t steps) {
+    // Initialize systems
+    brain->initialize();
+    world->configure(100, 100, 20, 20);
+    world->reset();
+    agent->initialize(*world);
+    
+    // Enable advanced features
+    agent->enableRewardModulation(true);
+    agent->enableStructuralPlasticity(true);
+    agent->enableDevelopment(true);
+    agent->enableCuriosity(true);
+    
+    // Run learning simulation
+    for (size_t step = 0; step < steps; ++step) {
+        // World dynamics
+        world->update(0.1);
+        
+        // Get sensory input
+        auto percept = world->getSensoryPercept();
+        
+        // Process sensory input
+        agent->processSensoryInput(percept);
+        
+        // Brain processing
+        brain->step(step, step * 0.1);
+        
+        // Get action from brain
+        auto action = agent->decodeMotorCommand();
+        
+        // Apply action in world
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        // Apply reward modulation based on action results
+        if (step % 10 == 0) {
+            float reward = (world->getAgentBody().energy > 50.0f) ? 1.0f : -0.1f;
+            float predictedReward = agent->getNeuromodulationLevel();
+            agent->applyRewardModulation(reward, predictedReward);
+        }
+        
+        // Update development
+        agent->updateDevelopment(0.1);
+        
+        // Print progress
+        if (step % 100 == 0) {
+            std::cout << "Step " << step << ": "
+                     << brain->getFiringNeuronCount() << " neurons firing, "
+                     << brain->getTotalSpikeCount() << " total spikes, "
+                     << "Development: " << static_cast<int>(agent->getDevelopmentalStage()) << std::endl;
+        }
+    }
 }
 
 } // namespace nlm

@@ -33,12 +33,17 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "pybind11>=2.11.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+
+[project.scripts]
+nlm-python = "python.main:run_cli"
+nlm-explore = "python.explorer:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +52,21 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = "ON"
+
+[tool.scikit-build.cmake.link]
+nlm_core = "nlm"
+nlm_agent = "agent"
+nlm_world = "world"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+

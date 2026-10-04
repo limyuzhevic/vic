@@ -127,6 +127,26 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Python bindings executable (for development/testing)
+add_executable(pynlm_python
+    python/bindings.cpp
+)
+target_include_directories(pynlm_python PRIVATE python)
+target_link_libraries(pynlm_python PUBLIC nlm_core nlm_agent nlm_world)
+
+# Python bindings library for installation
+add_library(pynlm_bindings SHARED
+    python/bindings.cpp
+)
+target_include_directories(pynlm_bindings PRIVATE python)
+target_link_libraries(pynlm_bindings PUBLIC nlm_core nlm_agent nlm_world)
+set_target_properties(pynlm_bindings PROPERTIES
+    OUTPUT_NAME "pynlm_enhanced"
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
