@@ -81,6 +81,11 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
     
+    // Apply developmental effects to brain systems
+    if (brain) {
+        applyToBrain(brain, dt);
+    }
+    
     // Auto-advance stage based on developmental age
     // These thresholds are in simulation seconds
     if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
@@ -89,6 +94,115 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
         advanceStage();
     } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
         advanceStage();
+    }
+}
+
+void DevelopmentSystem::applyToBrain(Brain* brain, TimestepDuration dt) {
+    if (!brain) return;
+    
+    // Get developmental stage effects
+    float plasticityMod = getPlasticityModifier();
+    float excitabilityMod = getExcitabilityModifier();
+    float attentionMod = getAttentionModifier();
+    float memoryMod = getMemoryConsolidationModifier();
+    
+    // Apply to plasticity systems
+    if (auto* stdp = brain->getSTDP()) {
+        // Modulate STDP parameters based on developmental stage
+        float currentLtp = stdp->getLTPWeight();
+        float currentLtd = stdp->getLTDWeight();
+        
+        // In early development, enhance plasticity
+        stdp->setLTPWeight(currentLtp * plasticityMod);
+        stdp->setLTDWeight(currentLtd * plasticityMod);
+    }
+    
+    if (auto* hebbian = brain->getHebbian()) {
+        // Hebbian learning also modulated by development
+        // (Hebbian implementation would need to be enhanced)
+    }
+    
+    if (auto* structural = brain->getStructuralPlasticity()) {
+        // Structural plasticity rate affected by development
+        float synaptogenesisRate = 0.0001f * plasticityMod;
+        float pruningRate = 0.00001f * (2.0f - plasticityMod);
+        structural->setSynaptogenesisRate(synaptogenesisRate);
+        structural->setPruningRate(pruningRate);
+    }
+    
+    // Apply to neuromodulation
+    if (auto* dopamine = brain->getDopamine()) {
+        // Dopamine level affected by development
+        float currentDA = dopamine->getLevel();
+        dopamine->setLevel(currentDA * (1.0f + (1.0f - plasticityMod) * 0.2f));
+    }
+    
+    if (auto* acetylcholine = brain->getAcetylcholine()) {
+        // ACh affects attention development
+        float currentACh = acetylcholine->getLevel();
+        acetylcholine->setLevel(currentACh * attentionMod);
+    }
+    
+    if (auto* norepinephrine = brain->getNorepinephrine()) {
+        // NE affects arousal and stress response
+        float currentNE = norepinephrine->getLevel();
+        norepinephrine->setLevel(currentNE * excitabilityMod);
+    }
+    
+    if (auto* serotonin = brain->getSerotonin()) {
+        // Serotonin affects mood and social development
+        float current5HT = serotonin->getLevel();
+        serotonin->setLevel(current5HT * moodMod);
+    }
+    
+    // Apply to neural excitability (like neuromodulators)
+    float totalExcitability = excitabilityMod;
+    for (auto& region : brain->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Developmental excitability modulation
+                if (totalExcitability > 1.0f) {
+                    neuron->injectCurrent(totalExcitability * 0.1f);
+                }
+            }
+        }
+    }
+    
+    // Apply to memory systems
+    if (auto* workingMem = brain->getWorkingMemory()) {
+        // Working memory capacity affected by development
+        int capacity = static_cast<int>(300 * plasticityMod);
+        workingMem->setCapacity(capacity);
+    }
+    
+    if (auto* episodicMem = brain->getEpisodicMemory()) {
+        // Episodic memory consolidation affected by development
+        float consolidationRate = memoryMod * 0.2f;
+        episodicMem->setConsolidationRate(consolidationRate);
+    }
+    
+    // Apply to attention system
+    if (auto* attention = brain->getAttention()) {
+        // Attention modulation through development
+        attention->setInhibitionStrength(0.5f * (1.0f - attentionMod));
+        attention->setExcitationStrength(1.5f * attentionMod);
+    }
+    
+    // Apply to prediction system
+    if (auto* prediction = brain->getPredictionSystem()) {
+        // Prediction system affects developmental learning
+        // (Implementation would depend on prediction system interface)
+    }
+    
+    // Apply to cognition systems
+    if (auto* planner = brain->getPlanner()) {
+        // Planning complexity affected by development
+        planner->setPlanningDepth(static_cast<int>(5 * plasticityMod));
+    }
+    
+    if (auto* conceptFormation = brain->getConceptFormation()) {
+        // Concept formation affected by development
+        // (Implementation would depend on concept formation interface)
     }
 }
 

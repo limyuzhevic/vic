@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -124,11 +127,14 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
+ // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -255,9 +261,14 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+        // Initialize neuromodulation
+    pImpl->dopamine->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->novelty->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -406,7 +417,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+        // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -417,7 +428,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update prediction error
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+    }
+    
+    // Update dopamine (reward and reinforcement)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -435,6 +451,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
+            }
+        }
+    }
+    
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on neural processing
+        // ACh enhances attention and memory consolidation
+        float achLevel = pImpl->acetylcholine->getLevel();
+        float attentionMod = pImpl->acetylcholine->getAttentionFocusFactor();
+        
+        // Modulate attention on sensory neurons
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (attentionMod > 1.0f) {
+                // ACh increases sensory neuron responsiveness
+                neuron->injectCurrent(achLevel * 0.5f);
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on arousal and stress
+        float neLevel = pImpl->norepinephrine->getLevel();
+        float arousalMod = pImpl->norepinephrine->getArousalLevel();
+        
+        // Modulate overall neural excitability
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // NE increases alertness and reduces threshold for firing
+                    float arousalEffect = neLevel * 0.3f * arousalMod;
+                    if (arousalEffect > 0.0f) {
+                        neuron->injectCurrent(arousalEffect);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood and social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on mood and impulse control
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        float moodMod = pImpl->serotonin->getMoodModifier();
+        float impulseControl = pImpl->serotonin->getImpulseControl();
+        // Modulate motivation and reward sensitivity
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (moodMod > 1.0f) {
+                // Serotonin improves mood-related motivation
+                neuron->injectCurrent(serotoninLevel * 0.3f);
             }
         }
     }
