@@ -191,6 +191,12 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate input parameters
+    if (dt <= 0.0f) {
+        NLM_LOG_ERROR("Invalid timestep " + std::to_string(dt) + " in Neuron::stepLIF");
+        return false;
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -213,11 +219,34 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate neuron parameters
+    if (std::isnan(V) || std::isinf(V)) {
+        NLM_LOG_ERROR("Invalid membrane potential in Neuron::stepLIF");
+        V = V_rest;  // Reset to valid state
+    }
+    
+    if (std::isnan(V_rest) || std::isinf(V_rest)) {
+        NLM_LOG_ERROR("Invalid resting potential in Neuron::stepLIF");
+        V_rest = -70.0f;  // Default reasonable value
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
+    // Check for NaN or infinite synaptic contribution
+    if (std::isnan(synapticContribution) || std::isinf(synapticContribution)) {
+        NLM_LOG_ERROR("Invalid synaptic contribution in Neuron::stepLIF");
+        synapticContribution = 0.0f;
+    }
+    
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
+    
+    // Check for NaN or infinite leak contribution
+    if (std::isnan(leakContribution) || std::isinf(leakContribution)) {
+        NLM_LOG_ERROR("Invalid leak contribution in Neuron::stepLIF");
+        leakContribution = 0.0f;
+    }
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);

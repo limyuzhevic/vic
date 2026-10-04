@@ -47,6 +47,67 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// The Brain class represents the core artificial neural substrate in NLM Phase 6.
+// It integrates multiple specialized systems into a coherent, functioning brain:
+// - Real LIF neuron dynamics with event-driven spike propagation
+// - Multiple memory systems (Working, Episodic, Associative)
+// - Prediction system for forward models and error computation
+// - Cognitive systems (Planning, Concept Formation, Attention)
+// - Neuromodulation systems (Dopamine, Curiosity, Novelty, Prediction Error)
+// - Structural plasticity for developmental changes
+// - Plasticity rules (STDP, Hebbian) for learning
+// 
+// The brain operates as a closed-loop system receiving sensory input,
+// generating motor output, and learning from reward prediction errors.
+// All components are tightly integrated through a common simulation framework.
+// 
+// Key features:
+// - Event-driven simulation with precise spike timing
+// - Modular architecture allowing for easy extension
+// - Comprehensive logging and status monitoring
+// - Checkpoint/save-load functionality for persistent state
+// - Developmental stages affecting plasticity rates and connectivity
+// - Memory consolidation and replay during rest/sleep cycles
+// 
+// Usage:
+// 1. Create brain with configuration: Brain brain(config);
+// 2. Initialize: brain.initialize();
+// 3. Run simulation steps: brain.step(step, time);
+// 4. Process sensory input: brain.receiveSensoryInput(input);
+// 5. Produce actions: auto action = brain.produceAction();
+// 6. Save/load state: brain.save("checkpoint") / brain.load("checkpoint")
+// 
+// The brain follows the NLM architectural philosophy where prediction
+// becomes a central organizing principle, and cognition emerges from
+// neural dynamics rather than being explicitly programmed.
+// 
+// Phase 6 integration achieves:
+// - All memory systems connected to neural processing
+// - Neuromodulation affects plasticity and dynamics
+// - Prediction integrated with learning
+// - Development affects plasticity rates
+// - Complete brain loop functions coherently
+// 
+// For scientific background, see:
+// - NLM README.md for project overview
+// - docs/ARCHITECTURE.md for detailed design
+// - docs/SCIENCE.md for theoretical foundations
+// 
+// Limitations:
+// - Simplified LIF neuron model (not biologically detailed)
+// - No realistic ion channel dynamics
+// - No detailed cortical architecture
+// - Claims no human intelligence or consciousness
+// - Limited by available computing resources
+// 
+// NLM is a research project investigating computational brain-like systems
+// for understanding how neural systems can develop, learn, and adapt through
+// interaction with environments.
+// 
+// See Phase 6 integration documentation in:
+// - src/experiments/Phase6IntegratedExperiment.hpp
+// - docs/PHASE6_FINAL_AUDIT.md
 
 class Brain {
 public:

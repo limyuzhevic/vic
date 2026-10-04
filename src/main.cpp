@@ -39,13 +39,19 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
+    ║     - Memory integration (Working + Episodic)                  ║
+    ║     - Neuromodulation (Dopamine, Curiosity, Novelty)           ║
+    ║     - Prediction and planning systems                          ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    
+    std::cout << "\nNLM (熙然, meaning 'serene flow') - An Experimental Artificial Developmental Brain\n";
+    std::cout << "============================================================================\n\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -321,10 +327,150 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+void printHelp() {
+    std::cout << R"(
+USAGE:
+    ./nlm_phase2 [OPTIONS]
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+DESCRIPTION:
+    NLM Phase 2: Real Neural Computation
+    
+    This phase implements real spiking neural computation with:
+    - Leaky Integrate-and-Fire (LIF) neuron dynamics
+    - Event-driven spike propagation with synaptic delays
+    - STDP and Hebbian plasticity rules
+    - Structural plasticity (synaptogenesis/pruning)
+    - Memory integration (Working + Episodic memory systems)
+    - Neuromodulation (Dopamine, Curiosity, Novelty signals)
+    - Prediction and planning systems
+    
+OPTIONS:
+    --help, -h                    Show this help message
+    --version                     Show version information
+    --config <file>               Load configuration from file (default: configs/default.cfg)
+    --validate-config <file>       Validate configuration file without running simulation
+    --neuron-count <N>            Override number of neurons (default: 500)
+    --region-count <N>            Override number of regions (default: 1)
+    --timestep <T>                Override simulation timestep in seconds (default: 0.001)
+    --random-seed <S>              Override random seed for reproducible experiments (default: 42)
+    --log-level <LEVEL>           Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    --checkpoint-dir <DIR>         Directory for checkpoint files (default: ./checkpoints)
+    --quiet, -q                   Suppress informational output (only errors)
+    --verbose, -v                  Enable verbose output
+    
+CONFIGURATION FILE FORMAT:
+    The default configuration file uses simple key=value format:
+    
+    # Random seed for reproducible experiments
+    random_seed = 42
+    
+    # Simulation timestep in seconds
+    simulation_timestep = 0.001
+    
+    # Number of neurons in the brain
+    neuron_count = 1000
+    
+    # Number of brain regions
+    region_count = 2
+    
+    # Connection probability for random connectivity
+    connection_probability = 0.1
+    
+    # Plasticity settings
+    stdp_ltp_weight = 0.01
+    stdp_ltd_weight = 0.012
+    stdp_time_constant = 20.0
+    
+    # Development settings
+    development_synaptogenesis_rate = 0.001
+    development_pruning_rate = 0.0001
+    
+    # Log level
+    log_level = INFO
+    
+    # Maximum simulation steps
+    max_simulation_steps = 10000
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Authors: NLM Research Team" << std::endl;
+    std::cout << "License: MIT" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Phase 2 Features:" << std::endl;
+    std::cout << "  ✓ Real LIF neuron dynamics" << std::endl;
+    std::cout << "  ✓ Event-driven spike propagation" << std::endl;
+    std::cout << "  ✓ STDP and Hebbian plasticity" << std::endl;
+    std::cout << "  ✓ Structural plasticity" << std::endl;
+    std::cout << "  ✓ Memory integration systems" << std::endl;
+    std::cout << "  ✓ Neuromodulation support" << std::endl;
+    std::cout << "  ✓ Prediction and planning" << std::endl;
+}
+
+bool validateConfigFile(const std::string& filepath) {
+    auto config = std::make_shared<Config>();
+    if (!config->loadFromFile(filepath)) {
+        NLM_LOG_ERROR("Failed to load configuration file: " + filepath);
+        return false;
+    }
+    
+    // Validate required configuration values
+    bool isValid = true;
+    
+    // Check for required keys
+    std::vector<std::string> requiredKeys = {"random_seed", "simulation_timestep", "neuron_count", "region_count"};
+    for (const auto& key : requiredKeys) {
+        if (!config->has(key)) {
+            NLM_LOG_WARNING("Missing required configuration key: " + key);
+            isValid = false;
+        }
+    }
+    
+    // Validate value ranges
+    if (config->has("simulation_timestep")) {
+        double timestep = config->getOr<double>("simulation_timestep", -1.0);
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be > 0");
+            isValid = false;
+        }
+    }
+    
+    if (config->has("neuron_count")) {
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", -1);
+        if (neuronCount <= 0) {
+            NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be > 0");
+            isValid = false;
+        }
+    }
+    
+    if (config->has("region_count")) {
+        int64_t regionCount = config->getOr<int64_t>("region_count", -1);
+        if (regionCount <= 0) {
+            NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be > 0");
+            isValid = false;
+        }
+    }
+    
+    if (config->has("connection_probability")) {
+        float connProb = config->getOr<float>("connection_probability", -1.0f);
+        if (connProb < 0.0f || connProb > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connProb) + ". Must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    if (isValid) {
+        NLM_LOG_INFO("Configuration file \"" + filepath + "\" is valid.");
+        config->summary();  // Print configuration summary
+    } else {
+        NLM_LOG_ERROR("Configuration file \"" + filepath + "\" is invalid.");
+    }
+    
+    return isValid;
+}
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -340,11 +486,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with enhanced error handling and validation
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configFileFound = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -356,17 +503,21 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with enhanced error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configFileFound = true;
     } else {
+        NLM_LOG_WARNING("Failed to load configuration from: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_WARNING("Some command line arguments may not be recognized");
+    }
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 with validation
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -384,20 +535,39 @@ int main(int argc, char** argv) {
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("Configuration Summary:");
+    
+    auto logConfigValue = [&config](const std::string& key, const std::string& defaultValue, 
+                                    const std::string& format = "{}: {}") {
+        auto val = config->getOr<std::string>(key, defaultValue);
+        NLM_LOG_INFO("  " + format + "", key, val);
+    };
+    
+    logConfigValue("random_seed", "42");
+    logConfigValue("simulation_timestep", "0.001", "simulation_timestep: {}s");
+    logConfigValue("neuron_count", "500");
+    logConfigValue("region_count", "1");
+    logConfigValue("connection_probability", "0.15");
+    logConfigValue("stdp_ltp_weight", "0.02");
+    logConfigValue("stdp_ltd_weight", "0.015");
+    logConfigValue("stdp_tau", "20.0");
+    logConfigValue("synaptogenesis_rate", "0.0001");
+    logConfigValue("pruning_rate", "0.00001");
+    
+    NLM_LOG_INFO("");
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep) + ". Must be > 0");
+        return 1;
+    }
+    
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
