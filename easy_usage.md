@@ -42,6 +42,25 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+### Example 1B: Using Pythonic Properties
+
+```python
+import pynlm
+
+# Create brain with default configuration
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Use Pythonic properties (NEW!)
+print(f"Brain has {brain.total_neurons} neurons")
+print(f"Total synapses: {brain.total_synapses}")
+print(f"Active neurons: {brain.active_neurons}")
+print(f"Firing neurons: {brain.firing_neurons}")
+print(f"Average firing rate: {brain.average_firing_rate:.2f}")
+print(f"Total spikes: {brain.total_spikes}")
+print(f"Developmental stage: {brain.development_stage}")
+```
+
 ### Example 2: Brain in a Simple World
 
 ```python
@@ -69,6 +88,55 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Using Pythonic Properties with Advanced Features
+
+```python
+import pynlm
+
+# Setup with learning capabilities
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+print("=== Brain Statistics (Pythonic Properties) ===")
+print(f"Neurons: {brain.total_neurons:,}")
+print(f"Synapses: {brain.total_synapses:,}")
+print(f"Active: {brain.active_neurons}")
+print(f"Firing: {brain.firing_neurons}")
+print(f"Firing rate: {brain.average_firing_rate:.2f}")
+print(f"Total spikes: {brain.total_spikes:,}")
+print(f"Development stage: {brain.development_stage}")
+
+# Run simulation with learning
+for step in range(50):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply some learning
+    reward = 1.0 if step % 10 == 0 else 0.0
+    agent.applyRewardModulation(reward, 0.5)
+
+print("\n=== Updated Statistics ===")
+print(f"Neurons: {brain.total_neurons:,}")
+print(f"Firing rate: {brain.average_firing_rate:.2f}")
+print(f"Total spikes: {brain.total_spikes:,}")
 ```
 
 ---
@@ -99,7 +167,7 @@ brain.initialize()
 # Make it active
 brain.step(0)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+print("Your brain has", brain.total_neurons, "neurons!")
 ```
 
 ---
@@ -133,14 +201,14 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Brain Stats (NEW!)
 
 ```python
 # Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+print("Neurons firing:", brain.firing_neurons)
+print("Total spikes:", brain.total_spikes)
+print("Average firing rate:", brain.average_firing_rate)
+print("Development stage:", brain.development_stage)
 ```
 
 ### Pattern 3: Enable Brain Features
@@ -218,10 +286,10 @@ for i in range(30):
     brain.step(i)
     
 print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+print("Firing rate:", brain.average_firing_rate)
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (NEW!)
 
 ```python
 import pynlm
@@ -249,7 +317,7 @@ for step in range(100):
     world.applyMotorCommand(action, world.getSimulationTime())
     
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Step {step}: {brain.firing_neurons} neurons firing")
 
 print("Agent simulation complete!")
 ```
@@ -265,7 +333,7 @@ print("Agent simulation complete!")
 | Make brain think | `brain.step(step)` |
 | Create world | `pynlm.createSimpleWorld()` |
 | Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
+| Get brain stats | `brain.total_neurons` (NEW!) |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
@@ -276,14 +344,21 @@ print("Agent simulation complete!")
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Check if `agent.processSensoryInput()` is being called
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Verify `agent.decodeMotorCommand()` is returning an action
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+
+**"Pythonic property errors"**
+- All Pythonic properties are read-only
+- Use `brain.getTotalNeuronCount()` for the original API
+- `brain.total_neurons`, `brain.firing_neurons`, etc. are shortcuts
 
 ---
 
@@ -293,5 +368,8 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Use the new Pythonic properties for cleaner code
+5. Try the advanced agent project
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the improved Python API.
+

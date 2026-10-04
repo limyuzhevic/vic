@@ -8,6 +8,11 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Reserve space for typical config size to avoid reallocations
+    Impl() : entries() {
+        // Phase 1 configs typically have 10-50 entries, reserve 50 as a reasonable default
+        entries.reserve(50);
+    }
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -26,6 +31,25 @@ bool Config::loadFromFile(const std::string& filepath) {
     if (!file.is_open()) {
         return false;
     }
+    
+    // Reserve space for config entries to avoid reallocations
+    // Typical config files have 10-50 entries
+    size_t estimated_size = 0;
+    std::string line;
+    while (std::getline(file, line)) {
+        // Estimate size to help with vector capacity planning
+        if (!line.empty() && line[0] != '#' && line[0] != '/') {
+            estimated_size++;
+        }
+    }
+    
+    // Resize to estimated size if reasonable (but don't exceed 100 to avoid over-allocation)
+    if (estimated_size > 0 && estimated_size <= 100) {
+        pImpl->entries.reserve(estimated_size);
+    }
+    
+    file.clear();
+    file.seekg(0); // Reset file pointer
     
     std::string line;
     while (std::getline(file, line)) {
@@ -143,6 +167,10 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    // Fast path: if vector is empty, key cannot exist
+    if (pImpl->entries.empty()) {
+        return false;
+    }
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
@@ -194,6 +222,12 @@ std::string Config::trim(const std::string& str) {
 }
 
 std::string Config::toLower(const std::string& str) {
+    // Check if string is already lowercase to avoid unnecessary copy
+    bool isLower = std::all_of(str.begin(), str.end(), 
+        [](unsigned char c) { return std::islower(c) || std::isdigit(c); });
+    if (isLower) {
+        return str; // Return original if already lowercase
+    }
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;

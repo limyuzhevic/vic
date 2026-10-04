@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,15 +20,59 @@
 namespace py = pybind11;
 namespace nlm {
 
-PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
+// Custom Python exceptions for NLM
+class NLMException : public std::runtime_error {
+public:
+    explicit NLMException(const std::string& msg) : std::runtime_error(msg) {}
+};
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+class ConfigError : public NLMException {
+public:
+    explicit ConfigError(const std::string& msg) : NLMException("Config error: " + msg) {}
+};
+
+class BrainError : public NLMException {
+public:
+    explicit BrainError(const std::string& msg) : NLMException("Brain error: " + msg) {}
+};
+
+class WorldError : public NLMException {
+public:
+    explicit WorldError(const std::string& msg) : NLMException("World error: " + msg) {}
+};
+
+class AgentError : public NLMException {
+public:
+    explicit AgentError(const std::string& msg) : NLMException("Agent error: " + msg) {}
+};
+
+class ValidationError : public NLMException {
+public:
+    explicit ValidationError(const std::string& msg) : NLMException("Validation error: " + msg) {}
+};
+
+class MemoryError : public NLMException {
+public:
+    explicit MemoryError(const std::string& msg) : NLMException("Memory error: " + msg) {}
+};
+
+class SimulationError : public NLMException {
+public:
+    explicit SimulationError(const std::string& msg) : NLMException("Simulation error: " + msg) {}
+};
+
+PYBIND11_MODULE(pynlm, m) {
+    // Register custom Python exceptions
+    py::register_exception<NLMException>(m, "NLMException", PyExc_RuntimeError);
+    py::register_exception<ConfigError>(m, "ConfigError", PyExc_RuntimeError);
+    py::register_exception<BrainError>(m, "BrainError", PyExc_RuntimeError);
+    py::register_exception<WorldError>(m, "WorldError", PyExc_RuntimeError);
+    py::register_exception<AgentError>(m, "AgentError", PyExc_RuntimeError);
+    py::register_exception<ValidationError>(m, "ValidationError", PyExc_ValueError);
+    py::register_exception<MemoryError>(m, "MemoryError", PyExc_MemoryError);
+    py::register_exception<SimulationError>(m, "SimulationError", PyExc_RuntimeError);
+    // Keep std::runtime_error for backward compatibility
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -348,10 +393,33 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
+        // Pythonic properties for better API
+        .def("__getattr__", [](const Brain& brain, const std::string& attr) {
+            if (attr == "total_neurons") {
+                return brain.getTotalNeuronCount();
+            } else if (attr == "total_synapses") {
+                return brain.getTotalSynapseCount();
+            } else if (attr == "active_neurons") {
+                return brain.getActiveNeuronCount();
+            } else if (attr == "firing_neurons") {
+                return brain.getFiringNeuronCount();
+            } else if (attr == "average_firing_rate") {
+                return brain.getAverageFiringRate();
+            } else if (attr == "excitation_inhibition_ratio") {
+                return brain.getExcitationInhibitionRatio();
+            } else if (attr == "total_spikes") {
+                return brain.getTotalSpikeCount();
+            } else if (attr == "developmental_stage") {
+                return brain.getDevelopmentalStage();
+            } else if (attr == "current_step") {
+                return 0; // Note: Brain doesn't store current_step, this is a limitation
+            }
+            throw py::attribute_error("Brain has no attribute '" + attr + "'");
+        })
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -415,6 +483,9 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Module metadata
+    m.attr("__version__") = "0.1.0";
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
