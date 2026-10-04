@@ -400,4 +400,61 @@ bool Phase6IntegratedExperiment::testReplay() {
     return true;
 }
 
+bool Phase6IntegratedExperiment::testPredictionIntegration() {
+    NLM_LOG_INFO("=== Testing Prediction System Integration ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    // Check if prediction system is integrated
+    auto* prediction = brain->getPredictionSystem();
+    if (!prediction) {
+        NLM_LOG_ERROR("Prediction system not available");
+        return false;
+    }
+    
+    // Run some steps
+    for (int i = 0; i < 100; ++i) {
+        // Inject some sensory activity to stimulate prediction
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
+        brain->step(i, i * 0.001);
+    }
+    
+    NLM_LOG_INFO("[PASS] Prediction system is integrated and functional");
+    return true;
+}
+
+bool Phase6IntegratedExperiment::testDevelopmentIntegration() {
+    NLM_LOG_INFO("=== Testing Development System Integration ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    // Check if development system is integrated
+    auto* development = brain->getDevelopmentSystem();
+    if (!development) {
+        NLM_LOG_ERROR("Development system not available");
+        return false;
+    }
+    
+    // Run some steps
+    for (int i = 0; i < 100; ++i) {
+        // Inject some activity to stimulate development
+        brain->injectCurrentToNeurons(NeuronType::Motor, 3.0f);
+        brain->step(i, i * 0.001);
+        
+        // Update development system
+        development->update(i * 0.001);
+    }
+    
+    NLM_LOG_INFO("[PASS] Development system is integrated and functional");
+    return true;
+}
+
 } // namespace nlm

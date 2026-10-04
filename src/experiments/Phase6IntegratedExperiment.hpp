@@ -133,6 +133,14 @@ public:
      * Test replay system
      */
     bool testReplay();
-};
 
-} // namespace nlm
+    /**
+     * Test prediction system integration
+     */
+    bool testPredictionIntegration();
+
+    /**
+     * Test development system integration
+     */
+    bool testDevelopmentIntegration();
+};

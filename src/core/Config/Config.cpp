@@ -3,12 +3,288 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <iostream>
+#include <stdexcept>
+#include <chrono>
+#include <any>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+class ValidationError : public std::runtime_error {
+public:
+    ValidationError(const std::string& message, const std::string& field = "", const std::string& value = "")
+        : std::runtime_error("Configuration Error"), 
+          message_(message), field_(field), value_(value) {}
+    
+    const std::string& getField() const { return field_; }
+    const std::string& getValue() const { return value_; }
+    const std::string& getMessage() const { return message_; }
+    
+private:
+    std::string message_;
+    std::string field_;
+    std::string value_;
 };
+
+struct ConfigValidationSchema {
+    std::string name;
+    std::string type;
+    std::any min;
+    std::any max;
+    std::string unit;
+    std::string description;
+    std::function<bool(const ConfigValue&)> customValidator;
+};
+
+// Standard configuration parameter validation schemas
+static std::vector<ConfigValidationSchema> getValidationSchemas() {
+    return {
+        {"neuron_count", "int", 1, 1000000, "neurons", 
+         "Number of neurons in the network. Range: 1-1,000,000", 
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 1 && val <= 1000000; }},
+        
+        {"region_count", "int", 1, 100, "regions",
+         "Number of brain regions. Range: 1-100",
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 1 && val <= 100; }},
+        
+        {"connection_probability", "double", 0.0, 1.0, "probability",
+         "Probability of connection between neurons. Range: 0.0-1.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 1.0; }},
+        
+        {"simulation_timestep", "double", 0.0001, 1.0, "seconds",
+         "Simulation timestep. Range: 0.0001-1.0 seconds",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0001 && val <= 1.0; }},
+        
+        {"stdp_ltp_weight", "double", -10.0, 10.0, "weight",
+         "STDP LTP weight. Range: -10.0-10.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= -10.0 && val <= 10.0; }},
+        
+        {"stdp_ltd_weight", "double", -10.0, 10.0, "weight",
+         "STDP LTD weight. Range: -10.0-10.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= -10.0 && val <= 10.0; }},
+        
+        {"synaptogenesis_rate", "double", 0.0, 0.1, "per_step",
+         "Synaptogenesis rate. Range: 0.0-0.1 per step",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 0.1; }},
+        
+        {"pruning_rate", "double", 0.0, 0.01, "per_step",
+         "Pruning rate. Range: 0.0-0.01 per step",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 0.01; }},
+        
+        {"working_memory_capacity", "int", 10, 100000, "neurons",
+         "Working memory capacity. Range: 10-100,000 neurons",
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 10 && val <= 100000; }},
+        
+        {"episodic_memory_max_episodes", "int", 1, 10000, "episodes",
+         "Episodic memory max episodes. Range: 1-10,000",
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 1 && val <= 10000; }},
+        
+        {"checkpoint_interval", "int", 100, 1000000, "steps",
+         "Checkpoint interval. Range: 100-1,000,000 steps",
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 100 && val <= 1000000; }},
+        
+        {"max_checkpoints", "int", 1, 100, "checkpoints",
+         "Maximum checkpoints to store. Range: 1-100",
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 1 && val <= 100; }},
+        
+        {"development_threshold", "double", 0.0, 1.0, "factor",
+         "Development threshold. Range: 0.0-1.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 1.0; }},
+        
+        {"dopamine_level", "double", 0.0, 1.0, "level",
+         "Dopamine level. Range: 0.0-1.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 1.0; }},
+        
+        {"curiosity_level", "double", 0.0, 1.0, "level",
+         "Curiosity level. Range: 0.0-1.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 1.0; }},
+        
+        {"novelty_threshold", "double", 0.0, 1.0, "threshold",
+         "Novelty threshold. Range: 0.0-1.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 1.0; }},
+        
+        {"prediction_horizon", "int", 1, 100, "steps",
+         "Prediction horizon. Range: 1-100 steps",
+         [](const ConfigValue& v) { auto val = std::get<int>(v); return val >= 1 && val <= 100; }},
+        
+        {"prediction_confidence_threshold", "double", 0.0, 1.0, "confidence",
+         "Prediction confidence threshold. Range: 0.0-1.0",
+         [](const ConfigValue& v) { auto val = std::get<double>(v); return val >= 0.0 && val <= 1.0; }},
+    };
+}
+
+// Validation utility functions
+namespace {
+    const std::vector<std::string> VALID_ENV_PREFIXES = {"NLM_", "BRAIN_"};
+    
+    bool validateFileFormat(const std::string& filepath) {
+        if (!std::filesystem::exists(filepath)) return false;
+        if (!std::filesystem::is_regular_file(filepath)) return false;
+        
+        try {
+            std::ifstream file(filepath);
+            if (!file.is_open()) return false;
+            
+            nlohmann::json jsonConfig;
+            file >> jsonConfig;
+            return true;
+        } catch (const std::exception&) {
+            return false;
+        }
+    }
+    
+    bool validateEnvVarName(const std::string& name) {
+        for (const auto& prefix : VALID_ENV_PREFIXES) {
+            if (name.find(prefix) == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    template<typename T>
+    bool convertAndValidate(const std::string& key, const std::string& valueStr, ConfigValue& target) {
+        try {
+            const auto& schemas = getValidationSchemas();
+            const auto& schemaIt = std::find_if(schemas.begin(), schemas.end(),
+                [&key](const ConfigValidationSchema& schema) { return schema.name == key; });
+            
+            if (schemaIt != schemas.end()) {
+                const auto& schema = *schemaIt;
+                
+                if constexpr (std::is_same_v<T, int>) {
+                    size_t pos;
+                    int intVal = std::stoi(valueStr, &pos);
+                    if (pos != valueStr.size()) return false;
+                    
+                    if (schema.min.has_value() && std::any_cast<int>(schema.min) > intVal) return false;
+                    if (schema.max.has_value() && std::any_cast<int>(schema.max) < intVal) return false;
+                    
+                    target = intVal;
+                    return true;
+                }
+                else if constexpr (std::is_same_v<T, double>) {
+                    size_t pos;
+                    double doubleVal = std::stod(valueStr, &pos);
+                    if (pos != valueStr.size()) return false;
+                    
+                    if (schema.min.has_value() && std::any_cast<double>(schema.min) > doubleVal) return false;
+                    if (schema.max.has_value() && std::any_cast<double>(schema.max) < doubleVal) return false;
+                    
+                    target = doubleVal;
+                    return true;
+                }
+                else if constexpr (std::is_same_v<T, bool>) {
+                    if (valueStr == "true" || valueStr == "false") {
+                        bool boolVal = (valueStr == "true");
+                        target = boolVal;
+                        return true;
+                    }
+                    return false;
+                }
+                else if constexpr (std::is_same_v<T, std::string>) {
+                    target = valueStr;
+                    return true;
+                }
+                else if constexpr (std::is_same_v<T, int64_t>) {
+                    size_t pos;
+                    int64_t intVal = std::stoll(valueStr, &pos);
+                    if (pos != valueStr.size()) return false;
+                    
+                    if (schema.min.has_value()) {
+                        int64_t minVal = std::any_cast<int64_t>(schema.min);
+                        if (minVal > intVal) return false;
+                    }
+                    if (schema.max.has_value()) {
+                        int64_t maxVal = std::any_cast<int64_t>(schema.max);
+                        if (maxVal < intVal) return false;
+                    }
+                    
+                    target = intVal;
+                    return true;
+                }
+            }
+        } catch (const std::exception&) {}
+        return false;
+    }
+}
+
+static ConfigValue jsonToConfigValue(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int>();
+    } else if (j.is_number_unsigned()) {
+        return static_cast<int>(j.get<std::uint64_t>());
+    } else if (j.is_number()) {
+        if (j.is_number_integer()) {
+            return j.get<int>();
+        } else {
+            double val = j.get<double>();
+            if (std::floor(val) == val) {
+                return static_cast<int>(val);
+            }
+            return val;
+        }
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        if (j.empty()) {
+            return std::vector<int>();
+        }
+        
+        bool isIntArray = std::all_of(j.begin(), j.end(), [](const nlohmann::json& item) {
+            return item.is_number_integer();
+        });
+        if (isIntArray) {
+            return j.get<std::vector<int>>();
+        }
+        
+        bool isDoubleArray = std::all_of(j.begin(), j.end(), [](const nlohmann::json& item) {
+            return item.is_number();
+        });
+        if (isDoubleArray) {
+            return j.get<std::vector<double>>();
+        }
+        
+        bool isStringArray = std::all_of(j.begin(), j.end(), [](const nlohmann::json& item) {
+            return item.is_string();
+        });
+        if (isStringArray) {
+            return j.get<std::vector<std::string>>();
+        }
+        
+        return j.get<std::vector<double>>();
+    }
+    
+    return j.get<std::string>();
+}
+
+static nlohmann::json configValueToJson(const ConfigValue& value) {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return arg;
+        } else {
+            return std::string("unknown_type");
+        }
+    }, value);
+}
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,77 +295,174 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw ValidationError("Configuration file not found or cannot be opened", "filepath", filepath);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Validate file format first
+        if (!validateFileFormat(filepath)) {
+            throw ValidationError("Invalid configuration file format - must be valid JSON", "filepath", filepath);
+        }
+        
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        if (!jsonConfig.is_object()) {
+            throw ValidationError("Configuration file must contain a JSON object", "format", "");
+        }
+        
+        clear();
+        
+        // Process and validate entries
+        for (const auto& [key, value] : jsonConfig.items()) {
+            ConfigValue configValue = jsonToConfigValue(value);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Validate against schema
+            const auto& schemas = getValidationSchemas();
+            const auto& schemaIt = std::find_if(schemas.begin(), schemas.end(),
+                [&key](const ConfigValidationSchema& schema) { return schema.name == key; });
+            
+            if (schemaIt != schemas.end()) {
+                const auto& schema = *schemaIt;
+                if (schema.customValidator && !schema.customValidator(configValue)) {
+                    throw ValidationError("Configuration value out of valid range", key, value.dump());
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, configValue, ConfigSource::File);
         }
+        
+        return true;
+    } catch (const ValidationError& e) {
+        std::cerr << "[CONFIG ERROR] " << e.what() << " (Field: " << e.getField() << ")" << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "[CONFIG ERROR] Failed to load configuration file: " << e.what() << std::endl;
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Convert to appropriate type with validation
+                bool converted = false;
+                
+                // Try boolean
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::CommandLine);
+                    converted = true;
+                }
+                // Try integer
+                else {
+                    // Check if it's a valid integer
+                    bool isValidInt = true;
+                    size_t posCheck;
+                    try {
+                        std::stoi(value, &posCheck);
+                        if (posCheck != value.size()) isValidInt = false;
+                    } catch (...) {
+                        isValidInt = false;
+                    }
+                    
+                    if (isValidInt) {
+                        set(key, std::stoi(value), ConfigSource::CommandLine);
+                        converted = true;
+                    } else {
+                        // Check if it's a valid float/double
+                        bool isValidFloat = true;
+                        try {
+                            std::stod(value, &posCheck);
+                            if (posCheck != value.size()) isValidFloat = false;
+                        } catch (...) {
+                            isValidFloat = false;
+                        }
+                        
+                        if (isValidFloat) {
+                            set(key, std::stod(value), ConfigSource::CommandLine);
+                            converted = true;
+                        }
+                    }
+                }
+                
+                if (!converted) {
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
-        // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Similar conversion logic for single-character args
+            bool converted = false;
+            
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::CommandLine);
+                converted = true;
+            } else {
+                size_t pos;
+                try {
+                    int intVal = std::stoi(value, &pos);
+                    if (pos == value.size()) {
+                        set(key, intVal, ConfigSource::CommandLine);
+                        converted = true;
+                    } else {
+                        double doubleVal = std::stod(value, &pos);
+                        if (pos == value.size()) {
+                            set(key, doubleVal, ConfigSource::CommandLine);
+                            converted = true;
+                        }
+                    }
+                } catch (const std::exception&) {}
+            }
+            
+            if (!converted) {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
-    return true;
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw ValidationError("Cannot create configuration file", "filepath", filepath);
+        }
+        
+        nlohmann::json jsonConfig;
+        
+        for (const auto& entry : pImpl->entries) {
+            jsonConfig[entry.key] = configValueToJson(entry.value);
+        }
+        
+        file << jsonConfig.dump(2);
+        file.flush();
+        
+        if (!file.good()) {
+            throw ValidationError("Failed to write configuration data", "file", filepath);
+        }
+        
+        return true;
+    } catch (const ValidationError& e) {
+        std::cerr << "[CONFIG ERROR] " << e.what() << " (Field: " << e.getField() << ")" << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "[CONFIG ERROR] Failed to save configuration file: " << e.what() << std::endl;
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -115,6 +488,33 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key name
+    if (key.empty()) {
+        throw ValidationError("Configuration key cannot be empty", "key", "");
+    }
+    
+    if (key.find(' ') != std::string::npos) {
+        throw ValidationError("Configuration key cannot contain spaces", "key", key);
+    }
+    
+    // Validate value based on type
+    const auto& schemas = getValidationSchemas();
+    const auto& schemaIt = std::find_if(schemas.begin(), schemas.end(),
+        [&key](const ConfigValidationSchema& schema) { return schema.name == key; });
+    
+    if (schemaIt != schemas.end()) {
+        const auto& schema = *schemaIt;
+        if (schema.customValidator && !schema.customValidator(value)) {
+            throw ValidationError("Configuration value validation failed", key, std::to_string(std::visit([](auto&& v) { 
+                if constexpr (std::is_same_v<decltype(v), int>) return v;
+                else if constexpr (std::is_same_v<decltype(v), double>) return v;
+                else if constexpr (std::is_same_v<decltype(v), bool>) return v;
+                else if constexpr (std::is_same_v<decltype(v), std::string>) return 0;
+                else return 0;
+            }, value)));
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -168,6 +568,19 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
+bool Config::validateEntry(const std::string& key, const ConfigValue& value) {
+    auto it = pImpl->validators.find(key);
+    if (it != pImpl->validators.end()) {
+        return it->second(value);
+    }
+    return true;
+}
+
+void Config::registerValidator(const std::string& key, 
+                               std::function<bool(const ConfigValue&)> validator) {
+    pImpl->validators[key] = validator;
+}
+
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
@@ -177,6 +590,27 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }

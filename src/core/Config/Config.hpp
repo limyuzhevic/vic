@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <unordered_map>
+#include <set>
 
 namespace nlm {
 
@@ -13,32 +16,35 @@ class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
+    int,                    // Integer values (32-bit)
+    int64_t,                // 64-bit integer values
+    double,                 // Floating point values
+    bool,                   // Boolean values
+    std::string,            // String values
+    std::vector<int>,       // Integer arrays
+    std::vector<double>,    // Float arrays
+    std::vector<std::string> // String arrays
 >;
 
-// Configuration source
+// Configuration source enumeration
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,    // Default configuration value
+    File,       // Loaded from configuration file
+    CommandLine,// Set via command line arguments
+    Runtime     // Set at runtime via API
 };
 
-// Configuration entry
+// Configuration entry structure
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;        // Configuration key name
+    ConfigValue value;      // Configuration value
+    ConfigSource source;    // How the value was set
+    std::string description; // Human-readable description of the parameter
     
+    // Default constructor
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    // Parameterized constructor
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
@@ -93,6 +99,11 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateEntry(const std::string& key, const ConfigValue& value);
+    void registerValidator(const std::string& key, 
+                           std::function<bool(const ConfigValue&)> validator);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
