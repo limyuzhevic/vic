@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <argparse/argparse.hpp>
 
 using namespace nlm;
 
@@ -245,81 +246,325 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
-    
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    // Get first few synapses
-    auto& synapses = region->getSynapses();
-    if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
-        return;
+// Include advanced CLI and debugging utilities
+#include "core/CLI/CommandLineInterface.hpp"
+#include "visualization/DebugVisualization.hpp"
+#include "visualization/NetworkVisualizer.hpp"
+#include "visualization/ProgressTracker.hpp"
+
+// Add command-line parser library includes
+#include <CLI/CLI.hpp>
+#include <argparse/argparse.hpp>
+
+using namespace nlm;
+
+// Command-line interface for advanced configuration
+class AdvancedCLI {
+public:
+    AdvancedCLI() : app("NLM - Neural Learning Machine", "Advanced neural simulation framework") {
+        setupConfigurationOptions();
+        setupExperimentOptions();
+        setupVisualizationOptions();
+        setupDebugOptions();
+        setupPerformanceOptions();
     }
     
-    NLM_LOG_INFO("  Testing STDP on 5 synapses:");
-    
-    // Record initial weights
-    std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
-    }
-    
-    // Create correlated activity: fire pre then post to trigger LTP
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-    
-    for (int trial = 0; trial < 50; ++trial) {
-        // Fire pre-synaptic neuron
-        Neuron* preNeuron = nullptr;
-        Neuron* postNeuron = nullptr;
-        
-        auto neurons = region->getAllNeurons();
-        if (neurons.size() >= 2) {
-            preNeuron = neurons[0];
-            postNeuron = neurons[1];
-        }
-        
-        if (preNeuron && postNeuron) {
-            // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+    bool parse(int argc, char** argv) {
+        try {
+            app.parse_args(argc, argv);
             
-            // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            // Post-processing and validation
+            postProcessConfiguration();
+            
+            // Display help if requested
+            if (showHelp) {
+                app.help();
+                return false;
+            }
+            
+            return true;
+            
+        } catch (const CLI::ParseError& e) {
+            app.exit(e);
+            return false;
         }
     }
     
-    // Record after weights
-    NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+    const Config& getConfig() const { return config; }
+    const CLI::App& getApp() const { return app; }
+    
+    // Get experiment configuration
+    std::string getExperimentType() const { return experimentType; }
+    size_t getMaxSteps() const { return maxSteps; }
+    bool getEnableVisualization() const { return enableVisualization; }
+    bool getEnableDebugMode() const { return enableDebugMode; }
+    float getProgressInterval() const { return progressInterval; }
+    
+private:
+    void setupConfigurationOptions() {
+        // Configuration file and parameters
+        app.add_option("-c,--config", configFile, "Configuration file path")
+            ->check(CLI::ExistingFile);
+        
+        app.add_option("--neuron-count", neuronCount, "Number of neurons to create")
+            ->default_val(1000);
+        
+        app.add_option("--region-count", regionCount, "Number of brain regions")
+            ->default_val(1);
+        
+        app.add_option("--connection-prob", connectionProb, "Connection probability between neurons")
+            ->default_val(0.1f)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--simulation-timestep", timestep, "Simulation timestep in seconds")
+            ->default_val(0.001f)
+            ->check(CLI::PositiveNumber);
+        
+        // STDP parameters
+        app.add_option("--stdp- LTP-weight", stdpLTPWeight, "STDP long-term potentiation weight")
+            ->default_val(0.01f)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--stdp-LTD-weight", stdpLTDWeight, "STDP long-term depression weight")
+            ->default_val(0.012f)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--stdp-time-constant", stdpTau, "STDP time constant in ms")
+            ->default_val(20.0f)
+            ->check(CLI::PositiveNumber);
+        
+        // Plasticity parameters
+        app.add_option("--synaptogenesis-rate", synaptogenesisRate, "Rate of synaptogenesis")
+            ->default_val(0.0001f)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--pruning-rate", pruningRate, "Rate of synaptic pruning")
+            ->default_val(0.00001f)
+            ->check(CLI::PositiveNumber);
+        
+        // Random seed
+        app.add_option("--random-seed", randomSeed, "Random number generator seed")
+            ->default_val(42);
+        
+        // Output options
+        app.add_flag("--quiet", quietMode, "Suppress non-essential output");
+        app.add_flag("--verbose", verboseMode, "Enable verbose output");
     }
     
-    // Check if weights increased (LTP)
-    float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+    void setupExperimentOptions() {
+        app.add_option("-e,--experiment", experimentType, "Experiment type (connectivity, plasticity, learning, custom)")
+            ->default_val("learning")
+            ->transform(CLI::AsLowerCase)
+            ->check([](const std::string& s) {
+                std::vector<std::string> valid = {"connectivity", "plasticity", "learning", "custom"};
+                if (std::find(valid.begin(), valid.end(), s) == valid.end()) {
+                    throw CLI::ValidationError("Invalid experiment type. Must be one of: connectivity, plasticity, learning, custom");
+                }
+                return s;
+            });
+        
+        app.add_option("--max-steps", maxSteps, "Maximum simulation steps")
+            ->default_val(1000)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--steps-per-report", stepsPerReport, "Steps between progress reports")
+            ->default_val(100)
+            ->check(CLI::PositiveNumber);
+        
+        // Experiment-specific options
+        app.add_flag("--enable-plasticity", enablePlasticity, "Enable synaptic plasticity");
+        app.add_flag("--enable-structural-plasticity", enableStructuralPlasticity, "Enable structural plasticity");
+        app.add_flag("--enable-neuromodulation", enableNeuromodulation, "Enable neuromodulation systems");
+        app.add_flag("--enable-memory", enableMemorySystems, "Enable memory systems");
+        app.add_flag("--enable-prediction", enablePredictionSystem, "Enable prediction system");
+        app.add_flag("--enable-cognition", enableCognitionSystems, "Enable cognitive systems");
     }
     
-    NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
-    } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    void setupVisualizationOptions() {
+        app.add_flag("--enable-visualization", enableVisualization, "Enable real-time visualization")
+            ->default_val(false);
+        
+        app.add_option("--visualization-backend", visualizationBackend, "Visualization backend (ascii, terminal, web)")
+            ->default_val("terminal")
+            ->transform(CLI::AsLowerCase);
+        
+        app.add_option("--progress-interval", progressInterval, "Progress reporting interval in seconds")
+            ->default_val(5.0f)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--output-file", outputFile, "Output file for results and visualizations")
+            ->check(CLI::NonEmptyString);
+        
+        app.add_option("--plot-neurons", plotNeurons, "Plot neuron activity visualization")
+            ->default_val(true);
+        
+        app.add_option("--plot-synapses", plotSynapses, "Plot synaptic weight visualization")
+            ->default_val(false);
+        
+        app.add_option("--plot-memory", plotMemory, "Plot memory system activity")
+            ->default_val(false);
     }
-}
+    
+    void setupDebugOptions() {
+        app.add_flag("--debug-mode", enableDebugMode, "Enable debug mode with additional logging")
+            ->default_val(false);
+        
+        app.add_option("--log-level", logLevel, "Logging level (trace, debug, info, warn, error, critical)")
+            ->default_val("info")
+            ->transform(CLI::AsLowerCase);
+        
+        app.add_option("--max-log-entries", maxLogEntries, "Maximum log entries to keep in memory")
+            ->default_val(10000)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_flag("--enable-memory-profiling", enableMemoryProfiling, "Enable memory usage profiling");
+        app.add_flag("--enable-timing-profiling", enableTimingProfiling, "Enable performance timing");
+        
+        app.add_option("--checkpoint-interval", checkpointInterval, "Interval between checkpoints (in steps)")
+            ->default_val(1000)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--checkpoint-dir", checkpointDir, "Directory for checkpoint files")
+            ->default_val("./checkpoints");
+    }
+    
+    void setupPerformanceOptions() {
+        app.add_option("--threads", numThreads, "Number of threads for parallel processing")
+            ->default_val(1)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_flag("--enable-parallel", enableParallelProcessing, "Enable parallel processing");
+        app.add_option("--thread-pool-size", threadPoolSize, "Size of thread pool for parallel processing")
+            ->default_val(4)
+            ->check(CLI::PositiveNumber);
+        
+        app.add_option("--memory-limit", memoryLimit, "Memory limit in MB (0 for unlimited)")
+            ->default_val(0)
+            ->check(CLI::NonNegativeNumber);
+        
+        app.add_option("--simulation-speed", simulationSpeed, "Simulation speed multiplier (1.0 = real-time)")
+            ->default_val(1.0f)
+            ->check(CLI::PositiveNumber);
+    }
+    
+    void postProcessConfiguration() {
+        // Apply command-line overrides to configuration
+        if (configFile) {
+            if (!config->loadFromFile(configFile)) {
+                NLM_LOG_ERROR("Failed to load configuration from file: " + configFile);
+            }
+        }
+        
+        // Override configuration with command-line parameters
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+        config->set("connection_probability", connectionProb, ConfigSource::CommandLine);
+        config->set("simulation_timestep", static_cast<double>(timestep), ConfigSource::CommandLine);
+        
+        config->set("stdp_ltp_weight", stdpLTPWeight, ConfigSource::CommandLine);
+        config->set("stdp_ltd_weight", stdpLTDWeight, ConfigSource::CommandLine);
+        config->set("stdp_tau", static_cast<double>(stdpTau), ConfigSource::CommandLine);
+        
+        config->set("synaptogenesis_rate", synaptogenesisRate, ConfigSource::CommandLine);
+        config->set("pruning_rate", pruningRate, ConfigSource::CommandLine);
+        
+        config->set("random_seed", static_cast<int64_t>(randomSeed), ConfigSource::CommandLine);
+        
+        // Set feature flags
+        config->set("enable_plasticity", enablePlasticity, ConfigSource::CommandLine);
+        config->set("enable_structural_plasticity", enableStructuralPlasticity, ConfigSource::CommandLine);
+        config->set("enable_neuromodulation", enableNeuromodulation, ConfigSource::CommandLine);
+        config->set("enable_memory", enableMemorySystems, ConfigSource::CommandLine);
+        config->set("enable_prediction", enablePredictionSystem, ConfigSource::CommandLine);
+        config->set("enable_cognition", enableCognitionSystems, ConfigSource::CommandLine);
+        
+        // Set performance options
+        config->set("thread_pool_size", static_cast<int64_t>(threadPoolSize), ConfigSource::CommandLine);
+        config->set("enable_parallel", enableParallelProcessing, ConfigSource::CommandLine);
+        
+        // Set logging options
+        config->set("log_level", static_cast<int64_t>(logLevelMap[logLevel]), ConfigSource::CommandLine);
+        
+        // Set checkpoint options
+        config->set("checkpoint_interval", static_cast<int64_t>(checkpointInterval), ConfigSource::CommandLine);
+        config->set("checkpoint_dir", checkpointDir, ConfigSource::CommandLine);
+    }
+    
+    // Map string log levels to enum
+    std::unordered_map<std::string, int64_t> logLevelMap = {
+        {"trace", 0},
+        {"debug", 1},
+        {"info", 2},
+        {"warn", 3},
+        {"error", 4},
+        {"critical", 5}
+    };
+    
+private:
+    CLI::App app;
+    
+    // Configuration
+    std::string configFile;
+    size_t neuronCount = 1000;
+    size_t regionCount = 1;
+    float connectionProb = 0.1f;
+    float timestep = 0.001f;
+    
+    float stdpLTPWeight = 0.01f;
+    float stdpLTDWeight = 0.012f;
+    float stdpTau = 20.0f;
+    
+    float synaptogenesisRate = 0.0001f;
+    float pruningRate = 0.00001f;
+    
+    int64_t randomSeed = 42;
+    
+    // Experiment options
+    std::string experimentType = "learning";
+    size_t maxSteps = 1000;
+    size_t stepsPerReport = 100;
+    
+    bool enablePlasticity = true;
+    bool enableStructuralPlasticity = true;
+    bool enableNeuromodulation = true;
+    bool enableMemorySystems = true;
+    bool enablePredictionSystem = true;
+    bool enableCognitionSystems = true;
+    
+    // Visualization options
+    bool enableVisualization = false;
+    std::string visualizationBackend = "terminal";
+    float progressInterval = 5.0f;
+    std::string outputFile;
+    bool plotNeurons = true;
+    bool plotSynapses = false;
+    bool plotMemory = false;
+    
+    // Debug options
+    bool showHelp = false;
+    bool quietMode = false;
+    bool verboseMode = false;
+    bool enableDebugMode = false;
+    std::string logLevel = "info";
+    size_t maxLogEntries = 10000;
+    bool enableMemoryProfiling = false;
+    bool enableTimingProfiling = false;
+    size_t checkpointInterval = 1000;
+    std::string checkpointDir = "./checkpoints";
+    
+    // Performance options
+    int numThreads = 1;
+    bool enableParallelProcessing = false;
+    size_t threadPoolSize = 4;
+    size_t memoryLimit = 0;
+    float simulationSpeed = 1.0f;
+    
+    // Configuration object
+    std::shared_ptr<Config> config = std::make_shared<Config>();
+};
+
+// Global CLI instance
+AdvancedCLI cli;
 
 int main(int argc, char** argv) {
     printBanner();
