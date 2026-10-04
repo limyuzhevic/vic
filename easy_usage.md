@@ -71,6 +71,28 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Using the New Command-Line Interface
+
+```bash
+# Run a simple simulation
+nlm run --steps 100
+
+# Show statistics
+nlm stats
+
+# Run phase 6 integration test
+nlm phase 6 --verify
+
+# Run a demo
+nlm demo basic --steps 200
+
+# Performance benchmark
+nlm benchmark --neurons 1000 --steps 1000
+
+# Help for any command
+nlm help run
+```
+
 ---
 
 ## Simple Analogy
@@ -271,6 +293,52 @@ print("Agent simulation complete!")
 
 ---
 
+## Using the Command-Line Interface
+
+The new command-line interface provides powerful tools for running simulations and analysis:
+
+### Basic Commands
+
+```bash
+# Run a simulation
+nlm run --steps 1000
+
+# Get statistics about the current brain
+nlm stats
+
+# Show help
+nlm help
+```
+
+### Phase Experiments
+
+```bash
+# Run Phase 6 integration test
+nlm phase 6 --verify
+
+# Run Phase 3 demo
+nlm phase 3
+```
+
+### Demos
+
+```bash
+# Run basic demonstration
+nlm demo basic --steps 500
+
+# Run plasticity demonstration
+nlm demo plasticity --steps 1000
+```
+
+### Performance Testing
+
+```bash
+# Benchmark with different neuron counts
+nlm benchmark --neurons 1000 --steps 1000 --iterations 5
+```
+
+---
+
 ## Troubleshooting
 
 **"My brain isn't doing anything"**
@@ -294,4 +362,4 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with both Python API and command-line interface.

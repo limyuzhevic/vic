@@ -113,305 +113,159 @@ brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
 
----
+## Part 4: Command-Line Interface (NEW)
 
-## Part 3: Using the Python Library
+NLM now includes a comprehensive command-line interface for advanced users and system integration. The CLI provides multiple commands for running simulations, managing configurations, and analyzing results.
 
 ### Basic Usage
 
-#### Creating a Brain
+```bash
+# Show available commands
+nlm help
 
-```python
-import pynlm
+# Show help for a specific command
+nlm help run
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+# Run a simulation
+nlm run --steps 1000
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Get statistics about the current brain
+nlm stats
 
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Run Phase 6 integration test
+nlm phase 6 --verify
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+# Run a demonstration
+nlm demo basic --steps 500
+
+# Performance benchmarking
+nlm benchmark --neurons 1000 --steps 1000
 ```
 
-#### Running a Simulation
+### Available Commands
 
-```python
-import pynlm
+#### 1. `nlm run` - Run Simulation
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+Run a neural simulation with specified configuration.
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+**Usage:**
+```bash
+nlm run --steps <N> [--config <file>] [--output <file>] [--log-level <LEVEL>] [--save] [--quiet]
 ```
 
-#### Creating a Simple World
+**Arguments:**
+- `--steps <N>` (Required): Number of simulation steps to run
+- `--config <file>` (Optional): Configuration file path (default: configs/default.cfg)
+- `--output <file>` (Optional): Output file for brain state (default: brain_state.bin)
+- `--log-level <LEVEL>` (Optional): Log level (INFO, WARNING, ERROR) (default: INFO)
+- `--save` (Optional): Save brain state after simulation
+- `--quiet` (Optional): Suppress output messages
 
-```python
-import pynlm
-
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
+**Example:**
+```bash
+nlm run --steps 5000 --config configs/my_config.cfg --output results.bin --save
 ```
 
-### Complete Agent Example
+#### 2. `nlm config` - Configuration Management
 
-```python
-import pynlm
+Manage configuration files and settings.
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
+**Usage:**
+```bash
+nlm config [list|save <file>|load <file>|show <key>|set <key> <value>]
 ```
 
-### Key Classes and Methods
+**Subcommands:**
+- `list`: List all configuration keys
+- `save <file>`: Save current configuration to file
+- `load <file>`: Load configuration from file
+- `show <key>`: Show value of specific configuration key
+- `set <key> <value>`: Set configuration value
 
-#### Brain Class
-
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+**Examples:**
+```bash
+nlm config list
+nlm config set brain.neuron_count 2000
+nlm config save my_config.cfg
+nlm config load my_config.cfg
 ```
 
-#### Config Class
+#### 3. `nlm stats` - Display Statistics
 
-```python
-# Create
-config = pynlm.createDefaultConfig()
+Display brain statistics and metrics.
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+**Usage:**
+```bash
+nlm stats [--brain <file>] [--format <json|text|table>] [--verbose]
 ```
 
-#### AgentBrain Class
+**Arguments:**
+- `--brain <file>` (Optional): Brain state file path (default: brain_state.bin)
+- `--format <json|text|table>` (Optional): Output format (default: text)
+- `--verbose` (Optional): Verbose output
 
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+**Example:**
+```bash
+nlm stats --brain saved_brain.bin --verbose
 ```
 
-#### SimpleWorld Class
+#### 4. `nlm phase` - Phase Experiments
 
-```python
-# Creation
-world = pynlm.createSimpleWorld()
+Run specific phase experiments.
 
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+**Usage:**
+```bash
+nlm phase <3|4|5|6> [--steps <N>] [--config <file>] [--verify]
 ```
 
-### Enumerations
+**Arguments:**
+- `<3|4|5|6>` (Required): Phase number to run
+- `--steps <N>` (Optional): Number of steps (default: 1000)
+- `--config <file>` (Optional): Configuration file (default: configs/default.cfg)
+- `--verify` (Optional): Run integration verification
 
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
+**Example:**
+```bash
+nlm phase 6 --steps 5000 --verify
+```
 
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
+#### 5. `nlm demo` - Run Demonstrations
 
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
+Run pre-configured demonstrations for different scenarios.
 
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+**Usage:**
+```bash
+nlm demo <basic|plasticity|stdp|memory|neuromodulation> [--steps <N>]
+```
+
+**Arguments:**
+- `<basic|plasticity|stdp|memory|neuromodulation>` (Required): Demo type
+- `--steps <N>` (Optional): Number of steps (default: 500)
+
+**Examples:**
+```bash
+nlm demo basic --steps 1000
+nlm demo plasticity
+```
+
+#### 6. `nlm benchmark` - Performance Benchmarking
+
+Run performance benchmarks with different configurations.
+
+**Usage:**
+```bash
+nlm benchmark [--neurons <N>] [--steps <N>] [--iterations <N>] [--warmup <N>]
+```
+
+**Arguments:**
+- `--neurons <N>` (Optional): Number of neurons (default: 1000)
+- `--steps <N>` (Optional): Steps per iteration (default: 1000)
+- `--iterations <N>` (Optional): Number of iterations (default: 5)
+- `--warmup <N>` (Optional): Warmup iterations (default: 2)
+
+**Example:**
+```bash
+nlm benchmark --neurons 5000 --steps 2000 --iterations 10
 ```
 
 ---
