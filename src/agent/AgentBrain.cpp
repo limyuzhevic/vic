@@ -1,7 +1,9 @@
+// AgentBrain.cpp - Implementation file (previously missing)
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
 
@@ -215,19 +217,42 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        // Use brain random generator if available
+        if (brain_ && brain_->getRandomGenerator()) {
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Random motor command from available actions
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
+            }
+        } else {
+            // Fallback to simple random
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+            float r = dis(gen);
+            if (r < exploreChance) {
+                std::uniform_int_distribution<int> actionDist(0, 7);
+                int choice = actionDist(gen);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
             }
         }
     }
