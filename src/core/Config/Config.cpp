@@ -3,14 +3,30 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstring>
+#include <cctype>
 
 namespace nlm {
 
+// Forward declarations for internal parsing
+static bool parseJsonValue(const std::string& content, JsonValue& value, size_t& pos);
+static bool parseJsonObject(const std::string& content, std::map<std::string, JsonValue>& obj, size_t& pos);
+static bool parseJsonArray(const std::string& content, std::vector<JsonValue>& arr, size_t& pos);
+static bool skipWhitespace(const std::string& content, size_t& pos);
+static bool parseString(const std::string& content, std::string& result, size_t& pos);
+static bool parseNumber(const std::string& content, double& result, size_t& pos);
+static bool parseBool(const std::string& content, bool& result, size_t& pos);
+static bool parseNull(const std::string& content, size_t& pos);
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::map<std::string, JsonValue> jsonData;
+    bool jsonParsed;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->jsonParsed = false;
+}
 
 Config::~Config() = default;
 
@@ -19,16 +35,45 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON/YAML first
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Check if it looks like JSON (starts with { or [)
+    if (content.empty()) {
+        NLM_LOG_ERROR("Configuration file is empty: " + filepath);
+        return false;
+    }
+    
+    char firstChar = content[0];
+    if (firstChar == '{' || firstChar == '[') {
+        // Try JSON parsing
+        JsonValue parsed;
+        size_t pos = 0;
+        if (parseJsonValue(content, parsed, pos)) {
+            pImpl->jsonData = convertToConfigMap(parsed);
+            pImpl->jsonParsed = true;
+            NLM_LOG_INFO("Configuration loaded as JSON from: " + filepath);
+            return true;
+        } else {
+            NLM_LOG_ERROR("Failed to parse JSON configuration file: " + filepath);
+            return false;
+        }
+    }
+    
+    // Fall back to simple key=value parsing
+    NLM_LOG_INFO("Parsing configuration file as key=value format: " + filepath);
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +86,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key found in configuration file (line " + std::to_string(lineNum) + ")");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,10 +99,25 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid line format in configuration file (line " + std::to_string(lineNum) + ")");
         }
     }
     
+    if (pImpl->entries.empty()) {
+        NLM_LOG_WARNING("No valid configuration entries found in: " + filepath);
+    }
+    
     return true;
+}
+
+// Helper function to convert JsonValue to Config map
+std::map<std::string, JsonValue> Config::convertToConfigMap(const JsonValue& value) {
+    std::map<std::string, JsonValue> result;
+    if (std::holds_alternative<std::map<std::string, JsonValue>>(value)) {
+        result = std::get<std::map<std::string, JsonValue>>(value);
+    }
+    return result;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -198,6 +263,342 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
+
+namespace nlm {
+
+// Forward declarations for internal parsing
+static bool parseJsonValue(const std::string& content, JsonValue& value, size_t& pos);
+static bool parseJsonObject(const std::string& content, std::map<std::string, JsonValue>& obj, size_t& pos);
+static bool parseJsonArray(const std::string& content, std::vector<JsonValue>& arr, size_t& pos);
+static bool skipWhitespace(const std::string& content, size_t& pos);
+static bool parseString(const std::string& content, std::string& result, size_t& pos);
+static bool parseNumber(const std::string& content, double& result, size_t& pos);
+static bool parseBool(const std::string& content, bool& result, size_t& pos);
+static bool parseNull(const std::string& content, size_t& pos);
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+    std::map<std::string, JsonValue> jsonData;
+    bool jsonParsed;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->jsonParsed = false;
+}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Try to parse as JSON/YAML first
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Check if it looks like JSON (starts with { or [)
+    if (content.empty()) {
+        NLM_LOG_ERROR("Configuration file is empty: " + filepath);
+        return false;
+    }
+    
+    char firstChar = content[0];
+    if (firstChar == '{' || firstChar == '[') {
+        // Try JSON parsing
+        JsonValue parsed;
+        size_t pos = 0;
+        if (parseJsonValue(content, parsed, pos)) {
+            pImpl->jsonData = convertToConfigMap(parsed);
+            pImpl->jsonParsed = true;
+            NLM_LOG_INFO("Configuration loaded as JSON from: " + filepath);
+            return true;
+        } else {
+            NLM_LOG_ERROR("Failed to parse JSON configuration file: " + filepath);
+            return false;
+        }
+    }
+    
+    // Fall back to simple key=value parsing
+    NLM_LOG_INFO("Parsing configuration file as key=value format: " + filepath);
+    std::string line;
+    size_t lineNum = 0;
+    while (std::getline(file, line)) {
+        lineNum++;
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key found in configuration file (line " + std::to_string(lineNum) + ")");
+                continue;
+            }
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid line format in configuration file (line " + std::to_string(lineNum) + ")");
+        }
+    }
+    
+    if (pImpl->entries.empty()) {
+        NLM_LOG_WARNING("No valid configuration entries found in: " + filepath);
+    }
+    
+    return true;
+}
+
+// Helper function to convert JsonValue to Config map
+std::map<std::string, JsonValue> Config::convertToConfigMap(const JsonValue& value) {
+    std::map<std::string, JsonValue> result;
+    if (std::holds_alternative<std::map<std::string, JsonValue>>(value)) {
+        result = std::get<std::map<std::string, JsonValue>>(value);
+    }
+    return result;
+}
+
+// JSON parsing helper functions
+static bool skipWhitespace(const std::string& content, size_t& pos) {
+    while (pos < content.size() && std::isspace(content[pos])) {
+        pos++;
+    }
+    return pos < content.size();
+}
+
+static bool parseString(const std::string& content, std::string& result, size_t& pos) {
+    if (pos >= content.size() || content[pos] != '"') {
+        return false;
+    }
+    
+    pos++; // Skip opening quote
+    size_t start = pos;
+    
+    while (pos < content.size()) {
+        if (content[pos] == '\\') {
+            pos += 2; // Skip escape sequence
+            continue;
+        } else if (content[pos] == '"') {
+            break;
+        }
+        pos++;
+    }
+    
+    if (pos >= content.size()) {
+        return false;
+    }
+    
+    result = content.substr(start, pos - start);
+    pos++; // Skip closing quote
+    return true;
+}
+
+static bool parseNumber(const std::string& content, double& result, size_t& pos) {
+    size_t start = pos;
+    bool hasDecimal = false;
+    bool hasExp = false;
+    
+    if (content[pos] == '-') {
+        pos++;
+    }
+    
+    while (pos < content.size()) {
+        if (std::isdigit(content[pos])) {
+            pos++;
+        } else if (content[pos] == '.' && !hasDecimal) {
+            hasDecimal = true;
+            pos++;
+        } else if ((content[pos] == 'e' || content[pos] == 'E') && !hasExp) {
+            hasExp = true;
+            pos++;
+            if (pos < content.size() && (content[pos] == '+' || content[pos] == '-')) {
+                pos++;
+            }
+        } else {
+            break;
+        }
+    }
+    
+    if (pos == start) {
+        return false;
+    }
+    
+    result = std::stod(content.substr(start, pos - start));
+    return true;
+}
+
+static bool parseBool(const std::string& content, bool& result, size_t& pos) {
+    if (pos + 4 <= content.size() && content.substr(pos, 4) == "true") {
+        result = true;
+        pos += 4;
+        return true;
+    } else if (pos + 5 <= content.size() && content.substr(pos, 5) == "false") {
+        result = false;
+        pos += 5;
+        return true;
+    }
+    return false;
+}
+
+static bool parseNull(const std::string& content, size_t& pos) {
+    if (pos + 4 <= content.size() && content.substr(pos, 4) == "null") {
+        pos += 4;
+        return true;
+    }
+    return false;
+}
+
+static bool parseJsonArray(const std::string& content, std::vector<JsonValue>& arr, size_t& pos) {
+    if (pos >= content.size() || content[pos] != '[') {
+        return false;
+    }
+    
+    pos++; // Skip opening bracket
+    skipWhitespace(content, pos);
+    
+    while (pos < content.size() && content[pos] != ']') {
+        JsonValue value;
+        if (!parseJsonValue(content, value, pos)) {
+            return false;
+        }
+        
+        arr.push_back(std::move(value));
+        skipWhitespace(content, pos);
+        
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;
+            skipWhitespace(content, pos);
+        }
+    }
+    
+    if (pos >= content.size() || content[pos] != ']') {
+        return false;
+    }
+    
+    pos++; // Skip closing bracket
+    return true;
+}
+
+static bool parseJsonObject(const std::string& content, std::map<std::string, JsonValue>& obj, size_t& pos) {
+    if (pos >= content.size() || content[pos] != '{') {
+        return false;
+    }
+    
+    pos++; // Skip opening brace
+    skipWhitespace(content, pos);
+    
+    while (pos < content.size() && content[pos] != '}') {
+        // Parse key
+        std::string key;
+        if (!parseString(content, key, pos)) {
+            return false;
+        }
+        
+        skipWhitespace(content, pos);
+        
+        if (pos >= content.size() || content[pos] != ':') {
+            return false;
+        }
+        
+        pos++; // Skip colon
+        skipWhitespace(content, pos);
+        
+        // Parse value
+        JsonValue value;
+        if (!parseJsonValue(content, value, pos)) {
+            return false;
+        }
+        
+        obj[key] = std::move(value);
+        skipWhitespace(content, pos);
+        
+        if (pos < content.size() && content[pos] == ',') {
+            pos++;
+            skipWhitespace(content, pos);
+        }
+    }
+    
+    if (pos >= content.size() || content[pos] != '}') {
+        return false;
+    }
+    
+    pos++; // Skip closing brace
+    return true;
+}
+
+static bool parseJsonValue(const std::string& content, JsonValue& value, size_t& pos) {
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size()) {
+        return false;
+    }
+    
+    switch (content[pos]) {
+        case '"': {
+            std::string str;
+            if (parseString(content, str, pos)) {
+                value = str;
+                return true;
+            }
+            return false;
+        }
+        case '{': {
+            std::map<std::string, JsonValue> obj;
+            if (parseJsonObject(content, obj, pos)) {
+                value = std::move(obj);
+                return true;
+            }
+            return false;
+        }
+        case '[': {
+            std::vector<JsonValue> arr;
+            if (parseJsonArray(content, arr, pos)) {
+                value = std::move(arr);
+                return true;
+            }
+            return false;
+        }
+        default:
+            // Try number
+            if (parseNumber(content, std::get<double>(value), pos)) {
+                return true;
+            }
+            // Try boolean
+            if (parseBool(content, std::get<bool>(value), pos)) {
+                return true;
+            }
+            // Try null
+            if (parseNull(content, pos)) {
+                // Null is a special case
+                return true;
+            }
+            return false;
+    }
+}
+
+// ============================================================================
+// Template instantiations
+// ============================================================================
 
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;

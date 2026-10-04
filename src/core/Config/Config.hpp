@@ -5,11 +5,14 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <unordered_map>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class JsonConfigParser;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -22,6 +25,16 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// Advanced JSON/YAML types (optional)
+using JsonValue = std::variant<
+    int,
+    double,
+    bool,
+    std::string,
+    std::vector<JsonValue>,
+    std::map<std::string, JsonValue>
+];
 
 // Configuration source
 enum class ConfigSource {
