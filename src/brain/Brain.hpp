@@ -2,10 +2,6 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
@@ -49,6 +45,10 @@ struct InterRegionConnection {
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
 class Brain {
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
 public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
@@ -61,50 +61,16 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // ========== CORE SIMULATION ==========
+    
     // Initialize brain with configuration
     bool initialize();
     
     // Main simulation step
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step with timestamp
     void step(SimulationStep currentStep, Timestamp currentTime);
-    
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
-    
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
-    
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
-    
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
-    
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
-    
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
-    
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
-    
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
-    
-    // Apply developmental changes (called automatically in step)
-    void develop();
     
     // Reset brain state
     void reset();
@@ -115,27 +81,49 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
+    // ========== INPUT/OUTPUT ==========
     
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    // Receive sensory input from environment
+    void receiveSensoryInput(const class SensoryInput& input);
     
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
+    // Produce motor/action output based on motor neuron activity
+    std::unique_ptr<class Action> produceAction();
     
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    // Inject current directly into a specific neuron
+    void injectCurrent(NeuronId neuron, MembranePotential current);
+    
+    // Inject current into all neurons of a specific type
+    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    
+    // ========== NEURAL SYSTEMS ==========
+    
+    // Spike system access
+    class SpikeSystem* getSpikeSystem();
+    const class SpikeSystem* getSpikeSystem() const;
+    
+    // Plasticity system access
+    class STDP* getSTDP();
+    class Hebbian* getHebbian();
+    class StructuralPlasticity* getStructuralPlasticity();
+    
+    // Apply neuromodulatory signals
+    void applyNeuromodulation(const class Neuromodulator& signal);
+    
+    // ========== PLASTICITY ==========
+    
+    // Update plasticity rules (called automatically in step)
+    void updatePlasticity();
+    
+    // ========== DEVELOPMENT ==========
+    
+    // Apply developmental changes (called automatically in step)
+    void develop();
+    
+    // Get developmental stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    
+    // Set developmental stage
+    void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== MEMORY SYSTEMS ==========
     
@@ -167,8 +155,6 @@ public:
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
@@ -184,18 +170,77 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== REGION MANAGEMENT ==========
+    
+    // Add a new neural region
+    RegionId addRegion(const std::string& name = "");
+    
+    // Get a region by ID
+    NeuralRegion* getRegion(RegionId id);
+    
+    // Get a region by ID (const version)
+    const NeuralRegion* getRegion(RegionId id) const;
+    
+    // Get region count
+    size_t getRegionCount() const;
+    
+    // Get all region IDs
+    std::vector<RegionId> getRegionIds() const;
+    
+    // Get all regions
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    
+    // ========== INTER-REGION CONNECTIONS ==========
+    
+    // Add connection between regions
+    void addInterRegionConnection(RegionId source, RegionId target, 
+                                  float weight = 0.0f, Delay delay = 1);
+    
+    // Remove connection between regions
+    void removeInterRegionConnection(RegionId source, RegionId target);
+    
+    // ========== STATISTICS ==========
+    
+    // Get total neuron count across all regions
+    size_t getTotalNeuronCount() const;
+    
+    // Get total synapse count across all regions
+    size_t getTotalSynapseCount() const;
+    
+    // Get count of active neurons
+    size_t getActiveNeuronCount() const;
+    
+    // Get count of currently firing neurons
+    size_t getFiringNeuronCount() const;
+    
+    // Get average firing rate across all neurons
+    float getAverageFiringRate() const;
+    
+    // Get excitation/inhibition balance ratio
+    float getExcitationInhibitionRatio() const;
+    
+    // Get total spike count
+    size_t getTotalSpikeCount() const;
+    
+    // Get pending spike event count
+    size_t getPendingSpikeEventCount() const;
+    
+    // ========== CONFIG AND UTILITIES ==========
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Get simulation clock
+    class SimulationClock* getClock();
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Get logger instance
+    class Logger* getLogger();
+    
+    // Log brain status
+    void logStatus() const;
 };
 
 } // namespace nlm
