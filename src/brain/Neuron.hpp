@@ -42,6 +42,17 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
+// 
+// This neuron model simulates biological neurons with:
+// - Membrane potential dynamics (integration of synaptic currents)
+// - Spike generation when threshold is reached
+// - Refractory period after spiking
+// - Synaptic input processing (excitatory, inhibitory, modulatory)
+// - Spike-frequency adaptation
+// - Random initialization for biological realism
+//
+// The neuron is implemented using the pImpl idiom for performance
+// and clean memory management.
 class Neuron {
 public:
     // Create neuron with ID
@@ -134,7 +145,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Uses LIF integration with current timestep (Phase 6 implementation)
     void step(Timestamp currentTime);
     
     // Reset to initial state

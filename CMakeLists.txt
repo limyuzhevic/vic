@@ -77,14 +77,19 @@ add_library(nlm_core STATIC
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
+        # Performance and Profiling
+    src/core/PerformanceProfiler.cpp
+    src/core/PerformanceProfiler.hpp
     # Visualization
-    src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationTools.cpp
+    # Experiment management
+    src/experiments/ExperimentManager.cpp
+    # Advanced configuration
+    src/config/AdvancedConfigSystem.cpp
+    # Benchmarking
+    src/benchmark/BenchmarkSuiteManager.cpp
+    # Memory usage monitoring
+    src/memory/MemoryUsageMonitor.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
