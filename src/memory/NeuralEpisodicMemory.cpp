@@ -21,6 +21,8 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    // Initialize episodes vector
+    episodes_.clear();
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;

@@ -18,6 +18,7 @@ NeuralPlanner::NeuralPlanner()
     , planningConfidence_(0.5f)
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
+    recentPlanSuccess_.clear();
 }
 
 NeuralPlanner::~NeuralPlanner() = default;

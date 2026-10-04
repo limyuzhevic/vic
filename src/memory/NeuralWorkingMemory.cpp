@@ -23,6 +23,13 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize memory vectors
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    recurrentConnections_.clear();
+    winners_.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;

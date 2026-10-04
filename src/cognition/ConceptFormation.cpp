@@ -20,6 +20,8 @@ ConceptFormation::ConceptFormation()
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
 {
+    // Initialize concepts vector
+    concepts_.clear();
 }
 
 ConceptFormation::~ConceptFormation() = default;
