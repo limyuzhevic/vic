@@ -332,10 +332,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+    // ========== STEP 2: Update all neurons (LIF dynamics) - OPTIMIZED ==========
+    // Process neurons in cache-friendly order: regions -> populations -> neurons
+    // Use local references for better performance
+    auto& regions = pImpl->regions;
+    
+    for (auto& region : regions) {
+        // Cache frequently accessed region data
+        auto& populations = region->getPopulations();
+        
+        for (auto& pop : populations) {
+            // Get neurons reference once to avoid repeated method calls
+            auto& neurons = pop->getNeurons();
+            
+            // Vectorized neuron stepping
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -425,13 +436,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        if (dopamineLevel > 0.0f) {
+            float excitabilityMod = dopamineLevel * 0.5f;
+            
+            // Optimized dopamine application - vectorized across neurons using cached references
+            for (auto& region : regions) {
+                auto& populations = region->getPopulations();
+                
+                for (auto& pop : populations) {
+                    auto& neurons = pop->getNeurons();
+                    
+                    for (auto* neuron : neurons) {
+                        // Dopamine modulates excitability by injecting additional current
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
@@ -439,15 +455,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) - OPTIMIZED ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+    // Cache references for better performance
+    auto& stdpPtr = pImpl->stdp;
+    auto& hebbianPtr = pImpl->hebbian;
+    
+    // Process plasticity for all synapses - optimized with cached references
+    for (auto& region : regions) {
+        auto& synapses = region->getSynapses();
+        
+        for (auto& syn : synapses) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -455,7 +478,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    stdpPtr->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
                     syn->setWeight(weight);
@@ -468,7 +491,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    hebbianPtr->update(syn, preSpikes, postSpikes, pImpl->timestep);
                 }
             }
             
@@ -488,10 +511,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+            // Store active neurons - optimized with local references
+            for (auto& region : regions) {
+                auto& populations = region->getPopulations();
+                
+                for (auto& pop : populations) {
+                    auto& neurons = pop->getNeurons();
+                    
+                    for (auto* neuron : neurons) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());

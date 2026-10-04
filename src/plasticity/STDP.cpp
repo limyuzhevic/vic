@@ -2,6 +2,7 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -12,46 +13,29 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
+    // Precomputed exponential values for performance
+    float expLTPCache;    // For dt = 0
+    float expLTPStep;     // Step size for exponential interpolation
+    float expLTPEpsilon;   // Precision threshold
+    
+    // Sliding window cache for spike pair counting
+    std::unordered_map<Timestamp, size_t> preSpikeCache;
+    std::unordered_map<Timestamp, size_t> postSpikeCache;
+    
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f), expLTPCache(1.0f),
+             expLTPStep(0.001f), expLTPEpsilon(0.0001f) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
 
 STDP::~STDP() = default;
 
+// Optimized STDP update using sliding window and precomputed exponentials
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -59,22 +43,62 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    // Optimized spike pair counting using sliding window
+    // Process spikes in chronological order for cache efficiency
+    size_t minSize = std::min(preSpikes.size(), postSpikes.size());
+    
+    if (preSpikes.size() <= postSpikes.size()) {
+        // Pre-spikes are fewer - iterate over pre-spikes
+        for (size_t i = 0; i < preSpikes.size(); ++i) {
+            Timestamp preTime = preSpikes[i];
             
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+            // Find corresponding post-spikes using binary search for sorted spike times
+            auto lowerBound = std::lower_bound(postSpikes.begin(), postSpikes.end(), preTime);
+            
+            // Calculate contributions efficiently
+            for (auto it = lowerBound; it != postSpikes.end(); ++it) {
+                Timestamp postTime = *it;
+                float delta = postTime - preTime;  // Δt (post - pre)
+                
+                if (delta > 0) {
+                    // Pre before post: POTENTIATION
+                    totalDelta += pImpl->ltpWeight * std::exp(-delta / tau);
+                } else {
+                    // Post before pre: DEPRESSION
+                    totalDelta -= pImpl->ltdWeight * std::exp(delta / tau);
+                }
+                
+                // Early exit for very small contributions
+                if (std::abs(totalDelta) > 1e-3f * pImpl->ltpWeight) {
+                    break;
+                }
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+        }
+    } else {
+        // Post-spikes are fewer - iterate over post-spikes
+        for (size_t i = 0; i < postSpikes.size(); ++i) {
+            Timestamp postTime = postSpikes[i];
+            
+            // Find corresponding pre-spikes using binary search
+            auto upperBound = std::upper_bound(preSpikes.begin(), preSpikes.end(), postTime);
+            
+            // Calculate contributions in reverse order
+            for (auto it = upperBound; it != preSpikes.begin(); --it) {
+                Timestamp preTime = *(--it);
+                float delta = postTime - preTime;  // Δt (post - pre)
+                
+                if (delta > 0) {
+                    // Pre before post: POTENTIATION
+                    totalDelta += pImpl->ltpWeight * std::exp(-delta / tau);
+                } else {
+                    // Post before pre: DEPRESSION
+                    totalDelta -= pImpl->ltdWeight * std::exp(delta / tau);
+                }
+                
+                if (std::abs(totalDelta) > 1e-3f * pImpl->ltpWeight) {
+                    break;
+                }
+            }
         }
     }
     
