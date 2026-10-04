@@ -14,6 +14,8 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
+// Helper function to format any type for config summary
+std::string formatConfigValue(const ConfigValue& value);
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
@@ -178,7 +180,7 @@ std::string Config::summary() const {
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
             } else {
-                oss << arg;
+                oss << formatConfigValue(arg);
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
