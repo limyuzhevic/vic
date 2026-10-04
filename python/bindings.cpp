@@ -5,6 +5,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <chrono>
+#include <cmath>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,12 +16,252 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/world/WorldObject.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// Enhanced helper classes for Python
+class PynlmError : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
+
+class ConfigurationError : public PynlmError {
+public:
+    using PynlmError::PynlmError;
+};
+
+class SimulationError : public PynlmError {
+public:
+    using PynlmError::PynlmError;
+};
+
+// Convenience helper functions
+namespace convenience {
+    // Enhanced brain creation with parameters
+    static std::shared_ptr<Brain> createBrain(size_t neuron_count = 1000, 
+                                            size_t region_count = 1,
+                                            double connection_probability = 0.1,
+                                            const std::string& config_file = "") {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Runtime);
+        config->set("brain.region_count", static_cast<int64_t>(region_count), ConfigSource::Runtime);
+        config->set("brain.connection_probability", connection_probability, ConfigSource::Runtime);
+        
+        if (!config_file.empty()) {
+            config->loadFromFile(config_file);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw SimulationError("Failed to initialize brain");
+        }
+        
+        return brain;
+    }
+    
+    // Create a brain with demo configuration
+    static std::shared_ptr<Brain> createDemoBrain() {
+        auto config = std::make_shared<Config>();
+        
+        // Basic configuration
+        config->set("brain.neuron_count", 500, ConfigSource::Default);
+        config->set("brain.region_count", 2, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05, ConfigSource::Default);
+        config->set("brain.v_thresh", -50.0, ConfigSource::Default);
+        config->set("brain.v_rest", -70.0, ConfigSource::Default);
+        config->set("brain.v_reset", -75.0, ConfigSource::Default);
+        config->set("brain.tau_mem", 20.0, ConfigSource::Default);
+        config->set("brain.tau_ref", 2.0, ConfigSource::Default);
+        
+        // Plasticity configuration
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        
+        // Neuromodulation configuration
+        config->set("neuromod.dopamine.scale", 1.0, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw SimulationError("Failed to initialize demo brain");
+        }
+        
+        return brain;
+    }
+    
+    // Create a simple world with configuration
+    static std::shared_ptr<SimpleWorld> createWorld(float width = 20.0f,
+                                                    float height = 20.0f,
+                                                    size_t vision_width = 8,
+                                                    size_t vision_height = 8,
+                                                    float max_energy = 100.0f,
+                                                    float energy_decay_rate = 0.01f) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, vision_width, vision_height);
+        world->setMaxEnergy(max_energy);
+        world->setEnergyDecayRate(energy_decay_rate);
+        return world;
+    }
+    
+    // Create an agent with learning enabled
+    static std::shared_ptr<AgentBrain> createAgent(std::shared_ptr<Brain> brain,
+                                                  std::shared_ptr<SimpleWorld> world,
+                                                  bool enable_reward_modulation = true,
+                                                  bool enable_structural_plasticity = true,
+                                                  bool enable_development = true,
+                                                  bool enable_curiosity = true) {
+        if (!brain || !world) {
+            throw SimulationError("Brain or world is null");
+        }
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        if (enable_reward_modulation) agent->enableRewardModulation(true);
+        if (enable_structural_plasticity) agent->enableStructuralPlasticity(true);
+        if (enable_development) agent->enableDevelopment(true);
+        if (enable_curiosity) agent->enableCuriosity(true);
+        
+        return agent;
+    }
+    
+    // Run complete agent simulation
+    static std::unordered_map<std::string, double> runCompleteSimulation(
+        size_t num_steps = 1000,
+        float world_width = 20.0f,
+        float world_height = 20.0f,
+        size_t vision_width = 8,
+        size_t vision_height = 8) {
+        
+        // Create brain with demo configuration
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500, ConfigSource::Default);
+        config->set("brain.region_count", 2, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create and configure world
+        auto world = createWorld(world_width, world_height, vision_width, vision_height);
+        world->reset();
+        world->setAgentStart(world_width/2, world_height/2);
+        
+        // Create and initialize agent
+        auto agent = createAgent(brain, world);
+        
+        // Run simulation
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step, world->getSimulationTime());
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        // Return statistics
+        std::unordered_map<std::string, double> results;
+        results["total_spikes"] = brain->getTotalSpikeCount();
+        results["firing_rate"] = brain->getAverageFiringRate();
+        results["active_neurons"] = brain->getActiveNeuronCount();
+        results["simulation_time"] = static_cast<double>(num_steps * 0.1);
+        
+        return results;
+    }
+    
+    // Format configuration for display
+    static std::string formatConfig(const std::shared_ptr<Config>& config) {
+        if (!config) return "Invalid configuration";
+        
+        std::stringstream ss;
+        ss << "Configuration Summary:\n";
+        auto keys = config->getKeys();
+        
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            ss << "  " << key << ": " << value << "\n";
+        }
+        
+        return ss.str();
+    }
+    
+    // Validate configuration
+    static bool validateConfig(const std::shared_ptr<Config>& config) {
+        if (!config) return false;
+        
+        if (config->getKeys().empty()) return false;
+        
+        auto neuron_count = config->getOr("brain.neuron_count", 0);
+        if (neuron_count <= 0) return false;
+        
+        auto connection_probability = config->getOr("brain.connection_probability", 0.0);
+        if (connection_probability < 0.0 || connection_probability > 1.0) return false;
+        
+        return true;
+    }
+}
+
+// Performance monitoring helper
+class PerformanceMonitor {
+public:
+    struct PerformanceStats {
+        double total_time;
+        size_t steps_completed;
+        double avg_firing_rate;
+        size_t active_neurons;
+        size_t total_spikes;
+        double memory_usage;
+        std::chrono::system_clock::time_point start_time;
+        std::chrono::system_clock::time_point end_time;
+    };
+    
+    static PerformanceStats measurePerformance(
+        std::function<void()> simulation_func,
+        size_t steps_to_run) {
+        
+        PerformanceStats stats;
+        stats.start_time = std::chrono::system_clock::now();
+        
+        auto start_cpu = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps_to_run; ++i) {
+            simulation_func();
+        }
+        
+        auto end_cpu = std::chrono::high_resolution_clock::now();
+        stats.end_time = std::chrono::system_clock::now();
+        
+        stats.total_time = std::chrono::duration<double>(end_cpu - start_cpu).count();
+        stats.steps_completed = steps_to_run;
+        
+        return stats;
+    }
+    
+    static std::string formatStats(const PerformanceStats& stats) {
+        std::stringstream ss;
+        ss << "Performance Statistics:\n";
+        ss << "  Total time: " << stats.total_time << " seconds\n";
+        ss << "  Steps completed: " << stats.steps_completed << "\n";
+        ss << "  Steps per second: " << (stats.steps_completed / stats.total_time) << "\n";
+        ss << "  Average firing rate: " << stats.avg_firing_rate << " Hz\n";
+        ss << "  Active neurons: " << stats.active_neurons << "\n";
+        ss << "  Total spikes: " << stats.total_spikes << "\n";
+        ss << "  Memory usage: " << stats.memory_usage << " MB\n";
+        
+        return ss.str();
+    }
+};
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
