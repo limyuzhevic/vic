@@ -61,23 +61,25 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        double currentTime = step * 0.001;
+        
+        // Get observation from world (use sensory percept directly)
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
         
         // Brain step
-        brain->step(step, step * 0.001);
+        brain->step(step, currentTime);
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(cmd, currentTime);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward();
         totalReward += reward;
         
         // Apply reward modulation
@@ -85,7 +87,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Update development
         if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+            agent.updateDevelopment(currentTime);
         }
         
         // Collect metrics

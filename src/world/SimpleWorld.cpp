@@ -378,19 +378,31 @@ void SimpleWorld::generateVision() {
     internal[3] = agent_.isTurning ? 1.0f : 0.0f;  // Turning state
     sensory_.setInternal(internal);
     
-    // Generate proprioception (body position/velocity)
-    std::vector<float> proprioception(6, 0.0f);
-    proprioception[0] = agent_.x / width_;     // Normalized X
-    proprioception[1] = agent_.y / height_;    // Normalized Y
-    proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
-    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
-    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
-    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
-    sensory_.setProprioception(proprioception);
+    // Apply action to agent
+    ActionResult SimpleWorld::applyAction(MotorCommand cmd, double currentTime) {
+        return applyMotorCommand(cmd, currentTime);
+    }
     
-    // No audio for now
-    sensory_.setAudio({});
-}
+    // Compute reward for current state
+    float SimpleWorld::computeReward() const {
+        float reward = 0.0f;
+        
+        // Check if agent is on a resource (positive reward)
+        WorldObject* obj = getObjectAt(agent_.x, agent_.y);
+        if (obj != nullptr && obj->type == WorldObjectType::Resource) {
+            reward += obj->value;
+        }
+        
+        // Check if agent is on a hazard (negative reward)
+        if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
+            reward += obj->value;  // Negative value
+        }
+        
+        // Small energy efficiency reward (encourage staying alive)
+        reward += agent_.energy * 0.1f;
+        
+        return reward;
+    }
 
 void SimpleWorld::checkCollisions() {
     // Passive collision check (for damage when moving into objects)

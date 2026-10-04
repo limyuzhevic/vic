@@ -63,8 +63,11 @@ public:
     // Check if position is valid (not wall)
     bool isValidPosition(float x, float y) const;
     
-    // Get object at position (if any)
-    WorldObject* getObjectAt(float x, float y);
+    // Apply action to agent
+    ActionResult applyAction(MotorCommand cmd, double currentTime);
+    
+    // Compute reward for current state
+    float computeReward() const;
     
     // World dimensions
     float getWidth() const { return width_; }

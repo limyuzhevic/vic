@@ -26,36 +26,43 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+        if (type == NeuronType::Motor) {
+            for (Neuron* n : pop->getNeurons()) {
+                // Distribute motor neurons to different action groups
+                // MotorCommand enum has 8 values: MoveForward, MoveBackward, TurnLeft, TurnRight, 
+                // LookLeft, LookRight, Interact, Wait
+                size_t totalGroups = motorForward_.size() + motorBackward_.size() + 
+                                   motorTurnLeft_.size() + motorTurnRight_.size() +
+                                   motorLookLeft_.size() + motorLookRight_.size() +
+                                   motorInteract_.size() + motorWait_.size();
+                
+                // Round-robin distribution across all 8 motor command types
+                switch (totalGroups % 8) {
+                    case 0: motorForward_.push_back(n); break;      // MoveForward
+                    case 1: motorBackward_.push_back(n); break;     // MoveBackward
+                    case 2: motorTurnLeft_.push_back(n); break;      // TurnLeft
+                    case 3: motorTurnRight_.push_back(n); break;     // TurnRight
+                    case 4: motorLookLeft_.push_back(n); break;      // LookLeft
+                    case 5: motorLookRight_.push_back(n); break;     // LookRight
+                    case 6: motorInteract_.push_back(n); break;      // Interact
+                    case 7: motorWait_.push_back(n); break;          // Wait
                 }
+            }
+        } else if (type == NeuronType::Sensory) {
+            for (Neuron* n : pop->getNeurons()) {
+                // Distribute sensory neurons
+                // 4 sensory groups: Vision, Touch, Internal, Proprioception
+                size_t totalGroups = sensoryVision_.size() + sensoryTouch_.size() +
+                                   sensoryInternal_.size() + sensoryProprioception_.size();
+                
+                switch (totalGroups % 4) {
+                    case 0: sensoryVision_.push_back(n); break;
+                    case 1: sensoryTouch_.push_back(n); break;
+                    case 2: sensoryInternal_.push_back(n); break;
+                    case 3: sensoryProprioception_.push_back(n); break;
+                }
+            }
+        }
             }
         }
     }
@@ -178,6 +185,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
     float rightAct = calcActivity(motorTurnRight_);
+    float lookLeftAct = calcActivity(motorLookLeft_);
+    float lookRightAct = calcActivity(motorLookRight_);
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
@@ -187,6 +196,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookLeft, lookLeftAct},
+        {MotorCommand::LookRight, lookRightAct},
         {MotorCommand::Interact, interactAct},
         {MotorCommand::Wait, waitAct}
     };
@@ -217,18 +228,18 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
+    // Random motor command selection (includes all 8 motor types)
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::LookLeft;
+        case 5: return MotorCommand::LookRight;
+        case 6: return MotorCommand::Interact;
+        default: return MotorCommand::Wait;
+    }
         }
     }
     
