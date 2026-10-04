@@ -139,6 +139,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Enhanced Phase 6 demo executable
+add_executable(nlm_phase6_demo_enhanced
+    src/experiments/Phase6Demo.cpp
+    src/experiments/EnhancedPhase6Demo.cpp
+    src/experiments/CLIParser.cpp
+    src/experiments/CLIParser.hpp
+)
+target_link_libraries(nlm_phase6_demo_enhanced PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3)
+
+# Enhanced Phase 6 header
+target_include_directories(nlm_phase6_demo_enhanced PUBLIC src/experiments)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

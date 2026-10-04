@@ -13,7 +13,7 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
+#include "nlm/experiments/EnhancedPhase4Demo.hpp"
 
 using namespace nlm;
 
@@ -37,16 +37,38 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
+    bool useEnhanced = true;
+    
+    if (argc >= 2 && argc <= 2) {
+        try {
+            size_t trials = std::stoul(argv[1]);
+            if (trials <= 1000) {
+                useEnhanced = false;
+            }
+        } catch (...) {
+            useEnhanced = true;
+        }
+    }
+    
+    if (useEnhanced) {
+        std::cout << "NLM Phase 4: Enhanced Emerging Cognition\n";
+        std::cout << "======================================\n\n";
+        std::cout << "Running enhanced Phase 4 demo with advanced features.\n";
+        std::cout << "Use 'basic', 'tutorial', 'batch', 'compare', or 'explore' modes for different behaviors.\n\n";
+        
+        EnhancedPhase4Demo demo;
+        demo.runDemo();
+        return 0;
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
     size_t numTrials = 50;
     if (argc > 1) {
         numTrials = std::stoi(argv[1]);
     }
     
-    // Create configuration
     auto config = std::make_shared<Config>();
     config->set("neuron_count", size_t(1000));
     config->set("region_count", size_t(2));
@@ -56,7 +78,6 @@ int main(int argc, char* argv[]) {
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
     
-    // Create brain
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
     if (!brain->initialize()) {
@@ -66,7 +87,6 @@ int main(int argc, char* argv[]) {
     
     printHeader("PHASE 4 EXPERIMENTS");
     
-    // Run Temporal Prediction Experiment
     printSection("1. Temporal Prediction Learning");
     {
         TemporalPredictionExperiment experiment;
@@ -84,7 +104,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Working Memory Experiment
     printSection("2. Working Memory");
     {
         WorkingMemoryExperiment experiment;
@@ -95,7 +114,6 @@ int main(int argc, char* argv[]) {
         printResult("Capacity", results.workingMemoryCapacity, 100.0f);
     }
     
-    // Run Episodic Recall Experiment
     printSection("3. Episodic Memory");
     {
         EpisodicRecallExperiment experiment;
@@ -106,7 +124,6 @@ int main(int argc, char* argv[]) {
         printResult("Episodic Influence", results.episodicInfluence);
     }
     
-    // Run Concept Formation Experiment
     printSection("4. Concept Formation");
     {
         ConceptFormationExperiment experiment;
@@ -121,7 +138,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Attention Experiment
     printSection("5. Neural Attention");
     {
         AttentionExperiment experiment;
@@ -135,7 +151,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Planning Experiment
     printSection("6. Multi-Step Planning");
     {
         PlanningExperiment experiment;
@@ -149,7 +164,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Self-Model Experiment
     printSection("7. Self-Model");
     {
         SelfModelExperiment experiment;
@@ -163,7 +177,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Social Learning Experiment
     printSection("8. Social Learning");
     {
         SocialLearningExperiment experiment;
@@ -177,7 +190,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Continual Learning Experiment
     printSection("9. Continual Learning");
     {
         ContinualLearningExperiment experiment;
@@ -187,7 +199,6 @@ int main(int argc, char* argv[]) {
         printResult("Transfer Performance", results.transferPerformance);
     }
     
-    // Run Integrated Experiment
     printSection("10. Integrated Phase 4");
     {
         Phase4IntegratedExperiment experiment;
@@ -200,7 +211,6 @@ int main(int argc, char* argv[]) {
         printResult("Body Awareness", results.bodyAwareness);
     }
     
-    // Final summary
     printHeader("PHASE 4 SUMMARY");
     
     std::cout << "\nPhase 4 demonstrates:\n";
