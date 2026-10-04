@@ -190,12 +190,124 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Configuration validation and management
+    bool validateConfiguration();
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Advanced logging and statistics
+    void logAdvancedConfiguration();
+    void logAdvancedStats();
+    void logAdvancedMetrics() const;
+    
+    // Development stage management
+    void setDevelopmentalStageFromString(const std::string& stageStr);
+    bool isValidDevelopmentalStageString(const std::string& stageStr);
+    
+    // Advanced metrics update
+    void updateAdvancedMetrics();
+    
+    // Status and information
+    std::string getSystemInfo() const;
+    std::string getConfigurationSummary() const;
+    std::string getPerformanceStats() const;
+    
+    // Debug and diagnostic tools
+    void debugSystemState() const;
+    void diagnoseIntegrationIssues() const;
+    void validateAllSystems() const;
+    
+    // Utility functions
+    static std::string getVersionInfo();
+    static std::string getBuildInfo();
+    
+    // Export and import utilities
+    bool exportSystemState(const std::string& filepath) const;
+    bool importSystemState(const std::string& filepath);
+    
+    // Performance monitoring
+    float getSystemPerformanceScore() const;
+    size_t getMemoryUsage() const;
+    size_t getProcessingTime() const;
+    
+    // Configuration helpers
+    void printConfiguration() const;
+    void printSystemStatus() const;
+    void printIntegrationStatus() const;
 
-} // namespace nlm
+    // ========== ADVANCED FEATURE ACCESS ==========
+
+    // Memory system diagnostics
+    size_t getWorkingMemoryCapacity() const;
+    size_t getEpisodicMemoryCapacity() const;
+    size_t getAssociativeMemoryCapacity() const;
+    
+    // Neuromodulation diagnostics
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    
+    // Prediction system diagnostics
+    float getPredictionAccuracy() const;
+    size_t getPredictionErrorCount() const;
+    
+    // Cognition system diagnostics
+    size_t getPlannerDepth() const;
+    size_t getConceptCount() const;
+    float getAttentionStrength() const;
+    
+    // Plasticity system diagnostics
+    bool isSTDPActive() const;
+    bool isHebbianActive() const;
+    bool isStructuralPlasticityActive() const;
+    
+    // Development system diagnostics
+    DevelopmentalStage getCurrentDevelopmentalStage() const;
+    float getPlasticityModulation() const;
+    
+    // Environment and interaction
+    void enableAllSubsystems();
+    void disableAllSubsystems();
+    void optimizeForPerformance();
+    void optimizeForLearning();
+    
+    // Simulation control
+    void pauseSimulation();
+    void resumeSimulation();
+    bool isSimulationPaused() const;
+    
+    // Learning control
+    void enableLearning();
+    void disableLearning();
+    bool isLearningEnabled() const;
+    
+    // Memory management
+    void clearWorkingMemory();
+    void clearEpisodicMemory();
+    void clearAllCaches();
+    
+    // Emergency controls
+    void emergencyShutdown();
+    void emergencyReset();
+    bool isEmergencyMode() const;
+
+    // ========== INTERNAL SYSTEM ACCESS ==========
+
+    // Direct access to internal systems (advanced usage)
+    NeuralWorkingMemory* getWorkingMemoryInternal();
+    NeuralEpisodicMemory* getEpisodicMemoryInternal();
+    NeuralAssociativeMemory* getAssociativeMemoryInternal();
+    PredictionSystem* getPredictionSystemInternal();
+    NeuralPlanner* getPlannerInternal();
+    ConceptFormation* getConceptFormationInternal();
+    AttentionalSelection* getAttentionInternal();
+    DevelopmentSystem* getDevelopmentSystemInternal();
+    Dopamine* getDopamineInternal();
+    Curiosity* getCuriosityInternal();
+    Novelty* getNoveltyInternal();
+    PredictionError* getPredictionErrorSignalInternal();
+    STDP* getSTDPInternal();
+    Hebbian* getHebbianInternal();
+    StructuralPlasticity* getStructuralPlasticityInternal();
+    
+    // Implementation details (for debugging)
+    const Impl* getImplementation() const;
+    Impl* getImplementation();
