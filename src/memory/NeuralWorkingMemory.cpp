@@ -43,12 +43,16 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // Set neuron activation with proper null checks
+        auto* region = brain_->getRegion(neuron.getId() / 1000);
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            if (neurons) {
+                for (auto* nn : *neurons) {
+                    if (nn && nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
@@ -82,6 +86,12 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
     }
+    
+    // Inject current to maintain activation with null check
+    if (brain_) {
+        brain_->injectCurrent(neuron, activation * 5.0f);
+    }
+}
     
     // Inject current to maintain activation
     if (brain_) {
@@ -172,12 +182,15 @@ void NeuralWorkingMemory::runCompetition() {
         }
     }
     
-    // Inhibitory competition - suppress non-winners
+    // Inhibitory competition - suppress non-winners with bounds checking
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Bounds check to prevent iterator invalidation
+        if (i >= memoryNeurons_.size() || i >= memoryActivations_.size()) break;
+        
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
         if (!isWinner && brain_) {
-            // Apply strong inhibition
+            // Apply strong inhibition with null check
             brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
     }
@@ -211,15 +224,19 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
     for (const auto& conn : pImpl->maintenanceSynapses) {
         float fromActivation = 0.0f;
         
-        // Find from neuron activation
-        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
-        if (it != memoryNeurons_.end()) {
-            size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
+        // Find from neuron activation with bounds checking
+        if (!memoryNeurons_.empty()) {
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                if (idx < memoryActivations_.size()) {
+                    fromActivation = memoryActivations_[idx];
+                }
+            }
         }
         
         if (fromActivation > 0.1f && brain_) {
-            // Send maintenance signal
+            // Send maintenance signal with null check
             brain_->injectCurrent(conn.second, fromActivation * 2.0f);
         }
     }

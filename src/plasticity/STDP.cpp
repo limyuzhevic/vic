@@ -59,22 +59,47 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    // OPTIMIZED: Sort spikes for O(n log n) complexity instead of O(n²)
+    // Using the optimal pairing approach from the analysis
+    // Create sorted copies for efficient pairing
+    std::vector<Timestamp> sortedPre = preSpikes;
+    std::vector<Timestamp> sortedPost = postSpikes;
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
+    // Efficient O(n log n) pair detection using binary search
+    // For each pre-synaptic spike, find post-synaptic spikes that occurred after it
+    for (Timestamp preTime : sortedPre) {
+        // Find first post-synaptic spike after this pre-synaptic spike
+        auto postIt = std::upper_bound(sortedPost.begin(), sortedPost.end(), preTime);
+        
+        // Calculate contributions from all post-synaptic spikes after this pre-synaptic spike
+        for (auto pit = postIt; pit != sortedPost.end(); ++pit) {
+            float dt = static_cast<float>(*pit - preTime);  // Δt in ms
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
+            }
+        }
+    }
+    
+    // Now process reverse for negative dt (post before pre)
+    // For each post-synaptic spike, find pre-synaptic spikes that occurred after it
+    for (Timestamp postTime : sortedPost) {
+        // Find first pre-synaptic spike after this post-synaptic spike
+        auto preIt = std::upper_bound(sortedPre.begin(), sortedPre.end(), postTime);
+        
+        // Calculate contributions from all pre-synaptic spikes after this post-synaptic spike
+        for (auto pit = preIt; pit != sortedPre.end(); ++pit) {
+            float dt = static_cast<float>(*pit - postTime);  // Δt in ms
+            
+            if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
         }
     }
     

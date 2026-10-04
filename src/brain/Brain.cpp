@@ -259,20 +259,26 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
+    // Register spike handlers for event-driven processing with safety checks
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
+        // Count spikes with bounds checking
+        if (pImpl) {
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        }
     });
     
-    // Register delayed spike handler to deliver synaptic input
+    // Register delayed spike handler to deliver synaptic input with comprehensive null checks
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
+        if (!pImpl) return;
+        
+        // Find destination neuron and deliver synaptic input with proper bounds checking
         for (auto& region : pImpl->regions) {
+            if (!region) continue;
             auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
+            if (!neurons) continue;
+            for (auto* neuron : *neurons) {
+                if (neuron && neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
                     if (event.is_excitatory) {
@@ -533,46 +539,69 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (currentStep % 100 == 0 && pImpl->structuralPlasticity) {
+        // Enhanced bounds checking and safety validation before calling update
+        size_t neuronCount = getTotalNeuronCount();
+        if (neuronCount > 0 && pImpl->rng) {
+            pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+        // Enhanced bounds checking for replay interval
+        size_t replayInterval = pImpl->replayInterval > 0 ? pImpl->replayInterval : 1;
+        if (currentStep % replayInterval == 0) {
+            // Get episodes for replay with safety checks
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+            for (const auto* episode : episodesToReplay) {
+                if (episode) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+            }
         }
     }
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem && pImpl->structuralPlasticity && pImpl->rng) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp && pImpl->developmentalStage != DevelopmentalStage::Undefined) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                    case DevelopmentalStage::Undefined:
+                        plasticityMod = 1.0f;  // Default high plasticity
+                        break;
+                }
+                
+                // Additional bounds checking for plasticity rates
+                float synaptogenesisRate = 0.0001f * plasticityMod;
+                float pruningRate = 0.00001f * (2.0f - plasticityMod);
+                
+                // Ensure rates are within reasonable bounds
+                synaptogenesisRate = std::max(0.0f, std::min(0.001f, synaptogenesisRate));
+                pruningRate = std::max(0.0f, std::min(0.0001f, pruningRate));
+                
+                sp->setSynaptogenesisRate(synaptogenesisRate);
+                sp->setPruningRate(pruningRate);
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
@@ -589,29 +618,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
+    if (!pImpl) return;
+    
+    // Inject current into sensory neurons based on input with comprehensive validation
     // This is a simple mapping - sensory encoding
     
-    const auto& values = input.getData();
-    if (values.empty()) return;
+    if (input.getData().empty()) return;
     
+    const auto& values = input.getData();
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Distribute input across sensory neurons with comprehensive bounds checking
     for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
+        // Normalize input value to range [-10, 10] mV with additional bounds checking
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            
+            // Additional bounds checking to prevent overflow
+            if (normalizedValue > 10.0f) normalizedValue = 10.0f;
+            if (normalizedValue < -10.0f) normalizedValue = -10.0f;
         }
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Inject current into this sensory neuron with null check
+        if (i < pImpl->sensoryNeurons.size() && pImpl->sensoryNeurons[i]) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            
+            // Also store in working memory with bounds checking
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                // Additional safety check for working memory capacity
+                if (pImpl->workingMemory->getActiveTraces() < pImpl->workingMemory->getCapacity()) {
+                    pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+                }
+            }
         }
     }
 }
