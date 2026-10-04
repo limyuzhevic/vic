@@ -42,60 +42,79 @@ public:
     ActionType planAction(const std::vector<float>& currentState,
                          float targetReward = 0.5f);
 
+    // Evaluate a single action from current state
+    // Returns expected value of taking this action
+    float evaluateAction(ActionType action, const std::vector<float>& state);
+    
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
                                       const std::vector<float>& startState);
-
+    
     // Get number of steps to look ahead
     size_t getPlanningDepth() const { return planningDepth_; }
     void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
-
+    
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
-
+    
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                          const std::vector<ActionType>& actualActions,
-                          float actualReward);
-
+                         const std::vector<ActionType>& actualActions,
+                         float actualReward);
+    
     // Clear planning cache
     void clearCache();
-
+    
     // Set action quality function (from experience)
     void setActionQuality(ActionType action, float quality) {
         actionQuality_[static_cast<size_t>(action)] = quality;
     }
-
+    
     // Get current goal
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
-
+    
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
 private:
-    // Generate possible action sequences
+// Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
-
+    
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t planningDepth_;
-    float planningConfidence_;
     
-    // Current goal state
-    std::vector<float> currentGoal_;
+    // Predict next state
+    std::vector<float> predictNextState(ActionType action,
+                                       const std::vector<float>& currentState);
     
-    // Action quality from experience
-    std::vector<float> actionQuality_;
+    // Get number of steps to look ahead
+    size_t getPlanningDepth() const { return planningDepth_; }
+    void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
     
-    // Recent plan success history
-    std::deque<bool> recentPlanSuccess_;
+    // Get planning confidence
+    float getPlanningConfidence() const { return planningConfidence_; }
+    
+    // Update plans based on actual outcome
+    void updatePlanQuality(const std::vector<ActionType>& plannedActions,
+                         const std::vector<ActionType>& actualActions,
+                         float actualReward);
+    
+    // Clear planning cache
+    void clearCache();
+    
+    // Set action quality function (from experience)
+    void setActionQuality(ActionType action, float quality) {
+        actionQuality_[static_cast<size_t>(action)] = quality;
+    }
+    
+    // Get current goal
+    std::vector<float> getCurrentGoal() const { return currentGoal_; }
+    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+    
+    // Has recent planning been successful?
+    bool wasRecentPlanSuccessful() const;
 };
 
 // SelfModel: Represents the agent's internal model of itself

@@ -152,11 +152,36 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
+    // Apply curiosity-driven exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        MotorCommand curiousCmd = selectWithCuriosity(decoded);
+        // If curiosity suggests a different action, use it
+        if (curiousCmd != MotorCommand::Wait) {
+            decoded = curiousCmd;
+        }
+    }
+    
+    // Apply planning from neural planner
+    if (brain_->getPlanner()) {
+        // Get current state for planning
+        auto currentState = getCurrentNeuralState();
+        
+        // Set goal based on curiosity and prediction error
+        float targetReward = 0.5f + curiosityLevel_ * 0.3f + std::abs(predictionError_) * 0.2f;
+        
+        // Plan action using neural planner
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState, targetReward);
+        
+        // If planner suggests a different action, check if it's better
+        if (plannedAction != MotorCommand::Wait && plannedAction != decoded) {
+            // Evaluate if planned action is better than current
+            float currentValue = getActionValue(decoded);
+            float plannedValue = brain_->getPlanner()->evaluateAction(plannedAction, currentState);
+            
+            if (plannedValue > currentValue * 0.8f) {  // 20% tolerance
+                decoded = static_cast<MotorCommand>(plannedAction);
+            }
+        }
     }
     
     return decoded;
@@ -232,7 +257,54 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         }
     }
     
-    return defaultCmd;
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Use membrane potential as feature
+                    float activation = n->getState().membranePotential / 20.0f;  // Normalize to 0-1
+                    neuralState.push_back(activation);
+                }
+            }
+        }
+    }
+    
+    return neuralState;
+}
+
+// Get value of an action based on experience
+float AgentBrain::getActionValue(MotorCommand action) const {
+    if (!brain_) return 0.0f;
+    
+    // In a full implementation, this would use action quality from experience
+    // For now, return a simple heuristic based on action type
+    switch (action) {
+        case MotorCommand::MoveForward: return 0.5f;
+        case MotorCommand::MoveBackward: return -0.3f;
+        case MotorCommand::TurnLeft: return 0.2f;
+        case MotorCommand::TurnRight: return 0.2f;
+        case MotorCommand::Interact: return 0.8f;
+        default: return 0.0f;
+    }
+}
+
+// Get current neural state for planning
+std::vector<float> AgentBrain::getCurrentNeuralState() const {
+    std::vector<float> neuralState;
+    
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Use membrane potential as feature
+                    float activation = n->getState().membranePotential / 20.0f;  // Normalize to 0-1
+                    neuralState.push_back(activation);
+                }
+            }
+        }
+    }
+    
+    return neuralState;
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

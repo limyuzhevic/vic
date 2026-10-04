@@ -55,6 +55,12 @@ public:
     // Reset agent for new episode
     void reset();
     
+    // Get current neural state for planning and decision making
+    std::vector<float> getCurrentNeuralState() const;
+    
+    // Evaluate action value based on experience
+    float getActionValue(MotorCommand action) const;
+    
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
