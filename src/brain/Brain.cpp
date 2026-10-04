@@ -446,6 +446,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Apply attention effects on plasticity (from attention system)
+    if (pImpl->attention && pImpl->attention->getFocusLevel() > 0.5f) {
+        plasticityMod *= 1.0f + pImpl->attention->getFocusLevel() * 0.2f;
+    }
+    
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
@@ -511,8 +516,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // The prediction system predicts next sensory input based on current neural activity
+        // and learns from prediction errors
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Use predictions to guide attention
+        if (pImpl->attention) {
+            float predictionConfidence = pImpl->predictionSystem->getPredictionConfidence();
+            pImpl->attention->setPredictionInfluence(predictionConfidence);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +540,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract patterns from working memory and form concepts
+        // Concept formation discovers abstract patterns from neural activity
+        // This is the system-level version of "pattern recognition"
+        auto workingNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!workingNeurons.empty()) {
+            pImpl->conceptFormation->processNeurons(workingNeurons, pImpl->timestep);
+        }
+        
+        // Use concepts to guide attention
+        if (pImpl->attention) {
+            float conceptActivation = pImpl->conceptFormation->getActivationLevel();
+            pImpl->attention->setConceptInfluence(conceptActivation);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
