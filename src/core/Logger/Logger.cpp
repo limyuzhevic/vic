@@ -12,45 +12,92 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    bool fileOutputInitialized = false;
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
-
-ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
-    pImpl->level = level;
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    try {
+        // Initialize file output if configured
+        std::string defaultLogFile = "nlm.log";
+        pImpl->fileOut.open(defaultLogFile, std::ios::app);
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOutputInitialized = true;
+            NLM_LOG_INFO("Log file initialized: " + defaultLogFile);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize log file: " + std::string(e.what()));
+        // Don't throw - logging initialization should not break the program
+    }
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
+    try {
+        pImpl->level = level;
+        
+        // Initialize file output if configured
+        std::string defaultLogFile = "nlm.log";
+        pImpl->fileOut.open(defaultLogFile, std::ios::app);
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOutputInitialized = true;
+            NLM_LOG_INFO("Log file initialized: " + defaultLogFile);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize log file: " + std::string(e.what()));
+        // Don't throw - logging initialization should not break the program
+    }
+}
+
+ConsoleLogger::~ConsoleLogger() {
+    try {
+        closeOutputFile();
+    } catch (const std::exception& e) {
+        // Log error but don't throw in destructor
+        std::cerr << "[ERROR] Failed to close log file in destructor: " << e.what() << std::endl;
+    }
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
         return;
     }
     
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        
+        std::ostringstream oss;
+        oss << "[" << levelToString(entry.level) << "] ";
+        
+        // Add timestamp
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        
+        oss << " " << entry.message;
+        
+        std::string output = oss.str();
+        
+        // Console output
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        } else {
+            std::cout << output << "\n";
+        }
+        
+        // File output if set
+        if (pImpl->fileOut.is_open()) {
+            try {
+                pImpl->fileOut << output << "\n";
+                pImpl->fileOut.flush();
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Failed to write to log file: " + std::string(e.what()));
+                // Attempt to recover by closing and reopening
+                pImpl->fileOut.close();
+                pImpl->fileOutputInitialized = false;
+            }
+        }
+    } catch (const std::exception& e) {
+        // Emergency logging - write directly to stderr
+        std::cerr << "[ERROR] Failed to log message: " << e.what() << std::endl;
+        std::cerr << "[MESSAGE] " << entry.message << std::endl;
     }
 }
 
@@ -71,12 +118,34 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    try {
+        // Close current file if open
+        closeOutputFile();
+        
+        // Open new file with error checking
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOutputInitialized = true;
+            NLM_LOG_INFO("Log file set to: " + filepath);
+        } else {
+            pImpl->fileOutputInitialized = false;
+            NLM_LOG_ERROR("Failed to open log file: " + filepath);
+        }
+    } catch (const std::exception& e) {
+        pImpl->fileOutputInitialized = false;
+        NLM_LOG_ERROR("Exception while setting log file: " + std::string(e.what()));
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    try {
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+            pImpl->fileOutputInitialized = false;
+            NLM_LOG_INFO("Log file closed");
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception while closing log file: " + std::string(e.what()));
     }
 }
 
@@ -106,9 +175,22 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    bool initialized = false;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    try {
+        // Add default console logger
+        auto consoleLogger = std::make_shared<ConsoleLogger>();
+        addLogger(consoleLogger);
+        pImpl->initialized = true;
+        NLM_LOG_INFO("Logger initialized with default console logger");
+    } catch (const std::exception& e) {
+        // Don't throw in constructor, but log the error
+        std::cerr << "[ERROR] Failed to initialize logger: " << e.what() << std::endl;
+        pImpl->initialized = false;
+    }
+}
 
 Logger::~Logger() = default;
 

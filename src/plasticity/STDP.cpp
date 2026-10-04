@@ -13,10 +13,33 @@ struct STDP::Impl {
     float maxWeight;      // Maximum synaptic weight
     
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f) {
+        try {
+            // Validate initial values
+            if (timeConstant <= 0.0f) {
+                throw std::invalid_argument("Time constant must be positive");
+            }
+            if (minWeight >= maxWeight) {
+                throw std::invalid_argument("Min weight must be less than max weight");
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize STDP parameters: " + std::string(e.what()));
+            throw;
+        }
+    }
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP() : pImpl(new Impl) {
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("Failed to allocate STDP implementation");
+        }
+        NLM_LOG_INFO("STDP initialized successfully");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize STDP: " + std::string(e.what()));
+        throw;
+    }
+}
 
 STDP::~STDP() = default;
 
@@ -45,61 +68,88 @@ void STDP::update(Synapse* synapse,
      *   - Reflects NMDA receptor-mediated calcium signaling
      *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
      *   - Post-before-pre causes backpropagating action potentials
-     *   
+     * 
      * Limitations:
      *   - Simplified pairwise rule (doesn't capture triplet interactions)
      *   - Assumes single exponential window (more complex in biology)
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
-    
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
         }
-    }
-    
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
         
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
+        if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+            NLM_LOG_WARNING("Invalid STDP parameters: null synapse or empty spike history");
+            return;
+        }
         
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        if (dt <= 0.0f) {
+            NLM_LOG_WARNING("Invalid timestep in STDP update: " + std::to_string(dt));
+            return;
+        }
+        
+        float totalDelta = 0.0f;
+        float tau = pImpl->timeConstant;
+        
+        for (Timestamp preTime : preSpikes) {
+            for (Timestamp postTime : postSpikes) {
+                float dt_val = static_cast<float>(postTime - preTime);  // Δt in ms
+                
+                if (dt_val > 0) {
+                    // Pre before post: POTENTIATION
+                    // "Cells that fire together, wire together" - but only if pre fires before post
+                    float delta = pImpl->ltpWeight * std::exp(-dt_val / tau);
+                    totalDelta += delta;
+                } else if (dt_val < 0) {
+                    // Post before pre: DEPRESSION
+                    // "Anti-Hebbian" - connection weakens if post fires without pre
+                    float delta = -pImpl->ltdWeight * std::exp(dt_val / tau);  // dt_val is negative, so this subtracts
+                    totalDelta += delta;
+                }
+                // dt_val == 0: no change (simultaneous spikes - rare in practice)
+            }
+        }
+        
+        // Apply weight change with bounds
+        if (std::abs(totalDelta) > 1e-6f) {
+            // Scale by synaptic efficacy if available
+            float efficacy = synapse->getEfficacy();
+            totalDelta *= efficacy;
+            
+            // Apply weight change
+            synapse->addToWeight(totalDelta);
+            
+            // Update eligibility trace for reward-modulated learning
+            float currentTrace = synapse->getEligibilityTrace();
+            synapse->setEligibilityTrace(currentTrace + totalDelta);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error in STDP update: ") + e.what());
+        throw;
     }
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
-    
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        
+        if (!synapse) {
+            NLM_LOG_WARNING("Cannot apply STDP weight change to null synapse");
+            return;
+        }
+        
+        // Clamp weight to bounds
+        float newWeight = synapse->getWeight() + delta;
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+        synapse->setWeight(newWeight);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error in STDP applyWeightChange: ") + e.what());
+        throw;
+    }
 }
 
 const char* STDP::getName() const {
@@ -107,33 +157,105 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        
+        if (weight < 0.0f) {
+            NLM_LOG_WARNING("Negative LTP weight value: " + std::to_string(weight));
+        }
+        
+        pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error setting STDP LTP weight: ") + e.what());
+        throw;
+    }
 }
 
 float STDP::getLTPWeight() const {
-    return pImpl->ltpWeight;
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        return pImpl->ltpWeight;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error getting STDP LTP weight: ") + e.what());
+        throw;
+    }
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        
+        if (weight < 0.0f) {
+            NLM_LOG_WARNING("Negative LTD weight value: " + std::to_string(weight));
+        }
+        
+        pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error setting STDP LTD weight: ") + e.what());
+        throw;
+    }
 }
 
 float STDP::getLTDWeight() const {
-    return pImpl->ltdWeight;
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        return pImpl->ltdWeight;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error getting STDP LTD weight: ") + e.what());
+        throw;
+    }
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        
+        if (tau <= 0.0f) {
+            throw std::invalid_argument("Time constant must be positive: " + std::to_string(tau));
+        }
+        
+        pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error setting STDP time constant: ") + e.what());
+        throw;
+    }
 }
 
 float STDP::getTimeConstant() const {
-    return pImpl->timeConstant;
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("STDP not properly initialized");
+        }
+        return pImpl->timeConstant;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error getting STDP time constant: ") + e.what());
+        throw;
+    }
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
-    setLTPWeight(ltpWeight);
-    setLTDWeight(ltdWeight);
-    setTimeConstant(tau);
+    try {
+        setLTPWeight(ltpWeight);
+        setLTDWeight(ltdWeight);
+        setTimeConstant(tau);
+        
+        NLM_LOG_INFO("STDP configured with LTP weight: " + std::to_string(ltpWeight) +
+                    ", LTD weight: " + std::to_string(ltdWeight) +
+                    ", time constant: " + std::to_string(tau));
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error configuring STDP: ") + e.what());
+        throw;
+    }
 }
 
 } // namespace nlm

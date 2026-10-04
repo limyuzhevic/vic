@@ -19,6 +19,15 @@ add_executable(nlm_test
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
+# Create performance monitoring test executable
+add_executable(nlm_performance_test
+    test_performance.cpp
+)
+
+target_link_libraries(nlm_performance_test PRIVATE nlm_core nlm_performance)
+target_compile_features(nlm_performance_test PRIVATE cxx_std_20)
+
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_performance_test COMMAND nlm_performance_test)

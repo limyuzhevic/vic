@@ -15,10 +15,29 @@ struct SpikeSystem::Impl {
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    Impl() : maxHistorySize(10000) {
+        try {
+            // Initialize collections safely
+            spikeHistory.reserve(maxHistorySize);
+            spikeCountPerNeuron.reserve(10000);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize SpikeSystem collections: " + std::string(e.what()));
+        }
+    }
 };
 
-SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
+SpikeSystem::SpikeSystem() : pImpl(new Impl) {
+    try {
+        // Initialize additional safety mechanisms
+        if (!pImpl) {
+            throw std::runtime_error("Failed to allocate SpikeSystem implementation");
+        }
+        NLM_LOG_INFO("SpikeSystem initialized successfully");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize SpikeSystem: " + std::string(e.what()));
+        throw;
+    }
+}
 
 SpikeSystem::~SpikeSystem() = default;
 
@@ -36,61 +55,107 @@ SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
 }
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
-    pImpl->pendingSpikes.push(event);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("SpikeSystem not properly initialized");
+        }
+        pImpl->pendingSpikes.push(event);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error queuing spike: ") + e.what());
+        throw;
+    }
 }
 
 void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step) {
-    pImpl->pendingSpikes.emplace(neuron, timestamp, step);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("SpikeSystem not properly initialized");
+        }
+        pImpl->pendingSpikes.emplace(neuron, timestamp, step);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error queuing spike with parameters: ") + e.what());
+        throw;
+    }
 }
 
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
-    // Store by delivery step for efficient processing
-    pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("SpikeSystem not properly initialized");
+        }
+        // Store by delivery step for efficient processing
+        pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error queuing delayed spike: ") + e.what());
+        throw;
+    }
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
-        pImpl->pendingSpikes.pop();
-        
-        // Create detailed event
-        DetailedSpikeEvent detailed;
-        detailed.source = event.source_neuron;
-        detailed.timestamp = event.timestamp;
-        detailed.step = event.step;
-        
-        // Add to history
-        pImpl->spikeHistory.push_back(detailed);
-        
-        // Track spike count per neuron
-        pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
-        
-        // Trim history if needed
-        if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("SpikeSystem not properly initialized");
         }
         
-        // Call handlers
-        for (auto& handler : pImpl->handlers) {
-            handler(detailed);
+        // Process all pending immediate spikes
+        while (!pImpl->pendingSpikes.empty()) {
+            SpikeEvent event = pImpl->pendingSpikes.front();
+            pImpl->pendingSpikes.pop();
+            
+            // Create detailed event
+            DetailedSpikeEvent detailed;
+            detailed.source = event.source_neuron;
+            detailed.timestamp = event.timestamp;
+            detailed.step = event.step;
+            
+            // Add to history
+            pImpl->spikeHistory.push_back(detailed);
+            
+            // Track spike count per neuron
+            pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
+            
+            // Trim history if needed
+            if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+                pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            }
+            
+            // Call handlers
+            for (auto& handler : pImpl->handlers) {
+                if (handler) {
+                    handler(detailed);
+                }
+            }
         }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error processing spikes: ") + e.what());
+        throw;
     }
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
-    // Find and process all delayed spikes scheduled for this step
-    auto it = pImpl->delayedSpikes.find(currentStep);
-    if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
-                handler(delayedEvent);
-            }
+    try {
+        if (!pImpl) {
+            throw std::runtime_error("SpikeSystem not properly initialized");
         }
-        // Remove processed spikes
-        pImpl->delayedSpikes.erase(it);
+        
+        // Find and process all delayed spikes scheduled for this step
+        auto it = pImpl->delayedSpikes.find(currentStep);
+        if (it != pImpl->delayedSpikes.end()) {
+            // Process all spikes scheduled for this step
+            for (const auto& delayedEvent : it->second) {
+                // Call delayed spike handlers (these will deliver synaptic input)
+                for (auto& handler : pImpl->delayedHandlers) {
+                    if (handler) {
+                        handler(delayedEvent);
+                    }
+                }
+            }
+            // Remove processed spikes
+            pImpl->delayedSpikes.erase(it);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error processing delayed spikes: ") + e.what());
+        throw;
     }
 }
 
