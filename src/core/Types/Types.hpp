@@ -183,10 +183,90 @@ enum class FiringState : uint8_t {
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Simulation constants
+namespace nlm {
+
+// Time constants (in seconds)
+constexpr TimestepDuration SIMULATION_TIMESTEP = 0.001;  // 1 ms timestep
+constexpr Timestamp DEVELOPMENT_DURATION_INITIAL = 60.0;    // 60 seconds
+constexpr Timestamp DEVELOPMENT_DURATION_CRITICAL = 300.0;   // 5 minutes  
+constexpr Timestamp DEVELOPMENT_DURATION_MATURATION = 900.0;  // 15 minutes
+constexpr Timestamp DEVELOPMENT_DURATION_ADULT = 900.0;      // After maturation
+
+// Neural constants
+constexpr MembranePotential NEURON_RESTING_POTENTIAL = -65.0f;
+constexpr MembranePotential NEURON_THRESHOLD = -50.0f;
+constexpr MembranePotential LIF_MEMBRANE_TIME_CONSTANT = 20.0f;
+constexpr MembranePotential LIF_MEMBRANE_RESISTANCE = 10.0f;
+
+// Plasticity constants
+constexpr SynapticWeight STDP_LTP_WEIGHT = 0.02f;
+constexpr SynapticWeight STDP_LTD_WEIGHT = 0.015f;
+constexpr SynapticWeight STDP_TIME_CONSTANT = 20.0f;
+constexpr SynapticWeight SYNAPTOGENESIS_RATE_INITIAL = 0.0001f;
+constexpr SynapticWeight PRUNING_RATE_INITIAL = 0.00001f;
+
+// Sensory constants
+constexpr size_t SENSE_VISION_WIDTH = 16;
+constexpr size_t SENSE_VISION_HEIGHT = 16;
+constexpr size_t SENSE_VISION_TOTAL = SENSE_VISION_WIDTH * SENSE_VISION_HEIGHT;
+
+constexpr size_t SENSE_TOUCH_SENSORS = 8;
+constexpr size_t SENSE_INTERNAL_SENSORS = 4;
+constexpr size_t SENSE_PROPRIOCEPTION_SENSORS = 6;
+
+// Motor constants
+constexpr size_t MOTOR_ACTIONS_COUNT = 6;
+
+// Noise and exploration constants
+constexpr float EXPLORATION_NOISE_STRENGTH = 0.1f;
+constexpr float NOVELTY_DETECTION_THRESHOLD = 0.3f;
+constexpr float NOVELTY_DECAY_RATE = 0.99f;
+
+// Memory constants
+constexpr size_t WORKING_MEMORY_TRACE_DECAY = 1000;
+constexpr size_t EPISODIC_MEMORY_MAX_EPISODES = 100;
+constexpr size_t SEMANTIC_MEMORY_MAX_CONCEPTS = 1000;
+
+// Performance and logging
+constexpr size_t MAX_SIMULATION_STEPS = 10000;
+constexpr Timestamp SIMULATION_TIME_LIMIT = 0.0;  // Unlimited
+
+// Reward and neuromodulation
+constexpr float REWARD_DISCOUNT_FACTOR = 0.99f;
+constexpr float DOPAMINE_BASELINE = 0.0f;
+constexpr float DOPAMINE_PEAK = 1.0f;
+constexpr float CURIOUSITY_NOVELTY_FACTOR = 2.0f;
+constexpr float PREDICTION_ERROR_FACTOR = 0.5f;
+
+// Structural plasticity
+constexpr float PLASTICITY_MODIFIER_INITIAL = 1.0f;
+constexpr float PLASTICITY_MODIFIER_CRITICAL = 0.8f;
+constexpr float PLASTICITY_MODIFIER_MATURATION = 0.5f;
+constexpr float PLASTICITY_MODIFIER_ADULT = 0.2f;
+
+// Input scaling factors
+constexpr float VISION_INPUT_SCALE = 5.0f;
+constexpr float TOUCH_INPUT_SCALE = 8.0f;
+constexpr float INTERNAL_INPUT_SCALE = 5.0f;
+constexpr float PROPRIOCEPTION_INPUT_SCALE = 3.0f;
+
+// Development stages
+constexpr float DEVELOPMENT_STAGE_INITIAL = 0.0f;
+constexpr float DEVELOPMENT_STAGE_CRITICAL = 60.0f;
+constexpr float DEVELOPMENT_STAGE_MATURATION = 300.0f;
+constexpr float DEVELOPMENT_STAGE_ADULT = 900.0f;
+
+// I/O and file operations
+constexpr const char* DEFAULT_CONFIG_FILE = "configs/default.cfg";
+constexpr const char* CHECKPOINT_FILE_EXTENSION = ".bin";
+constexpr const char* DEFAULT_LOG_FILE = "nlm.log";
+
+// Platform and build
+constexpr int CXX_STANDARD = 20;
+constexpr bool ENABLE_VISUALIZATION = false;
+constexpr float VISUALIZATION_UPDATE_RATE = 30.0f;
 
 } // namespace nlm
+
+// Add the constants to the existing namespace

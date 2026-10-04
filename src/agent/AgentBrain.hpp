@@ -70,11 +70,13 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Motor neuron distribution helpers
+    void distributeMotorNeurons(const NeuralPopulation* population);
+    void distributeSensoryNeurons(const NeuralPopulation* population);
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Motor groups initialization
+    void initializeMotorGroups();
+    void initializeSensoryGroups();
     
     std::shared_ptr<Brain> brain_;
     

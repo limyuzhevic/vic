@@ -1,3 +1,6 @@
+# NLM - Neural Learning Machine - Phase 6 Final Integration
+# CMake configuration file for building the NLM brain simulation project
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -5,11 +8,6 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
 
 # Enable warnings
 if(MSVC)
@@ -121,11 +119,17 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
+# Unified CLI application
+add_executable(nlm_cli
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+
+# Main executable (legacy - kept for backward compatibility)
+add_executable(nlm_legacy
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_legacy PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,13 +143,41 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+# Benchmarking executable
+add_executable(nlm_benchmark
+    src/benchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm_cli nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo nlm_benchmark
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Export configuration for downstream users
+export(TARGETS nlm_core nlm_agent nlm_world FILE "NLMConfig.cmake")
+
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Core library: nlm_core")
+message(STATUS "  Agent library: nlm_agent")
+message(STATUS "  World library: nlm_world")
+message(STATUS "  Main executable: nlm_legacy (legacy)")
+message(STATUS "  Unified CLI: nlm_cli (recommended)")
+message(STATUS "  Phase 3 demo: nlm_phase3_demo")
+message(STATUS "  Phase 4 demo: nlm_phase4_demo")
+message(STATUS "  Phase 6 demo: nlm_phase6_demo")
+message(STATUS "  Benchmark: nlm_benchmark")
