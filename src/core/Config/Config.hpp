@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <stdexcept>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -37,10 +40,27 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    bool required;
+    std::string validationRegex;
+    std::string units;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() 
+        : key(), value(), source(ConfigSource::Default), description(), required(false), validationRegex(), units() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "", 
+                bool req = false, const std::string& regex = "", const std::string& unit = "")
+        : key(k), value(v), source(s), description(desc), required(req), validationRegex(regex), units(unit) {}
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    std::string type; // "int", "int64", "double", "bool", "string", "array"
+    std::string description;
+    ConfigValue defaultValue;
+    bool required;
+    std::string validationRegex;
+    std::string units;
+    std::vector<std::string> allowedValues;
 };
 
 // Main configuration class
