@@ -1,20 +1,17 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
+#include <cstdint>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+// Type definitions for better Python interoperability
+using SimulationStep = uint64_t;
+using Timestamp = double;
+using TimestepDuration = double;
+using NeuronIndex = uint64_t;
+using SynapseIndex = uint64_t;
+using PopulationIndex = uint64_t;
+using RegionIndex = uint64_t;
+using SynapticWeight = float;
+using MembranePotential = float;
+using FiringRate = float;
+using Delay = uint32_t;
 
 namespace py = pybind11;
 namespace nlm {
@@ -39,7 +36,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("is_valid", [](const NeuronId& id) { return id != INVALID_NEURON_ID; })
+        .def_static("invalid", []() { return INVALID_NEURON_ID; });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -47,11 +46,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &SynapseId::value)
         .def("index", &SynapseId::index)
         .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
+        .def("__ne__", &NeuronId::operator!=)
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("is_valid", [](const SynapseId& id) { return id != INVALID_SYNAPSE_ID; })
+        .def_static("invalid", []() { return INVALID_SYNAPSE_ID; });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
@@ -63,7 +64,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("is_valid", [](const RegionId& id) { return id != INVALID_REGION_ID; })
+        .def_static("invalid", []() { return INVALID_REGION_ID; });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
@@ -71,7 +74,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("is_valid", [](const PopulationId& id) { return id != INVALID_POPULATION_ID; })
+        .def_static("invalid", []() { return INVALID_POPULATION_ID; });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -347,11 +356,156 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+.def("getConfig", &Brain::getConfig,
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
+        
+        // ========== ENHANCED BRAIN CONVENIENCE METHODS ==========
+        
+        // Simulation convenience methods
+        .def("stepSim", [](Brain& self, int steps) {
+            for (int i = 0; i < steps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("steps"), "Perform multiple simulation steps")
+        
+        .def("stepWithTime", [](Brain& self, int steps, Timestamp startTime) {
+            for (int i = 0; i < steps; ++i) {
+                self.step(i, startTime + i);
+            }
+        }, py::arg("steps"), py::arg("startTime"), "Perform multiple simulation steps with time")
+        
+        // Memory convenience methods
+        .def("getAllMemories", [](Brain& self) {
+            auto working = self.getWorkingMemory();
+            auto episodic = self.getEpisodicMemory();
+            auto associative = self.getAssociativeMemory();
+            return std::make_tuple(working, episodic, associative);
+        }, "Get all memory systems as tuple")
+        
+        // Action convenience methods
+        .def("produceActionWithRetry", [](Brain& self, int maxRetries) {
+            for (int i = 0; i < maxRetries; ++i) {
+                auto action = self.produceAction();
+                if (action) {
+                    return action;
+                }
+            }
+            return std::unique_ptr<Action>(nullptr);
+        }, py::arg("maxRetries"), "Produce action with retry logic")
+        
+        // Developmental convenience methods
+        .def("developToStage", &Brain::setDevelopmentalStage,
+              py::arg("stage"), "Develop brain to specific stage")
+        
+        // Configuration convenience methods
+        .def("setConfig", &Brain::getConfig,
+              py::return_value_policy::reference_internal,
+              "Get configuration reference for direct modification")
+        
+        // Statistics convenience methods
+        .def("getSystemStats", [](const Brain& self) {
+            return std::make_tuple(
+                self.getTotalNeuronCount(),
+                self.getTotalSynapseCount(),
+                self.getActiveNeuronCount(),
+                self.getFiringNeuronCount(),
+                self.getAverageFiringRate(),
+                self.getExcitationInhibitionRatio(),
+                self.getTotalSpikeCount(),
+                self.getPendingSpikeEventCount()
+            );
+        }, "Get comprehensive system statistics")
+        
+        .def("getMemoryStats", [](const Brain& self) {
+            auto working = self.getWorkingMemory();
+            auto episodic = self.getEpisodicMemory();
+            auto associative = self.getAssociativeMemory();
+            return std::make_tuple(
+                working ? working->getMemoryCapacity() : 0,
+                episodic ? episodic->getMemoryCapacity() : 0,
+                associative ? associative->getMemoryCapacity() : 0
+            );
+        }, "Get memory system statistics")
+        
+        .def("getPlasticityStats", [](const Brain& self) {
+            auto stdp = self.getSTDP();
+            auto hebbian = self.getHebbian();
+            auto structural = self.getStructuralPlasticity();
+            return std::make_tuple(
+                stdp ? stdp->getPlasticityRate() : 0.0f,
+                hebbian ? hebbian->getPlasticityRate() : 0.0f,
+                structural ? structural->getPlasticityRate() : 0.0f
+            );
+        }, "Get plasticity system statistics")
+        
+        .def("getNeuromodulationStats", [](const Brain& self) {
+            auto dopamine = self.getDopamine();
+            auto curiosity = self.getCuriosity();
+            auto novelty = self.getNovelty();
+            auto predictionError = self.getPredictionErrorSignal();
+            return std::make_tuple(
+                dopamine ? dopamine->getLevel() : 0.0f,
+                curiosity ? curiosity->getLevel() : 0.0f,
+                novelty ? novelty->getLevel() : 0.0f,
+                predictionError ? predictionError->getError() : 0.0f
+            );
+        }, "Get neuromodulation system statistics")
+        
+        .def("getPredictionStats", [](const Brain& self) {
+            auto prediction = self.getPredictionSystem();
+            auto neuralPrediction = prediction ? prediction->getNeuralPrediction() : nullptr;
+            return neuralPrediction ? std::make_tuple(
+                neuralPrediction->getPredictionAccuracy(),
+                neuralPrediction->getPredictionConfidence()
+            ) : std::make_tuple(0.0f, 0.0f);
+        }, "Get prediction system statistics")
+        
+        .def("getDevelopmentStats", [](const Brain& self) {
+            auto development = self.getDevelopmentSystem();
+            return development ? std::make_tuple(
+                development->getDevelopmentalStage(),
+                development->getAge(),
+                development->getMaturationLevel()
+            ) : std::make_tuple(DevelopmentalStage::Initial, 0.0, 0.0f);
+        }, "Get development system statistics")
+        
+        // Convenience methods for world integration
+        .def("createAgentBrain", [](const std::shared_ptr<Brain>& brain) -> std::shared_ptr<AgentBrain> {
+            return std::make_shared<AgentBrain>(brain);
+        }, py::arg("brain"), "Create agent brain interface from existing brain")
+        
+        // Backup and restore convenience
+        .def("backupAndSave", [](Brain& self, const std::string& filepath) {
+            bool success = self.save(filepath);
+            if (success) {
+                self.logStatus();
+            }
+            return success;
+        }, py::arg("filepath"), "Backup and save brain state")
+        
+        .def("loadAndValidate", [](Brain& self, const std::string& filepath) {
+            bool success = self.load(filepath);
+            if (success) {
+                self.initialize();
+            }
+            return success;
+        }, py::arg("filepath"), "Load and validate brain state")
+        
+        // Convenience factory methods
+        .def_static("createDefaultConfigWithSettings", [](const std::string& configPath) {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(configPath);
+            return config;
+        }, py::arg("configPath"), "Create config with file loading")
+        
+        .def_static("createBrainWithConfig", [](const std::string& configPath) -> std::shared_ptr<Brain> {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(configPath);
+            return std::make_shared<Brain>(config);
+        }, py::arg("configPath"), "Create brain with configuration from file");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,26 +554,200 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    // ========== ENHANCED AGENT BRAIN CONVENIENCE METHODS ==========
+    
+    // Processing convenience methods
+    .def("processBatchInputs", [](AgentBrain& self, const std::vector<SensoryPercept>& percepts) {
+        for (const auto& percept : percepts) {
+            self.processSensoryInput(percept);
+        }
+    }, py::arg("percepts"), "Process multiple sensory inputs in batch")
+    
+    .def("processSinglePercept", [](AgentBrain& self, const SensoryPercept& percept) {
+        self.processSensoryInput(percept);
+        self.decodeMotorCommand();
+        return self.decodeMotorCommand();
+    }, py::arg("percept"), "Process single percept and return action")
+    
+    // Neuromodulation convenience methods
+    .def("applyRewardWithPrediction", &AgentBrain::applyRewardModulation,
+          py::arg("reward"), py::arg("predictedReward"),
+          "Apply reward modulation with prediction error")
+    
+    .def("applyCuriosityDrivenExploration", [](AgentBrain& self, float noveltyThreshold) {
+        auto curiosity = self.getCuriosityLevel();
+        if (curiosity > noveltyThreshold) {
+            self.enableCuriosity(true);
+        }
+        return self.getCuriosityLevel();
+    }, py::arg("noveltyThreshold"), "Enable curiosity-driven exploration")
+    
+    // Development convenience methods
+    .def("advanceDevelopment", [](AgentBrain& self, double timestep) {
+        self.updateDevelopment(timestep);
+        return self.getDevelopmentalStage();
+    }, py::arg("timestep"), "Advance development and return stage")
+    
+    .def("isDevelopmentReady", [](AgentBrain& self) {
+        auto stage = self.getDevelopmentalStage();
+        return stage >= DevelopmentalStage::Maturation;
+    }, "Check if development is mature")
+    
+    // System status convenience methods
+    .def("getBrainStatus", [](AgentBrain& self) {
+        auto brain = self.getBrain();
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getActiveNeuronCount(),
+            brain->getDevelopmentalStage()
+        );
+    }, "Get comprehensive brain status")
+    
+    .def("getNeuromodulationStatus", [](AgentBrain& self) {
+        return std::make_tuple(
+            self.getNeuromodulationLevel(),
+            self.getCuriosityLevel(),
+            self.getNoveltyLevel(),
+            self.getPredictionError()
+        );
+    }, "Get neuromodulation status")
+    
+    .def("getDevelopmentStatus", [](AgentBrain& self) {
+        return std::make_tuple(
+            self.getDevelopmentalStage(),
+            self.getNeuromodulationLevel(),
+            self.getCuriosityLevel()
+        );
+    }, "Get development status")
+    
+    // Convenience methods for world interaction
+    .def("connectToWorld", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world) {
+        self.initialize(*world);
+        return self.getBrain();
+    }, py::arg("world"), "Connect agent brain to world")
+    
+    .def("processEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world,
+                            const std::vector<SensoryPercept>& observations,
+                            const std::vector<float>& rewards,
+                            double timestep) {
+        self.initialize(*world);
+        for (size_t i = 0; i < observations.size(); ++i) {
+            self.processSensoryInput(observations[i]);
+            if (i < rewards.size()) {
+                self.applyRewardModulation(rewards[i], 0.0f);
+            }
+            self.updateDevelopment(timestep);
+        }
+        auto action = self.decodeMotorCommand();
+        return std::make_tuple(action, self.getPredictionError());
+    }, py::arg("world"), py::arg("observations"), py::arg("rewards"), py::arg("timestep"),
+         "Process complete episode and return final action and prediction error")
+    
+    // Convenience factory methods
+    .def_static("createAgentWithBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create agent brain from existing brain")
+    
+    .def_static("createAgentWithConfig", [](std::shared_ptr<Config> config) -> std::shared_ptr<AgentBrain> {
+        auto brain = std::make_shared<Brain>(config);
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("config"), "Create agent brain with configuration")
+    
+.def_static("createAgentWithWorld", [](std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("world"), "Create agent brain with world");
 
+    // Context manager for brain simulation sessions
+    py::class_<BrainSessionManager>(m, "BrainSessionManager", 
+              R"pbdoc(Context manager for brain simulation sessions with automatic cleanup)pbdoc")
+        .def(py::init<>())
+        .def("create_session", [](BrainSessionManager& self, std::shared_ptr<Config> config) {
+            auto brain = std::make_shared<Brain>(config);
+            auto session = std::make_shared<BrainSession>(brain);
+            self.sessions_.push_back(session);
+            return session;
+        }, py::arg("config"), "Create a new simulation session")
+        .def("run_session", [](BrainSessionManager& self, size_t sessionIndex, 
+                             const std::vector<SensoryPercept>& inputs,
+                             double timestep = 0.1) {
+            if (sessionIndex < self.sessions_.size()) {
+                auto& session = self.sessions_[sessionIndex];
+                session->brain_->initialize();
+                for (const auto& input : inputs) {
+                    session->brain_->receiveSensoryInput(input);
+                    session->brain_->step(session->stepCounter_++);
+                }
+                return session->brain_->produceAction();
+            }
+            return std::unique_ptr<Action>(nullptr);
+        }, py::arg("sessionIndex"), py::arg("inputs"), py::arg("timestep") = 0.1,
+             "Run a simulation session with given inputs")
+        .def("cleanup_session", [](BrainSessionManager& self, size_t sessionIndex) {
+            if (sessionIndex < self.sessions_.size()) {
+                self.sessions_.erase(self.sessions_.begin() + sessionIndex);
+                return true;
+            }
+            return false;
+        }, py::arg("sessionIndex"), "Clean up and remove a session")
+        .def("get_session_count", [](BrainSessionManager& self) {
+            return self.sessions_.size();
+        }, "Get number of active sessions")
+        .def("cleanup_all_sessions", [](BrainSessionManager& self) {
+            self.sessions_.clear();
+        }, "Clean up all sessions");
+
+    // Context manager for agent brain sessions
+    py::class_<AgentBrainSessionManager>(m, "AgentBrainSessionManager",
+              R"pbdoc(Context manager for agent brain sessions with automatic cleanup)pbdoc")
+        .def(py::init<>())
+        .def("create_session", [](AgentBrainSessionManager& self, std::shared_ptr<Brain> brain,
+                                 std::shared_ptr<SimpleWorld> world) {
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            auto session = std::make_shared<AgentBrainSession>(agent, world);
+            self.sessions_.push_back(session);
+            return session;
+        }, py::arg("brain"), py::arg("world"), "Create a new agent brain session")
+        .def("run_session", [](AgentBrainSessionManager& self, size_t sessionIndex,
+                             const std::vector<SensoryPercept>& observations,
+                             const std::vector<float>& rewards,
+                             double timestep = 0.1) {
+            if (sessionIndex < self.sessions_.size()) {
+                auto& session = self.sessions_[sessionIndex];
+                for (size_t i = 0; i < observations.size(); ++i) {
+                    session->agent_->processSensoryInput(observations[i]);
+                    if (i < rewards.size()) {
+                        session->agent_->applyRewardModulation(rewards[i], 0.0f);
+                    }
+                    session->agent_->updateDevelopment(timestep);
+                }
+                return std::make_tuple(session->agent_->decodeMotorCommand(),
+                                     session->agent_->getPredictionError());
+            }
+            return std::make_tuple(MotorCommand::Wait, 0.0f);
+        }, py::arg("sessionIndex"), py::arg("observations"), py::arg("rewards"), py::arg("timestep") = 0.1,
+             "Run an agent brain session with given observations and rewards")
+        .def("cleanup_session", [](AgentBrainSessionManager& self, size_t sessionIndex) {
+            if (sessionIndex < self.sessions_.size()) {
+                self.sessions_.erase(self.sessions_.begin() + sessionIndex);
+                return true;
+            }
+            return false;
+        }, py::arg("sessionIndex"), "Clean up and remove an agent brain session")
+        .def("get_session_count", [](AgentBrainSessionManager& self) {
+            return self.sessions_.size();
+        }, "Get number of active agent brain sessions")
+        .def("cleanup_all_sessions", [](AgentBrainSessionManager& self) {
+            self.sessions_.clear();
+        }, "Clean up all agent brain sessions");
+
+    // Expose invalid ID constants for Python users
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm
