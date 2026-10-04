@@ -193,6 +193,123 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== PERFORMANCE OPTIMIZATION ==========
+    
+    // Batch simulation for improved performance
+    void stepBatch(SimulationStep startStep, SimulationStep endStep);
+    
+    // Parallel processing capabilities
+    void stepParallel(SimulationStep startStep, SimulationStep endStep, size_t numThreads = 0);
+    
+    // Memory-efficient batch processing
+    void stepMemoryEfficient(SimulationStep startStep, SimulationStep endStep);
+    
+    // Performance monitoring and profiling
+    struct PerformanceStats {
+        SimulationStep stepsProcessed;
+        float stepsPerSecond;
+        float memoryUsageMB;
+        float cpuUsagePercent;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        float totalSpikes;
+        double startTime;
+        double endTime;
+        std::vector<double> stepTimes;
+    };
+    
+    // Get performance statistics
+    PerformanceStats getPerformanceStats() const;
+    
+    // Reset performance statistics
+    void resetPerformanceStats();
+    
+    // Check if performance monitoring is enabled
+    bool isPerformanceMonitoring() const;
+    
+    // Enable/disable performance monitoring
+    void setPerformanceMonitoring(bool enabled);
+    
+    // Get current performance metrics
+    double getCurrentFPS() const;
+    double getAverageFPS() const;
+    
+    // ========== ADVANCED BATCH OPERATIONS ==========
+    
+    // Run multiple simulations with different configurations
+    static std::vector<PerformanceStats> runBatchSimulation(
+        const std::vector<std::shared_ptr<Config>>& configs,
+        size_t stepsPerConfig,
+        bool parallel = false);
+    
+    // Time series analysis of brain activity
+    struct ActivityTimeSeries {
+        std::vector<SimulationStep> steps;
+        std::vector<size_t> firingCounts;
+        std::vector<float> averageFiringRates;
+        std::vector<float> noveltyLevels;
+        std::vector<float> curiosityLevels;
+        std::vector<float> energyLevels;
+        std::vector<DevelopmentalStage> developmentalStages;
+    };
+    
+    // Collect time series data
+    ActivityTimeSeries collectTimeSeriesData(SimulationStep startStep, SimulationStep endStep);
+    
+    // Export performance data to file
+    bool exportPerformanceData(const std::string& filepath) const;
+    
+    // Import performance data from file
+    bool importPerformanceData(const std::string& filepath);
+    
+    // Compute performance metrics
+    struct PerformanceMetrics {
+        double throughput;           // steps per second
+        double efficiency;            // actual vs theoretical maximum
+        double memoryFootprint;      // MB
+        double cpuUtilization;       // percentage
+        size_t activeNeuronCount;     // average active neurons
+        size_t firingNeuronCount;     // average firing neurons
+        float plasticityRate;        // average plasticity events per step
+        float learningRate;          // average learning rate
+    };
+    
+    // Compute comprehensive performance metrics
+    PerformanceMetrics computePerformanceMetrics() const;
+    
+    // Profile performance hotspots
+    std::vector<std::pair<std::string, double>> profileHotspots() const;
+    
+    // Enable/disable profiling
+    void setProfilingEnabled(bool enabled);
+    bool isProfilingEnabled() const;
+    
+    // Get profiling results
+    std::string getProfilingResults() const;
+    
+    // Clear profiling data
+    void clearProfilingData();
+    
+    // ========== EXPERIMENTAL / DEBUGGING ==========
+    
+    // Run scientific experiment
+    bool runScientificExperiment(const std::string& experimentName,
+                                 const std::map<std::string, std::string>& parameters);
+    
+    // Get experimental results
+    std::string getExperimentalResults(const std::string& experimentName) const;
+    
+    // List available experiments
+    std::vector<std::string> listAvailableExperiments() const;
+    
+    // Enable/disable debugging mode
+    void setDebugMode(bool enabled);
+    bool isDebugMode() const;
+    
+    // Set debug verbosity level
+    void setDebugLevel(int level);
+    int getDebugLevel() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

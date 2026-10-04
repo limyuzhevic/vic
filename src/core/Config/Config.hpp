@@ -90,16 +90,108 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Load from YAML file (Phase 3)
+    bool loadFromYAMLFile(const std::string& filepath);
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlString);
+    
+    // Export to JSON string
+    std::string exportToJSON() const;
+    
+    // Export to YAML string
+    std::string exportToYAML() const;
+    
+    // Merge with another configuration
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validate configuration
+    std::vector<std::string> validate() const;
+    
+    // Get configuration by section
+    std::vector<std::string> getKeysBySection(const std::string& section) const;
+    
+    // Get all unique sections
+    std::vector<std::string> getSections() const;
+    
+    // Set description for key
+    void setDescription(const std::string& key, const std::string& description);
+    
+    // Get description for key
+    std::string getDescription(const std::string& key) const;
+    
+    // Copy configuration
+    Config copy() const;
+    
+    // Configuration validation rules
+    struct ValidationRule {
+        std::string key;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string errorMessage;
+    };
+    
+    // Add validation rule
+    void addValidationRule(const ValidationRule& rule);
+    
+    // Clear validation rules
+    void clearValidationRules();
+    
+    // Enable/disable strict validation mode
+    void setStrictValidation(bool enabled);
+    
+    // Get strict validation mode
+    bool isStrictValidation() const;
+    
+    // Get validation errors from last validation
+    std::vector<std::string> getLastValidationErrors() const;
+    
+    // Get configuration size
+    size_t size() const;
+    
+    // Check if configuration is empty
+    bool empty() const;
+    
+    // Get configuration age in milliseconds
+    uint64_t getAge() const;
+    
+    // Refresh configuration timestamp
+    void refresh();
+    
+    // Configuration statistics
+    struct ConfigStats {
+        size_t totalKeys;
+        size_t keysBySource[4]; // Default, File, CommandLine, Runtime
+        uint64_t ageMs;
+        std::string lastModified;
+        bool isValid;
+        std::vector<std::string> validationErrors;
+    };
+    
+    // Get configuration statistics
+    ConfigStats getStats() const;
+    
+    // Advanced CLI parsing with subcommands
+    bool loadFromAdvancedArgs(int argc, char** argv);
+    
+    // Configuration reset with source
+    void resetWithSource(ConfigSource source);
+    
+    // Get configuration keys sorted by source priority
+    std::vector<std::pair<std::string, ConfigSource>> getKeysWithSource() const;
+    
+    // Configuration diff between two configs
+    std::vector<std::pair<std::string, std::pair<ConfigValue, ConfigValue>>> diff(const Config& other) const;
+    
+    // Apply delta configuration
+    void applyDelta(const std::vector<std::pair<std::string, ConfigValue>>& delta);
+    
+    // Get configuration JSON schema (for validation)
+    static std::string getDefaultJSONSchema();
+    
+    // Validate against JSON schema
+    bool validateAgainstSchema(const std::string& schema) const;
 
 } // namespace nlm
