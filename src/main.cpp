@@ -321,8 +321,55 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void showUsage() {
+    std::cout << "NLM (Neural Learning Machine) - Phase 2 Demo\n" << std::endl;
+    std::cout << "Usage: nlm_phase2_demo [OPTIONS]\n" << std::endl;
+    std::cout << "\nOptions:\n" << std::endl;
+    std::cout << "  --config FILE          Load configuration from JSON file (default: configs/default.cfg)\n" << std::endl;
+    std::cout << "  --steps N             Run N simulation steps (default: 2000)\n" << std::endl;
+    std::cout << "  --help                Show this help message\n" << std::endl;
+    std::cout << "\nExamples:\n" << std::endl;
+    std::cout << "  nlm_phase2_demo                    # Run default demo (2000 steps)\n" << std::endl;
+    std::cout << "  nlm_phase2_demo --steps 5000       # Run 5000 simulation steps\n" << std::endl;
+    std::cout << "  nlm_phase2_demo --config myconfig.cfg  # Use custom config\n" << std::endl;
+}
+
+void validateCommandLineArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            showUsage();
+            std::exit(0);
+        } else if (arg.find("-") == 0) {
+            // Skip option parsing
+            continue;
+        }
+        std::cout << "Warning: Unknown argument ignored: " << arg << std::endl;
+    }
+}
+
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Parse command line arguments
+    validateCommandLineArgs(argc, argv);
+    
+    int numSteps = 2000;  // Default number of steps
+    std::string configFile = "configs/default.cfg";
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--steps" && i + 1 < argc) {
+            numSteps = std::stoi(argv[++i]);
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -342,19 +389,6 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -423,6 +457,26 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
+    
+    // Run the main simulation with progress reporting
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting Main Simulation ===");
+    NLM_LOG_INFO("Running " + std::to_string(numSteps) + " simulation steps...");
+    
+    // Log progress periodically
+    if (numSteps > 0) {
+        for (SimulationStep step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            
+            if (step % 200 == 0) {
+                NLM_LOG_INFO("Progress: Step " + std::to_string(step) + 
+                           "/" + std::to_string(numSteps) +
+                           " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                           " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                           " | E/I Ratio: " + std::to_string(brain->getExcitationInhibitionRatio()));
+            }
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

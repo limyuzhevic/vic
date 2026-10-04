@@ -190,12 +190,58 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Internal helper methods
+    void validateStepParameters(SimulationStep currentStep, Timestamp currentTime);
+    void initializeStepState(SimulationStep currentStep, Timestamp currentTime);
+    
     // Logging
     void logStatus() const;
     
 private:
     struct Impl;
     Impl* pImpl;
+};
+
+// StepProcessor class declaration - handles execution of brain simulation steps
+class StepProcessor {
+public:
+    StepProcessor(Brain* brain, Brain::Impl* impl);
+    void execute(SimulationStep currentStep, Timestamp currentTime);
+    
+private:
+    // Helper classes and methods for step execution
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeurons(Timestamp currentTime);
+    void detectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void processSingleNeuronSpike(Neuron* neuron, SimulationStep currentStep, 
+                                  Timestamp currentTime, NeuralRegion* region);
+    void handleNeuronFiring(Neuron* neuron, SimulationStep currentStep, 
+                           Timestamp currentTime, NeuralRegion* region);
+    void recordPrePostSpikeForPlasticity(Neuron* neuron, NeuralRegion* region, Timestamp currentTime);
+    void storeToWorkingMemory(Neuron* neuron, const NeuronState& state);
+    void processImmediateSpikes(SimulationStep currentStep);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects(SimulationStep currentStep);
+    void applyDopamineEffects();
+    void applyPlasticityRules(SimulationStep currentStep);
+    float calculatePlasticityModulation();
+    void applySingleSynapsePlasticity(Synapse* syn, float plasticityMod);
+    void applySTDP(Synapse* syn, float plasticityMod);
+    void applyHebbianLearning(Synapse* syn);
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void captureBrainStateAsEpisode(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    float calculateDevelopmentalPlasticityModulus();
+    void collectStatistics();
+    
+private:
+    Brain* brain;
+    Brain::Impl* impl;
 };
 
 } // namespace nlm
