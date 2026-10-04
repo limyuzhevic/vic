@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <chrono>
 
 namespace nlm {
 
@@ -29,6 +32,67 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Validation result
+struct ValidationResult {
+    bool isValid;
+    std::string errorMessage;
+    std::string warningMessage;
+    
+    ValidationResult(bool valid = true, const std::string& error = "",
+                     const std::string& warning = "")
+        : isValid(valid), errorMessage(error), warningMessage(warning) {}
+};
+
+// Configuration constraint
+struct ConfigConstraint {
+    std::string name;
+    std::function<ValidationResult(const ConfigValue&)> validator;
+    std::string errorMessage;
+    std::string warningMessage;
+    
+    ConfigConstraint(const std::string& n, 
+                     const std::function<ValidationResult(const ConfigValue&)>& v,
+                     const std::string& err = "",
+                     const std::string& warn = "")
+        : name(n), validator(v), errorMessage(err), warningMessage(warn) {}
+};
+
+// Default configuration parameters
+struct DefaultConfigParams {
+    int64_t neuronCount = 500;
+    int64_t regionCount = 1;
+    float connectionProbability = 0.15f;
+    double simulationTimestep = 0.001;
+    int64_t randomSeed = 42;
+    
+    // STDP parameters
+    float stdpLTPWeight = 0.02f;
+    float stdpLTDWeight = 0.015f;
+    float stdpTau = 20.0f;
+    
+    // Plasticity parameters
+    float synaptogenesisRate = 0.0001f;
+    float pruningRate = 0.00001f;
+    
+    // Neuromodulation parameters
+    float dopamineSensitivity = 1.0f;
+    float curiosityThreshold = 0.3f;
+    float noveltyDecay = 0.99f;
+    
+    // Memory parameters
+    size_t workingMemoryCapacity = 1000;
+    size_t episodicMemoryCapacity = 500;
+    
+    // Development parameters
+    double criticalPeriodDuration = 60.0;  // seconds
+    double maturationDuration = 300.0;    // seconds
+    
+    // Performance parameters
+    bool enableSIMD = true;
+    bool enableParallel = false;
+    size_t maxThreads = 4;
 };
 
 // Configuration entry
