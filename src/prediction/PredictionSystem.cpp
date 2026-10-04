@@ -10,9 +10,44 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem() : pImpl(new Impl), brain_(nullptr) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    brain_ = brain;
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
+
+void PredictionSystem::update() {
+    if (!brain_) {
+        return;
+    }
+    
+    // Simple prediction error computation for now
+    // This will be enhanced with real prediction capabilities
+    float error = 0.0f;
+    
+    // If we have dopamine, compute prediction error
+    // Dopamine level is inversely related to prediction error
+    if (brain_->getDopamine()) {
+        float dopamineLevel = brain_->getDopamine()->getLevel();
+        // Higher dopamine means lower prediction error (better predictions)
+        error = 1.0f - dopamineLevel;
+    }
+    
+    // Store error in history for analysis
+    pImpl->predictionError = error;
+    pImpl->errorHistory.push_back(error);
+    
+    // Simple confidence modulation based on error
+    if (error < 0.1f) {
+        pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.05f);
+    } else if (error > 0.5f) {
+        pImpl->confidence = std::max(0.1f, pImpl->confidence - 0.1f);
+    }
+}
+
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
