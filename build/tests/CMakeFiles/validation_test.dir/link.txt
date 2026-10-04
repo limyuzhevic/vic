@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/validation_test.dir/__/src/core/Config/ValidationTest.cpp.o -o validation_test  ../libnlm_core.a 

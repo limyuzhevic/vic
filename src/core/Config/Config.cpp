@@ -92,124 +92,172 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
+bool Config::validateConfiguration() const {
+    std::vector<ConfigEntry> entries;
+    entries.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+        entries.push_back(entry);
     }
-    return keys;
+    
+    lastValidationResult = getConfigurationSchema().validateAll(entries);
+    return lastValidationResult.valid;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+std::string Config::getValidationReport() const {
+    return getConfigurationSchema().createValidationReport(lastValidationResult);
 }
 
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
+const ValidationResult& Config::getLastValidationResult() const {
+    return lastValidationResult;
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Initialize the configuration schema
+static void initializeConfigurationSchema() {
+    ConfigurationSchema& schema = ConfigurationSchema::getInstance();
+    
+    // Initialize the schema with all configuration parameters and their validation rules
+    // Based on main.cpp and config file specifications
+    
+    // int64_t types
+    schema.addParameter("random_seed", ConfigurationSchema::Type::INT64_T, 
+                       "Random seed for reproducible experiments", false);
+    
+    schema.addParameter("neuron_count", ConfigurationSchema::Type::INT64_T,
+                       "Number of neurons in the brain", true,
+                       std::int64_t(500), {
+                           {ConfigurationSchema::ValidationType::POSITIVE, {}, {}, "must be positive"}
+                       });
+    
+    schema.addParameter("region_count", ConfigurationSchema::Type::INT64_T,
+                       "Number of brain regions", true,
+                       std::int64_t(1), {
+                           {ConfigurationSchema::ValidationType::POSITIVE, {}, {}, "must be positive"}
+                       });
+    
+    schema.addParameter("environment_width", ConfigurationSchema::Type::INT64_T,
+                       "Environment width", true,
+                       std::int64_t(10), {
+                           {ConfigurationSchema::ValidationType::POSITIVE, {}, {}, "must be positive"}
+                       });
+    
+    schema.addParameter("environment_height", ConfigurationSchema::Type::INT64_T,
+                       "Environment height", true,
+                       std::int64_t(10), {
+                           {ConfigurationSchema::ValidationType::POSITIVE, {}, {}, "must be positive"}
+                       });
+    
+    schema.addParameter("max_simulation_steps", ConfigurationSchema::Type::INT64_T,
+                       "Maximum simulation steps", true,
+                       std::int64_t(10000), {
+                           {ConfigurationSchema::ValidationType::NON_NEGATIVE, {}, {}, "must be non-negative"}
+                       });
+    
+    // double types
+    schema.addParameter("simulation_timestep", ConfigurationSchema::Type::DOUBLE,
+                       "Simulation timestep in seconds", true,
+                       double(0.001), {
+                           {ConfigurationSchema::ValidationType::RANGE_MIN_MAX, std::any(0.0), std::any(1.0), "must be in range (0, 1.0]"}
+                       });
+    
+    // float types
+    schema.addParameter("connection_probability", ConfigurationSchema::Type::FLOAT,
+                       "Probability of connection between neurons", true,
+                       float(0.15f), {
+                           {ConfigurationSchema::ValidationType::ZERO_TO_ONE, {}, {}, "must be in range [0, 1]"}
+                       });
+    
+    schema.addParameter("plasticity_learning_rate", ConfigurationSchema::Type::FLOAT,
+                       "Plasticity learning rate", true,
+                       float(0.01f), {
+                           {ConfigurationSchema::ValidationType::ZERO_TO_ONE, {}, {}, "must be in range [0, 1]"}
+                       });
+    
+    schema.addParameter("stdp_ltp_weight", ConfigurationSchema::Type::FLOAT,
+                       "STDP LTP weight", true,
+                       float(0.02f), {
+                           {ConfigurationSchema::ValidationType::RANGE_MIN_MAX, std::any(-1.0f), std::any(1.0f), "must be in reasonable range"}
+                       });
+    
+    schema.addParameter("stdp_ltd_weight", ConfigurationSchema::Type::FLOAT,
+                       "STDP LTD weight", true,
+                       float(0.015f), {
+                           {ConfigurationSchema::ValidationType::RANGE_MIN_MAX, std::any(-1.0f), std::any(1.0f), "must be in reasonable range"}
+                       });
+    
+    schema.addParameter("stdp_time_constant", ConfigurationSchema::Type::FLOAT,
+                       "STDP time constant", true,
+                       float(20.0f), {
+                           {ConfigurationSchema::ValidationType::POSITIVE, {}, {}, "must be positive"}
+                       });
+    
+    schema.addParameter("synaptogenesis_rate", ConfigurationSchema::Type::FLOAT,
+                       "Synaptogenesis rate", true,
+                       float(0.0001f), {
+                           {ConfigurationSchema::ValidationType::RANGE_MIN_MAX, std::any(0.0f), std::any(0.001f), "must be small positive rate"}
+                       });
+    
+    schema.addParameter("pruning_rate", ConfigurationSchema::Type::FLOAT,
+                       "Pruning rate", true,
+                       float(0.00001f), {
+                           {ConfigurationSchema::ValidationType::RANGE_MIN_MAX, std::any(0.0f), std::any(0.0001f), "must be small positive rate"}
+                       });
+    
+    schema.addParameter("dopamine_baseline", ConfigurationSchema::Type::FLOAT,
+                       "Dopamine baseline", true,
+                       float(0.1f), {
+                           {ConfigurationSchema::ValidationType::ZERO_TO_ONE, {}, {}, "must be in range [0, 1]"}
+                       });
+    
+    schema.addParameter("reward_discount_factor", ConfigurationSchema::Type::FLOAT,
+                       "Reward discount factor", true,
+                       float(0.99f), {
+                           {ConfigurationSchema::ValidationType::ZERO_TO_ONE, {}, {}, "must be in range [0, 1]"}
+                       });
+    
+    schema.addParameter("visualization_update_rate", ConfigurationSchema::Type::FLOAT,
+                       "Visualization update rate", true,
+                       float(30.0f), {
+                           {ConfigurationSchema::ValidationType::POSITIVE, {}, {}, "must be positive"}
+                       });
+    
+    // bool types
+    schema.addParameter("log_to_file", ConfigurationSchema::Type::BOOL,
+                       "Log to file flag", true,
+                       false);
+    
+    schema.addParameter("visualization_enabled", ConfigurationSchema::Type::BOOL,
+                       "Visualization enabled flag", true,
+                       false);
+    
+    // string types
+    schema.addParameter("environment_name", ConfigurationSchema::Type::STRING,
+                       "Environment name", true,
+                       std::string("GridWorld"));
+    
+    schema.addParameter("log_level", ConfigurationSchema::Type::STRING,
+                       "Log level", true,
+                       std::string("INFO"));
+    
+    schema.addParameter("log_filename", ConfigurationSchema::Type::STRING,
+                       "Log filename", true,
+                       std::string("nlm.log"));
+    
+    // vector types (optional)
+    schema.addParameter("sensor_parameters", ConfigurationSchema::Type::VECTOR_DOUBLE,
+                       "Sensor parameters", false);
+    
+    // Log schema initialization
+    // std::cout << "Configuration schema initialized with " << schema.getParameterNames().size() << " parameters" << std::endl;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Ensure schema is initialized on first use
+namespace {
+    struct SchemaInitializer {
+        SchemaInitializer() {
+            initializeConfigurationSchema();
+        }
+    };
+    SchemaInitializer schemaInitializer;
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

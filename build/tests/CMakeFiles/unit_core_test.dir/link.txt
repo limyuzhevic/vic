@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/unit_core_test.dir/test_core.cpp.o -o unit_core_test  ../libnlm_core.a 

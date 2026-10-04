@@ -1,0 +1,76 @@
+# clang-format configuration for NLM project
+# Based on LLVM coding standards with NLM-specific adaptations
+
+Language: C++
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+IndentCaseLabels: true
+IndentWrappedFunctionNames: false
+AlignConsecutiveMacros: false
+BreakBeforeBraces: Allman
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+IndentPPDirectives: None
+AllowShortEnumsOnASingleLine: false
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+AllowAllConstructorInitializersOnOneLine: false
+AllowShortCaseLabelsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+IncludeBlocks: None
+IncludeCategories:
+  - Regex: '^"(boost|std|Federal|NLMLib)/'
+    Priority: 1
+  - Regex: '^<.*>'
+    Priority: 2
+  - Regex: '^"(.*)".*'
+    Priority: 3
+
+SortIncludes: false
+SortUsingDeclarations: false
+ColumnLimit: 100
+MaxEmptyLines: 2
+BreakStringLiterals: true
+ContinueComments: true
+ReflowComments: true
+FixNamespaceComments: true
+Merge consecutive lines of comments
+
+# Style options
+AllowShortFunctionsOnASingleLine: None
+AllowShortBitFieldsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+
+# Code analysis specific options
+FixEmptyFunctionBody: false
+FixCommentFormatting: true
+FixNamespaceComments: true
+
+# Brace wrapping options
+AllowAllArgumentsOnOneLine: false
+AllowAllConstructorInitializersOnOneLine: false
+AllowAllParametersOfDeclarationOnOneLine: false
+AllowOneLineTemplates: false
+
+# ObjC specific (not used but defined for consistency)
+ObjCBinPackProtocolList: Auto
+BreakBeforeObjCBrace: false
+
+# Miscellaneous
+KeepControlStatementIndentation: false
+EmptyLineBeforeAccessModifier: LogicalBlock
+EmptyLineBeforeCatch: false
+EmptyLineBeforeElse: false
+EmptyLineBeforeCatchAfterThrow: false
+EmptyLineBeforeElseAfterCatch: false
+RemoveUnusedLocalVariable: false
+RemoveDeadCode: false
+
+# Testing and validation
+FixReadability: false
+FixStyle: false

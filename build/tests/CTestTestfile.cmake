@@ -1,0 +1,28 @@
+# CMake generated Testfile for 
+# Source directory: /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests
+# Build directory: /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests
+# 
+# This file includes the relevant testing commands required for 
+# testing this directory and lists subdirectories to be tested as well.
+add_test(unit_core_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/unit_core_test")
+set_tests_properties(unit_core_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;119;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(unit_brain_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/unit_brain_test")
+set_tests_properties(unit_brain_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;120;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(unit_dynamics_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/unit_dynamics_test")
+set_tests_properties(unit_dynamics_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;121;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(integration_tests "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/integration_tests")
+set_tests_properties(integration_tests PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;122;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(performance_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/performance_test")
+set_tests_properties(performance_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;123;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(phase_3_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/phase_3_test")
+set_tests_properties(phase_3_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;124;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(phase_4_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/phase_4_test")
+set_tests_properties(phase_4_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;125;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(phase_5_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/phase_5_test")
+set_tests_properties(phase_5_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;126;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(phase_6_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/phase_6_test")
+set_tests_properties(phase_6_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;127;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(nlm_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/nlm_test")
+set_tests_properties(nlm_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;128;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")
+add_test(validation_test "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/build/tests/validation_test")
+set_tests_properties(validation_test PROPERTIES  _BACKTRACE_TRIPLES "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;129;add_test;/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_262d6285-160d-472c-804d-80b30a605e7b/tests/CMakeLists.txt;0;")

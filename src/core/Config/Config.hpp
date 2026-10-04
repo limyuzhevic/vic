@@ -5,43 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include "Validation.hpp"
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
+// Include common configuration types
+#include "ConfigTypes.hpp"
 
 // Main configuration class
 class Config {
@@ -93,9 +63,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateConfiguration() const;
+    std::string getValidationReport() const;
+    
+    // Get validation results
+    const ValidationResult& getLastValidationResult() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    mutable ValidationResult lastValidationResult;
     
     // Internal helpers
     static std::string trim(const std::string& str);

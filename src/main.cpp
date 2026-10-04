@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "core/Version/Version.h"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +26,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
@@ -44,7 +46,7 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -322,15 +324,82 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    CLI::App app("NLM - Neural Learning Machine Phase 2 (熙然)");
+    
+    // Version options
+    app.add_flag("--version", "Display version information and exit")->group("Options");
+    
+    // Configuration file option (backward compatibility)
+    std::string configFile = "configs/default.cfg";
+    app.add_option("--config", configFile, "Configuration file path")
+        ->group("Configuration")
+        ->check(CLI::ExistingFile);
+    
+    // Basic simulation parameters
+    uint64_t randomSeed = 42;
+    app.add_option("--random-seed", randomSeed, "Random seed for reproducibility")
+        ->group("Configuration");
+    
+    double simulationTimestep = 0.001;
+    app.add_option("--timestep", simulationTimestep, "Simulation timestep (seconds)")
+        ->group("Configuration");
+    
+    int64_t neuronCount = 500;
+    app.add_option("--neurons", neuronCount, "Number of neurons")
+        ->group("Configuration");
+    
+    int64_t regionCount = 1;
+    app.add_option("--regions", regionCount, "Number of brain regions")
+        ->group("Configuration");
+    
+    float connectionProbability = 0.15f;
+    app.add_option("--connection-prob", connectionProbability, "Probability of connection between neurons")
+        ->group("Configuration");
+    
+    // Environment variable support
+    app.add_flag("--env-override", "Enable environment variable overrides")
+        ->group("Configuration");
+    
+    // Additional useful flags
+    app.add_flag("--verbose", "Enable verbose logging output")
+        ->group("Options");
+    
+    app.add_flag("--quiet", "Suppress non-error output")
+        ->group("Options");
+    
+    app.add_flag("--benchmark", "Run benchmark mode")
+        ->group("Options");
+    
+    // Parse command line
+    CLI11_PARSE(app, argc, argv)
+    
+    // Check if help or version was requested
+    if (app.get_flag("version")) {
+        std::cout << "NLM " << getVersion() << std::endl;
+        std::cout << "Build date: " << getBuildDate() << std::endl;
+        std::cout << "Git commit: " << getGitCommit() << std::endl;
+        std::cout << "Major.Minor.Patch: " << getMajorVersion() << "." 
+                  << getMinorVersion() << "." << getPatchVersion() << std::endl;
+        return 0;
+    }
+    
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
+    // Initialize logger based on verbosity flags
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
+    if (app.get_flag("quiet")) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Error);
+        logger->addLogger(consoleLogger);
+    } else if (app.get_flag("verbose")) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Debug);
+        logger->addLogger(consoleLogger);
+    } else {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        logger->addLogger(consoleLogger);
+    }
     Logger::setGlobal(logger);
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -343,20 +412,7 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
+    // Load config from file (backward compatibility)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
@@ -364,14 +420,32 @@ int main(int argc, char** argv) {
     }
     
     // Override with command line args
+    // Manually apply CLI11 values to config for backward compatibility
+    config->set("random_seed", randomSeed, ConfigSource::CommandLine);
+    config->set("simulation_timestep", simulationTimestep, ConfigSource::CommandLine);
+    config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+    config->set("region_count", regionCount, ConfigSource::CommandLine);
+    config->set("connection_probability", connectionProbability, ConfigSource::CommandLine);
+    
+    // Override with existing argv for backward compatibility
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (if not already set)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);

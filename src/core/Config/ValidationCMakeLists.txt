@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.16)
+
+# Test configuration
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Create validation test executable
+add_executable(validation_test
+    ValidationTest.cpp
+)
+
+target_link_libraries(validation_test PRIVATE nlm_core)
+target_compile_features(validation_test PRIVATE cxx_std_20)
+
+# Enable testing
+enable_testing()
+add_test(NAME validation_test COMMAND validation_test)

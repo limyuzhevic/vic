@@ -1,0 +1,174 @@
+name: NLM Code Quality Checks
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up C++ environment
+      uses: actions/setup-cpp@v1
+      with:
+        compiler: gcc
+        cxx-compiler: g++
+        cmake-version: '3.16'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-format clang-tidy cppcheck g++ make cmake
+
+    - name: Create build directory
+      run: mkdir -p build
+
+    - name: Configure CMake
+      run: |
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+
+    - name: Run clang-format check
+      run: |
+        cd build
+        echo "Checking code formatting with clang-format..."
+        if ! clang-format --version; then
+          echo "clang-format not found, installing..."
+          sudo apt-get install -y clang-format
+        fi
+        echo "Running clang-format check on all source files..."
+        FIND_RESULT=$(find . -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | grep -v build/ | grep -v _deps/ | head -20)
+        if [ -z "$FIND_RESULT" ]; then
+          echo "No source files found to check"
+          exit 0
+        fi
+        CLANG_FORMAT_CHECK="${FIND_RESULT}"
+        if [ ! -z "$CLANG_FORMAT_CHECK" ]; then
+          echo "Files to check:"
+          echo "$CLANG_FORMAT_CHECK"
+          for file in $CLANG_FORMAT_CHECK; do
+            if [ -f "$file" ]; then
+              echo "Checking $file..."
+              if ! clang-format --dry-run -Werror "$file"; then
+                echo "ERROR: Code formatting issues found in $file"
+                echo "Run 'clang-format -i' to fix formatting issues"
+                exit 1
+              fi
+            fi
+          done
+        fi
+        echo "Code formatting check passed!"
+
+    - name: Run clang-tidy analysis
+      run: |
+        cd build
+        echo "Running clang-tidy analysis..."
+        if ! clang-tidy --version; then
+          echo "clang-tidy not found, installing..."
+          sudo apt-get install -y clang-tidy
+        fi
+        echo "Analyzing source files with clang-tidy..."
+        for file in $(find . -name "*.cpp" | grep -v build/ | grep -v _deps/); do
+          echo "Analyzing $file with clang-tidy..."
+          if ! clang-tidy "$file" -- -I src/; then
+            echo "ERROR: clang-tidy found issues in $file"
+            exit 1
+          fi
+        done
+        echo "Clang-tidy analysis completed successfully!"
+
+    - name: Run cppcheck analysis
+      run: |
+        echo "Running cppcheck static analysis..."
+        if ! cppcheck --version; then
+          echo "cppcheck not found, installing..."
+          sudo apt-get install -y cppcheck
+        fi
+        echo "Running cppcheck on source directory..."
+        for file in $(find src/ -name "*.cpp" -o -name "*.hpp" | grep -v build/ | grep -v _deps/); do
+          echo "Analyzing $file with cppcheck..."
+          if ! cppcheck --enable=all --inconclusive --std=c++20 --project=. "$file"; then
+            echo "ERROR: cppcheck found issues in $file"
+            exit 1
+          fi
+        done
+        echo "Cppcheck analysis completed successfully!"
+
+    - name: Run CMake configuration checks
+      run: |
+        cd build
+        echo "Running CMake configuration checks..."
+        if [ ! -f "Makefile" ]; then
+          echo "ERROR: Makefile not found. CMake configuration failed."
+          exit 1
+        fi
+        echo "CMake configuration is valid."
+
+    - name: Build project (sanity check)
+      run: |
+        cd build
+        echo "Building project as a sanity check..."
+        if ! make -j4; then
+          echo "ERROR: Project build failed."
+          exit 1
+        fi
+        echo "Project build completed successfully!"
+
+    - name: Run existing tests
+      run: |
+        cd build
+        echo "Running existing test targets..."
+        if [ -f "Makefile" ]; then
+          echo "Running ci_checks target..."
+          if ! make ci_checks; then
+            echo "ERROR: CI checks failed."
+            exit 1
+          fi
+          echo "CI checks passed!"
+        fi
+
+    - name: Generate linting report
+      run: |
+        echo "Linting completed successfully!"
+        echo "All code quality checks have passed."
+        echo "The project follows proper coding standards and best practices."
+
+  formatting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up clang-format
+      run: sudo apt-get update && sudo apt-get install -y clang-format
+
+    - name: Run clang-format auto-format
+      run: |
+        echo "Running clang-format auto-format..."
+        for file in $(find src/ tests/ -name "*.cpp" -o -name "*.hpp" | grep -v build/ | grep -v _deps/); do
+          echo "Formatting $file..."
+          clang-format -i "$file"
+        done
+        echo "Auto-formatting completed."
+
+    - name: Check for formatting changes
+      run: |
+        echo "Checking if any files were formatted..."
+        if git diff --name-only | grep -E "\.(cpp|hpp|h)$" | grep -v "^build/" | grep -v "^_deps/"; then
+          echo "Some files were auto-formatted. The following files need to be committed:"
+          git diff --name-only | grep -E "\.(cpp|hpp|h)$" | grep -v "^build/" | grep -v "^_deps/"
+          echo "Please review and commit the formatted files."
+          exit 1
+        else
+          echo "No formatting changes detected. All files are properly formatted."
+        fi

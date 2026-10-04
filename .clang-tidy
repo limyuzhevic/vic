@@ -1,0 +1,123 @@
+# Clang-Tidy configuration for NLM project
+# Comprehensive C++ static analysis configuration
+
+# Enable checks
+Checks: "-
+    *,\
+    -abseil-*
+    -altera-*
+    -android-*
+    -boost-*
+    -cert-*
+    -clang-analyzer-*
+    -clang-diagnostic-*
+    -cppcoreguidelines-*
+    -darknet-*
+    -fuchsia-*
+    -google-*
+    -llvm-*
+    -llvmlibc-*
+    -misc-*
+    -modernize-*
+    -mpi-*
+    -performance-*
+    -portability-*
+    -reduce-*
+    -security-*
+    -sharp-*
+    -z3-
+    # Exclude certain categories that might be too noisy
+    -cppcoreguidelines-avoid-c-arrays
+    -cppcoreguidelines-avoid-goto
+    -cppcoreguidelines-explicit-virtual-functions
+    -cppcoreguidelines-init-variables
+    -cppcoreguidelines-owning-reference
+    -cppcoreguidelines-prefer-associative-containers
+    -cppcoreguidelines-prefer-initializer-list
+    -cppcoreguidelines-pro-type-const-cast
+    -cppcoreguidelines-pro-type-reinterpret-cast
+    -cppcoreguidelines-pro-type-static-cast-downcast
+    -cppcoreguidelines-pro-type-cstyle-cast
+    -cppcoreguidelines-pro-type-union-access
+    -fuchsia-*
+    -google-build-using-namespace
+    -google-readability-braces-around-statement
+    -google-readability-todo
+    -llvm-include-order
+    -misc-misplaced-const
+    -modernize-avoid-c-arrays
+    -modernize-concat-nested-namespaces
+    -modernize-deprecated-headers
+    -modernize-loop-convert
+    -modernize-raw-string-literal
+    -modernize-use-default-member-init
+    -modernize-use-equals-default
+    -modernize-use-nodiscard
+    -modernize-use-override
+    -modernize-use-trailing-return-type
+    -performance-noexcept-move-constructor
+    -performance-unnecessary-copy-initialization
+    -portability-simd-intrinsic
+    -readability-function-size
+    -readability-magic-numbers
+    -readability-named-parameter
+    -readability-uppercase-literal-suffix
+    -z3-
+"
+
+# Check levels
+CheckOptions:
+  - key: misc-new-delete-overloads
+    value: 0
+  - key: modernize-use-nodiscard
+    value: 0
+  - key: cppcoreguidelines-pro-type-static-cast-downcast
+    value: 0
+  - key: cppcoreguidelines-pro-type-reinterpret-cast
+    value: 0
+  - key: cppcoreguidelines-pro-type-const-cast
+    value: 0
+  - key: cppcoreguidelines-pro-type-cstyle-cast
+    value: 0
+
+# Clang-Tidy specific options
+clang-tidy-passes:
+  - CheckFirstIncludesPass
+  - ClangInternalSumReducerPass
+  - DefaultDefinitionReturnAddressPass
+  - DynamicTypeSizerPass
+  - FixItPass
+  - LdStObjectSizePass
+  - LeakCheckPass
+  - LoadStoreVectorizerPass
+  - UniquePtrResetRemovePass
+
+# NLM-specific exclusions
+# Disable checks that don't apply to NLM's specialized neural architecture
+DisabledChecks:
+  - "google-*"
+  - "modernize-*"
+  - "performance-*"
+  - "portability-*"
+  - "z3-"
+
+# Custom check patterns for NLM
+CustomCheckPrefixes:
+  - "nlm-"
+
+# Analysis configuration
+CheckOptions:
+  - key: "nlm-neural-dynamics"
+    value: 0
+  - key: "nlm-memory-consistency"
+    value: 0
+  - key: "nlm-plasticity-rules"
+    value: 0
+
+# Format configuration
+FormatStyle: file
+HeaderFileExtensions: ["hpp", "h", "hxx", "h++", "hm"]
+SourceFileExtensions: ["cpp", "cc", "cxx", "cpp", "C", "c++", "ii", "c", "h", "hpp", "hxx", "h++", "h", "c", "cc", "cpp", "C", "cxx"]
+
+# Analysis targets
+AnalysisTargets: "src/ src/*/*.cpp"

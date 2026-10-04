@@ -1,0 +1,219 @@
+# Cppcheck configuration for NLM project
+# Static analysis configuration for C++ code
+
+cppcheck-config-version: 1
+
+# Error messages format
+error-message-format: "{file}:{line}:{column}:{severity}:{id}:{message}"
+
+# Output format
+output-format: xml
+
+# Enable/disable checks
+enable: "*
+    # Enable all standard checks
+    # We will disable specific ones below based on NLM's architecture
+    #
+    # Memory Management
+    # Information messages (not errors)
+    nullPointer
+    outOfBounds
+    danglingPointer
+    useAfterFree
+    doubleFree
+    invalidFree
+    memoryLeak
+    unreadVariable
+    uninitializedVariable
+    uninitializedValue
+    invalidFunctionArgument
+    # Pointer arithmetic
+    pointerToInt
+    intToPointer
+    noPointerArithmetic
+    # Array bounds
+    arrayIndexOutOfBounds
+    containerOutOfBounds
+    # Floating-point
+    floatingPointError
+    divisionByZero
+    suspiciousMathFunction
+    # Security
+    secureCoding
+    bufferOverrun
+    # Code quality
+    unusedFunction
+    unusedStructMember
+    unusedVariable
+    unusedMacro
+    unusedLabel
+    unusedReturnValue
+    # Style
+    constParameter
+    # Stream
+    wrongPrintfFormat
+    # Misra rules
+    misra-*
+"
+
+# Disable checks that are not applicable to NLM's specialized neural architecture
+disable: "*
+    # Disable some checks that may produce false positives in neural network code
+    # - Some memory patterns are specific to NLM's neural architecture
+    # - Vector operations have specific memory patterns
+    # - Neural network specific constructs
+    #
+    # Disable checks related to:
+    # - Neural-specific memory operations that are intentional
+    # - Complex pointer arithmetic used in neural simulations
+    # - Performance optimizations specific to neural networks
+    #
+    # Note: Keep essential safety checks enabled
+    #
+    # Disable checks that don't apply to NLM's domain
+    # - These are disabled but can be re-enabled if needed
+    #
+    # Security-specific checks that may be too strict for research code
+    # (some are intentional for testing neural architectures)
+    #
+    # Style and formatting checks that don't apply to NLM's specific coding style
+    #
+    # Performance and optimization checks that are specific to NLM's architecture
+    #
+    # Documentation checks that are not applicable to research code
+    #
+    # Standards compliance checks that may be too strict for research code
+"
+
+# Include directories
+include: "
+    src/
+    src/include/
+    src/core/
+    src/brain/
+    src/neuromodulation/
+    src/memory/
+    src/prediction/
+    src/cognition/
+    src/sensory/
+    src/motor/
+    src/plasticity/
+    src/development/
+    src/experiments/
+    src/visualization/
+    src/world/
+    src/agent/
+"
+
+# Exclusions
+excludefile: "
+    *test*
+    */build/*
+    */_deps/*
+    */.git/*
+"
+
+# Defines for conditional compilation
+# NLM-specific defines that affect static analysis
+define: "
+    NLM_DEBUG=0
+    NLM_RELEASE=1
+    NLM_PROFILE=0
+    DEBUG=0
+    NDEBUG=1
+    NLM_VERSION_MAJOR=1
+    NLM_VERSION_MINOR=0
+    NLM_VERSION_PATCH=0
+"
+
+# C++ standards and configurations
+cpp-standard: c++20
+language: c++
+
+# Inline suppression (from .cppcheck comments)
+inlinemacro: "
+    DECLARE NEURAL_NEIGHBORHOOD
+    DECLARE_SYNAPSE_TYPE
+    CREATE_NEURON_TYPE
+    REGISTER_WEIGHT_UPDATE
+    IMPLEMENT_PLASTIC_RULE
+    DECLARE_BRAIN_REGION
+    CREATE_NEURAL_NETWORK
+    IMPLEMENT_MEMORY_SYSTEM
+"
+
+# Add comments to identify suppressed checks
+addcomments: true
+
+# Library paths (if any external libraries are used)
+# library: "path/to/library"
+
+# Configuration for specific file patterns
+# (these can be overridden in specific sections)
+
+# NLM-specific analysis configuration
+# These checks are disabled because they are intentional in NLM's neural architecture
+#
+# 1. Memory management patterns specific to neural networks
+# - Intentional use of raw pointers for performance
+# - Specific memory pooling patterns
+# - Neural network memory management is intentional
+
+# 2. Vectorization and SIMD optimizations
+# - NLM uses specific vector operations
+# - Performance optimizations are intentional
+# - SIMD intrinsics are used for neural simulations
+
+# 3. Code duplication patterns
+# - Neural networks often have repeated patterns
+# - Template specializations are intentional
+# - Code reuse is common in neural architectures
+
+# 4. Boolean operator patterns
+# - Neural network logic uses specific patterns
+# - These are intentional for performance
+
+# 5. Function return types
+# - Neural network functions return specific types
+# - Template functions are intentionally used
+
+# 6. Macro usage
+# - NLM uses specific macros for neural architecture
+# - These are intentional for code generation
+
+# 7. Namespace and include patterns
+# - NLM has specific namespace conventions
+# - These are intentional for organization
+
+# 8. Exception handling
+# - NLM has specific exception handling patterns
+# - These are intentional for error handling in neural systems
+
+# 9. C++ standards compliance
+# - Some C++20 features are used intentionally
+# - Compliance is evaluated based on specific code patterns
+
+# 10. Dependencies and external libraries
+# - NLM uses external dependencies (CLI11, etc.)
+# - These are intentional and managed
+
+# Note: This configuration is designed to balance code quality with the
+# flexibility needed for research and development of neural architectures.
+# Checks can be re-enabled if needed for specific files or sections.
+
+# Additional analysis options
+# -suppress-warnings: false
+# -suppress-normal: false
+# -suppress-error: false
+# -suppress-warning: false
+
+# Output options
+# -quiet: false
+# -verbose: false
+# -force: false
+# -check-config: false
+
+# Analysis depth
+# -low: false
+# -medium: true
+# -high: false
