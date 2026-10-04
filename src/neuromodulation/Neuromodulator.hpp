@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace nlm {
 
@@ -50,7 +51,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation

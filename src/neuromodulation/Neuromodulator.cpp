@@ -1,5 +1,6 @@
 #include "Neuromodulator.hpp"
 #include <algorithm>
+#include <memory>
 
 namespace nlm {
 
@@ -13,7 +14,7 @@ struct Dopamine::Impl {
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Dopamine::Dopamine() : pImpl(std::make_unique<Impl>()) {}
 
 Dopamine::~Dopamine() = default;
 
