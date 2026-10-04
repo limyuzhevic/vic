@@ -1,4 +1,4 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Enhanced Easy Usage Guide for Beginners
 
 ## What is NLM?
 
@@ -9,6 +9,8 @@ Think of it like this:
 - **Synapses** = Connections between brain cells
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
+
+**NEW:** NLM now includes enhanced Python bindings with improved memory safety and error handling!
 
 That's it! NLM simulates all of this.
 
@@ -69,6 +71,50 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+---
+
+## Enhanced Features
+
+### 1. Memory Safety
+All Python bindings now use safe reference policies to prevent memory issues:
+
+- Objects returned by value or copy (not references to internal state)
+- Proper reference counting for smart pointers
+- Exception-safe memory management
+
+### 2. Enhanced Error Handling
+The enhanced bindings provide:
+
+- Clear exception messages with context
+- Graceful handling of invalid operations
+- Detailed error reporting for debugging
+
+### 3. New Utility Functions
+```python
+# Enhanced configuration handling
+config = pynlm.createDefaultConfig()
+config.loadFromFile("config.json")
+config.set("learning.rate", 0.001)
+
+# Safe world object management
+world.addObject(WorldObject(5.0, 5.0, WorldObjectType.Resource, 10.0))
+
+# Enhanced action creation with validation
+action = pynlm.Action(pynlm.ActionType.Interact, [0.5, 0.3, 0.7])
+```
+
+### 4. Improved Monitoring and Logging
+```python
+# Enhanced logging for debugging
+brain.logStatus()
+agent.logStatus()
+
+# Performance monitoring
+print(f"Firing rate: {brain.getAverageFiringRate():.3f}")
+print(f"Neuromodulation: {agent.getNeuromodulationLevel():.3f}")
+print(f"Curiosity: {agent.getCuriosityLevel():.3f}")
 ```
 
 ---
