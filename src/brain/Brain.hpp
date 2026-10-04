@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuromodulatorManager;
+class BrainInitializer;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -187,11 +189,12 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Integration systems
+    NeuromodulatorManager* getNeuromodulatorManager();
+    const NeuromodulatorManager* getNeuromodulatorManager() const;
     
-    // Logging
-    void logStatus() const;
+    BrainInitializer* getBrainInitializer();
+    const BrainInitializer* getBrainInitializer() const;
     
 private:
     struct Impl;

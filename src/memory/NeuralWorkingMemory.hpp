@@ -75,15 +75,7 @@ public:
     float getMemoryActivity() const;
 
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
+    // Internal implementation struct to hide details
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
@@ -104,6 +96,18 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+
+    // Internal helper method to store to neuron with capacity management
+    void storeToNeuronInternal(NeuronId neuron, float activation);
+
+    // Create recurrent connection for maintenance
+    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
+
+    // Update recurrent connections for maintenance
+    void updateRecurrentConnections();
+
+    // Decay weak memory traces
+    void decayWeakTraces();
 };
 
 // AttentionalSelection: Neural attention through competition

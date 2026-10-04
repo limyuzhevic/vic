@@ -1,12 +1,28 @@
+// AgentBrain implementation with comprehensive memory integration
+// This file fixes the critical Phase 6 integration issues:
+// - Memory systems are now properly connected
+// - Neuromodulation systems are fully integrated
+// - Complete pipeline from sensory input to action selection
+
 #include "AgentBrain.hpp"
+#include "MemoryIntegration.hpp"
+#include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <sstream>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , memoryIntegration_(std::make_unique<MemoryIntegration>())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -58,20 +74,54 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 }
             }
         }
+        
+        // Initialize memory integration system
+        memoryIntegration_->initialize(brain_.get());
+        
+        // Initialize neuromodulation systems
+        initializeNeuromodulationSystems();
     }
 }
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::initializeNeuromodulationSystems() {
+    if (!brain_) return;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    NLM_LOG_INFO("Initializing neuromodulation systems...");
+    
+    // Create neuromodulation systems using NeuromodulatorManager
+    auto* neuromodulatorManager = brain_->getNeuromodulatorManager();
+    if (neuromodulatorManager) {
+        // Initialize each neuromodulation system
+        auto* dopamine = neuromodulatorManager->getDopamine();
+        auto* curiosity = neuromodulatorManager->getCuriosity();
+        auto* novelty = neuromodulatorManager->getNovelty();
+        auto* predictionError = neuromodulatorManager->getPredictionError();
+        auto* reward = neuromodulatorManager->getReward();
+        
+        // Configure dopamine system
+        if (dopamine) {
+            dopamine->setLevel(0.5f); // Start with moderate baseline
+        }
+        
+        // Initialize curiosity with brain reference
+        if (curiosity) {
+            curiosity->initialize(brain_.get());
+        }
+        
+        // Initialize novelty with brain reference
+        if (novelty) {
+            novelty->initialize(brain_.get());
+        }
+        
+        // Initialize prediction error with brain reference
+        if (predictionError) {
+            predictionError->initialize(brain_.get());
+        }
+        
+        NLM_LOG_INFO("Neuromodulation systems initialized successfully");
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -86,6 +136,11 @@ size_t AgentBrain::getMotorOutputSize() const {
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+    
+    // Store percept in memory integration
+    if (memoryIntegration_) {
+        memoryIntegration_->processSensoryInput(brain_.get(), percept);
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -138,14 +193,43 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
+        // Update novelty neuromodulator if available
+        updateNoveltyNeuromodulator();
+        
         // Store for next time
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Update curiosity neuromodulator if available
+        updateCuriosityNeuromodulator();
+    }
+}
+
+void AgentBrain::updateNoveltyNeuromodulator() {
+    auto* neuromodulatorManager = brain_ ? brain_->getNeuromodulatorManager() : nullptr;
+    if (!neuromodulatorManager) return;
+    
+    auto* novelty = neuromodulatorManager->getNovelty();
+    if (novelty) {
+        // Update novelty based on sensory difference
+        novelty->setLevel(noveltyLevel_);
+    }
+}
+
+void AgentBrain::updateCuriosityNeuromodulator() {
+    auto* neuromodulatorManager = brain_ ? brain_->getNeuromodulatorManager() : nullptr;
+    if (!neuromodulatorManager) return;
+    
+    auto* curiosity = neuromodulatorManager->getCuriosity();
+    if (curiosity) {
+        // Update curiosity based on novelty and prediction error
+        float curiosityValue = curiosityLevel_;
+        curiosity->setLevel(curiosityValue);
     }
 }
 
@@ -157,6 +241,11 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Store current action in memory integration
+    if (memoryIntegration_) {
+        memoryIntegration_->setCurrentAction(decoded);
     }
     
     return decoded;
@@ -277,6 +366,45 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // Update neuromodulation systems
+    updateNeuromodulationSystems(reward, predictionError_);
+}
+
+void AgentBrain::updateNeuromodulationSystems(float reward, float predictionError) {
+    auto* neuromodulatorManager = brain_ ? brain_->getNeuromodulatorManager() : nullptr;
+    if (!neuromodulatorManager) return;
+    
+    // Update dopamine based on reward prediction error
+    auto* dopamine = neuromodulatorManager->getDopamine();
+    if (dopamine) {
+        dopamine->signalRewardPredictionError(predictionError);
+        dopamine->update(0.001f); // Small timestep
+    }
+    
+    // Update curiosity based on novelty and prediction error
+    auto* curiosity = neuromodulatorManager->getCuriosity();
+    if (curiosity) {
+        curiosity->update(noveltyLevel_, std::abs(predictionError), 0.001f);
+    }
+    
+    // Update novelty detection
+    auto* novelty = neuromodulatorManager->getNovelty();
+    if (novelty) {
+        novelty->update(0.001f);
+    }
+    
+    // Update prediction error signal
+    auto* predError = neuromodulatorManager->getPredictionError();
+    if (predError) {
+        predError->computeError(predError->getPredictedValue(), reward);
+    }
+    
+    // Update reward system
+    auto* rewardSys = neuromodulatorManager->getReward();
+    if (rewardSys) {
+        rewardSys->add(reward);
+    }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
@@ -311,27 +439,63 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+    
+    // Update brain initializer for development effects
+    auto* brainInitializer = brain_ ? brain_->getBrainInitializer() : nullptr;
+    if (brainInitializer) {
+        brainInitializer->updateDevelopment(this, timestep);
+    }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
+void AgentBrain::setCurrentAction(MotorCommand action) {
+    if (memoryIntegration_) {
+        memoryIntegration_->setCurrentAction(action);
+    }
 }
 
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+void AgentBrain::setCurrentReward(float reward) {
+    currentReward_ = reward;
+    if (memoryIntegration_) {
+        memoryIntegration_->setCurrentReward(reward);
+    }
 }
 
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+void AgentBrain::setCurrentPredictionError(float error) {
+    currentPredictionError_ = error;
+    if (memoryIntegration_) {
+        memoryIntegration_->setCurrentPredictionError(error);
+    }
 }
 
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+void AgentBrain::updateBrainMemorySystems(double timestep) {
+    if (memoryIntegration_ && brain_) {
+        memoryIntegration_->update(brain_.get(), timestep);
+    }
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+void AgentBrain::logAgentStatus() const {
+    NLM_LOG_INFO("=== AgentBrain Status ===");
+    NLM_LOG_INFO("Vision neurons: " + std::to_string(sensoryVision_.size()));
+    NLM_LOG_INFO("Touch neurons: " + std::to_string(sensoryTouch_.size()));
+    NLM_LOG_INFO("Internal neurons: " + std::to_string(sensoryInternal_.size()));
+    NLM_LOG_INFO("Proprioception neurons: " + std::to_string(sensoryProprioception_.size()));
+    
+    NLM_LOG_INFO("Motor forward: " + std::to_string(motorForward_.size()));
+    NLM_LOG_INFO("Motor backward: " + std::to_string(motorBackward_.size()));
+    NLM_LOG_INFO("Motor turn left: " + std::to_string(motorTurnLeft_.size()));
+    NLM_LOG_INFO("Motor turn right: " + std::to_string(motorTurnRight_.size()));
+    NLM_LOG_INFO("Motor interact: " + std::to_string(motorInteract_.size()));
+    NLM_LOG_INFO("Motor wait: " + std::to_string(motorWait_.size()));
+    
+    NLM_LOG_INFO("Dopamine level: " + std::to_string(dopamineLevel_));
+    NLM_LOG_INFO("Novelty level: " + std::to_string(noveltyLevel_));
+    NLM_LOG_INFO("Curiosity level: " + std::to_string(curiosityLevel_));
+    NLM_LOG_INFO("Prediction error: " + std::to_string(predictionError_));
+    NLM_LOG_INFO("Expected reward: " + std::to_string(expectedReward_));
+    
+    if (memoryIntegration_) {
+        memoryIntegration_->logMemoryStatus(brain_.get());
+    }
 }
 
 void AgentBrain::reset() {
@@ -345,6 +509,11 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset memory integration
+    if (memoryIntegration_ && brain_) {
+        memoryIntegration_->reset(brain_.get());
+    }
 }
 
 } // namespace nlm
