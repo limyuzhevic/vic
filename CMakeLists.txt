@@ -21,6 +21,10 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Find Python and pybind11 dependencies
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -100,6 +104,22 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
+# Python bindings for agent components
+pybind11_add_module(pynlm_agent
+    src/agent/pybind/AgentBrainPy.cpp
+)
+target_link_libraries(pynlm_agent PRIVATE nlm_agent pybind11::module)
+
+# Python bindings for logging
+pybind11_add_module(pynlm_logging
+    src/agent/pybind/LoggerPy.cpp
+)
+target_link_libraries(pynlm_logging PRIVATE pybind11::module)
+
+# Set output name to match expected Python module name
+set_target_properties(pynlm_agent PROPERTIES OUTPUT_NAME "pynlm_agent")
+set_target_properties(pynlm_logging PROPERTIES OUTPUT_NAME "pynlm_logging")
+
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
@@ -119,7 +139,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
