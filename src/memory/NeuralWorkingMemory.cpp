@@ -2,19 +2,177 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
+#include <chrono>
 
 namespace nlm {
 
-struct NeuralWorkingMemory::Impl {
-    Brain* brain;
-    
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
-    
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
-    
-    Impl() : brain(nullptr) {}
+// Memory pool implementation for efficient memory management
+struct NeuralWorkingMemory::MemoryPool {
+    struct Allocation {
+        NeuronId neuronId;
+        float activation;
+        SimulationStep timestamp;
+        bool isActive;
+        uint32_t accessCount;
+    };
+
+    std::vector<Allocation> allocations;
+    std::unordered_map<NeuronId, size_t> neuronToIndex;
+    size_t capacity;
+    size_t activeCount;
+    mutable uint64_t totalAllocations;
+    mutable uint64_t totalDeallocations;
+    std::chrono::steady_clock::time_point lastCleanup;
+
+    MemoryPool(size_t poolCapacity) : 
+        capacity(poolCapacity), 
+        activeCount(0),
+        totalAllocations(0),
+        totalDeallocations(0),
+        lastCleanup(std::chrono::steady_clock::now()) {
+        allocations.reserve(capacity);
+    }
+
+    ~MemoryPool() {
+        totalDeallocations = allocations.size();
+    }
+
+    // Find or create allocation
+    Allocation& findOrCreate(NeuronId neuronId) {
+        auto it = neuronToIndex.find(neuronId);
+        if (it != neuronToIndex.end()) {
+            size_t idx = it->second;
+            if (!allocations[idx].isActive) {
+                allocations[idx].isActive = true;
+                ++activeCount;
+            }
+            ++allocations[idx].accessCount;
+            return allocations[idx];
+        }
+
+        // Allocate new slot
+        if (allocations.size() < capacity) {
+            size_t idx = allocations.size();
+            allocations.emplace_back(neuronId, 0.0f, 0, true, 1);
+            neuronToIndex[neuronId] = idx;
+            ++activeCount;
+            ++totalAllocations;
+            return allocations[idx];
+        }
+
+        // Replace least recently used inactive allocation
+        size_t replaceIdx = 0;
+        for (size_t i = 0; i < allocations.size(); ++i) {
+            if (!allocations[i].isActive) {
+                replaceIdx = i;
+                break;
+            }
+        }
+
+        NeuronId oldNeuronId = allocations[replaceIdx].neuronId;
+        neuronToIndex.erase(oldNeuronId);
+        allocations[replaceIdx] = Allocation{neuronId, 0.0f, 0, true, 1};
+        neuronToIndex[neuronId] = replaceIdx;
+        ++totalAllocations;
+
+        return allocations[replaceIdx];
+    }
+
+    // Update allocation timestamp and data
+    void update(NeuronId neuronId, float activation, SimulationStep timestamp) {
+        auto it = neuronToIndex.find(neuronId);
+        if (it != neuronToIndex.end()) {
+            size_t idx = it->second;
+            allocations[idx].activation = activation;
+            allocations[idx].timestamp = timestamp;
+        }
+    }
+
+    // Deactivate allocation
+    void deactivate(NeuronId neuronId) {
+        auto it = neuronToIndex.find(neuronId);
+        if (it != neuronToIndex.end()) {
+            size_t idx = it->second;
+            if (allocations[idx].isActive) {
+                allocations[idx].isActive = false;
+                --activeCount;
+            }
+        }
+    }
+
+    // Get allocation by neuron ID
+    const Allocation* get(NeuronId neuronId) const {
+        auto it = neuronToIndex.find(neuronId);
+        if (it != neuronToIndex.end()) {
+            return &allocations[it->second];
+        }
+        return nullptr;
+    }
+
+    // Get all active allocations
+    std::vector<Allocation> getActiveAllocations() const {
+        std::vector<Allocation> result;
+        result.reserve(activeCount);
+        for (const auto& alloc : allocations) {
+            if (alloc.isActive) {
+                result.push_back(alloc);
+            }
+        }
+        return result;
+    }
+
+    // Cleanup old allocations (to prevent memory leaks)
+    void cleanupOldAllocations(SimulationStep currentStep, SimulationStep maxAge) {
+        auto now = std::chrono::steady_clock::now();
+        auto timeSinceCleanup = std::chrono::duration_cast<std::chrono::seconds>(now - lastCleanup).count();
+        
+        if (timeSinceCleanup < 60) {  // Cleanup every 60 seconds
+            return;
+        }
+
+        std::vector<size_t> toRemove;
+        for (size_t i = 0; i < allocations.size(); ++i) {
+            if (allocations[i].isActive && 
+                (currentStep - allocations[i].timestamp) > maxAge) {
+                toRemove.push_back(i);
+            }
+        }
+
+        // Remove in reverse order to maintain indices
+        for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+            size_t idx = *it;
+            neuronToIndex.erase(allocations[idx].neuronId);
+            allocations[idx].isActive = false;
+            --activeCount;
+        }
+
+        lastCleanup = std::chrono::steady_clock::now();
+    }
+
+    // Get statistics
+    struct PoolStats {
+        size_t totalAllocations;
+        size_t activeAllocations;
+        size_t capacity;
+        float utilization;
+        uint64_t totalAccessCount;
+    };
+
+    PoolStats getStats() const {
+        size_t totalAccess = 0;
+        for (const auto& alloc : allocations) {
+            totalAccess += alloc.accessCount;
+        }
+        
+        return {
+            totalAllocations,
+            activeCount,
+            capacity,
+            capacity > 0 ? (static_cast<float>(activeCount) / capacity) : 0.0f,
+            totalAccess
+        };
+    }
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -22,7 +180,18 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , maxMemoryAge_(10000)
 {
+    // Initialize memory pools for different memory trace types
+    pImpl->memoryPools["primary"] = std::make_unique<MemoryPool>(capacity_);
+    pImpl->memoryPools["secondary"] = std::make_unique<MemoryPool>(capacity_ / 2);
+    pImpl->memoryPools["tertiary"] = std::make_unique<MemoryPool>(capacity_ / 4);
+    
+    // Setup cache for frequently accessed neurons
+    pImpl->neuronCache.reserve(capacity_ * 2);
+    pImpl->cacheHits = 0;
+    pImpl->cacheMisses = 0;
+    pImpl->cacheEnabled = true;
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -30,30 +199,49 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Clear memory pools and caches
+    for (auto& [name, pool] : pImpl->memoryPools) {
+        pool.reset();
+    }
+    
+    pImpl->neuronCache.clear();
+    pImpl->cacheHits = 0;
+    pImpl->cacheMisses = 0;
+    
+    NLM_LOG_INFO("NeuralWorkingMemory initialized with advanced memory management");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
+    // Find neurons to encode this pattern using cache
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
+        // Update memory pool with cache optimization
+        if (pImpl->memoryPools.find("primary") != pImpl->memoryPools.end()) {
+            auto& pool = pImpl->memoryPools["primary"];
+            auto& alloc = pool->findOrCreate(neuron);
+            alloc.activation = activation;
+            alloc.timestamp = 0;  // Reset timestamp for new storage
+            
+            // Update cache
+            if (pImpl->cacheEnabled) {
+                pImpl->neuronCache[neuron] = std::make_pair(activation, 0);
+                ++pImpl->cacheHits;
             }
         }
         
-        // Update stored activation
+        // Set neuron activation using optimized neuron lookup
+        if (brain_) {
+            injectCurrent(neuron, activation * 5.0f);
+        }
+        
+        // Update legacy arrays
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
@@ -70,17 +258,38 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
+    // Find or add this neuron to memory using optimized cache
+    if (pImpl->cacheEnabled && pImpl->neuronCache.find(neuron) != pImpl->neuronCache.end()) {
+        ++pImpl->cacheHits;
+        // Update cache entry
+        pImpl->neuronCache[neuron].first = activation;
+        pImpl->neuronCache[neuron].second = 0;
+        
+        // Update memory pool
+        if (pImpl->memoryPools.find("primary") != pImpl->memoryPools.end()) {
+            auto& pool = pImpl->memoryPools["primary"];
+            auto& alloc = pool->findOrCreate(neuron);
+            alloc.activation = activation;
+            alloc.timestamp = 0;
+        }
+    } else {
+        ++pImpl->cacheMisses;
+        // Cache miss - add to cache
+        if (pImpl->cacheEnabled) {
+            pImpl->neuronCache[neuron] = std::make_pair(activation, 0);
+        }
+        
+        // Add to legacy arrays
+        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+        if (it != memoryNeurons_.end()) {
+            size_t idx = std::distance(memoryNeurons_.begin(), it);
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
+        } else if (memoryNeurons_.size() < capacity_) {
+            memoryNeurons_.push_back(neuron);
+            memoryActivations_.push_back(activation);
+            memoryTimestamps_.push_back(0);
+        }
     }
     
     // Inject current to maintain activation
@@ -105,18 +314,45 @@ bool NeuralWorkingMemory::contains(NeuronId neuron) const {
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    // First try cache
+    if (pImpl->cacheEnabled && pImpl->neuronCache.find(neuron) != pImpl->neuronCache.end()) {
+        ++pImpl->cacheHits;
+        return pImpl->neuronCache.at(neuron).first;
+    }
+    
+    // Try memory pools first (O(1) lookup)
+    if (pImpl->memoryPools.find("primary") != pImpl->memoryPools.end()) {
+        const auto& pool = pImpl->memoryPools.at("primary");
+        const auto* alloc = pool->get(neuron);
+        if (alloc != nullptr && alloc->isActive) {
+            return alloc->activation;
+        }
+    }
+    
+    // Fallback to legacy linear search (with cache update)
+    ++pImpl->cacheMisses;
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
+        // Update cache for future access
+        if (pImpl->cacheEnabled) {
+            pImpl->neuronCache[neuron] = std::make_pair(memoryActivations_[idx], 0);
+        }
         return memoryActivations_[idx];
     }
+    
     return 0.0f;
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Update memory pools with periodic cleanup
+    for (auto& [name, pool] : pImpl->memoryPools) {
+        pool->cleanupOldAllocations(pImpl->currentStep, maxMemoryAge_);
+    }
+    
+    // Update maintenance - reinforce active memory neurons using optimized lookup
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
@@ -134,6 +370,12 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             }
             
             memoryActivations_[i] = activation;
+            
+            // Update memory pool if available
+            if (pImpl->memoryPools.find("primary") != pImpl->memoryPools.end()) {
+                auto& pool = pImpl->memoryPools["primary"];
+                pool->update(neuron, activation, memoryTimestamps_[i]);
+            }
         }
     }
     
@@ -142,6 +384,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {

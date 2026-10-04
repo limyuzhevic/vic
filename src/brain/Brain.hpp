@@ -47,6 +47,9 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// This is the main entry point for the NLM brain system.
+// Use createBrain() or Brain::create() static factory methods for instantiation.
 
 class Brain {
 public:
