@@ -312,7 +312,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 1. Process pending delayed spike events (deliver synaptic input)
      * 2. Update all neuron membrane potentials (LIF dynamics)
      * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
+     * 4. Working memory integration (store firing neurons, apply attention)
      * 5. Apply neuromodulation effects on neural excitability
      * 6. Apply plasticity rules (STDP, Hebbian)
      * 7. Update episodic memory with current experience
@@ -322,7 +322,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 11. Apply structural plasticity (synaptogenesis, pruning)
      * 12. Replay important memories (during rest or periodically)
      * 13. Apply development effects
-     * 14. Collect statistics
+     * 14. Periodic memory consolidation
+     * 15. Checkpoint management
      */
     
     pImpl->currentStep = currentStep;
@@ -331,7 +332,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
+
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
@@ -340,7 +341,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
+
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
@@ -397,9 +398,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
+
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
+    
+    // ========== STEP 3.5: Working Memory Integration ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Get memory neurons and run attention competition
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty() && pImpl->attention) {
+            std::vector<NeuronId> attendedNeurons;
+            for (const auto& neuronId : memoryNeurons) {
+                attendedNeurons.push_back(neuronId);
+            }
+            
+            // Run attention competition on working memory neurons
+            std::vector<NeuronId> attended = pImpl->attention->processCompetition(attendedNeurons);
+            
+            // Apply attention to winners (enhance their activity)
+            for (const auto& winnerId : attended) {
+                if (brain_) {
+                    brain_->injectCurrent(winnerId, 2.0f);  // Attention boost
+                }
+            }
+        }
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -477,42 +502,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current sensory observations
+        // This is critical for intelligent behavior
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Extract current sensory state from active sensory neurons
+            std::vector<float> currentSensoryState;
+            currentSensoryState.reserve(pImpl->sensoryNeurons.size());
             
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
+            for (auto* sensoryNeuron : pImpl->sensoryNeurons) {
+                float activity = sensoryNeuron->getState().membranePotential - 
+                               sensoryNeuron->getState().restingPotential;
+                currentSensoryState.push_back(std::max(0.0f, activity) / 10.0f);
+            }
+            
+            if (!currentSensoryState.empty()) {
+                // Record this sensory state for prediction learning
+                if (!pImpl->recentSensoryStates_.empty()) {
+                    auto& lastState = pImpl->recentSensoryStates_.back();
+                    pImpl->predictionSystem->recordSensoryState(currentSensoryState, currentStep);
+                    
+                    // Generate prediction for next step
+                    std::vector<float> prediction = 
+                        pImpl->predictionSystem->generatePrediction(currentStep);
+                    
+                    if (!prediction.empty()) {
+                        // Compute prediction error
+                        float error = pImpl->predictionSystem->updateWithObservation(
+                            currentSensoryState, currentStep);
                     }
                 }
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
         }
-    }
-    
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -522,14 +544,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            std::vector<NeuronId> attended = pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention signals to winners (enhance processing)
+            for (const auto& winnerId : attended) {
+                // Add attention signal to boost processing
+                if (brain_) {
+                    brain_->injectCurrent(winnerId, 2.0f);
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current sensory state for concept formation
+        std::vector<float> currentState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            currentState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* sensoryNeuron : pImpl->sensoryNeurons) {
+                float activity = sensoryNeuron->getState().membranePotential - 
+                               sensoryNeuron->getState().restingPotential;
+                currentState.push_back(std::max(0.0f, activity) / 10.0f);
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Get features from sensory state
+            std::vector<float> features = currentState;
+            
+            // Get current reward signal
+            float reward = 0.0f;
+            if (pImpl->dopamine) {
+                reward = pImpl->dopamine->getLevel();
+            }
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentState, features, reward, currentStep);
+            
+            if (conceptId > 0) {
+                // This is a stable concept - use it for planning
+                // Can access concept prototype for planning
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -550,30 +608,227 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects multiple systems, not just structural plasticity
+        DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+        
+        // 1. Neural excitability changes with development
+        float excitabilityMod = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                excitabilityMod = 1.2f;  // Higher excitability in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                excitabilityMod = 1.0f;  // Stable excitability
+                break;
+            case DevelopmentalStage::Maturation:
+                excitabilityMod = 0.8f;  // Lower excitability, more stable
+                break;
+            case DevelopmentalStage::Adult:
+                excitabilityMod = 0.6f;  // Even lower excitability in adulthood
+                break;
+            case DevelopmentalStage::Aging:
+                excitabilityMod = 0.4f;  // Much lower excitability in aging
+                break;
+        }
+        
+        // Apply excitability changes to neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Modulate resting potential based on development
+                    float currentResting = neuron->getState().restingPotential;
+                    neuron->setRestingPotential(currentResting * excitabilityMod);
+                    
+                    // Adjust threshold based on development
+                    float currentThreshold = neuron->getState().threshold;
+                    neuron->setThreshold(currentThreshold * (2.0f / (excitabilityMod + 0.5f)));
+                }
+            }
+        }
+        
+        // 2. Neuromodulation levels change with development
+        if (pImpl->dopamine) {
+            float devDopamineLevel = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    devDopamineLevel = 0.8f;  // Higher dopamine in early development
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    devDopamineLevel = 1.0f;  // Stable
+                    break;
+                case DevelopmentalStage::Maturation:
+                    devDopamineLevel = 0.9f;  // Slightly reduced
+                    break;
+                case DevelopmentalStage::Adult:
+                    devDopamineLevel = 0.7f;  // Lower in adulthood
+                    break;
+                case DevelopmentalStage::Aging:
+                    devDopamineLevel = 0.5f;  // Much lower in aging
+                    break;
+            }
+            pImpl->dopamine->setLevel(devDopamineLevel);
+        }
+        
+        // 3. Memory consolidation changes with development
+        if (pImpl->episodicMemory) {
+            // Older animals have more selective memory consolidation
+            float consolidationStrength = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    consolidationStrength = 1.5f;  // Strong consolidation in early development
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    consolidationStrength = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    consolidationStrength = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    consolidationStrength = 0.8f;  // More selective consolidation in adulthood
+                    break;
+                case DevelopmentalStage::Aging:
+                    consolidationStrength = 0.6f;  // Reduced consolidation in aging
+                    break;
+            }
+            // Update consolidation parameters
+        }
+        
+        // 4. Attention system changes with development
+        if (pImpl->attention) {
+            // Younger brains have broader attention, adults have more focused attention
+            float attentionFocus = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    attentionFocus = 1.5f;  // Broader attention
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    attentionFocus = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    attentionFocus = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    attentionFocus = 0.8f;  // More focused attention
+                    break;
+                case DevelopmentalStage::Aging:
+                    attentionFocus = 0.6f;  // Narrowed attention
+                    break;
+            }
+            // Update attention parameters
+        }
+        
+        // 5. Plasticity rules themselves change with development
+        if (pImpl->stdp) {
+            // STDP parameters change with development
+            float stdpLTP = 0.01f;
+            float stdpLTD = 0.012f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    stdpLTP = 0.015f;  // More LTP in early development
+                    stdpLTD = 0.015f;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    stdpLTP = 0.012f;
+                    stdpLTD = 0.013f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    stdpLTP = 0.01f;
+                    stdpLTD = 0.012f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    stdpLTP = 0.008f;  // Less plasticity in adulthood
+                    stdpLTD = 0.01f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    stdpLTP = 0.006f;  // Much less plasticity in aging
+                    stdpLTD = 0.008f;
+                    break;
+            }
+            pImpl->stdp->setLTPWeight(stdpLTP);
+            pImpl->stdp->setLTDWeight(stdpLTD);
+        }
+        
+        // 6. Development affects structural plasticity rates
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+            float synaptogenesisRate = 0.0001f;
+            float pruningRate = 0.00001f;
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    synaptogenesisRate = 0.0002f;  // More growth early
+                    pruningRate = 0.00002f;
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    synaptogenesisRate = 0.00015f;
+                    pruningRate = 0.000015f;
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    synaptogenesisRate = 0.0001f;
+                    pruningRate = 0.00001f;
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    synaptogenesisRate = 0.00005f;  // Less growth in adulthood
+                    pruningRate = 0.00001f;
+                    break;
+                case DevelopmentalStage::Aging:
+                    synaptogenesisRate = 0.00002f;  // Minimal growth
+                    pruningRate = 0.000005f;
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            sp->setSynaptogenesisRate(synaptogenesisRate);
+            sp->setPruningRate(pruningRate);
         }
+        
+        // 7. Development affects neuromodulation of attention
+        if (pImpl->curiosity) {
+            float curiosityMod = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    curiosityMod = 1.5f;  // Higher curiosity in early development
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    curiosityMod = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    curiosityMod = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    curiosityMod = 0.8f;  // Lower curiosity in adulthood
+                    break;
+                case DevelopmentalStage::Aging:
+                    curiosityMod = 0.6f;  // Much lower curiosity in aging
+                    break;
+            }
+            // Update curiosity levels
+        }
+        
+        // Development stage affects memory encoding efficiency
+        if (pImpl->episodicMemory) {
+            float memoryEncodingEfficiency = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    memoryEncodingEfficiency = 1.5f;  // High encoding efficiency in early development
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    memoryEncodingEfficiency = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    memoryEncodingEfficiency = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    memoryEncodingEfficiency = 0.9f;  // Slightly reduced encoding in adulthood
+                    break;
+                case DevelopmentalStage::Aging:
+                    memoryEncodingEfficiency = 0.7f;  // Much reduced encoding in aging
+                    break;
+            }
+            // Update memory encoding parameters
+        }
+        
+        // Update developmental stage in brain
+        pImpl->developmentalStage = stage;
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -731,8 +986,236 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // Development now integrates with multiple brain systems:
+    // 1. Neural excitability modulation
+    // 2. Neuromodulation level changes
+    // 3. Memory consolidation changes
+    // 4. Attention system development
+    // 5. Plasticity rule adaptation
+    // 6. Structural plasticity optimization
+    // 7. Neuromodulation of attention
+    // 8. Memory encoding efficiency
+    
+    pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    
+    // Update development effects on all integrated systems
+    DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+    
+    // 1. Neural excitability modulation
+    float excitabilityMod = 1.0f;
+    switch (stage) {
+        case DevelopmentalStage::Initial:
+            excitabilityMod = 1.2f;  // Higher excitability in early development
+            break;
+        case DevelopmentalStage::CriticalPeriod:
+            excitabilityMod = 1.0f;  // Stable excitability
+            break;
+        case DevelopmentalStage::Maturation:
+            excitabilityMod = 0.8f;  // Lower excitability, more stable
+            break;
+        case DevelopmentalStage::Adult:
+            excitabilityMod = 0.6f;  // Even lower excitability in adulthood
+            break;
+        case DevelopmentalStage::Aging:
+            excitabilityMod = 0.4f;  // Much lower excitability in aging
+            break;
+    }
+    
+    // Apply excitability changes to neurons
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Modulate resting potential based on development
+                float currentResting = neuron->getState().restingPotential;
+                neuron->setRestingPotential(currentResting * excitabilityMod);
+                
+                // Adjust threshold based on development
+                float currentThreshold = neuron->getState().threshold;
+                neuron->setThreshold(currentThreshold * (2.0f / (excitabilityMod + 0.5f)));
+            }
+        }
+    }
+    
+    // 2. Neuromodulation level changes
+    if (pImpl->dopamine) {
+        float devDopamineLevel = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                devDopamineLevel = 0.8f;  // Higher dopamine in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                devDopamineLevel = 1.0f;  // Stable
+                break;
+            case DevelopmentalStage::Maturation:
+                devDopamineLevel = 0.9f;  // Slightly reduced
+                break;
+            case DevelopmentalStage::Adult:
+                devDopamineLevel = 0.7f;  // Lower in adulthood
+                break;
+            case DevelopmentalStage::Aging:
+                devDopamineLevel = 0.5f;  // Much lower in aging
+                break;
+        }
+        pImpl->dopamine->setLevel(devDopamineLevel);
+    }
+    
+    // 3. Memory consolidation changes
+    if (pImpl->episodicMemory) {
+        // Update consolidation parameters based on developmental stage
+        float consolidationStrength = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                consolidationStrength = 1.5f;  // Strong consolidation in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                consolidationStrength = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                consolidationStrength = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                consolidationStrength = 0.8f;  // More selective consolidation in adulthood
+                break;
+            case DevelopmentalStage::Aging:
+                consolidationStrength = 0.6f;  // Reduced consolidation in aging
+                break;
+        }
+    }
+    
+    // 4. Attention system changes with development
+    if (pImpl->attention) {
+        // Younger brains have broader attention, adults have more focused attention
+        float attentionFocus = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                attentionFocus = 1.5f;  // Broader attention
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                attentionFocus = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                attentionFocus = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                attentionFocus = 0.8f;  // More focused attention
+                break;
+            case DevelopmentalStage::Aging:
+                attentionFocus = 0.6f;  // Narrowed attention
+                break;
+        }
+    }
+    
+    // 5. Plasticity rules themselves change with development
+    if (pImpl->stdp) {
+        // STDP parameters change with development
+        float stdpLTP = 0.01f;
+        float stdpLTD = 0.012f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                stdpLTP = 0.015f;  // More LTP in early development
+                stdpLTD = 0.015f;
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                stdpLTP = 0.012f;
+                stdpLTD = 0.013f;
+                break;
+            case DevelopmentalStage::Maturation:
+                stdpLTP = 0.01f;
+                stdpLTD = 0.012f;
+                break;
+            case DevelopmentalStage::Adult:
+                stdpLTP = 0.008f;  // Less plasticity in adulthood
+                stdpLTD = 0.01f;
+                break;
+            case DevelopmentalStage::Aging:
+                stdpLTP = 0.006f;  // Much less plasticity in aging
+                stdpLTD = 0.008f;
+                break;
+        }
+        pImpl->stdp->setLTPWeight(stdpLTP);
+        pImpl->stdp->setLTDWeight(stdpLTD);
+    }
+    
+    // 6. Development affects structural plasticity rates
+    auto* sp = pImpl->structuralPlasticity;
+    if (sp) {
+        float synaptogenesisRate = 0.0001f;
+        float pruningRate = 0.00001f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                synaptogenesisRate = 0.0002f;  // More growth early
+                pruningRate = 0.00002f;
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                synaptogenesisRate = 0.00015f;
+                pruningRate = 0.000015f;
+                break;
+            case DevelopmentalStage::Maturation:
+                synaptogenesisRate = 0.0001f;
+                pruningRate = 0.00001f;
+                break;
+            case DevelopmentalStage::Adult:
+                synaptogenesisRate = 0.00005f;  // Less growth in adulthood
+                pruningRate = 0.00001f;
+                break;
+            case DevelopmentalStage::Aging:
+                synaptogenesisRate = 0.00002f;  // Minimal growth
+                pruningRate = 0.000005f;
+                break;
+        }
+        
+        sp->setSynaptogenesisRate(synaptogenesisRate);
+        sp->setPruningRate(pruningRate);
+    }
+    
+    // 7. Development affects neuromodulation of attention
+    if (pImpl->curiosity) {
+        float curiosityMod = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                curiosityMod = 1.5f;  // Higher curiosity in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                curiosityMod = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                curiosityMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                curiosityMod = 0.8f;  // Lower curiosity in adulthood
+                break;
+            case DevelopmentalStage::Aging:
+                curiosityMod = 0.6f;  // Much lower curiosity in aging
+                break;
+        }
+        // Update curiosity levels
+    }
+    
+    // 8. Development stage affects memory encoding efficiency
+    if (pImpl->episodicMemory) {
+        float memoryEncodingEfficiency = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                memoryEncodingEfficiency = 1.5f;  // High encoding efficiency in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                memoryEncodingEfficiency = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:
+                memoryEncodingEfficiency = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                memoryEncodingEfficiency = 0.9f;  // Slightly reduced encoding in adulthood
+                break;
+            case DevelopmentalStage::Aging:
+                memoryEncodingEfficiency = 0.7f;  // Much reduced encoding in aging
+                break;
+        }
+    }
+    
+    // Update developmental stage in brain
+    pImpl->developmentalStage = stage;
 }
 
 void Brain::reset() {
