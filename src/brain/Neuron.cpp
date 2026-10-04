@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -189,6 +190,16 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate input parameters
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::stepLIF: Null pImpl pointer");
+        return false;
+    }
+    if (dt <= 0.0) {
+        NLM_LOG_ERROR("Neuron::stepLIF: Invalid timestep dt = " + std::to_string(dt));
+        return false;
+    }
+    
     bool fired = false;
     
     // Handle refractory period

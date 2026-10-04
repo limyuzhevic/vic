@@ -37,6 +37,18 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_memory {
+    void runAll();
+}
+
+namespace test_neuromodulation {
+    void runAll();
+}
+
+namespace test_plasticity {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +125,36 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    
+    // Run advanced system tests
+    std::cout << "Running Memory tests..." << std::endl;
+    try {
+        test_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation tests..." << std::endl;
+    try {
+        test_neuromodulation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity tests..." << std::endl;
+    try {
+        test_plasticity::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -1,5 +1,6 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -98,9 +99,20 @@ void Synapse::setWeight(SynapticWeight weight) {
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    // Validate weight delta to prevent numerical instability
+    if (std::abs(delta) > 10.0f) {
+        NLM_LOG_WARNING("Synapse::addToWeight: Extreme weight delta = " + std::to_string(delta) + ". Clamping.");
+    }
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Log significant weight changes for debugging
+    if (std::abs(delta) > 0.1f) {
+        NLM_LOG_DEBUG("Synapse::addToWeight: Weight changed from " + std::to_string(pImpl->weight - delta) + 
+                     " to " + std::to_string(pImpl->weight) + " (delta = " + std::to_string(delta) + ")");
+    }
 }
 
 Delay Synapse::getDelay() const {

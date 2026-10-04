@@ -177,10 +177,22 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
+    // Validate configuration parameters
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain::initialize: Null config pointer");
+        return false;
+    }
+    
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate region count
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Brain::initialize: region_count cannot be zero");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -191,8 +203,15 @@ bool Brain::initialize() {
     }
     
     // Create neurons across regions
+    if (regionCount > neuronCount) {
+        NLM_LOG_ERROR("Brain::initialize: region_count exceeds neuron_count");
+        return false;
+    }
+    
     size_t neuronsPerRegion = neuronCount / regionCount;
     for (size_t i = 0; i < regionCount; ++i) {
+        auto* region = getRegion(RegionId(i + 1));
+        if (region) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Add populations

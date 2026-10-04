@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -55,9 +56,19 @@ void STDP::update(Synapse* synapse,
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
+    if (dt <= 0.0) {
+        NLM_LOG_ERROR("STDP::update: Invalid timestep dt = " + std::to_string(dt));
+        return;
+    }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
+    
+    // Validate time constant to prevent division by zero
+    if (std::abs(tau) < 1e-6f) {
+        NLM_LOG_ERROR("STDP::update: Invalid time constant tau = " + std::to_string(tau));
+        return;
+    }
     
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {

@@ -1,5 +1,6 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -53,21 +54,38 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
+    // Validate timestep
+    if (dt <= 0.0) {
+        NLM_LOG_ERROR("Hebbian::update: Invalid timestep dt = " + std::to_string(dt));
+        return;
+    }
+    
     // Count correlated spike pairs (simplified covariance)
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+    try {
+        for (Timestamp preTime : preSpikes) {
+            for (Timestamp postTime : postSpikes) {
+                float dt = static_cast<float>(postTime - preTime);
+                // Count spikes within a broad time window as correlated
+                if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+                    ++correlationCount;
+                }
             }
         }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Hebbian::update: Exception during correlation counting: " + std::string(e.what()));
+        return;
     }
     
     // Compute weight change based on correlation
     // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    
+    // Validate delta before application
+    if (std::isnan(delta) || std::isinf(delta)) {
+        NLM_LOG_ERROR("Hebbian::update: Invalid delta computed: " + std::to_string(delta));
+        return;
+    }
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
@@ -76,11 +94,30 @@ void Hebbian::update(Synapse* synapse,
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        NLM_LOG_ERROR("Hebbian::applyWeightChange: Null synapse pointer");
+        return;
+    }
     
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Validate delta to prevent numerical instability
+    if (std::isnan(delta) || std::isinf(delta)) {
+        NLM_LOG_ERROR("Hebbian::applyWeightChange: Invalid delta = " + std::to_string(delta));
+        return;
+    }
+    
+    try {
+        float newWeight = synapse->getWeight() + delta;
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+        synapse->setWeight(newWeight);
+        
+        // Log significant weight changes
+        if (std::abs(delta) > 0.1f) {
+            NLM_LOG_DEBUG("Hebbian::applyWeightChange: Weight changed to " + std::to_string(newWeight) + 
+                         " (delta = " + std::to_string(delta) + ")");
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Hebbian::applyWeightChange: Exception during weight update: " + std::string(e.what()));
+    }
 }
 
 const char* Hebbian::getName() const {
