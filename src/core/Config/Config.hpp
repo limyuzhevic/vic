@@ -93,6 +93,43 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation and schema support
+    bool validate() const;
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    // Configuration schema
+    void addSchemaEntry(const std::string& key, const std::string& description, 
+                       const ConfigValue& defaultValue, ConfigSource source = ConfigSource::Default);
+    std::string getDescription(const std::string& key) const;
+    ConfigValue getDefaultValue(const std::string& key) const;
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Configuration help and documentation
+    void printHelp() const;
+    std::string getHelpText() const;
+    
+    // Configuration cloning and merging
+    std::unique_ptr<Config> clone() const;
+    void merge(const Config& other, bool override = true);
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    size_t getDefaultEntryCount() const;
+    size_t getFileEntryCount() const;
+    size_t getCommandLineEntryCount() const;
+    
+    // Configuration file format support
+    enum class FileFormat {
+        KeyValue,
+        JSON,
+        YAML
+    };
+    
+    // Set file format for future load/save operations
+    void setFileFormat(FileFormat format);
+    FileFormat getFileFormat() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +137,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isJsonValue(const std::string& value);
+    static bool isYamlValue(const std::string& value);
 };
 
 } // namespace nlm

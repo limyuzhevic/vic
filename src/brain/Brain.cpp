@@ -22,21 +22,20 @@
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
+class ActionConsequencePredictor;
+    struct PredictionErrorSignal;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    // ========== PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<PredictionErrorSignal> predictionErrorSignal;
+    std::unique_ptr<ActionConsequencePredictor> actionConsequencePredictor;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    // ========== COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
@@ -91,7 +90,7 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -151,7 +150,7 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    };
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -242,10 +241,39 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // ========== PREDICTION SYSTEM ==========
     
-    // Initialize cognition systems
+    // Initialize prediction system
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Configure prediction system
+    if (pImpl->predictionSystem) {
+        // Setup temporal prediction
+        auto* neuralPred = dynamic_cast<NeuralPrediction*>(pImpl->predictionSystem.get());
+        if (neuralPred) {
+            neuralPred->initialize(this);
+            neuralPred->setSequenceMemorySize(50);
+            neuralPred->setPredictionHorizon(3);
+            neuralPred->enableTemporalPrediction(true);
+            neuralPred->enableActionConsequencePrediction(true);
+        }
+    }
+    
+    // Initialize prediction error signal system
+    pImpl->predictionError = std::make_unique<PredictionError>();
+    
+    // Initialize action consequence predictor
+    pImpl->actionConsequencePredictor = std::make_unique<ActionConsequencePredictor>();
+    
+    if (pImpl->actionConsequencePredictor) {
+        pImpl->actionConsequencePredictor->initialize(this);
+    }
+    
+    // Initialize novelty detection
+    pImpl->novelty = std::make_unique<Novelty>();
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
