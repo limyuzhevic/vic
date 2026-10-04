@@ -509,12 +509,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // Use working memory to extract features for prediction
+        if (pImpl->workingMemory) {
+            std::vector<float> currentFeatures = pImpl->workingMemory->retrieve();
+            if (!currentFeatures.empty()) {
+                // For now, create a simple sensory input representation
+                // In a full implementation, this would use actual sensory data
+                SensoryInput predictedInput;
+                // predictNextState would create a proper prediction
+                // For now, just update prediction error based on current features
+                float avgFeature = 0.0f;
+                for (float f : currentFeatures) avgFeature += f;
+                if (!currentFeatures.empty()) avgFeature /= currentFeatures.size();
+                pImpl->predictionSystem->train(predictedInput);
+            }
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -525,11 +539,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract features from working memory and episodic memory
+        std::vector<float> currentPattern;
+        
+        // Get current neural activity from sensory neurons
+        if (!pImpl->sensoryNeurons.empty()) {
+            currentPattern.reserve(pImpl->sensoryNeurons.size());
+            for (Neuron* neuron : pImpl->sensoryNeurons) {
+                if (neuron) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Get additional features from working memory
+        if (pImpl->workingMemory) {
+            std::vector<float> wmFeatures = pImpl->workingMemory->retrieve();
+            if (!wmFeatures.empty()) {
+                // Integrate working memory features with neural activity
+                if (currentPattern.empty()) {
+                    currentPattern = wmFeatures;
+                } else {
+                    // Combine neural activity with working memory features
+                    size_t minSize = std::min(currentPattern.size(), wmFeatures.size());
+                    for (size_t i = 0; i < minSize; ++i) {
+                        currentPattern[i] = (currentPattern[i] + wmFeatures[i]) * 0.5f;
+                    }
+                }
+            }
+        }
+        
+        // Present to concept formation system
+        if (!currentPattern.empty() && pImpl->conceptFormation->getConceptCount() > 0) {
+            // Convert to features for concept formation (simplified)
+            std::vector<float> features = currentPattern;
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present to concept formation - it will automatically discover patterns
+            // For now, just call with a simple feature set
+            pImpl->conceptFormation->presentExperience(features, features, reward, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

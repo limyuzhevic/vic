@@ -186,30 +186,175 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Implementation of cognitive system configuration methods
+void Config::initializePhase6Defaults() {
+    // Prediction System
+    set(ConfigKeys::PREDICTION_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::PREDICTION_LEARNING_RATE, 0.01f, ConfigSource::Default);
+    set(ConfigKeys::PREDICTION_CONFIDENCE_THRESHOLD, 0.7f, ConfigSource::Default);
+    set(ConfigKeys::PREDICTION_HISTORY_SIZE, 1000, ConfigSource::Default);
+    
+    // Concept Formation
+    set(ConfigKeys::CONCEPT_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::CONCEPT_FORMATION_THRESHOLD, 0.75f, ConfigSource::Default);
+    set(ConfigKeys::CONCEPT_STABILITY_THRESHOLD, 0.7f, ConfigSource::Default);
+    set(ConfigKeys::CONCEPT_STABILITY_WINDOW, 5, ConfigSource::Default);
+    set(ConfigKeys::CONCEPT_MAX_CONCEPTS, 100, ConfigSource::Default);
+    set(ConfigKeys::CONCEPT_GENERALIZATION_THRESHOLD, 0.8f, ConfigSource::Default);
+    
+    // Working Memory
+    set(ConfigKeys::WORKING_MEMORY_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::WORKING_MEMORY_CAPACITY, 200, ConfigSource::Default);
+    set(ConfigKeys::WORKING_MEMORY_DECAY_RATE, 0.01f, ConfigSource::Default);
+    set(ConfigKeys::WORKING_MEMORY_REINFORCEMENT_STRENGTH, 0.5f, ConfigSource::Default);
+    
+    // Episodic Memory
+    set(ConfigKeys::EPISODIC_MEMORY_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::EPISODIC_MEMORY_MAX_EPISODES, 10000, ConfigSource::Default);
+    set(ConfigKeys::EPISODIC_MEMORY_CONSOLIDATION_THRESHOLD, 0.3f, ConfigSource::Default);
+    set(ConfigKeys::EPISODIC_MEMORY_REPLAY_INTERVAL, 100, ConfigSource::Default);
+    
+    // Attention System
+    set(ConfigKeys::ATTENTION_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::ATTENTION_INHIBITION_STRENGTH, 0.5f, ConfigSource::Default);
+    set(ConfigKeys::ATTENTION_EXCITATION_STRENGTH, 1.5f, ConfigSource::Default);
+    set(ConfigKeys::ATTENTION_NOISE_LEVEL, 0.1f, ConfigSource::Default);
+    
+    // Planner
+    set(ConfigKeys::PLANNER_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::PLANNER_PLANNING_DEPTH, 3, ConfigSource::Default);
+    set(ConfigKeys::PLANNER_ACTION_DIVERSITY, 10, ConfigSource::Default);
+    set(ConfigKeys::PLANNER_EXPLORATION_RATE, 0.3f, ConfigSource::Default);
+    set(ConfigKeys::PLANNER_CONSERVATION_BIAS, 0.7f, ConfigSource::Default);
+    
+    // Neuromodulation
+    set(ConfigKeys::NEUROMODULATION_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::DOPAMINE_BASELINE, 0.1f, ConfigSource::Default);
+    set(ConfigKeys::DOPAMINE_RELEASE_RATE, 1.0f, ConfigSource::Default);
+    set(ConfigKeys::DOPAMINE_DECAY_RATE, 0.1f, ConfigSource::Default);
+    set(ConfigKeys::CURIOUSITY_BASELINE, 0.1f, ConfigSource::Default);
+    set(ConfigKeys::NOVELTY_SENSITIVITY, 1.0f, ConfigSource::Default);
+    
+    // Development
+    set(ConfigKeys::DEVELOPMENT_ENABLED, true, ConfigSource::Default);
+    set(ConfigKeys::DEVELOPMENT_INITIAL_PLATONICITY, 1.0f, ConfigSource::Default);
+    set(ConfigKeys::DEVELOPMENT_MATURATION_RATE, 0.01f, ConfigSource::Default);
+    set(ConfigKeys::DEVELOPMENT_CRITICAL_PERIOD, 300.0f, ConfigSource::Default);
+    
+    // Performance
+    set(ConfigKeys::VERBOSE_LOGGING, false, ConfigSource::Default);
+    set(ConfigKeys::ENABLE_PERFORMANCE_METRICS, true, ConfigSource::Default);
+    set(ConfigKeys::METRICS_EXPORT_INTERVAL, 1000, ConfigSource::Default);
+    
+    // Integration
+    set(ConfigKeys::ENABLE_BRAIN_LOOP_LOGGING, false, ConfigSource::Default);
+    set(ConfigKeys::BRAIN_LOOP_TIMEOUT, 100, ConfigSource::Default);
+    set(ConfigKeys::ENABLE_EXPERIMENT_MODE, false, ConfigSource::Default);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::getPredictionEnabled() const {
+    return getOr<bool>(ConfigKeys::PREDICTION_ENABLED, false);
+}
+
+float Config::getPredictionLearningRate() const {
+    return getOr<float>(ConfigKeys::PREDICTION_LEARNING_RATE, 0.01f);
+}
+
+float Config::getPredictionConfidenceThreshold() const {
+    return getOr<float>(ConfigKeys::PREDICTION_CONFIDENCE_THRESHOLD, 0.7f);
+}
+
+int Config::getPredictionHistorySize() const {
+    return getOr<int>(ConfigKeys::PREDICTION_HISTORY_SIZE, 1000);
+}
+
+bool Config::getConceptFormationEnabled() const {
+    return getOr<bool>(ConfigKeys::CONCEPT_ENABLED, false);
+}
+
+float Config::getConceptFormationThreshold() const {
+    return getOr<float>(ConfigKeys::CONCEPT_FORMATION_THRESHOLD, 0.75f);
+}
+
+float Config::getConceptStabilityThreshold() const {
+    return getOr<float>(ConfigKeys::CONCEPT_STABILITY_THRESHOLD, 0.7f);
+}
+
+size_t Config::getConceptStabilityWindow() const {
+    return getOr<size_t>(ConfigKeys::CONCEPT_STABILITY_WINDOW, 5);
+}
+
+size_t Config::getConceptMaxConcepts() const {
+    return getOr<size_t>(ConfigKeys::CONCEPT_MAX_CONCEPTS, 100);
+}
+
+bool Config::getWorkingMemoryEnabled() const {
+    return getOr<bool>(ConfigKeys::WORKING_MEMORY_ENABLED, false);
+}
+
+size_t Config::getWorkingMemoryCapacity() const {
+    return getOr<size_t>(ConfigKeys::WORKING_MEMORY_CAPACITY, 200);
+}
+
+float Config::getWorkingMemoryDecayRate() const {
+    return getOr<float>(ConfigKeys::WORKING_MEMORY_DECAY_RATE, 0.01f);
+}
+
+bool Config::getEpisodicMemoryEnabled() const {
+    return getOr<bool>(ConfigKeys::EPISODIC_MEMORY_ENABLED, false);
+}
+
+size_t Config::getEpisodicMemoryMaxEpisodes() const {
+    return getOr<size_t>(ConfigKeys::EPISODIC_MEMORY_MAX_EPISODES, 10000);
+}
+
+float Config::getEpisodicMemoryConsolidationThreshold() const {
+    return getOr<float>(ConfigKeys::EPISODIC_MEMORY_CONSOLIDATION_THRESHOLD, 0.3f);
+}
+
+size_t Config::getEpisodicMemoryReplayInterval() const {
+    return getOr<size_t>(ConfigKeys::EPISODIC_MEMORY_REPLAY_INTERVAL, 100);
+}
+
+bool Config::getAttentionEnabled() const {
+    return getOr<bool>(ConfigKeys::ATTENTION_ENABLED, false);
+}
+
+float Config::getAttentionInhibitionStrength() const {
+    return getOr<float>(ConfigKeys::ATTENTION_INHIBITION_STRENGTH, 0.5f);
+}
+
+float Config::getAttentionExcitationStrength() const {
+    return getOr<float>(ConfigKeys::ATTENTION_EXCITATION_STRENGTH, 1.5f);
+}
+
+bool Config::getPlannerEnabled() const {
+    return getOr<bool>(ConfigKeys::PLANNER_ENABLED, false);
+}
+
+int Config::getPlannerPlanningDepth() const {
+    return getOr<int>(ConfigKeys::PLANNER_PLANNING_DEPTH, 3);
+}
+
+size_t Config::getPlannerActionDiversity() const {
+    return getOr<size_t>(ConfigKeys::PLANNER_ACTION_DIVERSITY, 10);
+}
+
+bool Config::getNeuromodulationEnabled() const {
+    return getOr<bool>(ConfigKeys::NEUROMODULATION_ENABLED, false);
+}
+
+float Config::getDopamineBaseline() const {
+    return getOr<float>(ConfigKeys::DOPAMINE_BASELINE, 0.1f);
+}
+
+bool Config::getDevelopmentEnabled() const {
+    return getOr<bool>(ConfigKeys::DEVELOPMENT_ENABLED, false);
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
 } // namespace nlm
+
+// Explicit template instantiations for the new getter methods
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
