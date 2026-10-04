@@ -121,7 +121,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Rest", ActionType::Rest)
         .value("Wait", ActionType::Wait)
         .value("Custom", ActionType::Custom)
-        .export_values();
+        .export_values()
+        .doc("Action types for agent movement and interaction");
 
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
@@ -132,7 +133,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("LookRight", MotorCommand::LookRight)
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
-        .export_values();
+        .export_values()
+        .doc("Low-level motor commands for agent control");
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
@@ -144,16 +146,51 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+        .def("loadFromFile", [](const py::object& self, const std::string& filepath) {
+            try {
+                auto& config = self.cast<std::shared_ptr<Config>&>();
+                return config->loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+                return false;
+            }
+        }, py::arg("filepath"), "Load configuration from a JSON file")
+        .def("loadFromArgs", [](const py::object& self, int argc, char** argv) {
+            try {
+                auto& config = self.cast<std::shared_ptr<Config>&>();
+                return config->loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+                return false;
+            }
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+            "Load configuration from command line arguments")
+        .def("saveToFile", [](const py::object& self, const std::string& filepath) {
+            try {
+                auto& config = self.cast<std::shared_ptr<Config>&>();
+                return config->saveToFile(filepath);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+                return false;
+            }
+        }, py::arg("filepath"), "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            try {
+                return self.getOr<std::string>(key, "");
+            } catch (...) { return std::string(); }
+        }, py::arg("key"), "Get configuration value as string")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            try {
+                return self.getOr<int64_t>(key, 0);
+            } catch (...) { return int64_t(); }
+        }, py::arg("key"), "Get configuration value as int64")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            try {
+                return self.getOr<double>(key, 0.0);
+            } catch (...) { return double(); }
+        }, py::arg("key"), "Get configuration value as float")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -291,17 +328,30 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+        .def("initialize", [](const py::object& self) {
+            try {
+                auto& brain = self.cast<std::shared_ptr<Brain>&>();
+                return brain->initialize();
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+                return false;
+            }
+        }, "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
+        .def("receiveSensoryInput", [](const py::object& self, const SensoryInput& input) {
+            try {
+                auto& brain = self.cast<std::shared_ptr<Brain>&>();
+                brain->receiveSensoryInput(input);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+            }
+        }, py::arg("input"),
+            "Inject sensory input into the brain")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
@@ -351,7 +401,14 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Convenience methods for Python users
+        .def("getNeuronCount", &Brain::getTotalNeuronCount)
+        .def("getSynapseCount", &Brain::getTotalSynapseCount)
+        .def("getSpikeCount", &Brain::getTotalSpikeCount)
+        .def("getFiringCount", &Brain::getFiringNeuronCount)
+        .def("getAverageRate", &Brain::getAverageFiringRate)
+        .def("getEI_ratio", &Brain::getExcitationInhibitionRatio)
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
