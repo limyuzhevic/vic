@@ -11,7 +11,9 @@ struct VisualizationInterface::Impl {
 
 VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
 
-VisualizationInterface::~VisualizationInterface() = default;
+VisualizationInterface::~VisualizationInterface() {
+    delete pImpl;
+}
 
 bool VisualizationInterface::initialize() {
     // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)

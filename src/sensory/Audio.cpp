@@ -11,7 +11,9 @@ struct AudioProcessor::Impl {
 
 AudioProcessor::AudioProcessor() : pImpl(new Impl) {}
 
-AudioProcessor::~AudioProcessor() = default;
+AudioProcessor::~AudioProcessor() {
+    delete pImpl;
+}
 
 void AudioProcessor::process(const Audio& input) {
     // TODO PHASE 2: Implement real audio processing using NLM's neural machinery

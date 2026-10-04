@@ -2,9 +2,14 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../agent/AgentBrain.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <string>
 #include <vector>
+
+// Forward declarations
+class NeuralRegion;
 
 namespace nlm {
 
@@ -42,9 +47,6 @@ public:
     // Set agent starting position
     void setAgentStart(float x, float y);
     
-    // Update world state (call each simulation step)
-    void update(double timestep);
-    
     // Apply motor command to agent
     ActionResult applyMotorCommand(MotorCommand cmd, double currentTime);
     
@@ -66,6 +68,16 @@ public:
     // Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
     
+    // New methods for brain region interface (Phase 6)
+    // Observe from brain's perspective (using region)
+    SensoryPercept observe(NeuralRegion* region);
+    
+    // Apply action from brain's perspective (using region)
+    ActionResult applyAction(NeuralRegion* region, MotorCommand cmd);
+    
+    // Compute reward from brain's perspective (using region)
+    float computeReward(NeuralRegion* region);
+    
     // World dimensions
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
@@ -75,6 +87,8 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    void setResourceEnergyGain(float g) { resourceEnergyGain_ = g; }
     
     // Time
     double getSimulationTime() const { return simTime_; }

@@ -25,7 +25,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 {
 }
 
-NeuralWorkingMemory::~NeuralWorkingMemory() = default;
+NeuralWorkingMemory::~NeuralWorkingMemory() {
+    delete pImpl;
+}
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -262,7 +264,9 @@ AttentionalSelection::AttentionalSelection()
 {
 }
 
-AttentionalSelection::~AttentionalSelection() = default;
+AttentionalSelection::~AttentionalSelection() {
+    delete pImpl;
+}
 
 void AttentionalSelection::initialize(Brain* brain) {
     pImpl = std::make_unique<Impl>();

@@ -18,7 +18,9 @@ struct STDP::Impl {
 
 STDP::STDP() : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+STDP::~STDP() {
+    delete pImpl;
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,

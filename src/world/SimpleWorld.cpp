@@ -400,4 +400,39 @@ void SimpleWorld::checkCollisions() {
     }
 }
 
+// New methods for brain region interface (Phase 6)
+SensoryPercept SimpleWorld::observe(NeuralRegion* region) {
+    // For SimpleWorld, just return the current sensory percept
+    // In a more complex world, this might extract different information
+    // based on the neural region's function
+    return sensory_;
+}
+
+ActionResult SimpleWorld::applyAction(NeuralRegion* region, MotorCommand cmd) {
+    // Convert motor command to action in world coordinates
+    // For now, delegate to the original applyMotorCommand
+    return applyMotorCommand(cmd, simTime_);
+}
+
+float SimpleWorld::computeReward(NeuralRegion* region) {
+    // Compute reward based on agent's interaction with world
+    float reward = 0.0f;
+    
+    // Check for resources
+    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
+    if (obj != nullptr) {
+        if (obj->type == WorldObjectType::Resource) {
+            reward += obj->value;
+            removeObject(agent_.x, agent_.y);
+        } else if (obj->type == WorldObjectType::Hazard) {
+            reward += obj->value;
+        }
+    }
+    
+    // Apply step penalty
+    reward -= 0.01f;
+    
+    return reward;
+}
+
 } // namespace nlm

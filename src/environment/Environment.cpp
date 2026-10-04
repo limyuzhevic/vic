@@ -10,7 +10,9 @@ struct EnvironmentState::Impl {
 
 EnvironmentState::EnvironmentState() : pImpl(new Impl) {}
 
-EnvironmentState::~EnvironmentState() = default;
+EnvironmentState::~EnvironmentState() {
+    delete pImpl;
+}
 
 bool EnvironmentState::is_terminal() const {
     return pImpl->terminal;
@@ -41,7 +43,9 @@ struct GridWorldEnvironment::Impl {
 GridWorldEnvironment::GridWorldEnvironment(int width, int height) 
     : pImpl(new Impl(width, height)) {}
 
-GridWorldEnvironment::~GridWorldEnvironment() = default;
+GridWorldEnvironment::~GridWorldEnvironment() {
+    delete pImpl;
+}
 
 std::unique_ptr<SensoryInput> GridWorldEnvironment::reset() {
     pImpl->agentX = 0;

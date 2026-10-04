@@ -16,7 +16,9 @@ struct Hebbian::Impl {
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+Hebbian::~Hebbian() {
+    delete pImpl;
+}
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,

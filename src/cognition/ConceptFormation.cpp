@@ -22,7 +22,9 @@ ConceptFormation::ConceptFormation()
 {
 }
 
-ConceptFormation::~ConceptFormation() = default;
+ConceptFormation::~ConceptFormation() {
+    delete pImpl;
+}
 
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -312,7 +314,9 @@ SpatialRepresentation::SpatialRepresentation()
 {
 }
 
-SpatialRepresentation::~SpatialRepresentation() = default;
+SpatialRepresentation::~SpatialRepresentation() {
+    delete pImpl;
+}
 
 void SpatialRepresentation::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -412,7 +416,9 @@ TemporalRelation::TemporalRelation()
 {
 }
 
-TemporalRelation::~TemporalRelation() = default;
+TemporalRelation::~TemporalRelation() {
+    delete pImpl;
+}
 
 void TemporalRelation::initialize(Brain* brain) {
     pImpl->brain = brain;

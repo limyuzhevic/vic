@@ -39,7 +39,9 @@ NeuralPrediction::NeuralPrediction()
 {
 }
 
-NeuralPrediction::~NeuralPrediction() = default;
+NeuralPrediction::~NeuralPrediction() {
+    delete pImpl;
+}
 
 void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -326,7 +328,9 @@ ActionConsequencePredictor::ActionConsequencePredictor()
 {
 }
 
-ActionConsequencePredictor::~ActionConsequencePredictor() = default;
+ActionConsequencePredictor::~ActionConsequencePredictor() {
+    delete pImpl;
+}
 
 void ActionConsequencePredictor::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -457,7 +461,9 @@ PredictionErrorSignal::PredictionErrorSignal()
     errorComponents_.totalError = 0.0f;
 }
 
-PredictionErrorSignal::~PredictionErrorSignal() = default;
+PredictionErrorSignal::~PredictionErrorSignal() {
+    delete pImpl;
+}
 
 float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
                                          const std::vector<float>& actual) {

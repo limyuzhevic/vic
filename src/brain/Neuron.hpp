@@ -1,151 +1,89 @@
 #pragma once
 
+/**
+ * @file Neuron.hpp
+ * @brief Core neuron interface implementing Leaky Integrate-and-Fire (LIF) dynamics
+ * @author NLM Team
+ * @date 2024
+ * @version 1.0
+ * @warning Phase 1 implementation. Full spiking dynamics implementation planned for Phase 2.
+ */
+
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
 
 namespace nlm {
 
+/**
+ * @namespace nlm
+ * @brief Neural Machine Learning (NLM) - A spiking neural network framework for cognitive computing
+ *
+ * This namespace encompasses the entire NLM ecosystem, from low-level neuron dynamics to
+ * high-level cognitive functions including memory, prediction, attention, and development.
+ */
+
 // Forward declarations
 class Synapse;
 class RandomGenerator;
+class Brain;
 
-// Neuron state structure for efficient storage
-struct NeuronState {
-    MembranePotential membranePotential;    // Current membrane potential (mV)
-    MembranePotential restingPotential;    // Resting potential (mV)
-    MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
-    MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
-    FiringRate firingRate;                 // Current firing rate (Hz)
-    FiringState firingState;               // Current firing state
-    uint32_t refractoryRemaining;          // Steps remaining in refractory period
-    uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
-    float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
-    
-    NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
-        , synapseConductance(0.0f)
-        , firingRate(0.0f)
-        , firingState(FiringState::Resting)
-        , refractoryRemaining(0)
-        , refractoryPeriod(5)
-        , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
-};
+/**
+ * @class NeuronStepProcessor
+ * @brief Processes individual neurons and regions for one simulation step
+ * @details Contains the low-level functions that update neuron states, handle spikes,
+ *          and manage synaptic transmission. These are the core computational
+ *          primitives used by the simulation step coordinator.
+ * @note Static class with no instance state. Used internally by SimulationStepCoordinator.
+ */
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
-class Neuron {
+class NeuronStepProcessor {
 public:
-    // Create neuron with ID
-    explicit Neuron(NeuronId id);
-    
-    ~Neuron();
-    
-    // Disable copying, enable moving
-    Neuron(const Neuron&) = delete;
-    Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
-    
-    // Identity
-    NeuronId getId() const;
-    
-    // Type
-    NeuronType getType() const;
-    void setType(NeuronType type);
-    
-    // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
-    
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
-    
-    // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
-    
-    // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
-    void setFiringState(FiringState state);
-    void setRefractoryPeriod(uint32_t steps);
-    void decrementRefractory();
-    
-    // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
-    
-    // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
-    void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
-    void setResetPotential(MembranePotential potential);
-    
-    // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
-    
-    // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
-    
-    // Incoming signals (post-synaptic potentials)
-    void receiveExcitatoryInput(MembranePotential amplitude);
-    void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
-    
-    // Current injection (from external sources)
-    void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
-    
-    // Spike history (recent spikes for STDP)
-    void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
-    void clearSpikeHistory();
-    
-    // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
-    
-    // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
-    
-    // Region/population membership
-    void setRegionId(RegionId region);
-    RegionId getRegionId() const;
-    void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
-    
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    /**
+     * @brief Processes a single neuron for one LIF integration step
+     * @param neuron Pointer to the neuron to process
+     * @param currentTime The current simulation time (seconds)
+     * @param dt The time step duration (seconds)
+     * @return bool true if the neuron fired (crossed threshold), false otherwise
+     * @details Updates the neuron's membrane potential using the Leaky
+     *          Integrate-and-Fire (LIF) dynamics equation: dV/dt = (V_rest - V)/tau + I/C
+     * @note Handles refractory periods, spike detection, and reset.
+     */
+    static bool processNeuronStep(Neuron* neuron, Timestamp currentTime, TimestepDuration dt);
 
-} // namespace nlm
+    /**
+     * @brief Processes all neurons in a specific region
+     * @param brain Pointer to the parent Brain instance
+     * @param regionId ID of the region to process
+     * @param currentTime The current simulation time (seconds)
+     * @param dt The time step duration (seconds)
+     * @details Iterates through all populations in the region and updates each neuron.
+     *          Used by SimulationStepCoordinator::executeStep2().
+     */
+    static void processRegionNeurons(Brain* brain, RegionId regionId, 
+                                      Timestamp currentTime, TimestepDuration dt);
+
+    /**
+     * @brief Processes spike events and their effects
+     * @param brain Pointer to the parent Brain instance
+     * @param currentStep The current simulation step number
+     * @param currentTime The current simulation time (seconds)
+     * @details Processes all neurons that fired during this step, scheduling
+     *          immediate and delayed spike events and updating spike history.
+     * @note Called by SimulationStepCoordinator::executeStep3().
+     */
+    static void processSpikes(Brain* brain, SimulationStep currentStep, 
+                              Timestamp currentTime);
+
+    /**
+     * @brief Delivers synaptic input from delayed spike events
+     * @param brain Pointer to the parent Brain instance
+     * @param currentStep The current simulation step number
+     * @param currentTime The current simulation time (seconds)
+     * @details Processes all delayed spike events that are now ready to deliver
+     *          their synaptic input to postsynaptic neurons.
+     * @note Called by SimulationStepCoordinator::executeStep1().
+     */
+    static void deliverDelayedSpikes(Brain* brain, SimulationStep currentStep, 
+                                      Timestamp currentTime);
+};

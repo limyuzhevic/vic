@@ -23,7 +23,9 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 {
 }
 
-NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
+NeuralEpisodicMemory::~NeuralEpisodicMemory() {
+    delete pImpl;
+}
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -331,7 +333,9 @@ NeuralAssociativeMemory::NeuralAssociativeMemory()
 {
 }
 
-NeuralAssociativeMemory::~NeuralAssociativeMemory() = default;
+NeuralAssociativeMemory::~NeuralAssociativeMemory() {
+    delete pImpl;
+}
 
 void NeuralAssociativeMemory::initialize(Brain* brain) {
     pImpl->brain = brain;

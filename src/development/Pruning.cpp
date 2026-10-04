@@ -11,7 +11,9 @@ struct Pruning::Impl {
 
 Pruning::Pruning() : pImpl(new Impl) {}
 
-Pruning::~Pruning() = default;
+Pruning::~Pruning() {
+    delete pImpl;
+}
 
 float Pruning::getThreshold() const {
     return pImpl->threshold;

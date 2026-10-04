@@ -20,7 +20,9 @@ NeuralPlanner::NeuralPlanner()
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
 
-NeuralPlanner::~NeuralPlanner() = default;
+NeuralPlanner::~NeuralPlanner() {
+    delete pImpl;
+}
 
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -267,7 +269,9 @@ SelfModel::SelfModel()
     actionEffects_.resize(10);  // 10 action types
 }
 
-SelfModel::~SelfModel() = default;
+SelfModel::~SelfModel() {
+    delete pImpl;
+}
 
 void SelfModel::initialize(Brain* brain) {
     pImpl->brain = brain;
@@ -452,7 +456,9 @@ SocialLearning::SocialLearning()
 {
 }
 
-SocialLearning::~SocialLearning() = default;
+SocialLearning::~SocialLearning() {
+    delete pImpl;
+}
 
 void SocialLearning::initialize(Brain* brain) {
     pImpl->brain = brain;
