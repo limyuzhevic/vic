@@ -77,7 +77,7 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
@@ -109,7 +109,7 @@ NLM/
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```

@@ -502,16 +502,17 @@ for _ in range(500):
 
 ### Build Issues
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
-```
+**Build Issues:**
+    - CMake cannot find Python:
+    ```bash
+    pip install scikit-build-core pybind11
+    cmake .. -DPython_EXECUTABLE=$(which python)
+    ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+    **Compilation errors:**
+    - Ensure C++20 compiler support
+    - Check CMake version >= 3.16
+    - Verify all source files are present
 
 ### Runtime Issues
 
