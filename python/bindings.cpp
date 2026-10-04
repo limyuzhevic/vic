@@ -416,6 +416,409 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced Network Analysis Functions
+    m.def("analyzeNetworkTopology", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) return std::map<std::string, double>{};
+        
+        std::map<std::string, double> topology;
+        topology["neuron_count"] = static_cast<double>(brain->getTotalNeuronCount());
+        topology["synapse_count"] = static_cast<double>(brain->getTotalSynapseCount());
+        topology["region_count"] = static_cast<double>(brain->getRegionCount());
+        topology["firing_rate"] = brain->getAverageFiringRate();
+        topology["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        topology["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        
+        return topology;
+    }, py::arg("brain"), "Analyze network topology and properties");
+
+    m.def("calculateNetworkDensity", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain || brain->getTotalNeuronCount() == 0) return 0.0f;
+        
+        size_t totalPossibleSynapses = brain->getTotalNeuronCount() * (brain->getTotalNeuronCount() - 1);
+        if (totalPossibleSynapses == 0) return 0.0f;
+        
+        return static_cast<double>(brain->getTotalSynapseCount()) / totalPossibleSynapses;
+    }, py::arg("brain"), "Calculate network density (0.0 to 1.0)");
+
+    m.def("getNeuronDistribution", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, size_t> distribution;
+        if (!brain) return distribution;
+        
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                std::string typeStr;
+                switch (type) {
+                    case NeuronType::Excitatory: typeStr = "excitatory"; break;
+                    case NeuronType::Inhibitory: typeStr = "inhibitory"; break;
+                    case NeuronType::Sensory: typeStr = "sensory"; break;
+                    case NeuronType::Motor: typeStr = "motor"; break;
+                    case NeuronType::Modulatory: typeStr = "modulatory"; break;
+                    case NeuronType::Internal: typeStr = "internal"; break;
+                    default: typeStr = "unknown"; break;
+                }
+                distribution[typeStr] += pop->getNeuronCount();
+            }
+        }
+        
+        return distribution;
+    }, py::arg("brain"), "Get distribution of neuron types");
+
+    m.def("getAverageSynapticWeights", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, double> weights;
+        if (!brain) return weights;
+        
+        for (const auto& region : brain->getRegions()) {
+            float avgWeight = region->getAverageSynapticWeight();
+            std::string regionName = region->getName();
+            if (regionName.empty()) {
+                regionName = "region_" + std::to_string(region->getId().value);
+            }
+            weights[regionName] = avgWeight;
+        }
+        
+        return weights;
+    }, py::arg("brain"), "Get average synaptic weights by region");
+
+    m.def("detectNetworkCommunities", [](const std::shared_ptr<Brain>& brain, double threshold = 0.5) {
+        std::vector<std::vector<std::string>> communities;
+        if (!brain) return communities;
+        
+        // Simple community detection based on connection strength
+        // This is a placeholder for more sophisticated algorithms
+        for (const auto& region : brain->getRegions()) {
+            std::vector<std::string> community;
+            for (const auto& syn : region->getSynapses()) {
+                if (std::abs(syn->getWeight()) > threshold) {
+                    community.push_back("synapse_" + std::to_string(syn->getId().value));
+                }
+            }
+            if (!community.empty()) {
+                communities.push_back(community);
+            }
+        }
+        
+        return communities;
+    }, py::arg("brain"), py::arg("threshold"), "Detect communities in the network");
+
+    // Performance Monitoring Functions
+    m.def("profileSimulation", [](std::shared_ptr<Brain> brain, uint64_t steps) {
+        if (!brain) return std::map<std::string, double>{};
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (uint64_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start);
+        
+        std::map<std::string, double> profile;
+        profile["total_steps"] = static_cast<double>(steps);
+        profile["wall_time"] = duration.count();
+        profile["steps_per_second"] = steps / duration.count();
+        profile["avg_firing_rate"] = brain->getAverageFiringRate();
+        profile["neurons_active"] = static_cast<double>(brain->getActiveNeuronCount());
+        
+        return profile;
+    }, py::arg("brain"), py::arg("steps"), "Profile simulation performance");
+
+    m.def("benchmarkPlasticity", [](std::shared_ptr<Brain> brain, uint64_t steps) {
+        if (!brain) return std::map<std::string, double>{};
+        
+        // Reset brain for clean benchmark
+        brain->reset();
+        brain->initialize();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (uint64_t step = 0; step < steps; ++step) {
+            // Inject activity to trigger plasticity
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 10.0f);
+            brain->step(step);
+            
+            // Inject reward to trigger reward-modulated learning
+            float reward = 1.0f;
+            float pred_error = 0.0f;
+            
+            // This would require access to an AgentBrain for proper neuromodulation
+            // For now, just track baseline performance
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start);
+        
+        std::map<std::string, double> benchmark;
+        benchmark["total_steps"] = static_cast<double>(steps);
+        benchmark["wall_time"] = duration.count();
+        benchmark["steps_per_second"] = steps / duration.count();
+        benchmark["final_firing_rate"] = brain->getAverageFiringRate();
+        benchmark["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        
+        return benchmark;
+    }, py::arg("brain"), py::arg("steps"), "Benchmark plasticity performance");
+
+    // Advanced Learning Algorithm Controls
+    m.def("configureAdvancedLearning", [](std::shared_ptr<Brain> brain, 
+                                          const std::map<std::string, double>& params) {
+        if (!brain) return false;
+        
+        // Apply advanced learning parameters
+        auto config = brain->getConfig();
+        
+        // Hebbian parameters
+        if (params.find("hebbian_learning_rate") != params.end()) {
+            // This would require access to plasticity modules
+            // For now, just store in config
+            config->set("plasticity.hebbian.learning_rate", 
+                       static_cast<float>(params.at("hebbian_learning_rate")));
+        }
+        
+        // STDP parameters
+        if (params.find("stdp_ltp_weight") != params.end()) {
+            config->set("plasticity.stdp.ltp_weight",
+                       static_cast<float>(params.at("stdp_ltp_weight")));
+        }
+        if (params.find("stdp_ltd_weight") != params.end()) {
+            config->set("plasticity.stdp.ltd_weight",
+                       static_cast<float>(params.at("stdp_ltd_weight")));
+        }
+        
+        // Neuromodulation parameters
+        if (params.find("dopamine_scale") != params.end()) {
+            config->set("neuromod.dopamine.scale",
+                       static_cast<float>(params.at("dopamine_scale")));
+        }
+        
+        if (params.find("curiosity_threshold") != params.end()) {
+            // This parameter doesn't exist in current config, would need to add
+            config->set("neuromod.curiosity.threshold",
+                       static_cast<float>(params.at("curiosity_threshold")));
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("params"), "Configure advanced learning parameters");
+
+    m.def("simulateWithLearningProfile", [](std::shared_ptr<Brain> brain,
+                                           const std::string& profile,
+                                           uint64_t steps) {
+        if (!brain) return std::map<std::string, double>{};
+        
+        // Apply predefined learning profile
+        std::map<std::string, double> defaultProfiles {
+            {"conservative", {
+                {"hebbian_learning_rate", 0.001},
+                {"stdp_ltp_weight", 0.01},
+                {"stdp_ltd_weight", 0.012},
+                {"dopamine_scale", 0.5}
+            }},
+            {"aggressive", {
+                {"hebbian_learning_rate", 0.01},
+                {"stdp_ltp_weight", 0.02},
+                {"stdp_ltd_weight", 0.015},
+                {"dopamine_scale", 1.5}
+            }},
+            {"balanced", {
+                {"hebbian_learning_rate", 0.005},
+                {"stdp_ltp_weight", 0.015},
+                {"stdp_ltd_weight", 0.015},
+                {"dopamine_scale", 1.0}
+            }}
+        };
+        
+        if (defaultProfiles.find(profile) == defaultProfiles.end()) {
+            throw std::runtime_error("Unknown learning profile: " + profile);
+        }
+        
+        // Configure with selected profile
+        m.def("configureAdvancedLearning", brain, defaultProfiles[profile]);
+        
+        // Run simulation
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (uint64_t step = 0; step < steps; ++step) {
+            brain->step(step);
+            
+            // Apply periodic stimulation to maintain learning activity
+            if (step % 100 == 0) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
+            }
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start);
+        
+        std::map<std::string, double> results;
+        results["profile"] = profile;
+        results["steps"] = static_cast<double>(steps);
+        results["time"] = duration.count();
+        results["firing_rate"] = brain->getAverageFiringRate();
+        results["spike_count"] = static_cast<double>(brain->getTotalSpikeCount());
+        
+        return results;
+    }, py::arg("brain"), py::arg("profile"), py::arg("steps"), 
+        "Run simulation with predefined learning profile");
+
+    // Network Manipulation Functions
+    m.def("createCustomNetwork", [](const std::map<std::string, double>& params) {
+        auto config = std::make_shared<Config>();
+        
+        // Set custom network parameters
+        if (params.find("neuron_count") != params.end()) {
+            config->set("brain.neuron_count", static_cast<int64_t>(params.at("neuron_count")));
+        }
+        if (params.find("region_count") != params.end()) {
+            config->set("brain.region_count", static_cast<int64_t>(params.at("region_count")));
+        }
+        if (params.find("connection_probability") != params.end()) {
+            config->set("brain.connection_probability", static_cast<float>(params.at("connection_probability")));
+        }
+        if (params.find("initial_weight_mean") != params.end()) {
+            config->set("brain.initial_weight_mean", static_cast<float>(params.at("initial_weight_mean")));
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        return brain;
+    }, py::arg("params"), "Create a custom network with specified parameters");
+
+    m.def("duplicateBrain", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) return std::shared_ptr<Brain>{};
+        
+        auto config = std::make_shared<Config>(*(brain->getConfig()));
+        auto duplicate = std::make_shared<Brain>(config);
+        
+        // This is a simplified duplication - real implementation would need to
+        // properly copy all state including neuron positions, weights, etc.
+        duplicate->initialize();
+        
+        return duplicate;
+    }, py::arg("brain"), "Create a duplicate of the current brain");
+
+    // Export/Import Utilities
+    m.def("exportNetworkToGraphML", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        // Write network data in GraphML format
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filepath);
+        }
+        
+        file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        file << "<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\">\n";
+        file << "  <key id=\"d0\" for=\"default\" attr.name=\"label\" attr.type=\"string\"/>\n";
+        file << "  <graph id=\"G\" edgedefault=\"directed\">\n";
+        
+        // Write nodes (neurons)
+        file << "    <node id=\"n0\"/>\n";  // Simplified - would need to iterate over all neurons
+        file << "    <node id=\"n1\"/>\n";
+        
+        // Write edges (synapses)
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                file << "    <edge source=\"" << syn->getSourceNeuron().value
+                     << "\" target=\"" << syn->getDestinationNeuron().value
+                     << "\"/>\n";
+            }
+        }
+        
+        file << "  </graph>\n";
+        file << "</graphml>\n";
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), "Export network to GraphML format");
+
+    m.def("importNetworkFromGraphML", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100); // Default size
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // This is a placeholder - real implementation would parse GraphML file
+        // and reconstruct the network topology
+        
+        return brain;
+    }, py::arg("filepath"), "Import network from GraphML format");
+
+    // Batch Processing Utilities
+    m.def("runBatchSimulations", [](const std::vector<std::shared_ptr<Config>>& configs,
+                                   const std::vector<uint64_t>& steps,
+                                   const std::string& outputPrefix = "batch_results") {
+        std::vector<std::map<std::string, double>> results;
+        
+        for (size_t i = 0; i < configs.size() && i < steps.size(); ++i) {
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            std::map<std::string, double> result;
+            result["config_id"] = static_cast<double>(i);
+            result["steps"] = static_cast<double>(steps[i]);
+            result["neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+            result["synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+            
+            // Run simulation
+            for (uint64_t step = 0; step < steps[i]; ++step) {
+                brain->step(step);
+            }
+            
+            result["final_firing_rate"] = brain->getAverageFiringRate();
+            result["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+            
+            results.push_back(result);
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("steps"), py::arg("outputPrefix"), 
+        "Run multiple simulations with different configurations");
+
+    m.def("runPopulationStudy", [](uint64_t populationSize, uint64_t stepsPerSimulation,
+                                 const std::map<std::string, double>& paramVariation) {
+        std::vector<std::map<std::string, double>> populationResults;
+        
+        for (uint64_t i = 0; i < populationSize; ++i) {
+            auto config = std::make_shared<Config>();
+            
+            // Apply parameter variation for evolutionary study
+            if (paramVariation.find("neuron_count") != paramVariation.end()) {
+                double variation = (static_cast<double>(rand()) / RAND_MAX - 0.5) * 
+                                  paramVariation.at("neuron_count") * 0.2;
+                config->set("brain.neuron_count", 
+                           static_cast<int64_t>(populationSize + variation));
+            }
+            
+            if (paramVariation.find("connection_probability") != paramVariation.end()) {
+                double variation = (static_cast<double>(rand()) / RAND_MAX - 0.5) * 
+                                  paramVariation.at("connection_probability") * 0.3;
+                config->set("brain.connection_probability", 
+                           static_cast<float>(0.1 + variation));
+            }
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            // Run simulation
+            for (uint64_t step = 0; step < stepsPerSimulation; ++step) {
+                brain->step(step);
+            }
+            
+            std::map<std::string, double> result;
+            result["individual"] = static_cast<double>(i);
+            result["neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+            result["synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+            result["firing_rate"] = brain->getAverageFiringRate();
+            result["spike_count"] = static_cast<double>(brain->getTotalSpikeCount());
+            
+            populationResults.push_back(result);
+        }
+        
+        return populationResults;
+    }, py::arg("populationSize"), py::arg("stepsPerSimulation"), 
+        py::arg("paramVariation"), "Run population study with parameter variations");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

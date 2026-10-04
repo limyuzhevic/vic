@@ -1,6 +1,10 @@
 [build-system]
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
+build-dir = "build"
+enable-extensions = true
+show-output = true
+parallel = true
 
 [project]
 name = "pynlm"
@@ -12,10 +16,13 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "neuroscience", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -24,21 +31,53 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20; python_version >= '3.6'",
+    "typing-extensions>=4.0; python_version < '3.8'",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=2.12",
+    "pytest-xdist>=3.0",
     "numpy>=1.20",
+    "matplotlib>=3.0; python_version >= '3.6'",
+    "pandas>=1.0; python_version >= '3.6'",
+    "scipy>=1.5; python_version >= '3.6'",
+    "black>=21.0; python_version >= '3.6'",
+    "isort>=5.0; python_version >= '3.6'",
+    "flake8>=3.8; python_version >= '3.6'",
+    "mypy>=0.910; python_version >= '3.6'",
+    "sphinx>=4.0; python_version >= '3.6'",
+    "sphinx-rtd-theme>=0.5; python_version >= '3.6'",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Download" = "https://github.com/nlm-project/nlm/releases"
+
+[project.entry-points]
+nlm.commands = [
+    "analyze = nlm_utils:analyze_command",
+    "export = nlm_utils:export_command",
+    "create = nlm_utils:create_config_command",
+    "compare = nlm_utils:compare_command",
+    "generate = nlm_utils:generate_random_command",
+]
+
+[project.scripts]
+nlm = "nlm_utils:main"
+nlm-analyze = "nlm_utils:analyze_command"
+nlm-export = "nlm_utils:export_command"
+nlm-create = "nlm_utils:create_config_command"
+nlm-compare = "nlm_utils:compare_command"
+nlm-generate = "nlm_utils:generate_random_command"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +86,109 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+    "-DBUILD_SHARED_LIBS=OFF",
+    "-DENABLE_TESTS=ON",
+    "-DENABLE_DOCS=OFF",
 ]
+cmake.verbose = false
+install-dir = "lib/python"
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = true
+NLM_ENABLE_TESTS = true
+NLM_ENABLE_DOCS = false
+
+[tool.scikit-build.cmake.option]
+BUILD_SHARED_LIBS = false
+CMAKE_BUILD_TYPE = "Release"
+CMAKE_POSITION_INDEPENDENT_CODE = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*", "*Test"]
+python_functions = ["test_*", "*test"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "-x",
+    "--cov=pynlm",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m "not slow"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | env
+  | venv
+  | __pycache__
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_third_party = ["numpy", "pytest", "pynlm"]
+
+[tool.coverage.run]
+source = ["pynlm"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/docs/*",
+    "*/examples/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == '__main__':",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+
+[tool.distutils]
+packages = [
+    "pynlm",
+]
+
+[tool.sphinx.ext.intersphinx]
+caches = {}
+
+[tool.sphinx.ext.autodoc]
+member-order = "bysource"
+autoclass-content = "both"
+
+[tool.sphinx.ext.viewcode]
