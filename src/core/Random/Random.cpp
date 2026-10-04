@@ -56,6 +56,10 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min == max) {
         return min;
     }
+    // Validate that the range is within 64-bit bounds
+    if (max - min >= std::numeric_limits<uint64_t>::max() / 2) {
+        throw std::invalid_argument("Range too large for uniform distribution");
+    }
     std::uniform_int_distribution<uint64_t> dist(min, max);
     return dist(pImpl->gen);
 }

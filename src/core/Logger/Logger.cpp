@@ -29,6 +29,12 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Validate log level
+    if (entry.level < LogLevel::Debug || entry.level > LogLevel::Critical) {
+        NLM_LOG_ERROR("Invalid log level: " + std::to_string(static_cast<int>(entry.level)));
+        return;
+    }
+    
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
@@ -49,8 +55,12 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error writing to log file: " + std::string(e.what()));
+        }
     }
 }
 
@@ -71,12 +81,26 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    try {
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_ERROR("Failed to open log file: " + filepath);
+        } else {
+            NLM_LOG_INFO("Log file opened: " + filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception opening log file " + filepath + ": " + std::string(e.what()));
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+        try {
+            pImpl->fileOut.close();
+            NLM_LOG_INFO("Log file closed");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Exception closing log file: " + std::string(e.what()));
+        }
     }
 }
 
@@ -131,18 +155,42 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        
+        // Validate parameters
+        if (message.empty()) {
+            NLM_LOG_ERROR("Attempted to log empty message from " + function);
+            return;
+        }
+        
+        if (level < LogLevel::Debug || level > LogLevel::Critical) {
+            NLM_LOG_ERROR("Invalid log level: " + std::to_string(static_cast<int>(level)));
+            return;
+        }
+        
+        if (line < 0) {
+            NLM_LOG_ERROR("Invalid line number: " + std::to_string(line));
+            return;
+        }
+        
+        LogEntry entry;
+        entry.level = level;
+        entry.message = message;
+        entry.file = file;
+        entry.line = line;
+        entry.function = function;
+        entry.timestamp = std::chrono::system_clock::now();
+        
+        for (auto& logger : pImpl->loggers) {
+            try {
+                logger->log(entry);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Exception in logger: " + std::string(e.what()));
+            }
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception in Logger::log: " + std::string(e.what()));
     }
 }
 

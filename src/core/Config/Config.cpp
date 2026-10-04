@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,10 +51,19 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Error parsing config file " + filepath + " line " + std::to_string(lineNum) + ": " + e.what());
+                return false;
+            }
+        } else {
+            NLM_LOG_ERROR("Invalid config file format in " + filepath + " line " + std::to_string(lineNum) + ": missing '='");
+            return false;
         }
     }
     
+    NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
     return true;
 }
 

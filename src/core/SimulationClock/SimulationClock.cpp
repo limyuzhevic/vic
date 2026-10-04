@@ -38,6 +38,9 @@ void SimulationClock::reset() {
 }
 
 void SimulationClock::advance() {
+    if (pImpl->timestep <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive");
+    }
     ++pImpl->step;
     pImpl->time += pImpl->timestep;
 }
@@ -65,6 +68,9 @@ TimestepDuration SimulationClock::getTimestep() const {
 }
 
 void SimulationClock::setTimestep(TimestepDuration dt) {
+    if (dt <= 0.0) {
+        throw std::invalid_argument("Timestep must be positive");
+    }
     pImpl->timestep = dt;
 }
 
