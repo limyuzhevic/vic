@@ -55,11 +55,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -75,22 +71,82 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance
+    src/performance/PerformanceProfiler.cpp
+    src/performance/FunctionCallProfiler.cpp
+    src/performance/AlgorithmProfiler.cpp
+    src/performance/BottleneckDetector.cpp
+    src/performance/MemoryProfiler.cpp
+    src/performance/ResourceMonitor.cpp
+    src/performance/ScalingAnalyzer.cpp
+    src/performance/ParallelPerformanceAnalyzer.cpp
+    src/performance/VectorizationAnalyzer.cpp
+    src/performance/CacheAnalyzer.cpp
+    src/performance/MemoryAccessPatternAnalyzer.cpp
+    src/performance/OptimizationRecommender.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
+# Analysis library
+add_library(nlm_analysis STATIC
+    # Analysis components
+    src/analysis/NetworkAnalyzer.cpp
+    src/analysis/ActivityAnalyzer.cpp
+    src/analysis/PerformanceAnalyzer.cpp
+    src/analysis/StateAnalyzer.cpp
+    src/analysis/PlottingTools.cpp
+)
+
+# Debugging library
+add_library(nlm_debug STATIC
+    # Debugging components
+    src/debug/DebugTrace.cpp
+    src/debug/DebuggingSystem.cpp
+    src/debug/PerformanceProfiler.cpp
+    src/debug/EventLogger.cpp
+    src/debug/MemoryProfiler.cpp
+    src/debug/DebugVisualizer.cpp
+)
+
+target_include_directories(nlm_debug PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(nlm_debug PUBLIC nlm_core nlm_analysis)
+
+target_include_directories(nlm_analysis PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Link analysis library to main executables
+target_link_libraries(nlm_analysis PUBLIC nlm_core)
+
+# Learning components
+add_library(nlm_learning STATIC
+    src/learning/AdvancedAgentLearning.cpp
+    src/learning/ReinforcementLearning.cpp
+    src/learning/SocialLearning.cpp
+    src/learning/ExperienceReplay.cpp
+    src/learning/TransferLearning.cpp
+)
+
+target_include_directories(nlm_learning PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(nlm_learning PUBLIC nlm_core nlm_analysis nlm_debug)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -125,26 +181,26 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_learning)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_learning)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_learning)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_learning
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

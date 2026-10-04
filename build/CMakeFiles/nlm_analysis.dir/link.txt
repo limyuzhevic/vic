@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_analysis.a CMakeFiles/nlm_analysis.dir/src/analysis/NetworkAnalyzer.cpp.o CMakeFiles/nlm_analysis.dir/src/analysis/ActivityAnalyzer.cpp.o CMakeFiles/nlm_analysis.dir/src/analysis/PerformanceAnalyzer.cpp.o CMakeFiles/nlm_analysis.dir/src/analysis/StateAnalyzer.cpp.o CMakeFiles/nlm_analysis.dir/src/analysis/PlottingTools.cpp.o
+/usr/bin/ranlib libnlm_analysis.a

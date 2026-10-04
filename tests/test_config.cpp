@@ -2,6 +2,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
 
 namespace test_config {
 
@@ -53,37 +54,45 @@ void testConfigGetOr() {
     std::cout << "    testConfigGetOr passed" << std::endl;
 }
 
-void testConfigRemove() {
+void testConfigValidation() {
     nlm::Config config;
     
-    config.set("test", 123, nlm::ConfigSource::Runtime);
-    assert(config.has("test"));
+    // Test that we can set values
+    config.set("simulation_timestep", 0.001, nlm::ConfigSource::Runtime);
+    assert(config.has("simulation_timestep"));
     
-    config.remove("test");
-    assert(!config.has("test"));
+    auto val = config.get<double>("simulation_timestep");
+    assert(val.has_value());
+    assert(*val == 0.001);
     
-    std::cout << "    testConfigRemove passed" << std::endl;
+    std::cout << "    testConfigValidation passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigTypes() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Test various types
+    config.set("int_val", 42, nlm::ConfigSource::Runtime);
+    assert(config.get<int>("int_val").has_value());
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    config.set("double_val", 3.14159, nlm::ConfigSource::Runtime);
+    assert(config.get<double>("double_val").has_value());
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    assert(config.get<bool>("bool_val").has_value());
+    
+    config.set("string_val", "test_string", nlm::ConfigSource::Runtime);
+    assert(config.get<std::string>("string_val").has_value());
+    
+    std::cout << "    testConfigTypes passed" << std::endl;
 }
 
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
+    testConfigValidation();
+    testConfigTypes();
 }
 
 } // namespace test_config

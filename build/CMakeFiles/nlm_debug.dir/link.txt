@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_debug.a CMakeFiles/nlm_debug.dir/src/debug/DebugTrace.cpp.o CMakeFiles/nlm_debug.dir/src/debug/DebuggingSystem.cpp.o CMakeFiles/nlm_debug.dir/src/debug/PerformanceProfiler.cpp.o CMakeFiles/nlm_debug.dir/src/debug/EventLogger.cpp.o CMakeFiles/nlm_debug.dir/src/debug/MemoryProfiler.cpp.o CMakeFiles/nlm_debug.dir/src/debug/DebugVisualizer.cpp.o
+/usr/bin/ranlib libnlm_debug.a
