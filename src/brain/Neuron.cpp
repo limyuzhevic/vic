@@ -213,6 +213,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Safety checks for numerical stability
+    if (tau <= 0.0f) {
+        tau = 1.0f;  // Fallback to safe value
+    }
+    if (C <= 0.0f) {
+        C = 1.0f;  // Fallback to safe value
+    }
+    
+    // Clamp dt to reasonable range to prevent overflow
+    TimestepDuration safe_dt = std::clamp(dt, 0.0001f, 1.0f);
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
@@ -220,12 +231,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(safe_dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        
+        // Clamp adaptation variable to prevent runaway growth
+        if (pImpl->state.adaptationVariable < 0.0f) {
+            pImpl->state.adaptationVariable = 0.0f;
+        }
     }
     
     // Clamp membrane potential to prevent instability
@@ -276,17 +292,50 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold is typically -55mV (biological range: -65 to -45mV)
+    pImpl->state.threshold = -55.0f + rng.uniformReal(-10.0f, 10.0f);
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Clamp threshold to biological range
+    pImpl->state.threshold = std::clamp(pImpl->state.threshold, -65.0f, -45.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Ensure threshold is above resting potential (neuronal constraint)
+    if (pImpl->state.threshold <= pImpl->state.restingPotential) {
+        pImpl->state.threshold = pImpl->state.restingPotential + 1.0f;
+    }
+    
+    // Membrane potential starts near resting potential (with bounds checking)
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-10.0f, 10.0f);
+    
+    // Clamp membrane potential to biological range
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, -90.0f, 50.0f);
+    
+    // Resting potential typically -70mV (biological range: -90 to -50mV)
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-20.0f, 20.0f);
+    
+    // Clamp resting potential to biological range
+    pImpl->state.restingPotential = std::clamp(pImpl->state.restingPotential, -90.0f, -50.0f);
+    
+    // Reset potential is usually close to resting (within -5 to +5mV)
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(-5.0f, 5.0f);
+    
+    // Clamp reset potential to be close to resting
+    pImpl->state.resetPotential = std::clamp(pImpl->state.resetPotential, 
+        pImpl->state.restingPotential - 10.0f, 
+        pImpl->state.restingPotential + 10.0f);
+    
+    // Leak conductance: 5-20 nS typical (biological range: 1-100 nS)
+    pImpl->state.leakConductance = 10.0f + rng.uniformReal(-15.0f, 10.0f);
+    
+    // Clamp leak conductance to biological range
+    pImpl->state.leakConductance = std::clamp(pImpl->state.leakConductance, 1.0f, 100.0f);
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    
+    // Ensure minimum refractory period to prevent division by zero
+    if (pImpl->state.refractoryPeriod < 1) {
+        pImpl->state.refractoryPeriod = 1;
+    }
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

@@ -200,13 +200,13 @@ void Synapse::step(Timestamp currentTime) {
     TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
+    if (pImpl->lastPreSpikeTime >= 0.0f && Impl::STP_FACILITATION_TAU > 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
     // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+    if ((pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) && Impl::STP_DEPRESSION_TAU > 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
@@ -218,8 +218,21 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Safety check: ensure efficacy is within valid range
+    if (pImpl->efficacy < 0.0f) {
+        pImpl->efficacy = 0.0f;
+    }
+    
+    // Clamp weight bounds with additional safety checks
+    if (pImpl->weight > Impl::MAX_WEIGHT) {
+        pImpl->weight = Impl::MAX_WEIGHT;
+    } else if (pImpl->weight < Impl::MIN_WEIGHT) {
+        pImpl->weight = Impl::MIN_WEIGHT;
+    }
+    
+    // Safety check: short-term plasticity parameters
+    pImpl->shortTermFacilitation = std::clamp(pImpl->shortTermFacilitation, 0.0f, 1.0f);
+    pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.0f, 1.0f);
 }
 
 void Synapse::reset() {
