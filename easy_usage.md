@@ -159,7 +159,19 @@ agent.enableCuriosity(True)             # Explore new things
 
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+- `config` = settings for the brain (use `create_default_config()` for simple setup)
+
+### `pynlm.create_default_config()`
+Creates a default configuration with sensible settings for most use cases.
+
+### `pynlm.create_optimized_config(neuron_count, connection_probability)`
+Creates an optimized configuration for performance testing with higher neuron counts and optimized parameters.
+
+### `pynlm.create_simple_config()`
+Creates a minimal configuration with fewer neurons for development and testing.
+
+### `pynlm.create_config_with_settings(...)`
+Creates a custom configuration with all settings that can be configured.
 
 ### `brain.initialize()`
 Starts up the brain. Always call this before using the brain!
@@ -179,6 +191,18 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
+### `pynlm.BrainSimulation(brain, steps)`
+Context manager for brain simulations. Automatically handles initialization and cleanup.
+
+### `pynlm.AgentSimulation(brain, world, agent, steps)`
+Context manager for agent simulations. Automatically handles initialization and cleanup.
+
+### `pynlm.run_simple_simulation(brain, steps, **kwargs)`
+Convenience function for running simple brain simulations.
+
+### `pynlm.run_agent_simulation(brain, world, agent, steps, **kwargs)`
+Convenience function for running complete agent simulations with automatic resource management.
+
 ---
 
 ## Mini Projects
@@ -188,7 +212,7 @@ Reads the brain's motor neurons to decide what action to take.
 ```python
 import pynlm
 
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain = pynlm.createBrain(pynlm.create_simple_config())
 brain.initialize()
 
 for i in range(10):
@@ -203,7 +227,7 @@ print("Silent brain test done!")
 import pynlm
 
 # Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain = pynlm.createBrain(pynlm.create_default_config())
 brain.initialize()
 world = pynlm.createSimpleWorld()
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
@@ -221,13 +245,13 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Enhanced Features
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
+# Setup with enhanced configuration
+config = pynlm.create_optimized_config(neuron_count=2000)
 brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
@@ -236,23 +260,54 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable all learning features
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+# Use context manager for production code
+with pynlm.AgentSimulation(brain, world, agent, steps=100) as simulation:
+    simulation.start()
+    results = simulation.run()
     
-    if step % 20 == 0:
+    # Print results
+    print("Agent simulation complete!")
+    print(f"Total reward: {results.get('total_reward', 0):.2f}")
+    print(f"Final curiosity: {results.get('final_curiosity', 0):.3f}")
+    print(f"Final novelty: {results.get('final_novelty', 0):.3f}")
+```
+
+### Project 4: Advanced Configuration Management
+
+```python
+import pynlm
+
+# Create a custom configuration
+custom_config = pynlm.create_config_with_settings(
+    neuron_count=1500,
+    region_count=2,
+    connection_probability=0.18,
+    initial_weight_mean=0.7,
+    initial_weight_std=0.08,
+    v_threshold=-50.0,
+    random_seed=42
+)
+
+# Modify configuration
+brain = pynlm.createBrain(custom_config)
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+    if step % 25 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
-print("Agent simulation complete!")
+print("Custom configuration experiment completed!")
 ```
+
+---
 
 ---
 
@@ -268,6 +323,12 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Create simple config | `pynlm.create_simple_config()` |
+| Create optimized config | `pynlm.create_optimized_config(neuron_count=5000)` |
+| Create custom config | `pynlm.create_config_with_settings(**kwargs)` |
+| Run simulation | `pynlm.run_agent_simulation(brain, world, agent, steps)` |
+| Brain simulation | `with pynlm.BrainSimulation(brain, steps): ...` |
+| Agent simulation | `with pynlm.AgentSimulation(brain, world, agent, steps): ...` |
 
 ---
 
@@ -276,14 +337,32 @@ print("Agent simulation complete!")
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Check if you're using the correct configuration
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Make sure the agent has a motor command to execute
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Check if you're using a suitable configuration
+
+**"Context manager errors"**
+- Ensure all context managers are used properly (enter/exit pairs)
+- Check that the brain/world/agent objects are properly initialized
+- Make sure you're using the correct context manager for your use case
+
+**"Configuration errors"**
+- Check that configuration parameters are valid
+- Ensure required parameters are set
+- Use the factory methods (`create_simple_config()`, `create_optimized_config()`) for common use cases
+
+**"Simulation performance issues"**
+- For larger simulations, use `create_optimized_config()`
+- Monitor system resources during long simulations
+- Consider using fewer steps for testing
 
 ---
 
@@ -293,5 +372,23 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Explore the Phase 6 integration experiments for advanced usage
+5. Check out the performance optimization features for large-scale simulations
+6. Learn about the new context managers for production code
+7. Try the advanced configuration factory methods
+8. Explore the convenience functions for complex simulations
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the enhanced Python API!
+
+---
+
+## Version Information
+
+This documentation covers the enhanced NLM Python API with:
+- Factory methods for configuration management
+- Context managers for resource management
+- Convenience functions for common operations
+- Enhanced error handling
+- Better documentation and examples
+
+For more detailed documentation, see `HOW_TO_USE.md` and the project documentation in `docs/`.
