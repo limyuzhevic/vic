@@ -74,7 +74,9 @@ public:
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -92,6 +94,17 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    bool validate() const;
+    bool validateValueRanges(std::string& errorMsg) const;
+    bool validateTypeCompatibility(std::string& errorMsg) const;
+    void enableValidation(bool enabled);
+    
+    // Static helper methods for environment variable support
+    static std::string getEnvVarName(const std::string& key);
+    static std::optional<std::string> getEnvVar(const std::string& key);
+    static bool trySetFromEnv(const std::string& key, const ConfigValue& value, ConfigSource& source);
     
 private:
     struct Impl;

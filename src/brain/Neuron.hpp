@@ -42,14 +42,47 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
+//
+// The Neuron class is the fundamental computational unit of the NLM brain.
+// Each neuron integrates incoming synaptic inputs and generates spikes when
+// reaching threshold, implementing a biologically plausible model of neural
+// computation. The neuron supports multiple plasticity mechanisms and maintains
+// state information for learning and development.
+//
+// LIF Dynamics:
+// The neuron follows the differential equation: τ·dV/dt = -(V - V_rest) + I_syn
+// where τ = 1/(g_leak/C_m) is the membrane time constant, V is membrane potential,
+// V_rest is resting potential, and I_syn is total synaptic current.
+//
+// Key Features:
+// - Leaky Integrate-and-Fire membrane dynamics with refractory period
+// - Multiple synaptic input types (excitatory, inhibitory, modulatory)
+// - Spike recording for STDP plasticity
+// - Plasticity flags for different learning mechanisms
+// - Developmental parameter modulation
+// - Efficient state management for large-scale simulation
+//
+// Neuron Types:
+// - Sensory: Respond to environmental inputs
+// - Motor: Generate action outputs
+// - Internal: Inter-neural communication
+// - All neurons share common dynamics but have specialized functions
+
 class Neuron {
 public:
     // Create neuron with ID
+    // 
+    // @param id Unique identifier for this neuron (must be unique within brain).
+    // @note Neuron IDs are used for connectivity mapping and state management.
+    //       Each neuron must have a globally unique ID for proper graph operations.
     explicit Neuron(NeuronId id);
     
     ~Neuron();
     
     // Disable copying, enable moving
+    // 
+    // @note Neurons contain dynamic resources including state vectors, synaptic
+    //       connections, and spike history. Copying would be unsafe and unnecessary.
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
     Neuron(Neuron&&) noexcept;
