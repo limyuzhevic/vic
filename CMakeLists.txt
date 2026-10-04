@@ -121,23 +121,37 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Performance optimizations
+add_library(nlm_performance STATIC
+    src/performance/SIMDVectorization.cpp
+    src/performance/CheckpointManager.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/EventQueue.cpp
+    src/performance/ParallelBrain.cpp
+    src/performance/OptimizedBrain.cpp
+    src/performance/SparseConnectivity.cpp
+)
+
+target_include_directories(nlm_performance PUBLIC src/performance)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_performance)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_performance)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance)
 
 # Testing
 enable_testing()
