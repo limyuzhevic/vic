@@ -21,6 +21,9 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    // Initialize all memory content vectors to prevent use-after-free
+    episodes_.clear();
+    pImpl->episodeNeurons.clear();
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
@@ -329,6 +332,9 @@ NeuralAssociativeMemory::NeuralAssociativeMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
 {
+    // Initialize all memory content vectors to prevent use-after-free
+    patternNeurons_.clear();
+    associations_.clear();
 }
 
 NeuralAssociativeMemory::~NeuralAssociativeMemory() = default;

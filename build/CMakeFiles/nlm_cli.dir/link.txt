@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/nlm_cli.dir/src/cli/main.cpp.o -o nlm_cli  libnlm_core.a libnlm_agent.a libnlm_world.a libnlm_phase3.a libnlm_phase4.a libnlm_phase5.a libnlm_phase6.a libnlm_phase5.a libnlm_phase4.a libnlm_phase3.a libnlm_agent.a libnlm_world.a libnlm_core.a 

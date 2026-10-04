@@ -54,36 +54,72 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal attentional events
+    void signalAttentionEvent();
+    void signalNoveltyEvent();
+    void signalWorkingMemoryEvent();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal arousing events
+    void signalArousalEvent();
+    void signalSurpriseEvent();
+    void signalPredictionErrorEvent(float error);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal social and reward events
+    void signalRewardEvent(float reward);
+    void signalSocialEvent();
+    void signalPredictionErrorEvent(float error);
+    
+    // Reduce impulsivity
+    void reduceImpulsivity();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

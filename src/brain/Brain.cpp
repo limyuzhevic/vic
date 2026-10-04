@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +129,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -258,6 +264,10 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    
+    // Initialize other neuromodulators if they have initialize methods
+    // ACh, NE, and 5-HT don't have initialize methods in their interface
+    // They are initialized in the constructor and updated during simulation
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -410,32 +420,215 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        // Novelty integration with ACh for attention
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->signalNoveltyEvent();
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get novelty and prediction error for curiosity calculation
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getMagnitude() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
+        // Curiosity integration with ACh and NE
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->signalWorkingMemoryEvent();
+        }
+        if (pImpl->norepinephrine) {
+            pImpl->norepinephrine->signalSurpriseEvent();
+        }
     }
     
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+// Update acetylcholine for attention and memory
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Apply ACh effects on attention and working memory
+        float achLevel = pImpl->acetylcholine->getLevel();
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    // Acetylcholine enhances attention focus
+                    // Stronger ACh increases attentional gain
+                    float attentionalGain = achLevel * 0.3f;
+                    if (attentionalGain > 0.0f) {
+                        neuron->injectCurrent(attentionalGain);
                     }
                 }
             }
+        }
+        
+        // ACh integration with norepinephrine
+        if (pImpl->norepinephrine) {
+            pImpl->norepinephrine->signalArousalEvent();
+        }
+        
+        // ACh integration with serotonin for mood-related attention
+        if (pImpl->serotonin) {
+            pImpl->serotonin->reduceImpulsivity();
+        }
+    }
+    
+    // Update norepinephrine for arousal and vigilance
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply NE effects on arousal and alertness
+        float neLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine increases alertness and response speed
+                    // Higher NE increases neuronal gain and responsiveness
+                    float alertnessMod = neLevel * 0.4f;
+                    if (alertnessMod > 0.0f) {
+                        neuron->injectCurrent(alertnessMod);
+                    }
+                }
+            }
+        }
+        
+        // NE integration with acetylcholine for attention-early interaction
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->signalAttentionEvent();
+        }
+        
+        // NE integration with dopamine for learning rate modulation
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(neLevel - 0.5f);
+        }
+    }
+    
+    // Update serotonin for mood and decision making
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply 5-HT effects on decision making and reward processing
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin modulates decision making and reward sensitivity
+                    // Higher 5-HT reduces impulsivity and affects reward processing
+                    float rewardMod = serotoninLevel * 0.2f;
+                    if (rewardMod > 0.0f) {
+                        // Inject to modulate reward sensitivity
+                        neuron->injectCurrent(rewardMod);
+                    }
+                }
+            }
+        }
+        
+        // 5-HT integration with dopamine for reward prediction error
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(serotoninLevel - 0.5f);
+        }
+        
+        // 5-HT integration with acetylcholine for mood-attention interaction
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->signalWorkingMemoryEvent();
+        }
+    }
+                }
+            }
+        }
+        
+        // Dopamine integration with serotonin for reward processing
+        if (pImpl->serotonin) {
+            pImpl->serotonin->signalPredictionErrorEvent(dopamineLevel - 0.5f);
+        }
+    }
+    
+    // Update acetylcholine for attention and memory
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply ACh effects on attention and working memory
+        float achLevel = pImpl->acetylcholine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Acetylcholine enhances attention focus
+                    // Stronger ACh increases attentional gain
+                    float attentionalGain = achLevel * 0.3f;
+                    if (attentionalGain > 0.0f) {
+                        neuron->injectCurrent(attentionalGain);
+                    }
+                }
+            }
+        }
+        
+        // ACh integration with norepinephrine
+        if (pImpl->norepinephrine) {
+            pImpl->norepinephrine->signalArousalEvent();
+        }
+        
+        // ACh integration with serotonin for mood-related attention
+        if (pImpl->serotonin) {
+            pImpl->serotonin->reduceImpulsivity();
+        }
+    }
+    
+    // Update norepinephrine for arousal and vigilance
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply NE effects on arousal and alertness
+        float neLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine increases alertness and response speed
+                    // Higher NE increases neuronal gain and responsiveness
+                    float alertnessMod = neLevel * 0.4f;
+                    if (alertnessMod > 0.0f) {
+                        neuron->injectCurrent(alertnessMod);
+                    }
+                }
+            }
+        }
+        
+        // NE integration with acetylcholine for attention-early interaction
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->signalAttentionEvent();
+        }
+        
+        // NE integration with dopamine for learning rate modulation
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(neLevel - 0.5f);
+        }
+    }
+    
+    // Update serotonin for mood and decision making
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply 5-HT effects on decision making and reward processing
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin modulates decision making and reward sensitivity
+                    // Higher 5-HT reduces impulsivity and affects reward processing
+                    float rewardMod = serotoninLevel * 0.2f;
+                    if (rewardMod > 0.0f) {
+                        // Inject to modulate reward sensitivity
+                        neuron->injectCurrent(rewardMod);
+                    }
+                }
+            }
+        }
+        
+        // 5-HT integration with dopamine for reward prediction error
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(serotoninLevel - 0.5f);
+        }
+        
+        // 5-HT integration with acetylcholine for mood-attention interaction
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->signalWorkingMemoryEvent();
         }
     }
     
@@ -446,6 +639,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Modulate plasticity with other neuromodulators
+    if (pImpl->acetylcholine) {
+        plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+    }
+    if (pImpl->norepinephrine) {
+        plasticityMod *= pImpl->norepinephrine->getPlasticityFactor();
+    }
+    if (pImpl->serotonin) {
+        plasticityMod *= pImpl->serotonin->getPlasticityFactor();
+    }
+    
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
@@ -454,7 +658,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Modify weight change based on all neuromodulators
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
@@ -1055,6 +1259,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {

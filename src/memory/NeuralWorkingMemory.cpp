@@ -23,6 +23,13 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize all memory content vectors to prevent use-after-free
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    recurrentConnections_.clear();
+    winners_.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -250,7 +257,11 @@ struct AttentionalSelection::Impl {
     std::vector<float> competitionStrength;
     std::vector<float> inhibitionLevel;
     
-    Impl() {}
+    Impl() {
+        competitionStrength.clear();
+        inhibitionLevel.clear();
+    }
+}
 };
 
 AttentionalSelection::AttentionalSelection()
