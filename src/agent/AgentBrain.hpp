@@ -9,109 +9,155 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
-class AgentBrain {
-public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
+// AgentBrain configuration constants
+namespace AgentBrainConstants {
+    // Motor configuration
+    const size_t MOTOR_GROUP_COUNT = 16;           // All advanced motor commands including LookLeft/LookRight
+    const float MOTOR_THRESHOLD = 0.5f;          // Minimum activity to trigger action
+    const float MOTOR_NOISE_LEVEL = 0.1f;        // Randomization in motor selection
     
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
+    // Sensory configuration
+    const size_t VISION_WIDTH = 16;              // Vision grid size
+    const size_t VISION_HEIGHT = 16;             // Vision grid size
+    const size_t VISION_NEUTRAL_SIZE = VISION_WIDTH * VISION_HEIGHT;  // 256
     
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    const size_t TOUCH_INPUT_COUNT = 8;          // Touch sensor count
+    const size_t INTERNAL_INPUT_COUNT = 4;       // Internal state signals
+    const size_t PROPRIOCEPTION_INPUT_COUNT = 6; // Body position/velocity signals
     
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    const float NOVELTY_DECAY_RATE = 0.99f;      // Novelty decay per timestep
+    const float NEUROMODULATION_CLAMP_MIN = -1.0f;
+    const float NEUROMODULATION_CLAMP_MAX = 1.0f;
+    const float PREDICTION_ERROR_THRESHOLD = 0.001f;
     
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
+    // Advanced neuromodulation constants
+    const float DOPAMINE_PREDICTION_ERROR_WEIGHT = 1.0f;      // Weight of prediction error on dopamine
+    const float NOVELTY_SENSITIVITY = 2.0f;                   // Novelty sensitivity for curiosity
+    const float PREDICTION_ERROR_SENSITIVITY = 0.5f;          // Prediction error sensitivity
+    const float CONSERVATIVE_DOPSINE_CLAMP = 0.8f;           // Conservative dopamine clamp
     
-    // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
+    // Development stage timing constants (in simulation steps)
+    const double DEVELOPMENT_STAGE_INITIAL_STEPS = 60.0;     // ~1 minute
+    const double DEVELOPMENT_STAGE_CRITICAL_STEPS = 300.0;   // ~5 minutes
+    const double DEVELOPMENT_STAGE_MATURE_STEPS = 900.0;     // ~15 minutes
+    const double DEVELOPMENT_STAGE_ADULT_STEPS = 1800.0;     // ~30 minutes
     
-    // Apply neuromodulation based on reward
-    void applyRewardModulation(float reward, float predictedReward);
+    // Developmental plasticity dynamics
+    const float PLASTICITY_DECAY_RATE = 0.95f;               // Plasticity decay during development
+    const float PLASTICITY_MATURATION_RATE = 0.8f;            // Rate of plasticity maturation
+    const float PLASTICITY_STABILIZATION = 0.3f;              // Plasticity stabilization factor
     
-    // Update development system
-    void updateDevelopment(double timestep);
+    // Structural plasticity dynamics
+    const float SYNAPTOGENESIS_RATE_INITIAL = 0.0002f;       // Initial synaptogenesis rate
+    const float SYNAPTOGENESIS_RATE_FINAL = 0.00001f;         // Final synaptogenesis rate
+    const float PRUNING_RATE_INITIAL = 0.000001f;            // Initial pruning rate
+    const float PRUNING_RATE_FINAL = 0.00005f;               // Final pruning rate
     
-    // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
+    // Advanced neuromodulation constants
+    const float NOVELTY_MEMORY_DECAY = 0.995f;               // Memory decay for novelty
+    const float CURIOSITY_CAPACITY = 1.0f;                   // Maximum curiosity level
+    const float PREDICTION_ERROR_DECAY = 0.9f;               // Prediction error decay
+    const float DOPSINE_FACTOR_BASE = 0.5f;                  // Base dopamine factor
+}
+
+// AgentBrain configuration options
+struct AgentBrainConfig {
+    bool rewardModulationEnabled = true;
+    bool structuralPlasticityEnabled = true;
+    bool developmentEnabled = true;
+    bool curiosityEnabled = true;
+    float sensoryNoveltyDecay = AgentBrainConstants::NOVELTY_DECAY_RATE;
+    float motorThreshold = AgentBrainConstants::MOTOR_THRESHOLD;
+    float explorationChance = AgentBrainConstants::CURIOSITY_EXPLORATION_CHANCE_MAX;
     
-    // Get neuromodulation level
-    float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
-    float getCuriosityLevel() const;
-    
-    // Get novelty level
-    float getNoveltyLevel() const;
-    
-    // Get prediction error
-    float getPredictionError() const;
-    
-    // Reset agent for new episode
-    void reset();
-    
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
-    
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Advanced configuration
+    bool enableAdvancedMotorCommands = false;     // Enable LookLeft/LookRight commands
+    bool enableAudioSensing = false;              // Enable audio input processing
+    float curiositySensitivity = 1.0f;           // Modify curiosity computation
+    float neuromodulationGain = 1.0f;            // Scale neuromodulation effects
 };
 
-} // namespace nlm
+// AgentBrain forward declarations for better modularity
+class SensoryProcessor;
+class MotorDecoder;
+class NeuromodulationSystem;
+class DevelopmentSystem;
+class CuriositySystem;
+
+// AgentBrain: Main orchestrator for agent capabilities
+// Connects NLM brain to the world
+// Handles sensory transduction, motor decoding, and neuromodulation
+class AgentBrain {
+public:
+    // Configuration and initialization
+    explicit AgentBrain(std::shared_ptr<Brain> brain, const AgentBrainConfig& config = AgentBrainConfig{});
+    ~AgentBrain();
+    
+    // Core functionality
+    void initialize(const SimpleWorld& world);
+    void reset();
+    
+    // Processing methods
+    void processSensoryInput(const SensoryPercept& percept);
+    MotorCommand decodeMotorCommand();
+    void applyRewardModulation(float reward, float predictedReward);
+    void updateDevelopment(double timestep);
+    
+    // System access and status
+    Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
+    
+    // Configuration management
+    void updateConfig(const AgentBrainConfig& newConfig);
+    const AgentBrainConfig& getConfig() const { return config_; }
+    
+    // System information
+    size_t getSensoryInputSize() const;
+    size_t getMotorOutputSize() const;
+    
+    // Status queries
+    DevelopmentalStage getDevelopmentalStage() const;
+    float getNeuromodulationLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionError() const;
+    
+    // Advanced features
+    void enableAdvancedFeatures(bool enable) { advancedFeaturesEnabled_ = enable; }
+    bool areAdvancedFeaturesEnabled() const { return advancedFeaturesEnabled_; }
+    
+    // Performance and diagnostics
+    double getProcessingTime() const { return processingTime_; }
+    size_t getTotalNeuronCount() const;
+    size_t getActiveMotorGroupCount() const;
+    
+    // Serialization and checkpointing
+    bool save(const std::string& filepath) const;
+    bool load(const std::string& filepath);
+    
+private:
+    // Sub-system composition for better modularity
+    std::unique_ptr<SensoryProcessor> sensoryProcessor_;
+    std::unique_ptr<MotorDecoder> motorDecoder_;
+    std::unique_ptr<NeuromodulationSystem> neuromodulationSystem_;
+    std::unique_ptr<DevelopmentSystem> developmentSystem_;
+    std::unique_ptr<CuriositySystem> curiositySystem_;
+    
+    // Core components
+    std::shared_ptr<Brain> brain_;
+    AgentBrainConfig config_;
+    
+    // Performance tracking
+    double processingTime_;
+    mutable size_t lastNeuronCount_;
+    mutable size_t lastActiveMotorGroups_;
+    
+    // Advanced features
+    bool advancedFeaturesEnabled_;
+    
+    // Helper methods
+    void initializeSubSystems();
+    void updateSubSystems(double timestep);
+    void synchronizeState();
+    void validateConfiguration() const;
+};

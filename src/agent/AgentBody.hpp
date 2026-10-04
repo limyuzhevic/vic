@@ -62,7 +62,18 @@ enum class MotorCommand {
     LookLeft = 4,      // Pan sensor left
     LookRight = 5,     // Pan sensor right
     Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    // Advanced motor commands for looking/panning
+    LookLeft = 7,     // Pan sensors left
+    LookRight = 8,    // Pan sensors right
+    // Additional advanced commands
+    Jump = 9,         // Jump action
+    Crouch = 10,      // Crouch action
+    Grab = 11,        // Interact/grab action
+    Throw = 12,       // Throw/discharge action
+    Eat = 13,         // Eat/consume action
+    Speak = 14,       // Speak/sound action
+    UseItem = 15,     // Use equipment
+    Wait = 16         // No action
 };
 
 // Action result from the world's perspective
