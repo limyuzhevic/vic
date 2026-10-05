@@ -300,16 +300,27 @@ void AgentBrain::updateDevelopment(double timestep) {
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
     }
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+    // Integrate with planner for goal-directed development
+    auto* planner = brain_->getPlanner();
+    if (planner && developmentEnabled_) {
+        // Planner adapts its planning strategies based on developmental stage
+        switch (brain_->getDevelopmentalStage()) {
+            case DevelopmentalStage::Initial:
+                planner->setPlanningDepth(2); // Simple reflexive planning
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                planner->setPlanningDepth(4); // Moderate complexity planning
+                break;
+            case DevelopmentalStage::Maturation:
+                planner->setPlanningDepth(6); // Complex planning
+                break;
+            case DevelopmentalStage::Adult:
+                planner->setPlanningDepth(8); // Advanced strategic planning
+                break;
         }
+        
+        NLM_LOG_INFO("Planner depth updated to " + std::to_string(planner->getPlanningDepth()) + 
+                     " based on developmental stage");
     }
 }
 
