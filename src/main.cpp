@@ -25,8 +25,239 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <unordered_map>
+#include <algorithm>
+#include <chrono>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+// Run mode enumeration
+enum class RunMode {
+    DEMO,
+    EXPERIMENT,
+    PROFILE,
+    DEBUG,
+    BENCHMARK
+};
+
+// Command line options structure (enhanced with advanced features)
+struct CommandLineOptions {
+    std::string configFile = "configs/default.cfg";
+    RunMode mode = RunMode::DEMO;
+    size_t steps = 1000;
+    size_t neuronCount = 0; // 0 means use config default
+    std::string outputFile;
+    bool verbose = false;
+    bool performance = false;
+    std::string saveStateFile;
+    std::string loadStateFile;
+    bool disablePlasticity = false;
+    bool disableMemory = false;
+    bool benchmark = false;
+    
+    // Advanced features options
+    bool enablePythonScripting = false;
+    bool enableJSONConfig = false;
+    bool enableParallelProcessing = false;
+    bool enableGPUAcceleration = false;
+    std::string customPlasticityRules;
+    std::vector<std::string> externalPlugins;
+    std::string analysisPipeline;
+    bool enableRealTimeMonitoring = false;
+    int profilingLevel = 0;
+    bool enableAutomatedLearning = false;
+    float learningRate = 0.01f;
+    int batchSize = 100;
+    std::string outputFormat;
+    bool enableCompression = false;
+    int compressionLevel = 5;
+    std::string analysisType = "performance";
+    std::string visualizationType = "spike_raster";
+};
+
+// Enhanced command line parsing with advanced feature support
+CommandLineOptions parseCommandLine(int argc, char** argv) {
+    CommandLineOptions options;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            ErrorHandling::printUsage(argv[0]);
+            exit(0);
+        } else if (arg == "--version") {
+            ErrorHandling::printVersion();
+            exit(0);
+        } else if (arg == "--verbose" || arg == "-v") {
+            options.verbose = true;
+        } else if (arg == "--performance") {
+            options.performance = true;
+        } else if (arg == "--benchmark") {
+            options.benchmark = true;
+        } else if (arg == "--disable-plasticity") {
+            options.disablePlasticity = true;
+        } else if (arg == "--disable-memory") {
+            options.disableMemory = true;
+        } else if (arg == "--config" && i + 1 < argc) {
+            options.configFile = argv[++i];
+        } else if (arg == "--mode" && i + 1 < argc) {
+            std::string modeArg = argv[++i];
+            if (modeArg == "demo") options.mode = RunMode::DEMO;
+            else if (modeArg == "experiment") options.mode = RunMode::EXPERIMENT;
+            else if (modeArg == "profile") options.mode = RunMode::PROFILE;
+            else if (modeArg == "debug") options.mode = RunMode::DEBUG;
+            else if (modeArg == "benchmark") options.mode = RunMode::BENCHMARK;
+            else {
+                NLM_LOG_ERROR("Unknown mode: " + modeArg);
+                ErrorHandling::printUsage(argv[0]);
+                exit(1);
+            }
+        } else if (arg == "--steps" && i + 1 < argc) {
+            options.steps = std::stoul(argv[++i]);
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            options.neuronCount = std::stoul(argv[++i]);
+        } else if (arg == "--output" && i + 1 < argc) {
+            options.outputFile = argv[++i];
+        } else if (arg == "--save-state" && i + 1 < argc) {
+            options.saveStateFile = argv[++i];
+        } else if (arg == "--load-state" && i + 1 < argc) {
+            options.loadStateFile = argv[++i];
+        } else if (arg == "--python-scripting") {
+            options.enablePythonScripting = true;
+        } else if (arg == "--json-config") {
+            options.enableJSONConfig = true;
+        } else if (arg == "--parallel") {
+            options.enableParallelProcessing = true;
+        } else if (arg == "--gpu") {
+            options.enableGPUAcceleration = true;
+        } else if (arg == "--plasticity-rules" && i + 1 < argc) {
+            options.customPlasticityRules = argv[++i];
+        } else if (arg == "--plugin" && i + 1 < argc) {
+            options.externalPlugins.push_back(argv[++i]);
+        } else if (arg == "--analysis" && i + 1 < argc) {
+            options.analysisPipeline = argv[++i];
+        } else if (arg == "--monitor") {
+            options.enableRealTimeMonitoring = true;
+        } else if (arg == "--profile-level" && i + 1 < argc) {
+            options.profilingLevel = std::stoi(argv[++i]);
+        } else if (arg == "--auto-learning") {
+            options.enableAutomatedLearning = true;
+        } else if (arg == "--learning-rate" && i + 1 < argc) {
+            options.learningRate = std::stof(argv[++i]);
+        } else if (arg == "--batch-size" && i + 1 < argc) {
+            options.batchSize = std::stoi(argv[++i]);
+        } else if (arg == "--output-format" && i + 1 < argc) {
+            options.outputFormat = argv[++i];
+        } else if (arg == "--compress") {
+            options.enableCompression = true;
+        } else if (arg == "--compression-level" && i + 1 < argc) {
+            options.compressionLevel = std::stoi(argv[++i]);
+        } else if (arg == "--analysis-type" && i + 1 < argc) {
+            options.analysisType = argv[++i];
+        } else if (arg == "--visualization-type" && i + 1 < argc) {
+            options.visualizationType = argv[++i];
+        } else {
+            NLM_LOG_ERROR("Unknown argument: " + arg);
+            ErrorHandling::printUsage(argv[0]);
+            exit(1);
+        }
+    }
+    
+    return options;
+}
+
+// Enhanced run mode implementations with advanced features
+void runDemo(std::shared_ptr<Brain> brain, size_t steps, bool performance);
+void runExperiments(std::shared_ptr<Brain> brain, size_t steps, bool performance);
+void runProfile(std::shared_ptr<Brain> brain, size_t steps);
+void runDebug(std::shared_ptr<Brain> brain, size_t steps);
+void runBenchmark(std::shared_ptr<Brain> brain, size_t steps);
+std::string writeResults(std::shared_ptr<Brain> brain, const std::string& filename);
 
 using namespace nlm;
+
+// Enhanced error handling utilities
+namespace ErrorHandling {
+    bool validateConfig(const std::shared_ptr<Config>& config) {
+        bool valid = true;
+        
+        // Validate essential configuration values
+        auto neuronCount = config->getOr<size_t>("neuron_count", 0);
+        if (neuronCount == 0) {
+            NLM_LOG_ERROR("Invalid neuron_count: must be > 0");
+            valid = false;
+        } else if (neuronCount > 1000000) {
+            NLM_LOG_WARNING("Very large neuron count may impact performance: " + std::to_string(neuronCount));
+        }
+        
+        auto regionCount = config->getOr<size_t>("region_count", 1);
+        if (regionCount == 0) {
+            NLM_LOG_ERROR("Invalid region_count: must be > 0");
+            valid = false;
+        }
+        
+        auto timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: must be > 0");
+            valid = false;
+        } else if (timestep > 1.0) {
+            NLM_LOG_WARNING("Large simulation timestep may affect accuracy: " + std::to_string(timestep));
+        }
+        
+        auto connectionProb = config->getOr<float>("connection_probability", 0.0f);
+        if (connectionProb < 0.0f || connectionProb > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection_probability: must be in [0.0, 1.0]");
+            valid = false;
+        }
+        
+        return valid;
+    }
+    
+    void printUsage(const std::string& programName) {
+        std::cout << R"(
+NLM - Neural Learning Machine Usage:
+
+Basic usage:
+  ./nlm [options]
+
+Options:
+  --config <file>          Configuration file path (default: configs/default.cfg)
+  --help, -h               Show this help message
+  --version                Show version information
+  --mode <mode>            Running mode (demo, experiment, profile, debug)
+  --steps <count>           Number of simulation steps (default: 1000)
+  --neurons <count>        Neuron count override (default: 500)
+  --output <file>           Output file for results
+  --verbose, -v             Enable verbose logging
+  --performance             Enable performance profiling
+  --save-state <file>       Save brain state to file
+  --load-state <file>       Load brain state from file
+  --disable-plasticity     Disable plasticity for testing
+  --disable-memory         Disable memory systems for testing
+  --benchmark               Run benchmark test
+
+Modes:
+  demo       Run basic demonstration (default)
+  experiment Run learning experiments
+  profile    Run performance profiling
+  debug      Run with maximum debugging output
+  benchmark  Run benchmark tests
+
+Examples:
+  ./nlm --mode experiment --steps 5000 --output results.txt
+  ./nlm --mode debug --verbose --load-state checkpoint.nlm
+  ./nlm --benchmark --output benchmark.csv
+
+)" << std::endl;
+    }
+    
+    void printVersion() {
+        std::cout << "NLM v0.1.0 - Neural Learning Machine (Phase 2)" << std::endl;
+        std::cout << "Experimental Artificial Developmental Brain" << std::endl;
+    }
+} // namespace ErrorHandling
 
 void printBanner() {
     std::cout << R"(
@@ -46,6 +277,9 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    
+    std::cout << "NLM Neural Learning Machine - Phase 2" << std::endl;
+    std::cout << "=====================================" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -324,15 +558,37 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command line arguments
+    CommandLineOptions options = parseCommandLine(argc, argv);
     
-    // Initialize logger
+    // Initialize performance monitoring
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Initialize logger with appropriate level based on verbosity
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = options.verbose ? LogLevel::Debug : LogLevel::Info;
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
+    // Performance monitoring helper
+    auto logPerformance = [&](const std::string& stage, const std::chrono::high_resolution_clock::time_point& start) {
+        if (options.performance) {
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            NLM_LOG_INFO("[PERF] " + stage + ": " + std::to_string(duration.count()) + "ms");
+        }
+    };
+    
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    if (options.performance) {
+        NLM_LOG_INFO("Performance monitoring: ENABLED");
+    }
+    NLM_LOG_INFO("Mode: " + std::string(options.mode == RunMode::DEMO ? "demo" : 
+                                 options.mode == RunMode::EXPERIMENT ? "experiment" :
+                                 options.mode == RunMode::PROFILE ? "profile" :
+                                 options.mode == RunMode::DEBUG ? "debug" : "benchmark"));
+    
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
@@ -342,19 +598,10 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
+    auto loadStart = std::chrono::high_resolution_clock::now();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
+    std::string configFile = options.configFile;
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -365,6 +612,12 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Override with command line neuron count if specified
+    if (options.neuronCount > 0) {
+        config->set("neuron_count", static_cast<int64_t>(options.neuronCount), ConfigSource::CommandLine);
+        NLM_LOG_INFO("Overrode neuron_count: " + std::to_string(options.neuronCount));
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,6 +635,14 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Validate configuration
+    if (!ErrorHandling::validateConfig(config)) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        return 1;
+    }
+    
+    logPerformance("Configuration loading", loadStart);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -397,37 +658,82 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
+    // Load or initialize brain state
+    auto brainStart = std::chrono::high_resolution_clock::now();
+    auto brain = std::make_shared<Brain>(config);
+    
+    if (!options.loadStateFile.empty()) {
+        NLM_LOG_INFO("Loading brain state from: " + options.loadStateFile);
+        if (!brain->load(options.loadStateFile)) {
+            NLM_LOG_ERROR("Failed to load brain state! Starting fresh.");
+        } else {
+            NLM_LOG_INFO("Brain state loaded successfully");
+        }
+    }
+    
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    auto initStart = std::chrono::high_resolution_clock::now();
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
         return 1;
     }
     
+    logPerformance("Brain initialization", initStart);
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run appropriate mode
+    switch (options.mode) {
+        case RunMode::DEMO:
+            runDemo(brain, options.steps, options.performance);
+            break;
+        case RunMode::EXPERIMENT:
+            runExperiments(brain, options.steps, options.performance);
+            break;
+        case RunMode::PROFILE:
+            runProfile(brain, options.steps);
+            break;
+        case RunMode::DEBUG:
+            runDebug(brain, options.steps);
+            break;
+        case RunMode::BENCHMARK:
+            runBenchmark(brain, options.steps);
+            break;
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    logPerformance("Main execution", brainStart);
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Save state if requested
+    if (!options.saveStateFile.empty()) {
+        NLM_LOG_INFO("Saving brain state to: " + options.saveStateFile);
+        if (brain->save(options.saveStateFile)) {
+            NLM_LOG_INFO("Brain state saved successfully");
+        } else {
+            NLM_LOG_ERROR("Failed to save brain state");
+        }
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Write output if requested
+    if (!options.outputFile.empty()) {
+        writeResults(brain, options.outputFile);
+    }
     
-    // Final brain status
+    // Final status
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto totalDuration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Execution Summary ===");
+    NLM_LOG_INFO("Total execution time: " + std::to_string(totalDuration.count()) + " seconds");
+    NLM_LOG_INFO("Final spike count: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("E/I ratio: " + std::to_string(brain->getExcitationInhibitionRatio()));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(brain->getActiveNeuronCount()));
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");

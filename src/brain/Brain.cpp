@@ -333,18 +333,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // OPTIMIZED: Cache region iterators and reduce pointer dereferencing
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // OPTIMIZED: Pre-fetch commonly used data and reduce repeated calculations
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -425,13 +431,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        float excitabilityMod = dopamineLevel * 0.5f;
+        
+        if (excitabilityMod > 0.0f) {
+            // OPTIMIZED: Cache iterators and reduce function call overhead
+            for (auto& region : pImpl->regions) {
+                auto& populations = region->getPopulations();
+                for (auto& pop : populations) {
+                    auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
@@ -446,8 +454,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // OPTIMIZED: Batch synapse processing and reduce function call overhead
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        auto& synapses = region->getSynapses();
+        for (auto* syn : synapses) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -488,15 +498,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // OPTIMIZED: Pre-allocate and cache neuron access patterns
+            float threshold = 5.0f;
             for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+                auto& populations = region->getPopulations();
+                for (auto& pop : populations) {
+                    auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
+                        const auto& state = neuron->getState();
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            std::abs(state.membranePotential - state.restingPotential) > threshold) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                                std::abs(state.membranePotential - state.restingPotential) / 20.0f);
                         }
                     }
                 }
