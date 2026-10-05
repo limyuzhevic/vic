@@ -35,17 +35,32 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    if (pImpl != nullptr) {
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    if (pImpl != nullptr) {
+        NLM_LOG_DEBUG("Moving Neuron with ID: " + std::to_string(pImpl->id));
+    }
+    other.pImpl = nullptr;  // Prevent double deletion
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Safe deletion with null check
+        if (pImpl != nullptr) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        other.pImpl = nullptr;  // Prevent double deletion
+        
+        if (pImpl != nullptr) {
+            NLM_LOG_DEBUG("Assigning moved Neuron with ID: " + std::to_string(pImpl->id));
+        }
     }
     return *this;
 }
@@ -191,6 +206,12 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate currentTime and dt
+    if (dt <= 0.0f) {
+        NLM_LOG_ERROR("Invalid timestep duration: " + std::to_string(dt));
+        return false;
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -202,16 +223,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Validate neural parameters
+    if (std::abs(V_rest) > 1000.0f || std::abs(V_reset) > 1000.0f || std::abs(threshold) > 1000.0f) {
+        NLM_LOG_ERROR("Invalid neural parameters detected");
+        V = V_rest;  // Reset to resting potential
+        return fired;
+    }
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -220,7 +244,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Protect against numerical overflow
+    float totalChange = dt * 1000.0f * (leakContribution + synapticContribution);
+    if (std::abs(totalChange) > 1000.0f) {
+        NLM_LOG_WARNING("Large membrane potential change detected, clamping");
+        totalChange = std::clamp(totalChange, -1000.0f, 1000.0f);
+    }
+    
+    V = V + totalChange;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {

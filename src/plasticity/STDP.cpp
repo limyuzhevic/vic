@@ -18,7 +18,12 @@ struct STDP::Impl {
 
 STDP::STDP() : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+STDP::~STDP() {
+    if (pImpl != nullptr) {
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
@@ -52,29 +57,55 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate input parameters
+    if (!synapse) {
+        NLM_LOG_ERROR("Null synapse pointer in STDP::update");
+        return;
+    }
+    
+    if (preSpikes.empty()) {
+        NLM_LOG_DEBUG("No pre-spikes provided to STDP update");
+    }
+    
+    if (postSpikes.empty()) {
+        NLM_LOG_DEBUG("No post-spikes provided to STDP update");
+    }
+    
+    if (dt <= 0.0f) {
+        NLM_LOG_ERROR("Invalid timestep duration in STDP::update: " + std::to_string(dt));
         return;
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Validate time constant
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid time constant in STDP::update: " + std::to_string(tau));
+        return;
+    }
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            float dt_calc = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
+            // Protect against numerical overflow in exp
+            if (std::abs(dt_calc) > 1000.0f) {
+                NLM_LOG_WARNING("Extremely large time difference in STDP update: " + std::to_string(dt_calc));
+            }
+            
+            if (dt_calc > 0) {
                 // Pre before post: POTENTIATION
                 // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                float delta = pImpl->ltpWeight * std::exp(-dt_calc / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
+            } else if (dt_calc < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * std::exp(dt_calc / tau);  // dt_calc is negative, so this subtracts
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // dt_calc == 0: no change (simultaneous spikes - rare in practice)
         }
     }
     
@@ -83,6 +114,12 @@ void STDP::update(Synapse* synapse,
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
+        
+        // Protect against numerical overflow
+        if (std::abs(totalDelta) > 10.0f) {
+            NLM_LOG_WARNING("Large STDP weight change detected: " + std::to_string(totalDelta));
+            totalDelta = std::clamp(totalDelta, -10.0f, 10.0f);
+        }
         
         // Apply weight change
         synapse->addToWeight(totalDelta);

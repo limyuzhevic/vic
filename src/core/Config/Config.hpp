@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <stdexcept>
+#include <chrono>
+#include <filesystem>
 
 namespace nlm {
 
@@ -93,6 +97,31 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    void validateConfiguration() const;
+    
+    // Get default configuration values
+    static constexpr int64_t DEFAULT_RANDOM_SEED = 42;
+    static constexpr double DEFAULT_SIMULATION_TIMESTEP = 0.001;
+    static constexpr int64_t DEFAULT_NEURON_COUNT = 500;
+    static constexpr int64_t DEFAULT_REGION_COUNT = 1;
+    static constexpr float DEFAULT_CONNECTION_PROBABILITY = 0.15f;
+    static constexpr float DEFAULT_STDP_LTP_WEIGHT = 0.02f;
+    static constexpr float DEFAULT_STDP_LTD_WEIGHT = 0.015f;
+    static constexpr float DEFAULT_STDP_TIME_CONSTANT = 20.0f;
+    static constexpr float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;
+    static constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+    static constexpr float DEFAULT_NOISE_LEVEL = 0.01f;
+    static constexpr float DEFAULT_TEMPERATURE = 37.0f;
+    static constexpr bool DEFAULT_ENABLE_DEVELOPMENT = true;
+    static constexpr bool DEFAULT_ENABLE_CHECKPOINTING = false;
+    static constexpr bool DEFAULT_ENABLE_REPLAY = false;
+    static constexpr int64_t DEFAULT_MAX_STEPS = 1000;
+    static constexpr int64_t DEFAULT_BRAIN_COMPLEXITY = 1;
+    static constexpr int64_t DEFAULT_MAX_MEMORY_EPISODES = 100;
+    static constexpr float DEFAULT_REWARD_SCALE = 1.0f;
+    static constexpr float DEFAULT_PUNISHMENT_SCALE = 1.0f;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +129,33 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    void initializeDefaults();
+    void validateEntry(const ConfigEntry& entry) const;
+    std::string getCurrentTimeString() const;
+    
+    // Enhanced implementation details
+    struct ValidationRule {
+        std::string key;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string errorMessage;
+    };
 };
+
+} // namespace nlm
+
+// Explicit template instantiations
+namespace nlm {
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+} // namespace nlm
 
 } // namespace nlm

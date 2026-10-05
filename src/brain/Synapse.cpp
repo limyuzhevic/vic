@@ -62,17 +62,32 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    if (pImpl != nullptr) {
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    if (pImpl != nullptr) {
+        NLM_LOG_DEBUG("Moving Synapse with ID: " + std::to_string(pImpl->id));
+    }
+    other.pImpl = nullptr;  // Prevent double deletion
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Safe deletion with null check
+        if (pImpl != nullptr) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        other.pImpl = nullptr;  // Prevent double deletion
+        
+        if (pImpl != nullptr) {
+            NLM_LOG_DEBUG("Assigning moved Synapse with ID: " + std::to_string(pImpl->id));
+        }
     }
     return *this;
 }
@@ -192,6 +207,12 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // Validate input parameters
+    if (currentTime < 0) {
+        NLM_LOG_ERROR("Invalid timestamp in Synapse::step: " + std::to_string(currentTime));
+        return;
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
@@ -202,7 +223,14 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        if (timeSincePre < 0) {
+            NLM_LOG_WARNING("Negative timeSincePre in Synapse::step");
+            timeSincePre = 0.0f;
+        }
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        
+        // Clamp facilitation to reasonable bounds
+        pImpl->shortTermFacilitation = std::clamp(pImpl->shortTermFacilitation, 0.0f, 2.0f);
     }
     
     // Decay short-term depression
@@ -211,8 +239,17 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
+        // Protect against invalid timeSinceActivity
+        if (timeSinceActivity < 0) {
+            NLM_LOG_WARNING("Negative timeSinceActivity in Synapse::step");
+            timeSinceActivity = 0.0f;
+        }
+        
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        
+        // Clamp depression to reasonable bounds
+        pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.0f, 1.0f);
     }
     
     // Decay eligibility trace for reward-modulated learning

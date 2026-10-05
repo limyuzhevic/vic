@@ -10,49 +10,44 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default values for backward compatibility
+    set("random_seed", static_cast<int64_t>(Config::DEFAULT_RANDOM_SEED), ConfigSource::Default);
+    set("simulation_timestep", DEFAULT_SIMULATION_TIMESTEP, ConfigSource::Default);
+    set("neuron_count", DEFAULT_NEURON_COUNT, ConfigSource::Default);
+    set("region_count", DEFAULT_REGION_COUNT, ConfigSource::Default);
+    set("connection_probability", DEFAULT_CONNECTION_PROBABILITY, ConfigSource::Default);
+    set("stdp_ltp_weight", DEFAULT_STDP_LTP_WEIGHT, ConfigSource::Default);
+    set("stdp_ltd_weight", DEFAULT_STDP_LTD_WEIGHT, ConfigSource::Default);
+    set("stdp_tau", DEFAULT_STDP_TIME_CONSTANT, ConfigSource::Default);
+    set("synaptogenesis_rate", DEFAULT_SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    set("pruning_rate", DEFAULT_PRUNING_RATE, ConfigSource::Default);
+    set("noise_level", DEFAULT_NOISE_LEVEL, ConfigSource::Default);
+    set("temperature", DEFAULT_TEMPERATURE, ConfigSource::Default);
+    set("enable_development", DEFAULT_ENABLE_DEVELOPMENT, ConfigSource::Default);
+    set("enable_checkpointing", DEFAULT_ENABLE_CHECKPOINTING, ConfigSource::Default);
+    set("enable_replay", DEFAULT_ENABLE_REPLAY, ConfigSource::Default);
+    set("max_steps", DEFAULT_MAX_STEPS, ConfigSource::Default);
+    set("brain_complexity", DEFAULT_BRAIN_COMPLEXITY, ConfigSource::Default);
+    set("max_memory_episodes", DEFAULT_MAX_MEMORY_EPISODES, ConfigSource::Default);
+    set("reward_scale", DEFAULT_REWARD_SCALE, ConfigSource::Default);
+    set("punishment_scale", DEFAULT_PUNISHMENT_SCALE, ConfigSource::Default);
+}
 
-Config::~Config() = default;
+Config::~Config() {
+    if (pImpl != nullptr) {
+        pImpl->entries.clear();
+    }
+}
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept = default;
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+    // For backward compatibility, use enhanced ConfigEnhanced.cpp
+    // This is a placeholder that should be replaced with the enhanced version
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
