@@ -3,24 +3,31 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, size_t> keyToIndex;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()), schema_() {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)), schema_(std::move(other.schema_)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+        schema_ = std::move(other.schema_);
+    }
+    return *this;
+}
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+bool Config::loadFromFile(const std::string& filepath, const std::vector<ConfigSchema>& schema) {
+    setSchema(schema);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,14 +35,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,14 +57,18 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            if (!setFromString(key, value, ConfigSource::File)) {
+                return false;  // File format error
+            }
         }
     }
     
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
+bool Config::loadFromArgs(int argc, char** argv, const std::vector<ConfigSchema>& schema) {
+    setSchema(schema);
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,14 +78,18 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                if (!setFromString(key, value, ConfigSource::CommandLine)) {
+                    return false;  // Invalid command line argument
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (!setFromString(key, value, ConfigSource::CommandLine)) {
+                return false;  // Invalid command line argument
+            }
         }
     }
     return true;
@@ -84,9 +101,18 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated: " << "TODO_TIMESTAMP\n";
+    file << "\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (entry.source == ConfigSource::CommandLine) {
+            continue;  // Skip runtime overrides
+        }
+        
+        file << "# " << getDescription(entry.key) << " (" << getUnit(entry.key) << ")\n";
+        file << entry.key << " = " << "TODO_VALUE\n";
+        file << "# Source: " << static_cast<int>(entry.source) << "\n\n";
     }
     
     return true;
@@ -94,15 +120,18 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    auto it = pImpl->keyToIndex.find(key);
+    if (it == pImpl->keyToIndex.end()) {
+        return std::nullopt;
+    }
     
-    if (it == pImpl->entries.end()) {
+    size_t index = it->second;
+    if (index >= pImpl->entries.size()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        return std::get<T>(pImpl->entries[index].value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
@@ -115,15 +144,21 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    // Remove from lookup map first
+    auto it_map = pImpl->keyToIndex.find(key);
+    if (it_map != pImpl->keyToIndex.end()) {
+        size_t index = it_map->second;
+        if (index < pImpl->entries.size()) {
+            pImpl->entries[index].value = value;
+            pImpl->entries[index].source = source;
+            return;
+        }
     }
+    
+    // Add new entry
+    size_t newIndex = pImpl->entries.size();
+    pImpl->entries.emplace_back(key, value, source);
+    pImpl->keyToIndex[key] = newIndex;
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -131,6 +166,10 @@ void Config::set(const std::string& key, const std::string& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
@@ -142,17 +181,103 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+bool Config::setFromString(const std::string& key, const std::string& value, ConfigSource source) {
+    // Try to infer type from schema
+    std::optional<ConfigSchema::Type> inferredType;
+    
+    // Check schema for this key
+    for (const auto& schema : schema_) {
+        if (schema.key == key) {
+            inferredType = schema.type;
+            break;
+        }
+    }
+    
+    // Infer type if not in schema
+    if (!inferredType) {
+        if (value.empty()) {
+            return false;
+        }
+        if (value == "true" || value == "false") {
+            inferredType = ConfigSchema::Type::BOOL;
+        } else if (value[0] == '-' && std::all_of(value.begin() + 1, value.end(), ::isdigit) ||
+                   std::all_of(value.begin(), value.end(), ::isdigit)) {
+            inferredType = ConfigSchema::Type::INT;
+        } else {
+            // Try to parse as double
+            char* endptr;
+            strtod(value.c_str(), &endptr);
+            if (*endptr == '\0') {
+                inferredType = ConfigSchema::Type::DOUBLE;
+            } else {
+                inferredType = ConfigSchema::Type::STRING;
+            }
+        }
+    }
+    
+    ConfigValue configValue;
+    
+    try {
+        switch (*inferredType) {
+            case ConfigSchema::Type::INT: {
+                int intValue = std::stoi(value);
+                configValue = intValue;
+                break;
+            }
+            case ConfigSchema::Type::INT64: {
+                int64_t int64Value = std::stoll(value);
+                configValue = int64Value;
+                break;
+            }
+            case ConfigSchema::Type::DOUBLE: {
+                double doubleValue = std::stod(value);
+                configValue = doubleValue;
+                break;
+            }
+            case ConfigSchema::Type::BOOL: {
+                bool boolValue = (value == "true");
+                configValue = boolValue;
+                break;
+            }
+            case ConfigSchema::Type::STRING: {
+                configValue = value;
+                break;
+            }
+            default: {
+                configValue = value;
+                break;
+            }
+        }
+    } catch (const std::exception&) {
+        return false;  // Failed to parse
+    }
+    
+    set(key, configValue, source);
+    return true;
+}
+
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->keyToIndex.find(key) != pImpl->keyToIndex.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = pImpl->keyToIndex.find(key);
+    if (it == pImpl->keyToIndex.end()) {
+        return;
+    }
+    
+    size_t index = it->second;
+    if (index < pImpl->entries.size()) {
+        pImpl->entries.erase(pImpl->entries.begin() + index);
+        pImpl->keyToIndex.erase(it);
+        
+        // Update indices for remaining entries
+        for (auto& kv : pImpl->keyToIndex) {
+            if (kv.second > index) {
+                kv.second--;
+            }
+        }
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -166,6 +291,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->keyToIndex.clear();
 }
 
 std::string Config::summary() const {
@@ -186,17 +312,151 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+void Config::setSchema(const std::vector<ConfigSchema>& schema) {
+    schema_ = schema;
+    
+    // Validate schema for duplicates
+    std::unordered_map<std::string, size_t> keyCounts;
+    for (const auto& s : schema_) {
+        keyCounts[s.key]++;
+    }
+    
+    for (const auto& kv : keyCounts) {
+        if (kv.second > 1) {
+            // TODO: Warning for duplicate schema entries
+        }
+    }
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validate() const {
+    std::vector<std::string> errors = getValidationErrors();
+    return errors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& schema : schema_) {
+        if (schema.required && !has(schema.key)) {
+            errors.push_back("Required parameter missing: " + schema.key);
+            continue;
+        }
+        
+        if (has(schema.key)) {
+            auto it = pImpl->keyToIndex.find(schema.key);
+            if (it != pImpl->keyToIndex.end()) {
+                size_t index = it->second;
+                if (index < pImpl->entries.size()) {
+                    if (!validateValue(schema, pImpl->entries[index].value)) {
+                        errors.push_back("Invalid value for parameter: " + schema.key);
+                    }
+                }
+            }
+        }
+    }
+    
+    return errors;
+}
+
+ConfigSource Config::getSource(const std::string& key) const {
+    auto it = pImpl->keyToIndex.find(key);
+    if (it != pImpl->keyToIndex.end()) {
+        size_t index = it->second;
+        if (index < pImpl->entries.size()) {
+            return pImpl->entries[index].source;
+        }
+    }
+    return ConfigSource::Default;
+}
+
+std::string Config::getDescription(const std::string& key) const {
+    for (const auto& schema : schema_) {
+        if (schema.key == key && schema.description) {
+            return *schema.description;
+        }
+    }
+    return "";
+}
+
+std::string Config::getUnit(const std::string& key) const {
+    for (const auto& schema : schema_) {
+        if (schema.key == key && schema.unit) {
+            return *schema.unit;
+        }
+    }
+    return "";
+}
+
+template<typename T>
+std::optional<T> Config::getFromString(const std::string& value) const {
+    try {
+        if constexpr (std::is_same_v<T, int>) {
+            return std::stoi(value);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return std::stoll(value);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::stod(value);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return value == "true" || value == "1" || value == "yes";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return value;
+        }
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+bool Config::validateValue(const ConfigSchema& schema, const ConfigValue& value) const {
+    try {
+        switch (schema.type) {
+            case ConfigSchema::Type::INT: {
+                int val = std::get<int>(value);
+                if (schema.range) {
+                    if (val < schema.range->first || val > schema.range->second) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            case ConfigSchema::Type::INT64: {
+                int64_t val = std::get<int64_t>(value);
+                if (schema.range) {
+                    if (val < static_cast<int64_t>(schema.range->first) ||
+                        val > static_cast<int64_t>(schema.range->second)) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            case ConfigSchema::Type::DOUBLE: {
+                double val = std::get<double>(value);
+                if (schema.range) {
+                    if (val < schema.range->first || val > schema.range->second) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            case ConfigSchema::Type::BOOL: {
+                // Always valid for bool
+                break;
+            }
+            case ConfigSchema::Type::STRING: {
+                std::string val = std::get<std::string>(value);
+                if (schema.minSize && val.size() < schema.minSize) {
+                    return false;
+                }
+                break;
+            }
+            default: {
+                return false;
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+    return true;
 }
 
 // Explicit template instantiations
