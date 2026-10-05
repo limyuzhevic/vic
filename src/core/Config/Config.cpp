@@ -21,6 +21,7 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced with validation for key format and type checking
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +29,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,12 +46,28 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Basic validation of key format
+            if (!isValidConfigKey(key)) {
+                throw std::runtime_error("Invalid configuration key: '" + key + "' at line " + std::to_string(lineNumber));
+            }
+            
+            // Basic type validation based on key name
+            try {
+                validateConfigKeyType(key, value);
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Configuration validation error at line " + std::to_string(lineNumber) + ": " + std::string(e.what()));
+            }
+            
             set(key, value, ConfigSource::File);
+            
+            if (!std::string(key).empty()) {
+                NLM_LOG_DEBUG("Loaded config: " + key + " = " + value);
+            }
         }
     }
     
@@ -200,16 +219,153 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::isValidConfigKey(const std::string& key) {
+    // Validate configuration key format
+    if (key.empty()) {
+        throw std::runtime_error("Empty configuration key");
+    }
+    
+    // Check for invalid characters
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            throw std::runtime_error("Invalid character in configuration key: '" + std::string(1, c) + "'");
+        }
+    }
+    
+    // Check for key length (reasonable limit)
+    if (key.length() > 100) {
+        throw std::runtime_error("Configuration key too long (max 100 characters): '" + key + "'");
+    }
+    
+    return true;
+}
 
-} // namespace nlm
+void Config::validateConfigKeyType(const std::string& key, const std::string& value) {
+    // Validate configuration value type based on key name
+    // This provides basic type checking for common configuration patterns
+    
+    std::string lowerKey = toLower(key);
+    
+    // Integer types
+    if (lowerKey.find("count") != std::string::npos || 
+        lowerKey.find("size") != std::string::npos ||
+        lowerKey.find("steps") != std::string::npos ||
+        lowerKey.find("iterations") != std::string::npos ||
+        lowerKey.find("delay") != std::string::npos ||
+        lowerKey.find("refractory") != std::string::npos) {
+        // Try to parse as integer
+        try {
+            size_t pos;
+            long val = std::stol(value, &pos);
+            if (pos != value.length()) {
+                throw std::runtime_error("Invalid integer format for key: '" + key + "'");
+            }
+            // Check reasonable bounds
+            if (val < 0) {
+                throw std::runtime_error("Negative value not allowed for key: '" + key + "'");
+            }
+            if (val > 1000000000) {
+                throw std::runtime_error("Value too large for key: '" + key + "'");
+            }
+        } catch (const std::invalid_argument&) {
+            throw std::runtime_error("Invalid integer value for key: '" + key + "' = '" + value + "'");
+        } catch (const std::out_of_range&) {
+            throw std::runtime_error("Integer value out of range for key: '" + key + "'");
+        }
+    }
+    
+    // Float/double types
+    else if (lowerKey.find("rate") != std::string::npos || 
+             lowerKey.find("weight") != std::string::npos ||
+             lowerKey.find("prob") != std::string::npos ||
+             lowerKey.find("potential") != std::string::npos ||
+             lowerKey.find("conductance") != std::string::npos ||
+             lowerKey.find("amplitude") != std::string::npos ||
+             lowerKey.find("threshold") != std::string::npos ||
+             lowerKey.find("delay") != std::string::npos ||
+             lowerKey.find("time") != std::string::npos) {
+        // Try to parse as float
+        try {
+            size_t pos;
+            double val = std::stod(value, &pos);
+            if (pos != value.length()) {
+                throw std::runtime_error("Invalid float format for key: '" + key + "'");
+            }
+            // Check reasonable bounds
+            if (val < -1000.0) {
+                throw std::runtime_error("Value too negative for key: '" + key + "'");
+            }
+            if (val > 1000.0) {
+                throw std::runtime_error("Value too large for key: '" + key + "'");
+            }
+        } catch (const std::invalid_argument&) {
+            throw std::runtime_error("Invalid float value for key: '" + key + "' = '" + value + "'");
+        } catch (const std::out_of_range&) {
+            throw std::runtime_error("Float value out of range for key: '" + key + "'");
+        }
+    }
+    
+    // Boolean types
+    else if (lowerKey.find("enable") != std::string::npos || 
+             lowerKey.find("enabled") != std::string::npos ||
+             lowerKey.find("active") != std::string::npos ||
+             lowerKey.find("debug") != std::string::npos ||
+             lowerKey.find("verbose") != std::string::npos ||
+             lowerKey.find("quiet") != std::string::npos) {
+        // Check for boolean values
+        std::string lowerValue = toLower(value);
+        if (lowerValue != "true" && lowerValue != "false" && 
+            lowerValue != "1" && lowerValue != "0" &&
+            lowerValue != "on" && lowerValue != "off") {
+            throw std::runtime_error("Invalid boolean value for key: '" + key + "' = '" + value + "'");
+        }
+    }
+    
+    // String types (passthrough for other keys)
+}
+
+std::string Config::getDefaultConfigFile() const {
+    return "configs/default.cfg";
+}
+
+bool Config::validateRequiredKeys() const {
+    // Validate that all required configuration keys are present
+    // This is a basic implementation - more sophisticated schema validation
+    // can be added in Phase 2
+    
+    // Check for essential keys that should always be present
+    std::vector<std::string> essentialKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability"
+    };
+    
+    std::string missingKeys;
+    for (const auto& essentialKey : essentialKeys) {
+        if (!has(essentialKey)) {
+            if (!missingKeys.empty()) missingKeys += ", ";
+            missingKeys += essentialKey;
+        }
+    }
+    
+    if (!missingKeys.empty()) {
+        NLM_LOG_WARNING("Missing required configuration keys: " + missingKeys);
+        return false;
+    }
+    
+    return true;
+}
+
+void Config::validateAll() const {
+    // Comprehensive configuration validation
+    if (!validateRequiredKeys()) {
+        throw std::runtime_error("Configuration validation failed: missing required keys");
+    }
+    
+    // Additional validation can be added here
+    // Check for value ranges, dependencies, etc.
+}

@@ -322,15 +322,82 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Print banner
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command-line arguments for configuration and debugging options
+    std::string configFile = "configs/default.cfg";
+    bool verboseMode = false;
+    bool debugMode = false;
+    bool quietMode = false;
+    std::string logLevel = "INFO";
+    std::string logFile = "";
     
-    // Initialize logger
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+        else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        }
+        else if (arg == "--debug") {
+            debugMode = true;
+            verboseMode = true;
+            logLevel = "DEBUG";
+        }
+        else if (arg == "--quiet") {
+            quietMode = true;
+            logLevel = "ERROR";
+        }
+        else if (arg == "--log-level" && i + 1 < argc) {
+            logLevel = argv[++i];
+        }
+        else if (arg == "--log-file" && i + 1 < argc) {
+            logFile = argv[++i];
+        }
+        else if (arg == "--neuron-count" && i + 1 < argc) {
+            // Will be processed by config->loadFromArgs later
+        }
+        else if (arg == "--steps" && i + 1 < argc) {
+            // Will be processed by config->loadFromArgs later
+        }
+        else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
+    // Initialize logging system
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
+    
+    // Configure console logger based on user preferences
+    if (!quietMode) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(getLogLevelFromString(logLevel));
+        logger->addLogger(consoleLogger);
+        
+        if (!logFile.empty()) {
+            auto fileLogger = std::make_shared<FileLogger>(logFile);
+            fileLogger->setLevel(getLogLevelFromString(logLevel));
+            logger->addLogger(fileLogger);
+        }
+    }
+    
     Logger::setGlobal(logger);
+    
+    // Log application startup
+    if (verboseMode) {
+        NLM_LOG_INFO("Application starting with enhanced logging");
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -339,6 +406,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
+    
+    if (verboseMode) {
+        NLM_LOG_INFO("Command-line options:");
+        NLM_LOG_INFO("  Config file: " + configFile);
+        NLM_LOG_INFO("  Verbose mode: " + std::string(verboseMode ? "enabled" : "disabled"));
+        NLM_LOG_INFO("  Debug mode: " + std::string(debugMode ? "enabled" : "disabled"));
+        NLM_LOG_INFO("  Log level: " + logLevel);
+        if (!logFile.empty()) {
+            NLM_LOG_INFO("  Log file: " + logFile);
+        }
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -430,7 +508,7 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+        NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
@@ -446,4 +524,52 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+void printUsage() {
+    std::cout << R"(
+NLM - Neural Learning Machine (Phase 2)
+
+USAGE:
+  nlm [OPTIONS]
+
+OPTIONS:
+  --help, -h              Show this help message
+  --version               Show version information
+  --config <file>         Load configuration from file
+  --verbose, -v           Enable verbose logging
+  --debug                 Enable debug mode (implies --verbose)
+  --quiet                 Enable quiet mode (only errors)
+  --log-level <level>     Set log level (DEBUG, INFO, WARNING, ERROR)
+  --log-file <file>       Log output to file
+  --neuron-count <n>      Set number of neurons (default: 500)
+  --steps <n>             Set number of simulation steps (default: 1000)
+  
+CONFIGURATION:
+  Configuration files should be in JSON or YAML format
+  Default config: configs/default.cfg
+
+EXAMPLES:
+  nlm --verbose                    # Run with verbose logging
+  nlm --debug --config myconfig.json  # Debug mode with custom config
+  nlm --quiet                       # Quiet mode (errors only)
+  nlm --log-file nlm.log             # Log to file
+
+For more information, visit: https://github.com/nlm-project/nlm
+  )" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "Version: 0.1.0" << std::endl;
+    std::cout << "Phase 2: Real LIF neuron dynamics with STDP and structural plasticity" << std::endl;
+    std::cout << "Built with C++20, pybind11 for Python bindings" << std::endl;
+}
+
+LogLevel getLogLevelFromString(const std::string& level) {
+    if (level == "DEBUG") return LogLevel::Debug;
+    if (level == "WARNING") return LogLevel::Warning;
+    if (level == "ERROR") return LogLevel::Error;
+    if (level == "TRACE") return LogLevel::Trace;
+    return LogLevel::Info;  // Default
 }

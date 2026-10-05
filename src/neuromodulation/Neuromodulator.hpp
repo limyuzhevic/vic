@@ -22,6 +22,8 @@ public:
     
     // Apply neuromodulatory effect to plasticity
     // TODO PHASE 2: Implement real modulation
+    // This method returns a scaling factor that modulates learning rates
+    // Real neuromodulators (dopamine, acetylcholine) modulate plasticity
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state

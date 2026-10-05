@@ -16,6 +16,8 @@ public:
     
     // Store item
     // TODO PHASE 2: Implement real storage
+    // This method implements working memory with capacity limits and decay
+    // Real working memory includes: overwriting policies, priority mechanisms, and recall
     void store(NeuronId neuron, float value);
     
     // Retrieve item

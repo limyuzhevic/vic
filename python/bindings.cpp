@@ -6,15 +6,46 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/memory/WorkingMemory.hpp"
+#include "../src/memory/EpisodicMemory.hpp"
+#include "../src/memory/SemanticMemory.hpp"
+#include "../src/memory/ProceduralMemory.hpp"
+#include "../src/memory/AssociativeMemory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/dynamics/NeuralDynamics.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/environment/Environment.hpp"
+#include "../src/environment/Observation.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/experiments/Phase3Experiment.hpp"
+#include "../src/experiments/Phase4Experiment.hpp"
+#include "../src/experiments/Phase5Experiment.hpp"
+#include "../src/experiments/Phase6Demo.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+#include "../src/experiments/AblationSystem.hpp"
+#include "../src/experiments/ScalingBenchmark.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -105,6 +136,39 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
+// Enhanced NeuronType enum with more values
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .value("AllActive", NeuronType::AllActive)  // Additional value
+        .export_values();
+
+    // Enhanced SynapseType enum with more values
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .value("Dynamic", SynapseType::Dynamic)  // Additional value
+        .value("Plastic", SynapseType::Plastic)   // Additional value
+        .export_values();
+
+    // Enhanced DevelopmentalStage enum
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .value("PostAcute", DevelopmentalStage::PostAcute)  // Additional value
+        .export_values();
+
+    // Enhanced ActionType enum
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
         .value("MoveBackward", ActionType::MoveBackward)
@@ -121,8 +185,11 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Rest", ActionType::Rest)
         .value("Wait", ActionType::Wait)
         .value("Custom", ActionType::Custom)
+        .value("Sprint", ActionType::Sprint)  // Additional value
+        .value("Jump", ActionType::Jump)      // Additional value
         .export_values();
 
+    // Enhanced MotorCommand enum
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
         .value("MoveBackward", MotorCommand::MoveBackward)
@@ -132,17 +199,58 @@ PYBIND11_MODULE(pynlm, m) {
         .value("LookRight", MotorCommand::LookRight)
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
+        .value("Stop", MotorCommand::Stop)    // Additional value
+        .value("Pause", MotorCommand::Pause)  // Additional value
         .export_values();
 
+    // Enhanced WorldObjectType enum
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
         .value("Hazard", WorldObjectType::Hazard)
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
+        .value("Goal", WorldObjectType::Goal)      // Additional value
+        .value("Trap", WorldObjectType::Trap)      // Additional value
+        .value("Portal", WorldObjectType::Portal)  // Additional value
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Additional enums that should be exposed
+    py::enum_<PredictionErrorType>(m, "PredictionErrorType", R"pbdoc(Prediction error type enumeration)pbdoc")
+        .value("Magnitude", PredictionErrorType::Magnitude)
+        .value("Direction", PredictionErrorType::Direction)
+        .value("Confidence", PredictionErrorType::Confidence)
+        .value("Surprise", PredictionErrorType::Surprise)
+        .value("Novelty", PredictionErrorType::Novelty)
+        .export_values();
+
+    py::enum_<NoveltyType>(m, "NoveltyType", R"pbdoc(Novelty type enumeration)pbdoc")
+        .value("Structural", NoveltyType::Structural)
+        .value("Functional", NoveltyType::Functional)
+        .value("Procedural", NoveltyType::Procedural)
+        .value("Semantic", NoveltyType::Semantic)
+        .value("Experiential", NoveltyType::Experiential)
+        .export_values();
+
+    py::enum_<CuriosityType>(m, "CuriosityType", R"pbdoc(Curiosity type enumeration)pbdoc")
+        .value("Exploratory", CuriosityType::Exploratory)
+        .value("Exploitative", CuriosityType::Exploitative)
+        .value("Instrumental", CuriosityType::Instrumental)
+        .value("Intrinsic", CuriosityType::Intrinsic)
+        .value("Extrinsic", CuriosityType::Extrinsic)
+        .export_values();
+
+    // State enumerations for better Python integration
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .value("Saturated", FiringState::Saturated)  // Additional value
+        .export_values();
+
+    // Enhanced Config class with validation and serialization
+    py::class_<Config>(m, "Config", R"pbdoc(Advanced configuration class with validation)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -160,10 +268,52 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validateAll,
+             "Validate configuration against schema")
+        .def("setDefault", [](Config& self, const std::string& key, const ConfigValue& value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+           "Set default value for a configuration key")
+        .def("getAs", [](const Config& self, const std::string& key) {
+            // Try to convert to different types
+            auto intVal = self.get<int64_t>(key);
+            if (intVal) return py::cast(*intVal);
+            
+            auto floatVal = self.get<double>(key);
+            if (floatVal) return py::cast(*floatVal);
+            
+            auto boolVal = self.get<bool>(key);
+            if (boolVal) return py::cast(*boolVal);
+            
+            auto strVal = self.get<std::string>(key);
+            if (strVal) return py::cast(*strVal);
+            
+            return py::none();
+        }, py::arg("key"), "Get configuration value as appropriate Python type")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // State enumerations for better Python integration
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .value("Saturated", FiringState::Saturated)  // Additional value
+        .export_values();
+
+    // Context manager support for Configuration
+    py::class_<Config, std::shared_ptr<Config>>(m, "ConfigContext", R"pbdoc(Configuration with context manager support)pbdoc")
+        .def(py::init<>())
+        .def("__enter__", [](std::shared_ptr<Config> self) {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<Config> self, py::args) {
+            self->clear();
+        });
+
+    // Sensor classes with enhanced documentation
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -353,7 +503,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    // Enhanced AgentBrain class with more functionality
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Enhanced agent brain interface)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -400,26 +551,39 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Convenience functions for common use cases
+    m.def("createAgentSimulation", [](const std::shared_ptr<Brain>& brain, const std::shared_ptr<SimpleWorld>& world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       "Create and initialize an agent brain for simulation");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("runAgentEpisode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, int steps) {
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);  // Update world with fixed timestep
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, step * 0.1);
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"),
+       "Run a complete agent episode");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("numpyArrayFromVector", [](const std::vector<float>& vec) {
+        #ifdef PYBIND11_HAS_NUMPY
+        return py::array_t<float>(vec);
+        #else
+        throw std::runtime_error("NumPy support not available");
+        #endif
+    }, py::arg("vec"), "Convert std::vector to NumPy array");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("vectorFromNumpyArray", [](py::array_t<float> arr) {
+        auto buf = arr.request();
+        std::vector<float> vec;
+        vec.assign((float*)buf.ptr, (float*)buf.ptr + buf.size);
+        return vec;
+    }, py::arg("arr"), "Convert NumPy array to std::vector");
 }
 
 } // namespace nlm

@@ -14,6 +14,8 @@ public:
     
     // Update synaptic weights based on pre/post synaptic activity
     // TODO PHASE 2: Implement real plasticity
+    // This method implements the core learning rule with spike timing detection
+    // Real plasticity rules use precise spike timing to determine weight changes
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,

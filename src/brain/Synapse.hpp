@@ -72,6 +72,8 @@ public:
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
+    // This method should implement spike timing detection, weight updates, and synaptic transmission
+    // Real synaptic dynamics include: PSP generation, delay handling, and short-term plasticity
     void step(Timestamp currentTime);
     
     // Reset to initial state

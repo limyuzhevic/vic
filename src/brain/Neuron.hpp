@@ -135,6 +135,7 @@ public:
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // This method should implement the core LIF dynamics with proper timestep handling
     void step(Timestamp currentTime);
     
     // Reset to initial state
