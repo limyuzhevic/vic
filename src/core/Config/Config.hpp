@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
 
 namespace nlm {
 
@@ -43,6 +45,14 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation error
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    
+    ConfigValidationError(const std::string& k, const std::string& msg) : key(k), message(msg) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +65,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -92,6 +102,20 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration schema validation
+    using ValidationRule = std::function<bool(const ConfigEntry&)>;
+    void addValidationRule(const std::string& key, ValidationRule rule);
+    void validate() const;
+    std::vector<ConfigValidationError> getValidationErrors() const;
+    
+    // Get configuration metadata
+    std::string getDescription(const std::string& key) const;
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Environment variable support
+    void setEnvVarPrefix(const std::string& prefix);
+    std::string getEnvVarPrefix() const;
     
 private:
     struct Impl;

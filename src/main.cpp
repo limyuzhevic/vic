@@ -18,6 +18,8 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/Phase6Demo.hpp"
 
 #include <iostream>
 #include <memory>
@@ -46,6 +48,120 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+CommandLineOptions parseCommandLine(int argc, char** argv) {
+    CommandLineOptions options;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            options.help = true;
+        } else if (arg == "--version") {
+            options.version = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            options.verbose = true;
+            options.logLevel = "Debug";
+        } else if (arg == "--quiet" || arg == "-q") {
+            options.logLevel = "Error";
+        } else if (arg == "--log-file" && i + 1 < argc) {
+            options.logFile = argv[++i];
+        } else if (arg == "--mode" && i + 1 < argc) {
+            options.mode = argv[++i];
+        } else if (arg == "--max-steps" && i + 1 < argc) {
+            options.maxSteps = std::stoi(argv[++i]);
+        } else if (arg == "--neuron-count" && i + 1 < argc) {
+            options.neuronCount = std::stoull(argv[++i]);
+        } else if (arg == "--region-count" && i + 1 < argc) {
+            options.regionCount = std::stoull(argv[++i]);
+        } else if (arg == "--connection-prob" && i + 1 < argc) {
+            options.connectionProbability = std::stod(argv[++i]);
+        } else if (arg == "--random-seed" && i + 1 < argc) {
+            options.randomSeed = std::stoull(argv[++i]);
+        } else if (arg == "--timestep" && i + 1 < argc) {
+            options.timestep = std::stod(argv[++i]);
+        } else if (arg == "--config" && i + 1 < argc) {
+            options.configFile = argv[++i];
+        } else if (arg.substr(0, 7) == "--config") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                options.configFile = arg.substr(pos + 1);
+            } else if (i + 1 < argc) {
+                options.configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 2) == "--") {
+            // Unknown option, but will be handled by config loading
+            // Pass it through to the config system
+            if (i + 1 < argc && argv[i+1][0] != '-') {
+                std::string key = arg.substr(2);
+                std::string value = argv[++i];
+                options.configFile = "cmd:" + key + "=" + value;
+            }
+        } else if (arg[0] != '-') {
+            // Positional argument could be config file
+            options.configFile = arg;
+        }
+    }
+    
+    return options;
+}
+
+void printHelp(const std::string& programName) {
+    std::cout << "NLM (Neural Learning Machine) - Neural Network Simulator" << std::endl;
+    std::cout << "Version 0.1.0" << std::endl;
+    std::cout << std::endl;
+    std::cout << "USAGE:" << std::endl;
+    std::cout << "  " << programName << " [OPTIONS] [CONFIG_FILE]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "MODES:" << std::endl;
+    std::cout << "  demo      - Run Phase 2 demonstration (default)" << std::endl;
+    std::cout << "  test      - Run comprehensive test suite" << std::endl;
+    std::cout << "  experiment - Run integration experiment" << std::endl;
+    std::cout << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  -h, --help                    Show this help message" << std::endl;
+    std::cout << "  -v, --verbose                 Enable verbose output" << std::endl;
+    std::cout << "  -q, --quiet                   Suppress non-error messages" << std::endl;
+    std::cout << "  --version                     Show version information" << std::endl;
+    std::cout << "  --log-file FILE               Log output to file" << std::endl;
+    std::cout << "  --mode MODE                   Execution mode (demo, test, experiment)" << std::endl;
+    std::cout << "  --max-steps N                 Maximum simulation steps" << std::endl;
+    std::cout << "  --neuron-count N              Number of neurons (default: 1000)" << std::endl;
+    std::cout << "  --region-count N              Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection-prob P           Connection probability (0.0-1.0)" << std::endl;
+    std::cout << "  --random-seed N               Random seed for reproducibility" << std::endl;
+    std::cout << "  --timestep T                  Simulation timestep" << std::endl;
+    std::cout << "  --config FILE                 Configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  " << programName << " --help                          Show help" << std::endl;
+    std::cout << "  " << programName << " --mode demo --neuron-count 5000" << std::endl;
+    std::cout << "  " << programName << " --mode test --verbose" << std::endl;
+    std::cout << "  " << programName << " custom_config.cfg" << std::endl;
+    std::cout << std::endl;
+    std::cout << "ENVIRONMENT VARIABLES:" << std::endl;
+    std::cout << "  NLM_*                         Configuration via environment variables" << std::endl;
+    std::cout << "  NLM_LOG_LEVEL                 Override log level (Debug, Info, Warning, Error)" << std::endl;
+    std::cout << "  NLM_LOG_FILE                  Log output file path" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version 0.1.0" << std::endl;
+    std::cout << "Built with C++20" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neurons" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  - Configuration management (JSON/YAML support)" << std::endl;
+    std::cout << "  - Advanced logging system" << std::endl;
+    std::cout << "  - Comprehensive test suite" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

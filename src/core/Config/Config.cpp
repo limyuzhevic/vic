@@ -8,6 +8,9 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::map<std::string, std::vector<Config::ValidationRule>> validationRules;
+    std::string envVarPrefix = "NLM_";
+    std::vector<ConfigValidationError> validationErrors;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,9 +22,42 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to detect file format
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return loadFromJsonFile(filepath);
+    } else if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yaml") {
+        return loadFromYamlFile(filepath);
+    } else if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yml") {
+        return loadFromYamlFile(filepath);
+    } else {
+        // Try to auto-detect
+        return loadFromAutoDetectedFile(filepath);
+    }
+}
+
+bool Config::loadFromAutoDetectedFile(const std::string& filepath) {
+    // Try JSON first
+    if (loadFromJsonFile(filepath)) {
+        return true;
+    }
     
+    // Try simple key=value format
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromJsonFile(const std::string& filepath) {
+    // TODO: Add nlohmann/json dependency
+    // For now, fall back to simple parsing
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromYamlFile(const std::string& filepath) {
+    // TODO: Add yaml-cpp dependency
+    // For now, fall back to simple parsing
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,11 +67,11 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == ';') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -74,6 +110,15 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
+        // Handle environment variables
+        else if (arg.find('=') != std::string::npos && 
+                 arg.find(pImpl->envVarPrefix) == 0) {
+            // Check if this is an environment variable
+            size_t pos = arg.find('=');
+            std::string envKey = arg.substr(pImpl->envVarPrefix.size(), pos - pImpl->envVarPrefix.size());
+            std::string envValue = arg.substr(pos + 1);
+            set(envKey, envValue, ConfigSource::File);
+        }
     }
     return true;
 }
@@ -84,10 +129,54 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << "\"" << arg[j] << "\"";
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        if (entry.description.empty()) {
+            file << "\n";
+        } else {
+            file << " // " << entry.description << "\n";
+        }
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        }
     }
+    
+    file << "}\n";
     
     return true;
 }
@@ -123,6 +212,11 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->source = source;
     } else {
         pImpl->entries.emplace_back(key, value, source);
+    }
+    
+    // Validate if there are rules for this key
+    if (pImpl->validationRules.find(key) != pImpl->validationRules.end()) {
+        validate();
     }
 }
 
@@ -166,6 +260,60 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->validationErrors.clear();
+}
+
+void Config::addValidationRule(const std::string& key, ValidationRule rule) {
+    pImpl->validationRules[key].push_back(rule);
+}
+
+void Config::validate() const {
+    pImpl->validationErrors.clear();
+    
+    for (const auto& entry : pImpl->entries) {
+        if (pImpl->validationRules.find(entry.key) != pImpl->validationRules.end()) {
+            for (const auto& rule : pImpl->validationRules.at(entry.key)) {
+                if (!rule(entry)) {
+                    pImpl->validationErrors.emplace_back(entry.key, "Validation failed");
+                    break;
+                }
+            }
+        }
+    }
+}
+
+std::vector<ConfigValidationError> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
+
+std::string Config::getDescription(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        return it->description;
+    }
+    
+    return "";
+}
+
+ConfigSource Config::getSource(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        return it->source;
+    }
+    
+    return ConfigSource::Default;
+}
+
+void Config::setEnvVarPrefix(const std::string& prefix) {
+    pImpl->envVarPrefix = prefix;
+}
+
+std::string Config::getEnvVarPrefix() const {
+    return pImpl->envVarPrefix;
 }
 
 std::string Config::summary() const {
@@ -183,6 +331,14 @@ std::string Config::summary() const {
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
+    
+    if (!pImpl->validationErrors.empty()) {
+        oss << "\nValidation Errors:\n";
+        for (const auto& error : pImpl->validationErrors) {
+            oss << "  " << error.key << ": " << error.message << "\n";
+        }
+    }
+    
     return oss.str();
 }
 
