@@ -7,6 +7,30 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 limyuzhevic
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -48,7 +72,7 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Learning Experiment: Demonstrates synaptic changes through neural plasticity
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -103,7 +127,7 @@ struct LearningExperiment {
     
     void computeStatistics() {
         NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
+        NLM_LOG_INFO("=== NLM Learning Experiment Results ===");
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
@@ -111,18 +135,18 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
+        // Compute weight changes using NLM's plasticity metrics
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
         float finalMean = finalSum / finalWeights.size();
         
-        NLM_LOG_INFO("Weight Statistics:");
+        NLM_LOG_INFO("Synaptic Plasticity Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
-        // Count synapses that changed significantly
+        // Count synapses that changed significantly (STDP thresholds)
         size_t strengthened = 0;
         size_t weakened = 0;
         size_t unchanged = 0;
@@ -130,31 +154,31 @@ struct LearningExperiment {
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
+            if (delta > 0.02f) ++strengthened;  // LTP threshold
+            else if (delta < -0.02f) ++weakened;  // LTD threshold
             else ++unchanged;
         }
         
         NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+        NLM_LOG_INFO("Plasticity Results:");
+        NLM_LOG_INFO("  Strengthened synapses: " + std::to_string(strengthened));
+        NLM_LOG_INFO("  Weakened synapses: " + std::to_string(weakened));
+        NLM_LOG_INFO("  Unchanged synapses: " + std::to_string(unchanged));
         
         NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
+        NLM_LOG_INFO("Neural Activity:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
+        // Determine if learning occurred through NLM mechanisms
+        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.005f) ||  // NLM sensitivity threshold
                                 (strengthened > 0 || weakened > 0);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic plasticity through STDP and Hebbian mechanisms");
         } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
+            NLM_LOG_INFO("✗ NO LEARNING: Synaptic weights remained stable");
         }
     }
 };

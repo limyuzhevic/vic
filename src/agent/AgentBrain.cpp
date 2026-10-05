@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace nlm {
 
@@ -20,7 +21,27 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with weak pointers to avoid ownership
+    refreshNeuronGroups();
+}
+
+AgentBrain::~AgentBrain() = default;
+
+void AgentBrain::refreshNeuronGroups() {
+    // Clear existing groups
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    // Repopulate with raw pointers (consistent with rest of codebase)
+    // Neurons are owned by NeuralPopulations and remain valid as long as Brain exists
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -28,6 +49,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        // Add raw pointer (does not take ownership)
+                        // This is consistent with the rest of the NLM codebase
+                        // which uses raw pointers for neuron access
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +69,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        // Add raw pointer (does not take ownership)
+                        // This is consistent with the rest of the NLM codebase
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -60,8 +88,6 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
         }
     }
 }
-
-AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);

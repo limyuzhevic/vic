@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 namespace nlm {
 
@@ -18,6 +19,9 @@ public:
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
+    
+    // Update neuron groups (e.g., after brain restructuring)
+    void refreshNeuronGroups();
     
     // Get sensory input size expected by brain
     size_t getSensoryInputSize() const;
@@ -78,7 +82,9 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups - raw pointers (consistent with rest of codebase)
+    // Note: These pointers are owned by NeuralPopulations and remain valid
+    // as long as the Brain exists
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,7 +92,7 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups - raw pointers (consistent with rest of codebase)
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
