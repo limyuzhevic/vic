@@ -260,8 +260,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Use default timestep (1ms) if not specified
+    TimestepDuration dt = 0.001;  // 1ms standard timestep
     stepLIF(currentTime, dt);
 }
 
