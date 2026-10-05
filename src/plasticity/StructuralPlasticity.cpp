@@ -19,11 +19,15 @@ struct StructuralPlasticity::Impl {
     size_t totalSynapsesCreated;
     size_t totalSynapsesPruned;
     
-    Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
-             minWeightThreshold(0.05f), activityThreshold(0.001f),
-             maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
-             useActivityDependency(true),
-             totalSynapsesCreated(0), totalSynapsesPruned(0) {}
+    Impl() : synaptogenesisRate(StructuralPlasticityConstants::DEFAULT_SYNAPTOGENESIS_RATE),
+             pruningRate(StructuralPlasticityConstants::DEFAULT_PRUNING_RATE),
+             minWeightThreshold(StructuralPlasticityConstants::MIN_WEIGHT_THRESHOLD),
+             activityThreshold(StructuralPlasticityConstants::ACTIVITY_THRESHOLD),
+             maxSynapsesPerNeuron(StructuralPlasticityConstants::MAX_SYNAPSES_PER_NEURON),
+             maxTotalSynapses(StructuralPlasticityConstants::MAX_TOTAL_SYNAPSES),
+             useActivityDependency(StructuralPlasticityConstants::DEFAULT_USE_ACTIVITY_DEPENDENCY),
+             totalSynapsesCreated(0),
+             totalSynapsesPruned(0) {}
 };
 
 StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
@@ -31,7 +35,7 @@ StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 StructuralPlasticity::~StructuralPlasticity() = default;
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
-                                               NeuronId destination, SynapticWeight weight) {
+                                             NeuronId destination, SynapticWeight weight) {
     /*
      * Create a new synapse between source and destination neurons
      * 

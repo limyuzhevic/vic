@@ -10,8 +10,10 @@ struct Hebbian::Impl {
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+    Impl() : learningRate(HebbianConstants::BASE_LEARNING_RATE),
+             maxWeight(HebbianConstants::BASE_MAX_WEIGHT),
+             minWeight(HebbianConstants::BASE_MIN_WEIGHT),
+             covarianceThreshold(HebbianConstants::DEFAULT_CORRELATION_THRESHOLD) {}
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -19,9 +21,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                     const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes,
+                     TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -59,7 +61,7 @@ void Hebbian::update(Synapse* synapse,
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);
             // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+            if (std::abs(dt) < HebbianConstants::SPIKE_CORRELATION_WINDOW) {  // 100ms correlation window
                 ++correlationCount;
             }
         }
@@ -70,7 +72,7 @@ void Hebbian::update(Synapse* synapse,
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
     // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
+    if (std::abs(delta) > HebbianConstants::WEIGHT_CHANGE_THRESHOLD) {
         applyWeightChange(synapse, delta);
     }
 }
@@ -88,7 +90,7 @@ const char* Hebbian::getName() const {
 }
 
 void Hebbian::setLearningRate(float rate) {
-    pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
+    pImpl->learningRate = std::clamp(rate, HebbianConstants::MIN_LEARNING_RATE, HebbianConstants::MAX_LEARNING_RATE);
 }
 
 float Hebbian::getLearningRate() const {
@@ -96,11 +98,19 @@ float Hebbian::getLearningRate() const {
 }
 
 void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, HebbianConstants::MAX_WEIGHT_LIMIT);
 }
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::setMinWeight(float minWeight) {
+    pImpl->minWeight = std::clamp(minWeight, -HebbianConstants::MAX_WEIGHT_LIMIT, 0.0f);
+}
+
+float Hebbian::getMinWeight() const {
+    return pImpl->minWeight;
 }
 
 } // namespace nlm

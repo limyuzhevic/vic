@@ -128,6 +128,7 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (!pImpl) return;
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +136,7 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (!pImpl) return;
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -150,6 +152,7 @@ const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
 }
 
 void Synapse::clearHistory() {
+    if (!pImpl) return;
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
 }
@@ -169,6 +172,7 @@ const PlasticityFlags& Synapse::getPlasticityFlags() const {
 }
 
 float Synapse::getEligibilityTrace() const {
+    if (!pImpl) return 0.0f;
     return pImpl->eligibilityTrace;
 }
 
@@ -177,6 +181,7 @@ void Synapse::setEligibilityTrace(float trace) {
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    if (!pImpl) return;
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -192,6 +197,8 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    if (!pImpl) return;
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace

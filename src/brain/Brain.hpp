@@ -29,6 +29,31 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Brain-level constants
+namespace BrainConstants {
+    // Default configuration values
+    constexpr double DEFAULT_TIMESTEP = 0.001;  // 1ms
+    constexpr double DEFAULT_WEIGHT_STANDARD_DEVIATION = 0.2f;
+    constexpr double DEFAULT_THRESHOLD_DEVIATION = 0.1f;
+    
+    // Neuromodulation constants
+    constexpr float NEUROMODULATION_EXCITABILITY_GAIN = 0.5f;
+    constexpr float NEUROMODULATION_PLASTICITY_MODULATION = 1.0f;
+    
+    // Memory system constants
+    constexpr size_t DEFAULT_WORKING_MEMORY_CAPACITY = 1000;
+    constexpr size_t DEFAULT_MAX_EPISODIC_MEMORY_EPISODES = 1000;
+    
+    // Development constants
+    constexpr size_t REPLAY_INTERVAL = 100;
+    constexpr size_t CONSOLIDATION_INTERVAL = 1000;
+    constexpr size_t DEVELOPMENT_UPDATE_INTERVAL = 1000;
+    
+    // Structural plasticity constants
+    constexpr float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;
+    constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+}
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;

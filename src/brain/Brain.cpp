@@ -430,7 +430,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    float excitabilityMod = dopamineLevel * NEUROMODULATION_EXCITABILITY_GAIN;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
@@ -716,14 +716,12 @@ std::unique_ptr<class Action> Brain::produceAction() {
     return action;
 }
 
-void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
-}
+    pImpl->stdp->setLTPWeight(STDP_BASE_LTP_WEIGHT * modulation);
+    pImpl->stdp->setLTDWeight(STDP_BASE_LTD_WEIGHT * modulation);
 
 void Brain::updatePlasticity() {
     // Plasticity is now applied during each step

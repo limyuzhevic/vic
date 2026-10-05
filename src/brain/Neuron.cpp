@@ -51,6 +51,7 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    if (!pImpl) return;
     pImpl->type = type;
 }
 
@@ -112,10 +113,12 @@ void Neuron::setResetPotential(MembranePotential potential) {
 }
 
 bool Neuron::checkThreshold() const {
+    if (!pImpl) return false;
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 float Neuron::getLastSpikeTime() const {
+    if (!pImpl) return -1.0f;
     return pImpl->state.lastSpikeTime;
 }
 
@@ -140,14 +143,17 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
+    if (!pImpl) return;
     pImpl->synapticInput += current;
 }
 
 void Neuron::clearTotalCurrent() {
+    if (!pImpl) return;
     pImpl->synapticInput = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    if (!pImpl) return;
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
@@ -155,14 +161,17 @@ void Neuron::recordSpike(Timestamp timestamp) {
 }
 
 void Neuron::clearSpikeHistory() {
+    if (!pImpl) return;
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    if (!pImpl) return;
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    if (!pImpl) return;
     pImpl->outgoingSynapses.push_back(handle);
 }
 

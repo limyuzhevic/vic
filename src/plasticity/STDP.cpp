@@ -12,8 +12,11 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    Impl() : ltpWeight(STDPConstants::BASE_LTP_WEIGHT), 
+             ltdWeight(STDPConstants::BASE_LTD_WEIGHT),
+             timeConstant(STDPConstants::BASE_TIME_CONSTANT),
+             minWeight(STDPConstants::MIN_WEIGHT),
+             maxWeight(STDPConstants::MAX_WEIGHT) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -21,9 +24,9 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                  const std::vector<Timestamp>& preSpikes,
+                  const std::vector<Timestamp>& postSpikes,
+                  TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -45,7 +48,7 @@ void STDP::update(Synapse* synapse,
      *   - Reflects NMDA receptor-mediated calcium signaling
      *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
      *   - Post-before-pre causes backpropagating action potentials
-     *   
+     * 
      * Limitations:
      *   - Simplified pairwise rule (doesn't capture triplet interactions)
      *   - Assumes single exponential window (more complex in biology)
@@ -79,7 +82,7 @@ void STDP::update(Synapse* synapse,
     }
     
     // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
+    if (std::abs(totalDelta) > STDPConstants::WEIGHT_CLAMP_THRESHOLD) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
@@ -107,7 +110,7 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltpWeight = std::clamp(weight, STDPConstants::MIN_LTP_WEIGHT, STDPConstants::MAX_LTP_WEIGHT);
 }
 
 float STDP::getLTPWeight() const {
@@ -115,7 +118,7 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltdWeight = std::clamp(weight, STDPConstants::MIN_LTD_WEIGHT, STDPConstants::MAX_LTD_WEIGHT);
 }
 
 float STDP::getLTDWeight() const {
@@ -123,7 +126,7 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    pImpl->timeConstant = std::clamp(tau, STDPConstants::MIN_TIME_CONSTANT, STDPConstants::MAX_TIME_CONSTANT);
 }
 
 float STDP::getTimeConstant() const {
