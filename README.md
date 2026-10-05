@@ -1,230 +1,476 @@
-# NLM — 熙然
+# NLM System - Getting Started Guide
 
-**An Experimental Artificial Developmental Brain**
+This document provides an overview of the NLM (Neural Learning Machine) system and its improvements.
 
-## What is NLM?
+## Overview
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM is an experimental artificial developmental brain project that implements:
+- Leaky Integrate-and-Fire (LIF) neurons
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+- Multiple neuromodulators (dopamine, curiosity, reward, novelty)
+- Memory systems (working, episodic)
+- Development and maturation systems
+- Sensorimotor control and learning
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+## Key Improvements
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+The NLM system has been significantly enhanced with the following improvements:
 
-## Current Phase
+### 1. Advanced Agent Controller
 
-**PHASE 6: FINAL INTEGRATION**
+**File**: `advanced_agent_controller.py`
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Provides enhanced functionality for:
+- Advanced experiment configuration
+- Enhanced brain creation with custom parameters
+- Advanced world simulation with object management
+- Agent brain interface with mode selection
+- Simulation monitoring and performance tracking
+- Data export and visualization
+- Callback system for event-driven programming
 
-### Phase 6 Integration Achievements
+**Key Features**:
+- Multiple configuration options for brain, world, and agent
+- Real-time performance metrics and monitoring
+- Support for different agent modes (exploration, exploitation, etc.)
+- Comprehensive error handling and recovery
+- Data export in multiple formats (JSON, CSV)
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### 2. Interactive Agent System
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+**File**: `interactive_agent_system.py`
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+Provides a comprehensive interactive interface for:
+- Command-line interface (CLI) for system control
+- Multiple agent types (Explorer, Learner, Adaptive, Social, Creative, Basic)
+- Advanced environment profiles and configuration
+- Experiment management and tracking
+- Performance monitoring and analysis
+- Callback system and event handling
+- Data export and reporting
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+**Key Features**:
+- Full interactive CLI with help system
+- Six distinct agent types with unique behaviors
+- Comprehensive experiment setup and management
+- Real-time system monitoring
+- Event-driven programming with callbacks
+- Multiple data export formats
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+### 3. Demonstration System
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+**File**: `demo_improvements.py`
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+Provides comprehensive demonstrations of:
+- Advanced agent controller functionality
+- Interactive agent system capabilities
+- Performance monitoring features
+- Multiple agent types and behaviors
+- Experiment management and analysis
 
-## Building
+**Purpose**: Educational and testing purposes to showcase all system improvements.
 
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+### 4. Documentation and Examples
+
+**Files**:
+- `IMPROVEMENTS_SUMMARY.md` - Comprehensive documentation of all improvements
+- `easy_usage.md` - Enhanced beginner documentation
+- `HOW_TO_USE.md` - Comprehensive usage guide
+
+## System Architecture
+
+### Core Components
+
+1. **Brain System** (`src/brain/`)
+   - Neuron simulation (LIF model)
+   - Synapse management and plasticity
+   - Neural populations and regions
+   - Memory systems integration
+
+2. **Agent System** (`src/agent/`)
+   - Agent brain interface
+   - Sensory processing and transduction
+   - Motor decoding and action selection
+   - Neuromodulation and reward processing
+
+3. **World System** (`src/world/`)
+   - Environment simulation
+   - Agent interaction
+   - Sensory input generation
+   - Action execution and feedback
+
+4. **Plasticity Systems** (`src/plasticity/`)
+   - Spike-Timing Dependent Plasticity (STDP)
+   - Hebbian learning
+   - Structural plasticity
+   - Development and maturation
+
+5. **Neuromodulation Systems** (`src/neuromodulation/`)
+   - Dopamine system
+   - Curiosity and novelty detection
+   - Reward processing
+   - Prediction error signals
+
+### New Components (Improvements)
+
+1. **Advanced Configuration** (`src/core/Config/`)
+   - Enhanced parameter management
+   - File-based configuration
+   - Command-line argument parsing
+   - Configuration validation
+
+2. **Performance Monitoring** (`PerformanceMonitor` class)
+   - Real-time system metrics
+   - Resource usage tracking
+   - Performance analysis
+   - Benchmarking tools
+
+3. **Experiment Management**
+   - Complete experiment lifecycle
+   - Result tracking and analysis
+   - Multiple experiment execution
+   - Data persistence and export
+
+4. **Agent Types and Behaviors**
+   - Explorer: High curiosity, random exploration
+   - Learner: Focused learning, reward-based
+   - Adaptive: Dynamic adaptation to environment
+   - Social: Cooperative and social behaviors
+   - Creative: Innovative and exploratory behavior
+   - Basic: Simple, straightforward behavior
+
+## Installation and Setup
+
+### Prerequisites
+
+- C++20 compatible compiler (GCC 10+, Clang 12+, or MSVC 2019+)
+- CMake 3.16 or higher
+- Python 3.8 or higher
+- pybind11 2.11.0+
+- scikit-build-core 0.5.0+
+- pytest
+- numpy
+
+### Building the System
+
+1. **Build the C++ core**
+   ```bash
+   mkdir build
+   cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Install Python bindings**
+   ```bash
+   cd /path/to/nlm
+   pip install pybind11 scikit-build-core pytest numpy
+   pip install -e .
+   ```
+
+### Running Examples
+
+#### Basic Usage
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+
+print(f"Simulation complete. Neurons: {brain.getTotalNeuronCount()}")
 ```
 
-## Running
+#### Advanced Agent Controller Example
 
-### Phase 6 Demo (Integration Test)
-```bash
-./nlm_phase6_demo
+```python
+from advanced_agent_controller import AdvancedAgentController
+
+# Create controller
+controller = AdvancedAgentController()
+
+# Define advanced experiment
+experiment_config = {
+    "brain_config": {
+        "neuron_count": 1000,
+        "synapse_density": 0.15,
+        "plasticity": {"stdp": {"enable": True}}
+    },
+    "world_config": {
+        "width": 20,
+        "height": 20,
+        "visionWidth": 8,
+        "visionHeight": 8
+    },
+    "agent_config": {
+        "features": {
+            "reward_modulation": True,
+            "curiosity": True,
+            "development": True
+        }
+    }
+}
+
+# Run experiment
+results = controller.run_experiment(experiment_config)
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+#### Interactive Agent System Example
 
-## Project Structure
+```python
+from interactive_agent_system import InteractiveAgentSystem
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+# Create interactive system
+system = InteractiveAgentSystem()
+
+# Create experiment setup
+experiment = system.create_experiment_setup(
+    name="demo_experiment",
+    agent_type="explorer",
+    duration=100.0,
+    environment_size=15
+)
+
+# Run simulation
+results = system.run_advanced_simulation(experiment)
 ```
 
-## Phase Summary
+#### Using Different Agent Types
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+```python
+from interactive_agent_system import AgentProfile, AgentType
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+# Create different agent profiles
+agents = {
+    "explorer": AgentProfile(
+        name="explorer_agent",
+        type=AgentType.EXPLORER,
+        curiosity_threshold=0.7,
+        exploration_rate=0.5
+    ),
+    "learner": AgentProfile(
+        name="learner_agent",
+        type=AgentType.LEARNER,
+        curiosity_threshold=0.3,
+        exploration_rate=0.2
+    ),
+    "adaptive": AgentProfile(
+        name="adaptive_agent",
+        type=AgentType.ADAPTIVE,
+        curiosity_threshold=0.5,
+        exploration_rate=0.4
+    )
+}
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+# Use agents in experiments
+for agent_name, agent_profile in agents.items():
+    experiment = system.create_experiment_setup(
+        name=f"{agent_name}_experiment",
+        agent_profile=agent_profile,
+        duration=200.0
+    )
+    results = system.run_advanced_simulation(experiment)
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+## Features and Capabilities
+
+### 1. Advanced Configuration
+
+- **Brain Configuration**: Neuron count, synapse density, plasticity parameters
+- **World Configuration**: Environment dimensions, vision range, object properties
+- **Agent Configuration**: Agent type, behavior parameters, feature toggles
+
+### 2. Agent Types and Behaviors
+
+#### Explorer Agent
+- High curiosity and exploration rates
+- Random action selection
+- Novelty-seeking behavior
+- Adaptive learning from new experiences
+
+#### Learner Agent
+- Focused on reward-based learning
+- Stable and consistent behavior
+- Efficient skill acquisition
+- Reduced exploration in favor of exploitation
+
+#### Adaptive Agent
+- Dynamic adaptation to environmental changes
+- Developmental plasticity
+- Structural plasticity for connection growth
+- Balance between exploration and exploitation
+
+#### Social Agent
+- Cooperative and social behaviors
+- Group coordination and interaction
+- Social learning and imitation
+- Community-based decision making
+
+#### Creative Agent
+- Innovative and exploratory behavior
+- High curiosity and novelty seeking
+- Structural adaptation and innovation
+- Boundary-pushing and novel solution finding
+
+#### Basic Agent
+- Simple, straightforward behavior
+- Essential functionality only
+- Baseline for comparison
+- Minimal configuration requirements
+
+### 3. Performance Monitoring
+
+- **Real-time Metrics**: CPU, memory, thread usage
+- **Performance Analysis**: Benchmarks and comparisons
+- **Resource Monitoring**: System resource utilization
+- **Progress Tracking**: Step-by-step progress monitoring
+
+### 4. Experiment Management
+
+- **Experiment Setup**: Complete experiment configuration
+- **Execution Control**: Start, pause, resume, stop
+- **Result Tracking**: Comprehensive result collection
+- **Data Export**: Multiple export formats
+- **Analysis Tools**: Performance analysis and reporting
+
+### 5. Data Export and Visualization
+
+- **JSON Export**: Structured data export
+- **CSV Export**: Tabular data export
+- **Performance Reports**: Detailed performance analysis
+- **Result Summaries**: Concise experiment summaries
+
+### 6. Error Handling and Recovery
+
+- **Comprehensive Error Detection**: All failure modes
+- **Graceful Degradation**: Fallback mechanisms
+- **Detailed Logging**: Comprehensive error logging
+- **Recovery Mechanisms**: Automatic recovery where possible
+
+## Usage Examples
+
+### Example 1: Simple Brain Simulation
+
+```python
+import pynlm
+
+# Create and initialize brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simple simulation
+for i in range(50):
+    brain.step(i)
+
+print(f"Simulation complete!")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
 ```
+
+### Example 2: Complete Agent Simulation
+
+```python
+import pynlm
+from interactive_agent_system import InteractiveAgentSystem
+
+# Setup interactive system
+system = InteractiveAgentSystem()
+
+# Create advanced experiment
+experiment = system.create_experiment_setup(
+    name="agent_learning_demo",
+    agent_type="explorer",
+    duration=300.0,
+    environment_size=20,
+    timestep=0.1
+)
+
+# Run experiment
+print(f"Starting experiment: {experiment.name}")
+print(f"Agent type: {experiment.agent_profile.type.value}")
+print(f"Environment: {experiment.environment_profile.width}x{experiment.environment_profile.height}")
+
+results = system.run_advanced_simulation(experiment)
+
+print(f"\nExperiment completed!")
+print(f"Steps: {results['steps_completed']}")
+print(f"Duration: {results['duration_seconds']:.2f}s")
+print(f"Average firing rate: {results['brain_statistics']['average_firing_rate']:.2f}")
+```
+
+### Example 3: Performance Monitoring
+
+```python
+from interactive_agent_system import PerformanceMonitor
+
+# Create and start monitoring
+monitor = PerformanceMonitor(sample_rate=0.1)
+monitor.start_monitoring()
+
+# Perform some work
+for i in range(10):
+    time.sleep(0.1)
+    metrics = monitor.get_current_metrics()
+    print(f"Step {i}: Memory={metrics['memory_usage']['rss_mb']:.1f} MB, "
+          f"CPU={metrics['cpu_usage']:.1f}%")
+
+# Stop monitoring
+monitor.stop_monitoring()
+
+# Get statistics
+stats = monitor.get_statistics()
+print(f"\nPerformance Statistics:")
+print(f"  Duration: {stats['duration']:.2f}s")
+print(f"  Memory Avg: {stats['memory_avg_mb']:.2f} MB")
+print(f"  CPU Avg: {stats['cpu_avg_percent']:.1f}%")
+```
+
+## Getting Help
+
+### Documentation
+
+- **README.md**: Overview and basic usage
+- **easy_usage.md**: Beginner-friendly guide
+- **HOW_TO_USE.md**: Comprehensive usage documentation
+- **IMPROVEMENTS_SUMMARY.md**: Detailed improvements documentation
+
+### Examples
+
+- `demo_improvements.py`: Comprehensive demonstration script
+- `advanced_agent_controller.py`: Advanced agent controller examples
+- `interactive_agent_system.py`: Interactive system examples
+
+### Support
+
+For issues or questions:
+1. Check the documentation
+2. Run the demonstration scripts
+3. Review example code
+4. Check log files for errors
 
 ## License
 
-MIT
+This project is licensed under the MIT License. See `LICENSE` file for details.
 
-## Authors
+## Acknowledgements
 
-Research project — See docs for scientific background.
+This project builds on extensive research in:
+- Computational neuroscience
+- Neural network simulations
+- Artificial intelligence
+- Machine learning
+- Neuromodulation systems
+
+Special thanks to all contributors and researchers in the field.
