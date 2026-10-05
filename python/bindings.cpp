@@ -170,7 +170,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("asVision", [](const SensoryInput& self) {
+            return static_cast<const Vision&>(self);
+        }, "Cast to Vision type for convenience")
+        .def("asAudio", [](const SensoryInput& self) {
+            return static_cast<const Audio&>(self);
+        }, "Cast to Audio type for convenience")
+        .def("asInternalSignals", [](const SensoryInput& self) {
+            return static_cast<const InternalSignals&>(self);
+        }, "Cast to InternalSignals type for convenience");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -415,6 +424,123 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Create a quick start helper that sets up a basic brain-world-agent system
+    m.def("createDemoSystem", []() {
+        py::dict system;
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        system["config"] = config;
+        system["brain"] = brain;
+        system["world"] = world;
+        system["agent"] = agent;
+        
+        return system;
+    }, "Create a complete demo system with brain, world, and agent");
+
+    // Advanced simulation utilities
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, 
+                               std::shared_ptr<SimpleWorld> world,
+                               std::shared_ptr<AgentBrain> agent,
+                               size_t steps) {
+        for (size_t step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(step);
+            
+            // Get action and apply
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete simulation with brain, world, and agent");
+
+    // Convenience methods for brain configuration
+    m.def("configure_brain", [](std::shared_ptr<Brain> brain, 
+                               size_t neuronCount = 500,
+                               size_t regionCount = 1,
+                               float connectionProb = 0.15f) {
+        auto config = brain->getConfig();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(regionCount));
+        config->set("connection_probability", connectionProb);
+        brain->reset();
+    }, py::arg("brain"), py::arg("neuronCount") = 500, py::arg("regionCount") = 1, 
+       py::arg("connectionProb") = 0.15f, "Configure brain with specified parameters");
+
+    // Advanced visualization utilities
+    m.def("get_network_stats", [](const std::shared_ptr<Brain>& brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Get comprehensive statistics about the brain network");
+
+    // Memory management utilities
+    m.def("checkpoint_brain", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to checkpoint file");
+
+    m.def("restore_brain", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        brain->reset();
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from checkpoint file");
+
+    // Development and learning utilities
+    m.def("enable_all_features", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"), "Enable all learning features for the agent");
+
+    m.def("disable_all_features", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(false);
+        agent->enableStructuralPlasticity(false);
+        agent->enableDevelopment(false);
+        agent->enableCuriosity(false);
+    }, py::arg("agent"), "Disable all learning features for the agent");
+
+    // Quick testing utilities
+    m.def("test_brain_functionality", [](std::shared_ptr<Brain> brain) {
+        py::dict results;
+        
+        // Test basic connectivity
+        bool initialized = brain->initialize();
+        results["initialized"] = initialized;
+        
+        if (initialized) {
+            // Test basic operation
+            brain->step(0);
+            auto action = brain->produceAction();
+            results["can_produce_action"] = action != nullptr;
+            
+            // Get statistics
+            auto stats = get_network_stats(brain);
+            for (const auto& item : stats) {
+                results[item.first] = item.second;
+            }
+        }
+        
+        return results;
+    }, py::arg("brain"), "Test brain functionality and return results");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

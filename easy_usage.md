@@ -85,31 +85,63 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## The Simplest Possible Example
+## The Enhanced Example with All Features
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create a complete demo system with brain, world, and agent
+print("Creating demo system...")
+system = pynlm.createDemoSystem()
+brain = system["brain"]
+world = system["world"]
+agent = system["agent"]
 
-# Initialize it
+# Configure the brain with custom settings
+print("Configuring brain...")
+pynlm.configure_brain(brain, neuronCount=200, regionCount=2)
+
+# Initialize everything
 brain.initialize()
+agent.initialize(world)
 
-# Make it active
-brain.step(0)
+# Enable all learning features for the agent
+pynlm.enable_all_features(agent)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Run a complete simulation
+print("Running simulation with learning...")
+pynlm.run_simulation(brain, world, agent, 500)
+
+# Get comprehensive network statistics
+print("\nNetwork Statistics:")
+stats = pynlm.get_network_stats(brain)
+for key, value in stats.items():
+    print(f"  {key}: {value}")
+
+# Test brain functionality
+print("\nTesting brain functionality:")
+test_results = pynlm.test_brain_functionality(brain)
+for key, value in test_results.items():
+    print(f"  {key}: {value}")
+
+print("\nEnhanced demo complete!")
 ```
 
 ---
 
 ## Common Patterns
 
-### Pattern 1: Run a Simulation
+### Pattern 4: Run a Complete Enhanced Simulation
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
+def run_enhanced_simulation(brain, world, agent, num_steps):
+    # Enable all learning features
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Run the simulation
     for step in range(num_steps):
         # 1. Update world
         world.update(0.1)
@@ -128,29 +160,151 @@ def run_simulation(brain, world, agent, num_steps):
         
         # 6. Do action in world
         world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # 7. Monitor progress every 50 steps
+        if step % 50 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+                  f"Avg rate: {brain.getAverageFiringRate():.2f}")
 
 # Use it like this:
-run_simulation(brain, world, agent, 1000)
+run_enhanced_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 5: Save and Load Brain States
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+def save_and_restore(brain, filepath):
+    # Save brain state (checkpoint)
+    print("Saving brain state...")
+    if brain.save(filepath):
+        print(f"Brain saved to {filepath}")
+        
+        # Test with a new brain
+        new_brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        new_brain.initialize()
+        
+        # Load saved state
+        print("Loading brain state...")
+        if new_brain.load(filepath):
+            print("Brain loaded successfully!")
+            
+            # Verify structure is intact
+            print(f"Original brain neurons: {brain.getTotalNeuronCount()}")
+            print(f"Loaded brain neurons: {new_brain.getTotalNeuronCount()}")
+        else:
+            print("Failed to load brain")
+    else:
+        print("Failed to save brain")
+
+# Use it like this:
+save_and_restore(brain, "./my_brain_checkpoint.bin")
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 6: Get Comprehensive Brain Analysis
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+def analyze_brain(brain):
+    # Get comprehensive statistics
+    stats = pynlm.get_network_stats(brain)
+    
+    print("=== Brain Analysis ===")
+    for key, value in stats.items():
+        if isinstance(value, (int, float)):
+            print(f"{key}: {value:.4f}")
+        else:
+            print(f"{key}: {value}")
+    
+    # Test basic functionality
+    test_results = pynlm.test_brain_functionality(brain)
+    
+    print("\n=== Functionality Test ===")
+    for key, value in test_results.items():
+        print(f"{key}: {value}")
+    
+    return stats, test_results
+
+# Use it like this:
+stats, test_results = analyze_brain(brain)
+```
+
+### Pattern 7: Experiment with Different Configurations
+
+```python
+def experiment_with_configurations():
+    configurations = [
+        {"neuronCount": 100, "regionCount": 1},
+        {"neuronCount": 200, "regionCount": 2},
+        {"neuronCount": 500, "regionCount": 3},
+    ]
+    
+    results = []
+    
+    for i, config in enumerate(configurations):
+        print(f"\n=== Running Configuration {i+1} ===")
+        
+        # Create brain with specific config
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        pynlm.configure_brain(brain, 
+                            neuronCount=config["neuronCount"],
+                            regionCount=config["regionCount"])
+        
+        # Initialize and test
+        brain.initialize()
+        
+        # Get network stats
+        stats = pynlm.get_network_stats(brain)
+        results.append({
+            "config": config,
+            "neurons": brain.getTotalNeuronCount(),
+            "synapses": brain.getTotalSynapseCount(),
+            "firing_rate": stats["average_firing_rate"]
+        })
+        
+        print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+    
+    return results
+
+# Use it like this:
+experiment_results = experiment_with_configurations()
+```
+
+### Pattern 8: Quick Testing and Validation
+
+```python
+def quick_test(brain):
+    """Quick test to verify brain functionality"""
+    # Initialize if not already done
+    if brain.getTotalNeuronCount() == 0:
+        brain.initialize()
+    
+    # Run a few steps
+    for i in range(10):
+        brain.step(i)
+    
+    # Check basic functionality
+    stats = pynlm.get_network_stats(brain)
+    
+    # Simple validation
+    checks = {
+        "has_neurons": brain.getTotalNeuronCount() > 0,
+        "has_synapses": brain.getTotalSynapseCount() >= 0,
+        "can_produce_action": brain.produceAction() is not None,
+        "has_active_spiking": stats["total_spikes"] > 0,
+        "network_balanced": 0.1 < stats["excitatory_inhibition_ratio"] < 10.0
+    }
+    
+    all_passed = all(checks.values())
+    
+    print("Quick Test Results:")
+    for check, passed in checks.items():
+        status = "✓" if passed else "✗"
+        print(f"  {status} {check}")
+    
+    print(f"\nOverall: {'PASSED' if all_passed else 'FAILED'}")
+    return all_passed
+
+# Use it like this:
+quick_test(brain)
 ```
 
 ---
