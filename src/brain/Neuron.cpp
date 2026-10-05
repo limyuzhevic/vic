@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 namespace nlm {
 
@@ -27,50 +28,101 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()), mutex() {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
 }
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)), mutex() {
     other.pImpl = nullptr;
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
 }
 
+NeuronId Neuron::getId() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->type;
+}
+
 void Neuron::setType(NeuronType type) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->type = type;
 }
 
+const NeuronState& Neuron::getState() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state.membranePotential;
+}
+
 void Neuron::setMembranePotential(MembranePotential potential) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.membranePotential += delta;
 }
 
+MembranePotential Neuron::getThreshold() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state.threshold;
+}
+
 void Neuron::setThreshold(MembranePotential threshold) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.threshold = threshold;
 }
 
+bool Neuron::isFiring() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state.refractoryRemaining > 0;
+}
+
 void Neuron::setFiringState(FiringState state) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.firingState = state;
 }
 
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    std::lock_guard<std::mutex> lock(mutex);
+    pImpl->state.refractoryPeriod = steps;
+}
+
 void Neuron::decrementRefractory() {
+    std::lock_guard<std::mutex> lock(mutex);
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
@@ -79,116 +131,168 @@ void Neuron::decrementRefractory() {
     }
 }
 
+FiringRate Neuron::getFiringRate() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state.firingRate;
+}
+
 void Neuron::setFiringRate(FiringRate rate) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.firingRate = rate;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.leakConductance = conductance;
 }
 
 MembranePotential Neuron::getLeakConductance() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return pImpl->state.leakConductance;
 }
 
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
-}
-
 uint32_t Neuron::getRefractoryPeriod() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return pImpl->state.refractoryPeriod;
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.restingPotential = potential;
 }
 
 MembranePotential Neuron::getRestingPotential() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return pImpl->state.restingPotential;
 }
 
+MembranePotential Neuron::getResetPotential() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->state.resetPotential;
+}
+
 void Neuron::setResetPotential(MembranePotential potential) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.resetPotential = potential;
 }
 
 bool Neuron::checkThreshold() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 float Neuron::getLastSpikeTime() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return pImpl->state.lastSpikeTime;
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->synapticInput -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->synapticInput += current;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->totalCurrent;
+}
+
 void Neuron::clearTotalCurrent() {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->synapticInput = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
 }
 
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->spikeHistory;
+}
+
 void Neuron::clearSpikeHistory() {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
+    std::lock_guard<std::mutex> lock(mutex);
     return pImpl->plasticityFlags;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
 void Neuron::setRegionId(RegionId region) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->regionId;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->populationId = population;
 }
 
+PopulationId Neuron::getPopulationId() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return pImpl->populationId;
+}
+
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    std::lock_guard<std::mutex> lock(mutex);
     bool fired = false;
     
     // Handle refractory period
@@ -260,18 +364,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
 void Neuron::reset() {
+    std::lock_guard<std::mutex> lock(mutex);
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
+    std::lock_guard<std::mutex> lock(mutex);
+    
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);

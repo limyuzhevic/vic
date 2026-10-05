@@ -1,7 +1,10 @@
 #include "NeuralWorkingMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../brain/Neuron.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -18,11 +21,12 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    NLM_LOG_DEBUG("NeuralWorkingMemory created");
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -34,7 +38,10 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::store: Empty pattern or no brain reference");
+        return;
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,11 +51,13 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            if (auto* neurons = region->getAllNeurons()) {
+                for (auto* nn : *neurons) {
+                    if (nn && nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        break;
+                    }
                 }
             }
         }
@@ -57,19 +66,26 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            memoryActivations_.emplace_back(activation);
+            memoryTimestamps_.emplace_back(0);
+            memoryNeurons_.emplace_back(neuron);
         }
     }
     
     // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    if (memoryNeurons_.size() > 1) {
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        }
     }
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    if (!brain_) {
+        NLM_LOG_WARNING("NeuralWorkingMemory::storeToNeuron: No brain reference");
+        return;
+    }
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -78,15 +94,16 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
     } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
+        memoryNeurons_.emplace_back(neuron);
+        memoryActivations_.emplace_back(activation);
+        memoryTimestamps_.emplace_back(0);
+    } else {
+        NLM_LOG_WARNING("NeuralWorkingMemory::storeToNeuron: Memory at capacity, cannot store new neuron");
+        return;
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
+    brain_->injectCurrent(neuron, activation * 5.0f);
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {
@@ -161,7 +178,7 @@ void NeuralWorkingMemory::strengthenMemory(float factor) {
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
-    if (memoryActivations_.empty()) return;
+    if (memoryActivations_.empty() || !brain_) return;
     
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
@@ -173,10 +190,18 @@ void NeuralWorkingMemory::runCompetition() {
     }
     
     // Inhibitory competition - suppress non-winners
+    std::vector<bool> isWinner(memoryNeurons_.size(), false);
+    for (size_t i = 0; i < winners_.size(); ++i) {
+        for (size_t j = 0; j < memoryNeurons_.size(); ++j) {
+            if (winners_[i] == memoryNeurons_[j]) {
+                isWinner[j] = true;
+                break;
+            }
+        }
+    }
+    
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
-        
-        if (!isWinner && brain_) {
+        if (!isWinner[i]) {
             // Apply strong inhibition
             brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
@@ -254,12 +279,13 @@ struct AttentionalSelection::Impl {
 };
 
 AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)
     , competitionThreshold_(0.3f)
 {
+    NLM_LOG_DEBUG("AttentionalSelection created");
 }
 
 AttentionalSelection::~AttentionalSelection() = default;
@@ -267,7 +293,11 @@ AttentionalSelection::~AttentionalSelection() = default;
 void AttentionalSelection::initialize(Brain* brain) {
     pImpl = std::make_unique<Impl>();
     brain_ = brain;
-    NLM_LOG_INFO("AttentionalSelection initialized");
+    if (brain_) {
+        NLM_LOG_INFO("AttentionalSelection initialized");
+    } else {
+        NLM_LOG_WARNING("AttentionalSelection initialized with null brain pointer");
+    }
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
