@@ -24,16 +24,73 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides access to the complete NLM artificial brain system,
+        including:
+        - Neural computation with LIF neurons
+        - Memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Prediction and cognitive mechanisms
+        - Development and plasticity
+        - Agent-world interaction
+        
+        The NLM framework simulates a complete brain system that learns,
+        adapts, and develops through experience.
+        
+        Quick Start Examples:
+        
+        Basic Brain Simulation:
+        >>> import pynlm
+        >>> config = pynlm.createDefaultConfig()
+        >>> brain = pynlm.createBrain(config)
+        >>> brain.initialize()
+        >>> for i in range(100):
+        ...     brain.step(i)
+        
+        Agent in World:
+        >>> import pynlm
+        >>> brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        >>> brain.initialize()
+        >>> world = pynlm.createSimpleWorld()
+        >>> world.configure(20, 20, 8, 8)
+        >>> agent = pynlm.createAgentBrain(brain)
+        >>> agent.initialize(world)
+        >>> 
+        >>> for step in range(100):
+        ...     world.update(0.1)
+        ...     agent.processSensoryInput(world.getSensoryPercept())
+        ...     brain.step(step)
+        ...     action = agent.decodeMotorCommand()
+        ...     world.applyMotorCommand(action, world.getSimulationTime())
+        
+        Advanced Features:
+        - Enable learning with reward modulation
+        - Configure structural plasticity for brain development
+        - Set up curiosity-driven exploration
+        - Load and save brain states
+        - Visualize neural activity
+        
+        See documentation in HOW_TO_USE.md and docs/ for comprehensive usage examples.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(
+        Unique identifier for a neuron.
+        
+        NeuronId contains an unsigned 64-bit integer value and provides
+        helper methods for comparison and hashing. NeuronIds are used
+        throughout the NLM to reference specific neurons.
+    )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
+        .def("index", &NeuronId::index, R"pbdoc(
+            Return the index of the neuron ID.
+            
+            Returns:
+                int: The index portion of the neuron ID.
+        )pbdoc")
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -41,11 +98,22 @@ PYBIND11_MODULE(pynlm, m) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(
+        Unique identifier for a synapse.
+        
+        SynapseId contains an unsigned 64-bit integer value and provides
+        helper methods for comparison and hashing. SynapseIds are used
+        to reference specific synaptic connections in the brain.
+    )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
+        .def("index", &SynapseId::index, R"pbdoc(
+            Return the index of the synapse ID.
+            
+            Returns:
+                int: The index portion of the synapse ID.
+        )pbdoc")
         .def("__eq__", &SynapseId::operator==)
         .def("__ne__", &SynapseId::operator!=)
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -53,11 +121,22 @@ PYBIND11_MODULE(pynlm, m) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(
+        Unique identifier for a brain region.
+        
+        RegionId contains an unsigned 64-bit integer value and provides
+        helper methods for comparison and hashing. RegionIds are used
+        to reference specific neural regions within the brain.
+    )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
+        .def("index", &RegionId::index, R"pbdoc(
+            Return the index of the region ID.
+            
+            Returns:
+                int: The index portion of the region ID.
+        )pbdoc")
         .def("__eq__", &RegionId::operator==)
         .def("__ne__", &RegionId::operator!=)
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
@@ -65,13 +144,93 @@ PYBIND11_MODULE(pynlm, m) {
             return "<RegionId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(
+        Unique identifier for a neuron population.
+        
+        PopulationId contains an unsigned 64-bit integer value and provides
+        helper methods for comparison. Populations group neurons by type
+        and function within a brain region.
+    )pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
+        .def("index", &PopulationId::index, R"pbdoc(
+            Return the index of the population ID.
+            
+            Returns:
+                int: The index portion of the population ID.
+        )pbdoc")
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
+
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(
+        Enumeration of neuron types in the NLM brain.
+        
+        Each neuron type serves a specific function in the neural network:
+        - Excitatory: Promotes neural activity
+        - Inhibitory: Reduces neural activity
+        - Modulatory: Regulates overall brain state
+        - Sensory: Processes external input
+        - Motor: Produces behavioral output
+        - Internal: Maintains internal state
+    )pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(
+        Enumeration of synapse types in the NLM brain.
+        
+        Different synapse types affect neural communication in distinct ways:
+        - Excitatory: Increases postsynaptic neuron activity
+        - Inhibitory: Decreases postsynaptic neuron activity
+        - Modulatory: Alters synaptic efficacy over time
+        - Electrical: Direct electrical coupling
+        - GapJunction: Electrical synapse via gap junctions
+    )pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(
+        Enumeration of developmental stages in the NLM brain.
+        
+        The brain develops through distinct stages with different
+        plasticity characteristics:
+        - Initial: High plasticity, rapid learning
+        - CriticalPeriod: Sensitive learning window
+        - Maturation: Balanced plasticity
+        - Adult: Low plasticity, stable connections
+        - Aging: Declining function
+    )pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(
+        Enumeration of neuron firing states in the NLM brain.
+        
+        Neurons cycle through these states during their operation:
+        - Resting: Not firing, below threshold
+        - Active: Firing spikes
+        - Refractory: Cannot fire immediately after spike
+        - Inhibited: Temporarily suppressed
+    )pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .export_values();
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)

@@ -55,11 +55,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON and simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from JSON string (helper method)
+    bool loadFromJson(const std::string& json);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,6 +96,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    
+    // Merge configuration from another config
+    void merge(const Config& other);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +109,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    void parseJsonValue(const std::string& json, size_t& pos);
+    std::string parseString(const std::string& str, size_t& pos);
+    std::string parseNumber(const std::string& str, size_t& pos);
+    std::string parseArray(const std::string& str, size_t& pos);
+    std::string parseValue(const std::string& str, size_t& pos);
+    
+    // Helper functions for JSON parsing
+    static bool isDigit(char c);
+    static bool isWhitespace(char c);
+    
+    // Configuration validation
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    
+    // Utility functions
+    static std::string configValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
