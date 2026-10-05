@@ -83,8 +83,14 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/BaseExperimentFramework.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -127,17 +133,17 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase 3 refactored demo executable (using base framework)
+add_executable(nlm_phase3_demo_refactored
+    src/experiments/Phase3DemoRefactored.cpp
+)
+target_link_libraries(nlm_phase3_demo_refactored PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 3 demo executable (original - for comparison)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()

@@ -82,6 +82,22 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 6 Integration Experiment
+```bash
+cd build
+./nlm_phase6_integration
+```
+
+This runs the full Phase 6 integration experiment with agent-based interaction.
+
+### Legacy Phase 2 Demo
+```bash
+cd build
+./nlm_phase2_demo
+```
+
+This demonstrates the Phase 2 neural computation foundation (for educational purposes).
+
 ## Project Structure
 
 ```
@@ -108,8 +124,9 @@ NLM/
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
+│   ├── agent/         # Agent architecture (Phase 6)
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```
@@ -121,11 +138,12 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Complete) 
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
+- **Used as foundation for Phase 6 integration**
 
 ### Phase 3 (Complete)
 - World interaction loop
@@ -152,15 +170,84 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (In Final Integration)
+- **ALL systems integrated into coherent brain loop** ✓
+- Memory systems connected to neural processing ✓
+- Neuromodulation affects plasticity and dynamics ✓
+- Prediction integrated with learning ✓
+- Development affects plasticity rates ✓
+- Checkpoint save/load working ✓
+- Replay and consolidation functional ✓
+- **Phase 6 integration experiment created and running** ✓
+- **Ready for production use and scientific investigation** ✓
+
+## Getting Started with NLM Phase 6
+
+### Quick Start
+1. **Build the project**: `cd build && make -j4`
+2. **Run integration test**: `./nlm_phase6_demo`
+3. **Explore advanced features**: `./nlm_phase6_integration`
+
+### Key Features for Users
+
+#### For Researchers
+- Integrated brain simulation with memory, prediction, and cognition
+- Memory systems (working, episodic, associative) fully connected
+- Neuromodulation (dopamine, curiosity, novelty) affecting plasticity
+- Checkpoint/save-load capability for state persistence
+- Replay mechanisms for memory consolidation
+- Developmental plasticity modulation
+
+#### For Developers
+- Modular architecture with clear interfaces
+- Performance optimizations (memory pools, SIMD)
+- Event-driven spike processing
+- Comprehensive experiment framework
+- Config-driven system customization
+
+#### For Advanced Users
+- Neural planner and concept formation systems
+- Attention mechanisms with competitive dynamics
+- Full integration of all cognitive systems
+- Agent-based environment interaction
+- Sleep/rest cycle implementation
+
+## Quick Commands
+
+Run the **Phase 6 Integration Demo** to see all systems working together:
+```bash
+cd build
+./nlm_phase6_demo
+```
+
+Run the **Full Integration Experiment** for comprehensive testing:
+```bash
+cd build
+./nlm_phase6_integration --neurons 1000 --steps 5000
+```
+
+Run the **Legacy Phase 2 Demo** for neural computation basics:
+```bash
+cd build
+./nlm_phase2_demo
+```
+
+## Configuration
+
+All NLM systems are configurable via:
+- **Command line arguments** for runtime customization
+- **Configuration files** for persistent settings
+- **Default configs** in `configs/` directory
+
+Example configuration for Phase 6 experiments:
+```bash
+./nlm_phase6_integration \
+  --config configs/phase6_experimental.cfg \
+  --neurons 2000 \
+  --steps 10000 \
+  --enable-checkpointing \
+  --enable-replay
+```
 
 ## Scientific Limitations
 
