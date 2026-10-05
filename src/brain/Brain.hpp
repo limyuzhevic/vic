@@ -136,6 +136,9 @@ public:
     size_t getActiveNeuronCount() const;
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
+    float getExcitationInhibitionRatio() const;
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
     
     // ========== MEMORY SYSTEMS ==========
     
@@ -192,6 +195,52 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ===== Pythonic Interface Enhancements =====
+    
+    // Pythonic iteration support for regions
+    class RegionIterator {
+    public:
+        RegionIterator(const std::vector<RegionId>& ids, size_t index);
+        RegionId operator*();
+        RegionIterator& operator++();
+        bool operator!=(const RegionIterator& other) const;
+        bool operator==(const RegionIterator& other) const;
+        
+    private:
+        const std::vector<RegionId>* ids_;
+        size_t index_;
+    };
+    
+    RegionIterator regionBegin();
+    RegionIterator regionEnd();
+    
+    // Pythonic property access with defaults
+    float getExcitationInhibitionRatioSafe() const;
+    size_t getTotalSpikeCountSafe() const;
+    size_t getPendingSpikeEventCountSafe() const;
+    
+    // Simulation control with Pythonic interfaces
+    void runForSteps(int steps, bool verbose = false);
+    void runUntilStable(float threshold = 0.95f, int maxSteps = 1000);
+    
+    // Data export for analysis
+    std::string exportNeuronData() const;
+    std::string exportSynapseData() const;
+    
+    // Batch operations
+    void batchInjectCurrent(NeuronType type, MembranePotential current);
+    void batchAddRegions(int count, const std::string& prefix = "");
+    
+    // Configuration shortcuts
+    void setDefaultLearningRate(float rate);
+    void setDefaultPlasticityEnabled(bool enabled);
+    void setDefaultDevelopmentEnabled(bool enabled);
+    
+    // Monitoring and statistics
+    float getLearningProgress() const;
+    float getPerformanceScore() const;
+    bool isTrainingComplete() const;
     
 private:
     struct Impl;
