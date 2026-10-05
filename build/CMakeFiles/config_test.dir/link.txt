@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/config_test.dir/test_config_simple.cpp.o -o config_test  libnlm_core.a 

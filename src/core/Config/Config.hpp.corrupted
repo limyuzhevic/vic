@@ -1,0 +1,110 @@
+// Main configuration class
+class Config {
+public:
+    Config();
+    ~Config();
+    
+    // Disable copying, enable moving
+    Config(const Config&) = delete;
+    Config& operator=(const Config&) = delete;
+    Config(Config&&) noexcept;
+    Config& operator=(Config&&) noexcept;
+    
+    // Load from file (JSON/YAML format)
+    bool loadFromFile(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYamlFile(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJsonFile(const std::string& filepath);
+    
+    // Load from command line arguments
+    bool loadFromArgs(int argc, char** argv);
+    
+    // Load from environment variables
+    void loadFromEnv(const std::string& prefix = "NLM_");
+    
+    // Save to file
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Get nested section
+    ConfigSection getSection(const std::string& name) const;
+    
+    // Set values
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set nested value
+    void setNested(const std::vector<std::string>& path, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Check existence
+    bool has(const std::string& key) const;
+    bool hasNested(const std::vector<std::string>& path) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Get all sections
+    std::vector<std::string> getSections() const;
+    
+    // Clear all
+    void clear();
+    
+    // Get configuration summary
+    std::string summary() const;
+    
+    // Validation
+    bool validate() const;
+    std::string validationErrors() const;
+    
+    // Set validation rules
+    void addValidation(const std::string& key, std::function<bool(const ConfigValue&)> validator);
+    
+    // Set default values
+    void setDefaults(const std::vector<ConfigTemplate>& defaults);
+    
+    // Apply environment variable overrides
+    void applyEnvOverrides(const std::string& prefix = "NLM_");
+    
+    // Static default templates
+    static std::vector<ConfigTemplate> getDefaultTemplates();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static bool isJsonFile(const std::string& filepath);
+    static bool isYamlFile(const std::string& filepath);
+    static std::string determineFileFormat(const std::string& filepath);
+    
+    // Parser functions
+    bool parseSimpleFormat(const std::string& content);
+    bool parseJsonFormat(const std::string& content);
+    bool parseYamlFormat(const std::string& content);
+    void parseJsonObject(const nlohmann::json& obj, const std::string& prefix, ConfigSource source);
+    void parseYamlNode(const YAML::Node& node, const std::string& prefix, ConfigSource source);
+    
+    // Conversion functions
+    nlohmann::json configValueToJson(const ConfigValue& value) const;
+    YAML::Node configValueToYaml(const ConfigValue& value) const;
+    ConfigValue yamlNodeToConfigValue(const YAML::Node& node) const;
+};
+
+} // namespace nlm

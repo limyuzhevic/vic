@@ -366,7 +366,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (using new config system)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -382,14 +382,61 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Neuromodulation parameters
+    config->set("reward_scale", 1.0f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.1f, ConfigSource::Default);
+    config->set("novelty_decay_rate", 0.99f, ConfigSource::Default);
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("dopamine_peak", 2.0f, ConfigSource::Default);
+    config->set("dopamine_decay_rate", 0.05f, ConfigSource::Default);
+    config->set("dopamine_release_rate", 0.2f, ConfigSource::Default);
+    
+    // Memory system parameters
+    config->set("working_memory_capacity", 100.0f, ConfigSource::Default);
+    config->set("episodic_memory_capacity", 1000.0f, ConfigSource::Default);
+    config->set("associative_memory_capacity", 5000.0f, ConfigSource::Default);
+    
+    // Prediction system parameters
+    config->set("prediction_error_threshold", 0.05f, ConfigSource::Default);
+    config->set("prediction_learning_rate", 0.01f, ConfigSource::Default);
+    
+    // Development parameters
+    config->set("initial_plasticity", 1.0f, ConfigSource::Default);
+    config->set("critical_period_age", 60.0f, ConfigSource::Default);
+    config->set("maturation_rate", 0.01f, ConfigSource::Default);
+    config->set("senescence_rate", 0.001f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Log some additional key configurations
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    
+    // Log neuromodulation settings if available
+    if (config->has("reward_scale")) {
+        NLM_LOG_INFO("  reward_scale: " + std::to_string(config->getOr<float>("reward_scale", 1.0f)));
+    }
+    if (config->has("curiosity_threshold")) {
+        NLM_LOG_INFO("  curiosity_threshold: " + std::to_string(config->getOr<float>("curiosity_threshold", 0.1f)));
+    }
+    
+    // Log memory system settings if available
+    if (config->has("working_memory_capacity")) {
+        NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<float>("working_memory_capacity", 100.0f)));
+    }
+    if (config->has("episodic_memory_capacity")) {
+        NLM_LOG_INFO("  episodic_memory_capacity: " + std::to_string(config->getOr<float>("episodic_memory_capacity", 1000.0f)));
+    }
+    
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
