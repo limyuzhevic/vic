@@ -1,230 +1,543 @@
-# NLM — 熙然
+# NLM Phase 2 - Neural Learning Machine
+# Comprehensive Documentation and API Examples
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+NLM (熙然) Phase 2 represents a significant advancement in artificial neural network research, implementing real spiking neural computation with event-driven dynamics and integrated cognitive architectures.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Key Features
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### Neural Computation
+- **Leaky Integrate-and-Fire (LIF) neurons**: Real biophysical neuron models with proper membrane dynamics
+- **Event-driven spike propagation**: Asynchronous computation with synaptic delays
+- **STDP and Hebbian plasticity**: Dual plasticity mechanisms for learning
+- **Structural plasticity**: Dynamic rewiring through synaptogenesis and pruning
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+### Integrated Systems
+- **Working Memory**: Transient active information maintenance
+- **Episodic Memory**: Experience storage and replay
+- **Associative Memory**: Pattern association and recall
+- **Prediction System**: Forward models and prediction error computation
+- **Cognition**: Neural planning, concept formation, and attentional selection
+- **Neuromodulation**: Dopamine, curiosity, novelty, and reward systems
 
-## Current Phase
+### Development
+- **Developmental Stages**: Initial, Critical Period, Maturation, Adult, Aging
+- **Activity-Dependent Plasticity**: Experience-driven structural changes
+- **Memory Consolidation**: Strengthening and integration of memories
 
-**PHASE 6: FINAL INTEGRATION**
+## Command Line Interface
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
-
-### Phase 6 Integration Achievements
-
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
+### Basic Commands
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Show help information
+nlm --help
+
+# Show version information  
+nlm --version
+
+# List all configuration options
+nlm --config-list
+
+# Generate template configuration file
+nlm --generate-config --output=myconfig.cfg
+
+# Validate configuration file
+nlm --validate --config=myconfig.cfg
 ```
 
-## Running
+### Brain Simulation Commands
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+# Run brain simulation with default configuration
+nlm --brain --steps=1000
+
+# Run simulation with custom configuration
+nlm --brain --config=myconfig.cfg --steps=500 --record
+
+# Run with specific parameters
+nlm --brain --steps=1000 --record=true
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Analysis Commands
 
-## Project Structure
+```bash
+# Analyze neural connectivity patterns
+nlm --analyze --type=connectivity --output=connectivity_analysis.txt
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+# Analyze plasticity effects over time
+nlm --analyze --type=plasticity --output=plasticity_analysis.txt
 ```
 
-## Phase Summary
+## Configuration File Format
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### Example Configuration File
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+```ini
+# NLM Configuration File
+# Generated by NLM Command Line Interface
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+# Core Simulation Parameters
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+# Connectivity Parameters
+connection_probability = 0.1
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+# Plasticity Parameters
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+# Development Parameters
+synaptogenesis_rate = 0.001
+pruning_rate = 0.0001
 
-## Scientific Limitations
+# Neuromodulation Parameters
+dopamine_baseline = 0.1
+curiosity_baseline = 0.1
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+# Reward Parameters
+reward_discount_factor = 0.99
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+# Environment Parameters
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+# Logging Parameters
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+# Simulation Parameters
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
 
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+# Visualization Parameters
+visualization_enabled = false
+visualization_update_rate = 30.0
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+### JSON Configuration Format
+
+```json
+{
+    "nlm_config": {
+        "random_seed": 42,
+        "simulation_timestep": 0.001,
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1,
+        "plasticity_learning_rate": 0.01,
+        "stdp_ltp_weight": 0.01,
+        "stdp_ltd_weight": 0.012,
+        "stdp_time_constant": 20.0,
+        "synaptogenesis_rate": 0.001,
+        "pruning_rate": 0.0001,
+        "dopamine_baseline": 0.1,
+        "curiosity_baseline": 0.1,
+        "reward_discount_factor": 0.99,
+        "environment_name": "GridWorld",
+        "environment_width": 10,
+        "environment_height": 10,
+        "log_level": "INFO",
+        "log_to_file": false,
+        "log_filename": "nlm.log",
+        "max_simulation_steps": 10000,
+        "simulation_time_limit": 0.0,
+        "visualization_enabled": false,
+        "visualization_update_rate": 30.0
+    }
+}
 ```
+
+### YAML Configuration Format
+
+```yaml
+nlm_config:
+  random_seed: 42
+  simulation_timestep: 0.001
+  neuron_count: 1000
+  region_count: 2
+  connection_probability: 0.1
+  plasticity_learning_rate: 0.01
+  stdp_ltp_weight: 0.01
+  stdp_ltd_weight: 0.012
+  stdp_time_constant: 20.0
+  synaptogenesis_rate: 0.001
+  pruning_rate: 0.0001
+  dopamine_baseline: 0.1
+  curiosity_baseline: 0.1
+  reward_discount_factor: 0.99
+  environment_name: GridWorld
+  environment_width: 10
+  environment_height: 10
+  log_level: INFO
+  log_to_file: false
+  log_filename: nlm.log
+  max_simulation_steps: 10000
+  simulation_time_limit: 0.0
+  visualization_enabled: false
+  visualization_update_rate: 30.0
+```
+
+## API Examples
+
+### Basic Brain Usage
+
+```cpp
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+
+// Create configuration
+auto config = std::make_shared<Config>();
+config->set("random_seed", int64_t(42));
+config->set("neuron_count", int64_t(1000));
+config->set("region_count", int64_t(2));
+
+// Create brain
+auto brain = std::make_shared<Brain>(config);
+
+// Initialize brain
+if (brain->initialize()) {
+    // Run simulation
+    for (SimulationStep step = 0; step < 100; ++step) {
+        brain->step(step);
+    }
+} else {
+    std::cerr << "Failed to initialize brain!" << std::endl;
+}
+```
+
+### Configuration Management
+
+```cpp
+#include "core/Config/Config.hpp"
+
+// Create configuration
+auto config = std::make_shared<Config>();
+
+// Load from file
+if (config->loadFromFile("config.cfg")) {
+    std::cout << "Loaded config: " << config->getOr<std::string>("random_seed", "unknown") << std::endl;
+}
+
+// Load from command line
+config->loadFromArgs(2, {"program", "--neuron_count=500", "--connection_probability=0.2"});
+
+// Save configuration
+config->saveToFile("backup.cfg");
+
+// Get configuration summary
+std::cout << config->summary() << std::endl;
+```
+
+### Brain Simulation Control
+
+```cpp
+#include "brain/Brain.hpp"
+#include "sensory/SensoryInput.hpp"
+
+// Create and initialize brain
+auto config = std::make_shared<Config>();
+auto brain = std::make_shared<Brain>(config);
+brain->initialize();
+
+// Run simulation with sensory input
+for (int step = 0; step < 1000; ++step) {
+    // Create sensory input
+    std::vector<double> inputData = {0.5, 0.8, 0.3, 0.9};
+    SensoryInput sensoryInput(inputData);
+    
+    // Process input
+    brain->receiveSensoryInput(sensoryInput);
+    
+    // Run simulation step
+    brain->step(step);
+    
+    // Check for specific events (e.g., spikes)
+    size_t firingNeurons = brain->getFiringNeuronCount();
+    if (firingNeurons > 0) {
+        std::cout << "Step " << step << ": " << firingNeurons << " neurons firing" << std::endl;
+    }
+}
+```
+
+### Memory System Access
+
+```cpp
+#include "brain/Brain.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+
+// Access working memory
+NeuralWorkingMemory* workingMemory = brain->getWorkingMemory();
+if (workingMemory) {
+    workingMemory->initialize(brain.get());
+    workingMemory->setCapacity(100);
+    
+    // Store information
+    workingMemory->storeToNeuron(NeuronId(42), 0.7);
+    
+    // Get active traces
+    std::vector<NeuronId> activeNeurons = workingMemory->getMemoryNeurons();
+    std::cout << "Working memory traces: " << activeNeurons.size() << std::endl;
+}
+
+// Access episodic memory
+NeuralEpisodicMemory* episodicMemory = brain->getEpisodicMemory();
+if (episodicMemory) {
+    episodicMemory->initialize(brain.get());
+    episodicMemory->setMaxEpisodes(1000);
+    
+    // Store episode
+    EpisodicMemoryItem episode;
+    episode.timestamp = SimulationStep(100);
+    episode.reward = 0.5;
+    episode.activeNeurons = {NeuronId(1), NeuronId(2), NeuronId(3)};
+    
+    episodicMemory->storeEpisode(episode);
+    
+    // Get episode count
+    std::cout << "Episodic memory episodes: " << episodicMemory->getEpisodeCount() << std::endl;
+}
+```
+
+### Plasticity Control
+
+```cpp
+#include "brain/Brain.hpp"
+#include "plasticity/STDP.hpp"
+#include "plasticity/Hebbian.hpp"
+
+// Access plasticity systems
+STDP* stdp = brain->getSTDP();
+Hebbian* hebbian = brain->getHebbian();
+
+if (stdp) {
+    stdp->configure(0.01f, 0.012f, 20.0f);
+}
+
+if (hebbian) {
+    hebbian->setLearningRate(0.01f);
+}
+
+// Enable/disable plasticity on synapses
+if (auto* region = brain->getRegion(RegionId(1))) {
+    for (auto& syn : region->getSynapses()) {
+        // Enable STDP and Hebbian plasticity
+        syn->enablePlasticity(true, true, false);
+        
+        // Set plasticity parameters
+        syn->setSTDPParameters(0.01f, 0.012f);
+        syn->setHebbianLearningRate(0.01f);
+    }
+}
+```
+
+### Configuration Validation
+
+```cpp
+#include "core/Config/Config.hpp"
+
+// Create configuration
+auto config = std::make_shared<Config>();
+
+// Load and validate configuration
+if (!config->loadFromFile("config.cfg")) {
+    std::cerr << "Failed to load configuration file!" << std::endl;
+    return 1;
+}
+
+// Validate required parameters
+bool valid = true;
+std::vector<std::string> requiredParams = {
+    "neuron_count", "region_count", "simulation_timestep", "random_seed"
+};
+
+for (const auto& param : requiredParams) {
+    if (!config->has(param)) {
+        std::cerr << "Missing required parameter: " << param << std::endl;
+        valid = false;
+    }
+}
+
+if (valid) {
+    std::cout << "Configuration is valid!" << std::endl;
+    
+    // Display configuration summary
+    std::cout << config->summary() << std::endl;
+} else {
+    std::cout << "Configuration validation failed!" << std::endl;
+}
+```
+
+### Command Line Configuration Management
+
+```cpp
+// Example command line usage:
+// nlm --validate --config=myconfig.cfg
+// nlm --brain --config=myconfig.cfg --steps=1000 --record
+// nlm --analyze --type=connectivity --output=analysis.txt
+// nlm --generate-config --output=template.cfg
+
+// Configuration file formats supported:
+// - Plain text (key=value)
+// - JSON (with nlm_config wrapper)
+// - YAML
+```
+
+## Advanced Features
+
+### JSON/YAML Configuration Support
+
+The configuration system supports multiple file formats:
+
+1. **Plain Text**: Simple key=value format for backward compatibility
+2. **JSON**: Structured configuration with nested parameters
+3. **YAML**: Human-readable configuration with comments and lists
+
+### Command Line Interface
+
+The NLM CLI provides extensive functionality:
+
+1. **Help System**: Comprehensive documentation and examples
+2. **Configuration Validation**: Check configuration files for errors
+3. **Configuration Generation**: Create template configuration files
+4. **Brain Simulation Control**: Run simulations with custom parameters
+5. **Brain Analysis**: Analyze connectivity, plasticity, and other properties
+6. **Recording and Checkpointing**: Save brain state for later analysis
+
+### Error Handling
+
+The improved error handling provides:
+
+1. **File Operation Errors**: Proper error messages for file access issues
+2. **Configuration Validation**: Check for invalid parameter values
+3. **Memory Management**: Safe handling of memory allocation failures
+4. **Simulation Control**: Graceful handling of invalid simulation parameters
+
+## Performance Considerations
+
+### Memory Management
+- **Efficient Data Structures**: Use of std::unique_ptr for automatic memory management
+- **Static Analysis**: Compile-time checks for type safety
+- **Pool Allocators**: Custom memory pools for frequent allocations
+
+### Computational Efficiency
+- **Event-Driven Processing**: Only process when neurons spike
+- **Lazy Evaluation**: Defer expensive computations until needed
+- **Parallel Processing**: SIMD optimizations for mathematical operations
+
+### Simulation Scaling
+- **Configurable Time Steps**: Adaptive time stepping for different time scales
+- **Multi-Region Processing**: Parallel processing across neural regions
+- **Checkpointing**: Save and restore simulation state for long runs
+
+## Testing and Validation
+
+### Unit Tests
+- **Configuration Validation**: Test configuration loading and validation
+- **Brain Initialization**: Test brain creation and setup
+- **Plasticity Rules**: Test STDP and Hebbian learning
+- **Memory Systems**: Test working and episodic memory functionality
+
+### Integration Tests
+- **Full Simulation Runs**: End-to-end simulation testing
+- **Cross-Validation**: Compare results across different configurations
+- **Performance Benchmarking**: Measure simulation speed and memory usage
+
+### Validation Commands
+
+```bash
+# Validate configuration file
+nlm --validate --config=myconfig.cfg
+
+# Run brain simulation
+nlm --brain --config=myconfig.cfg --steps=100
+
+# Analyze brain connectivity
+nlm --analyze --type=connectivity --output=connectivity_results.txt
+
+# Generate test configuration
+nlm --generate-config --output=test_config.cfg
+```
+
+## Migration Guide
+
+### From Phase 1 to Phase 2
+
+1. **Configuration Updates**:
+   - Add new parameters for enhanced functionality
+   - Update existing parameters to new names if needed
+   - Use JSON/YAML formats for better structure
+
+2. **Code Changes**:
+   - Include new Brain.hpp header
+   - Use Brain::Brain(config) constructor
+   - Call brain->initialize() instead of manual setup
+
+3. **API Changes**:
+   - Use brain->step(step) instead of brain->step(step, time)
+   - Access memory systems through brain->getWorkingMemory(), etc.
+   - Use new configuration methods for validation
+
+4. **Example Migration**:
+
+```cpp
+// Phase 1 style
+// Brain brain(500);
+// brain.initialize();
+
+// Phase 2 style
+auto config = std::make_shared<Config>();
+config->set("neuron_count", int64_t(500));
+auto brain = std::make_shared<Brain>(config);
+brain->initialize();
+```
+
+## Future Enhancements
+
+### Planned Features
+
+1. **Advanced Plasticity**: Reward-modulated and homeostatic plasticity
+2. **Social Learning**: Multi-agent simulation and interaction
+3. **Adaptive Architecture**: Dynamic system reconfiguration
+4. **Quantum-inspired Learning**: Simulated quantum annealing
+5. **Explainable AI**: Generate interpretable explanations of learned behavior
+
+### Research Directions
+
+1. **Neuromodulation**: Enhanced models of dopamine and other neuromodulators
+2. **Development**: More sophisticated developmental trajectories
+3. **Memory**: Advanced episodic and semantic memory integration
+4. **Learning**: Transfer learning and lifelong learning capabilities
+
+## References
+
+1. **LIF Neuron Model**: Gerstner et al., "Neuronal Dynamics: From Single Neurons to Networks"
+2. **STDP**: Song et al., "Computational principles of synaptic plasticity"
+3. **Memory Systems**: Squire & Zola, "Memory systems in the brain"
+4. **Cognition**: Anderson, "The Architecture of Cognition"
+
+## Acknowledgements
+
+The NLM Phase 2 implementation builds on decades of neural network research and incorporates insights from:
+
+- Computational neuroscience
+- Cognitive science
+- Machine learning
+- Systems biology
 
 ## License
 
-MIT
+This software is part of the NLM (熙然) project. See the LICENSE file for details.
 
-## Authors
+---
 
-Research project — See docs for scientific background.
+*For more information, visit the NLM documentation website or contact the development team.*

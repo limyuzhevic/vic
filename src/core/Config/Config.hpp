@@ -100,6 +100,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection and parsing helpers
+    static bool isJsonContent(const std::string& content);
+    static bool isYamlContent(const std::string& content);
+    static bool loadFromJson(const std::string& content, const std::string& filepath);
+    static bool loadFromYaml(const std::string& content, const std::string& filepath);
+    static bool loadFromSimpleFormat(const std::string& content, const std::string& filepath);
 };
 
 } // namespace nlm

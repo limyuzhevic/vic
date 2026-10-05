@@ -71,12 +71,27 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file with error handling
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        std::cerr << "ERROR: ConsoleLogger::setOutputFile - Failed to open file: " << filepath << std::endl;
+        // Continue without file output
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_DEBUG("ConsoleLogger: File output closed successfully");
+        } else {
+            std::cerr << "WARNING: ConsoleLogger::closeOutputFile - File may still be open after close attempt" << std::endl;
+        }
     }
 }
 
