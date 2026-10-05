@@ -184,14 +184,19 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get current brain state as activity vector for planning
+    std::vector<float> getBrainState() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Set current goal for planning
+    void setCurrentGoal(const std::vector<float>& goal);
     
-    // Logging
-    void logStatus() const;
+    // Update planning based on actual outcome
+    void updatePlanning(const std::vector<ActionType>& plannedActions,
+                       const std::vector<ActionType>& actualActions,
+                       float actualReward);
+    
+    // Get current goal for planning
+    const std::vector<float>& getCurrentGoal() const { return pImpl->currentGoal_; }
     
 private:
     struct Impl;
