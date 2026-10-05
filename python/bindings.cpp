@@ -245,23 +245,119 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    
+    // Convenience function for easier agent creation
+    m.def("createDefaultAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       "Create and initialize an agent brain with world");
+
+    // Memory system bindings
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Episodic memory item representing a stored experience)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("sensoryState", &EpisodicMemoryItem::sensoryState)
+        .def_readwrite("positionX", &EpisodicMemoryItem::positionX)
+        .def_readwrite("positionY", &EpisodicMemoryItem::positionY)
+        .def_readwrite("orientation", &EpisodicMemoryItem::orientation)
+        .def_readwrite("action", &EpisodicMemoryItem::action)
+        .def_readwrite("reward", &EpisodicMemoryItem::reward)
+        .def_readwrite("energy", &EpisodicMemoryItem::energy)
+        .def_readwrite("novelty", &EpisodicMemoryItem::novelty)
+        .def_readwrite("resultingSensoryState", &EpisodicMemoryItem::resultingSensoryState)
+        .def_readwrite("resultingReward", &EpisodicMemoryItem::resultingReward)
+        .def_readwrite("activeNeurons", &EpisodicMemoryItem::activeNeurons)
+        .def_readwrite("neuronActivations", &EpisodicMemoryItem::neuronActivations)
+        .def_readwrite("age", &EpisodicMemoryItem::age);
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Neural episodic memory system storing experiences as neural patterns)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store a new experience in episodic memory")
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar,
+             py::arg("sensoryPattern"), py::arg("maxResults") = 5,
+             "Retrieve episodes similar to a sensory pattern")
+        .def("retrieveTemporal", &NeuralEpisodicMemory::retrieveTemporal,
+             py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10,
+             "Retrieve episodes from a time window")
+        .def("retrieveByLocation", &NeuralEpisodicMemory::retrieveByLocation,
+             py::arg("x"), py::arg("y"), py::arg("radius") = 1.0f, py::arg("maxResults") = 5,
+             "Retrieve episodes near a location")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode,
+             py::arg("episode"),
+             "Replay an episode to reactivate neural patterns")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get total number of stored episodes")
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes,
+             py::arg("count") = 5,
+             "Get recent episodes")
+        .def("clear", &NeuralEpisodicMemory::clear,
+             "Clear all episodes");
+
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory using persistent activity patterns)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("store", &NeuralWorkingMemory::store,
+             py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store information in working memory")
+        .def("retrieve", &NeuralWorkingMemory::retrieve,
+             "Retrieve current working memory content")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation,
+             py::arg("neuron"),
+             "Get activation level of specific neuron in working memory")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory dynamics")
+        .def("clear", &NeuralWorkingMemory::clear,
+             "Clear working memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory,
+             py::arg("factor"),
+             "Strengthen working memory representation");
+
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Neural associative memory creating relationships between patterns)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralAssociativeMemory::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("associate", &NeuralAssociativeMemory::associate,
+             py::arg("patternA"), py::arg("patternB"), py::arg("strength") = 1.0f,
+             "Create association between two patterns")
+        .def("retrieve", &NeuralAssociativeMemory::retrieve,
+             py::arg("queryPattern"), py::arg("maxResults") = 5,
+             "Retrieve patterns associated with query")
+        .def("getAssociationStrength", &NeuralAssociativeMemory::getAssociationStrength,
+             py::arg("patternA"), py::arg("patternB"),
+             "Get association strength between two patterns")
+        .def("clear", &NeuralAssociativeMemory::clear,
+             "Clear all associations");
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -353,6 +449,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Clean, complete AgentBrain with all essential methods
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -399,27 +496,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    
+    // Convenience function for easier agent creation
+    m.def("createDefaultAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       "Create and initialize an agent brain with world");
