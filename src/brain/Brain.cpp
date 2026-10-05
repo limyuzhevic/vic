@@ -267,24 +267,30 @@ bool Brain::initialize() {
     });
     
     // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            if (!pImpl || pImpl->regions.empty()) {
+                return;
+            }
+            for (auto& region : pImpl->regions) {
+                if (!region) continue;
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron && neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+    }
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
@@ -399,7 +405,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -548,31 +556,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
@@ -604,22 +614,26 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
-        
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        if (i < pImpl->sensoryNeurons.size()) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            
+            // Also store in working memory
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            }
         }
     }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    if (!pImpl) return;
+    
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
+            if (!n) continue;
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
@@ -629,11 +643,19 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    if (!pImpl) return;
+    
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
+        if (!region) continue;
+        auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            if (!pop) continue;
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                auto neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron) {
+                        neuron->injectCurrent(current);
+                    }
                 }
             }
         }
@@ -789,8 +811,13 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
+            if (!region) continue;
+            auto& populations = region->getPopulations();
+            for (const auto* pop : populations) {
+                if (!pop) continue;
+                auto neurons = pop->getNeurons();
+                for (const auto* neuron : neurons) {
+                    if (!neuron) continue;
                     const auto& state = neuron->getState();
                     neuronData.membranePotential.push_back(state.membranePotential);
                     neuronData.restingPotential.push_back(state.restingPotential);
@@ -805,6 +832,11 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        // Check if we have any neuron data to save
+        if (neuronData.membranePotential.empty()) {
+            NLM_LOG_WARN("No neuron data to save (empty neuron list)");
+        }
+        
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
             return false;
@@ -812,8 +844,13 @@ bool Brain::save(const std::string& filepath) const {
         
         // Write synapses
         SynapseCheckpointData synapseData;
+        if (!pImpl) return false;
+        
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
+            if (!region) continue;
+            auto& synapses = region->getSynapses();
+            for (const auto* syn : synapses) {
+                if (!syn) continue;
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());
@@ -821,6 +858,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
             }
+        }
+        
+        // Check for empty synapse data
+        if (synapseData.weight.empty() && synapseData.sourceNeuron.empty()) {
+            NLM_LOG_WARN("No synapse data to save (empty synapse list)");
         }
         
         if (!writer.writeSynapses(synapseData)) {
@@ -865,28 +907,57 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
+    // Apply neuron states
+    size_t idx = 0;
+    if (!pImpl) return false;
+    
+    for (auto& region : pImpl->regions) {
+        if (!region) continue;
+        auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            if (!pop) continue;
+            auto neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
+                if (!neuron) continue;
+                
+                if (idx < neuronData.membranePotential.size()) {
+                    neuron->setMembranePotential(neuronData.membranePotential[idx]);
                 }
+                if (idx < neuronData.restingPotential.size()) {
+                    neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                }
+                if (idx < neuronData.threshold.size()) {
+                    neuron->setThreshold(neuronData.threshold[idx]);
+                }
+                if (idx < neuronData.resetPotential.size()) {
+                    neuron->setResetPotential(neuronData.resetPotential[idx]);
+                }
+                if (idx < neuronData.leakConductance.size()) {
+                    neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                }
+                if (idx < neuronData.firingState.size()) {
+                    neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                }
+                if (idx < neuronData.refractoryRemaining.size()) {
+                    neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                }
+                if (idx < neuronData.refractoryPeriod.size()) {
+                    neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                }
+                if (idx < neuronData.lastSpikeTime.size()) {
+                    neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
+                }
+                
+                idx++;
             }
         }
+    }
+    
+    // Verify all data was processed
+    if (idx < neuronData.membranePotential.size()) {
+        NLM_LOG_ERROR("Not all neuron data was processed during load");
+        return false;
+    }
         
         // Read synapses
         SynapseCheckpointData synapseData;
