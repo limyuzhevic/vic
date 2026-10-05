@@ -43,6 +43,15 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Validation error
+struct ValidationError {
+    std::string key;
+    std::string message;
+    
+    ValidationError() : key(), message() {}
+    ValidationError(const std::string& k, const std::string& m) : key(k), message(m) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -92,6 +101,11 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    void validate();
+    bool hasErrors() const;
+    const std::vector<ValidationError>& getErrors() const;
     
 private:
     struct Impl;

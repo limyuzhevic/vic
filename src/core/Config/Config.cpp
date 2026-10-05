@@ -3,11 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <limits>
+#include <numeric>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ValidationError> validationErrors;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -147,69 +150,105 @@ bool Config::has(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+// Configuration validation
+void Config::validate() {
+    pImpl->validationErrors.clear();
+    
+    // Validate specific known configuration parameters
+    if (has("neuron_count")) {
+        auto neuronCountOpt = get<size_t>("neuron_count");
+        if (neuronCountOpt && *neuronCountOpt == 0) {
+            pImpl->validationErrors.emplace_back("neuron_count", "Neuron count must be greater than 0");
+        }
     }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+    
+    if (has("region_count")) {
+        auto regionCountOpt = get<size_t>("region_count");
+        if (regionCountOpt && *regionCountOpt == 0) {
+            pImpl->validationErrors.emplace_back("region_count", "Region count must be greater than 0");
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto timestepOpt = get<double>("simulation_timestep");
+        if (timestepOpt) {
+            if (*timestepOpt <= 0.0) {
+                pImpl->validationErrors.emplace_back("simulation_timestep", "Simulation timestep must be positive");
+            } else if (*timestepOpt > 1.0) {
+                pImpl->validationErrors.emplace_back("simulation_timestep", "Simulation timestep too large (max 1.0)");
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }
     }
-    return oss.str();
+    
+    if (has("connection_probability")) {
+        auto probOpt = get<double>("connection_probability");
+        if (probOpt) {
+            if (*probOpt < 0.0 || *probOpt > 1.0) {
+                pImpl->validationErrors.emplace_back("connection_probability", "Connection probability must be between 0.0 and 1.0");
+            }
+        }
+    }
+    
+    if (has("stdp_ltp_weight")) {
+        auto ltpOpt = get<double>("stdp_ltp_weight");
+        if (ltpOpt && *ltpOpt < 0.0) {
+            pImpl->validationErrors.emplace_back("stdp_ltp_weight", "STDP LTP weight must be non-negative");
+        }
+    }
+    
+    if (has("stdp_ltd_weight")) {
+        auto ltdOpt = get<double>("stdp_ltd_weight");
+        if (ltdOpt && *ltdOpt < 0.0) {
+            pImpl->validationErrors.emplace_back("stdp_ltd_weight", "STDP LTD weight must be non-negative");
+        }
+    }
+    
+    if (has("stdp_tau")) {
+        auto tauOpt = get<double>("stdp_tau");
+        if (tauOpt && *tauOpt <= 0.0) {
+            pImpl->validationErrors.emplace_back("stdp_tau", "STDP tau must be positive");
+        }
+    }
+    
+    if (has("synaptogenesis_rate")) {
+        auto rateOpt = get<double>("synaptogenesis_rate");
+        if (rateOpt) {
+            if (*rateOpt < 0.0 || *rateOpt > 0.1) {
+                pImpl->validationErrors.emplace_back("synaptogenesis_rate", "Synaptogenesis rate must be between 0.0 and 0.1");
+            }
+        }
+    }
+    
+    if (has("pruning_rate")) {
+        auto rateOpt = get<double>("pruning_rate");
+        if (rateOpt) {
+            if (*rateOpt < 0.0 || *rateOpt > 0.1) {
+                pImpl->validationErrors.emplace_back("pruning_rate", "Pruning rate must be between 0.0 and 0.1");
+            }
+        }
+    }
+    
+    // Check that required keys have values
+    const std::vector<std::string> requiredKeys = {
+        "neuron_count",
+        "region_count",
+        "simulation_timestep",
+        "connection_probability"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            pImpl->validationErrors.emplace_back(key, "Required configuration key is missing");
+        }
+    }
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::hasErrors() const {
+    return !pImpl->validationErrors.empty();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+const std::vector<ValidationError>& Config::getErrors() const {
+    return pImpl->validationErrors;
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

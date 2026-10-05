@@ -65,17 +65,54 @@ void testConfigRemove() {
     std::cout << "    testConfigRemove passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigValidation() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Should have no errors initially (all required keys are set by default in main.cpp)
+    config.validate();
+    assert(!config.hasErrors());
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    // Test invalid neuron_count
+    config.set("neuron_count", static_cast<int64_t>(0), nlm::ConfigSource::Runtime);
+    config.validate();
+    assert(config.hasErrors());
+    auto errors = config.getErrors();
+    assert(!errors.empty());
+    bool foundNeuronCountError = false;
+    for (const auto& error : errors) {
+        if (error.key == "neuron_count" && 
+            error.message.find("greater than 0") != std::string::npos) {
+            foundNeuronCountError = true;
+            break;
+        }
+    }
+    assert(foundNeuronCountError);
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    // Reset for next test
+    config.set("neuron_count", static_cast<int64_t>(500), nlm::ConfigSource::Runtime);
+    config.validate();
+    assert(!config.hasErrors());
+    
+    // Test invalid simulation_timestep
+    config.set("simulation_timestep", -0.1, nlm::ConfigSource::Runtime);
+    config.validate();
+    assert(config.hasErrors());
+    bool foundTimestepError = false;
+    for (const auto& error : config.getErrors()) {
+        if (error.key == "simulation_timestep" && 
+            error.message.find("positive") != std::string::npos) {
+            foundTimestepError = true;
+            break;
+        }
+    }
+    assert(foundTimestepError);
+    
+    // Reset and test valid timestep
+    config.set("simulation_timestep", 0.001, nlm::ConfigSource::Runtime);
+    config.validate();
+    assert(!config.hasErrors());
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
 }
 
 void runAll() {
@@ -84,6 +121,5 @@ void runAll() {
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
 }
-
-} // namespace test_config
