@@ -48,12 +48,15 @@ add_library(nlm_core STATIC
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
-    # Neuromodulation
+    # Neuromodulation (enhanced real implementations)
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -124,6 +127,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/user_interface.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 

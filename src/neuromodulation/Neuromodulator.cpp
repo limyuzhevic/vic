@@ -1,4 +1,5 @@
 #include "Neuromodulator.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -14,7 +15,6 @@ struct Dopamine::Impl {
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
-
 Dopamine::~Dopamine() = default;
 
 const char* Dopamine::getName() const {
