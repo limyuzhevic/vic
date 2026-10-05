@@ -1,10 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
+#include "../memory/NeuralEpisodicMemory.hpp"
 
 namespace nlm {
 
@@ -54,10 +48,9 @@ public:
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
 
-    // Update plans based on actual outcome
-    void updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                          const std::vector<ActionType>& actualActions,
-                          float actualReward);
+    // Update plans based on episodic memory
+    void updateFromEpisodicMemory(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                 SimulationStep currentTime);
 
     // Clear planning cache
     void clearCache();
@@ -87,6 +80,10 @@ private:
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
+    
+    // Episodic memory integration
+    bool episodicMemoryEnabled_;
+    float episodicMemoryIntegrationWeight_;
     
     // Current goal state
     std::vector<float> currentGoal_;

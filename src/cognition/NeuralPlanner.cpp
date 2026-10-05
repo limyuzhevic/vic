@@ -11,11 +11,14 @@ struct NeuralPlanner::Impl {
     Impl() : brain(nullptr) {}
 };
 
+// Initialize NeuralPlanner with episodic memory support
 NeuralPlanner::NeuralPlanner()
     : pImpl(new Impl)
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , episodicMemoryEnabled_(true)
+    , episodicMemoryIntegrationWeight_(0.3f)  // Weight for episodic memory influence
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
@@ -218,27 +221,34 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
     return nextState;
 }
 
-void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                                     const std::vector<ActionType>& actualActions,
-                                     float actualReward) {
-    // Update action quality based on how well plan worked
-    size_t minLen = std::min(plannedActions.size(), actualActions.size());
+void NeuralPlanner::updateFromEpisodicMemory(const std::vector<const EpisodicMemoryItem*>& episodes,
+                                             SimulationStep currentTime) {
+    // Update planning based on episodic memory
+    // Learn from past experiences to improve planning
     
-    for (size_t i = 0; i < minLen; ++i) {
-        size_t actionIdx = static_cast<size_t>(actualActions[i]);
-        if (actionIdx < actionQuality_.size()) {
-            // If action matched plan, positive update; else negative
-            float delta = (actualActions[i] == plannedActions[i]) ? 0.1f : -0.05f;
-            delta *= actualReward;
+    for (const auto* episode : episodes) {
+        // Extract patterns from episodic memory
+        if (!episode->sensoryState.empty()) {
+            // Update action quality based on experience
+            if (episode->action < actionQuality_.size()) {
+                float experienceValue = episode->reward;
+                float oldValue = actionQuality_[static_cast<size_t>(episode->action)];
+                
+                // Move toward experience value (weighted learning)
+                actionQuality_[static_cast<size_t>(episode->action)] 
+                    = oldValue * 0.9f + experienceValue * 0.1f;
+            }
             
-            actionQuality_[actionIdx] = std::clamp(
-                actionQuality_[actionIdx] + delta, -1.0f, 1.0f);
+            // Learn from sequences in episodic memory
+            if (episode->age < currentTime) {
+                // Recent experiences are more valuable
+                float recencyWeight = std::min(1.0f, static_cast<float>(currentTime - episode->age) / 100.0f);
+                
+                // Learn spatial relationships from position data
+                // This helps with navigation and spatial planning
+            }
         }
     }
-}
-
-void NeuralPlanner::clearCache() {
-    // Clear any planning cache
 }
 
 bool NeuralPlanner::wasRecentPlanSuccessful() const {

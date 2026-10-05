@@ -113,9 +113,9 @@ public:
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 
-    // Update concept with new instance
-    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
+    // Update concept with episodic memory information
+    void updateEpisodicKnowledge(const std::vector<float>& pattern, float reward,
+                                SimulationStep timestamp);
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
@@ -156,6 +156,13 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
+    
+    // Episodic memory integration
+    void updateEpisodicKnowledge(const std::vector<float>& pattern, float reward,
+                                SimulationStep timestamp);
+    
+    bool episodicMemoryEnabled_;
+    float episodicMemoryIntegrationWeight_;
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept

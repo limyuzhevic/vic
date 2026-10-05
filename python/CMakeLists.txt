@@ -3,7 +3,7 @@ project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -87,16 +87,82 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+# Modular Python Bindings
+# Each binding module can be independently built or combined
+
+set(BINDING_MODULES
+    core_bindings
+    enum_bindings
+    config_bindings
+    sensory_bindings
+    motor_bindings
+    world_bindings
+    brain_bindings
+    agent_bindings
+    memory_bindings
+    neuromodulation_bindings
+    cognition_bindings
+    experiment_bindings
+    performance_bindings
+)
+
+# Create a unified module that includes all bindings
+pybind11_add_module(pynlm_unified
+    core_bindings.cpp
+    enum_bindings.cpp
+    config_bindings.cpp
+    sensory_bindings.cpp
+    motor_bindings.cpp
+    world_bindings.cpp
+    brain_bindings.cpp
+    agent_bindings.cpp
+    memory_bindings.cpp
+    neuromodulation_bindings.cpp
+    cognition_bindings.cpp
+    experiment_bindings.cpp
+    performance_bindings.cpp
+    BindingManager.cpp
+    BindingUtils.cpp
+    ModuleBuilder.cpp
+)
+
+target_link_libraries(pynlm_unified PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_unified PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${pybind11_INCLUDE_DIR}
+)
+
+# Create individual modules for advanced users who want to load modules dynamically
+foreach(module ${BINDING_MODULES})
+    pybind11_add_module(${module} ${module}.cpp)
+    target_link_libraries(${module} PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(${module} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${pybind11_INCLUDE_DIR}
+    )
+endforeach()
+
+# Create a convenience alias for backward compatibility
+add_library(pynlm ALIAS pynlm_unified)
 
 if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm_unified PRIVATE /permissive-)
+    foreach(module ${BINDING_MODULES})
+        target_compile_options(${module} PRIVATE /permissive-)
+    endforeach()
 endif()
 
-install(TARGETS pynlm
+install(TARGETS pynlm_unified
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
 )
+
+# Install individual modules for plugin system
+foreach(module ${BINDING_MODULES})
+    install(TARGETS ${module}
+        LIBRARY DESTINATION pynlm/modules
+        ARCHIVE DESTINATION pynlm/modules
+        RUNTIME DESTINATION pynlm/modules
+    )
+endforeach()

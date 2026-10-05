@@ -19,6 +19,8 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , episodicMemoryEnabled_(true)
+    , episodicMemoryIntegrationWeight_(0.3f)
 {
 }
 
@@ -93,50 +95,32 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     return concept.id;
 }
 
-void ConceptFormation::updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                                    const std::vector<float>& features, float reward) {
-    DiscoveredConcept* concept = nullptr;
-    for (auto& c : concepts_) {
-        if (c.id == conceptId) {
-            concept = &c;
-            break;
+void ConceptFormation::updateEpisodicKnowledge(const std::vector<float>& pattern,
+                                               float reward,
+                                               SimulationStep timestamp) {
+    // Update concept formation based on episodic memory
+    // Learn from experiences to improve concept formation
+    
+    // Check if this pattern belongs to an existing concept
+    size_t matchingConcept = findConceptForPattern(pattern);
+    
+    if (matchingConcept > 0) {
+        // Update existing concept with episodic information
+        updateConcept(matchingConcept, pattern, std::vector<float>(), reward);
+    } else {
+        // Consider forming new concept from episodic pattern
+        // Only form new concept if pattern is sufficiently novel
+        if (isNovel(pattern)) {
+            // Check if we have enough observations to form stable concept
+            // For episodic memory, we often have limited observations
+            // So we require higher similarity threshold for episodic learning
+            if (computeSimilarity(pattern, pattern) > formationThreshold_ * 0.9f) {
+                // Create new concept from episodic memory pattern
+                // This helps the agent categorize similar experiences
+                createConcept(pattern, std::vector<float>(), reward);
+            }
         }
     }
-    
-    if (!concept) return;
-    
-    // Add new instance
-    ConceptInstance instance;
-    instance.pattern = newPattern;
-    instance.features = features;
-    instance.observationCount = 1;
-    instance.lastObserved = concept->totalObservations;
-    instance.avgReward = reward;
-    
-    concept->instances.push_back(instance);
-    concept->totalObservations++;
-    
-    // Update prototype using exponential moving average (Hebbian-like)
-    updatePrototype(conceptId, newPattern);
-    
-    // Update stability
-    float newStability = 1.0f;
-    if (concept->instances.size() > 1) {
-        // Compute stability as average similarity to prototype
-        float totalSim = 0.0f;
-        size_t recentCount = std::min(concept->instances.size(), stabilityWindow_);
-        
-        for (size_t i = concept->instances.size() - recentCount; 
-             i < concept->instances.size(); ++i) {
-            totalSim += computeSimilarity(concept->instances[i].pattern, concept->prototype);
-        }
-        
-        newStability = totalSim / recentCount;
-        concept->avgStability = concept->avgStability * 0.9f + newStability * 0.1f;
-    }
-    
-    // Update instance stability
-    concept->instances.back().stability = newStability;
 }
 
 void ConceptFormation::updatePrototype(size_t conceptId, const std::vector<float>& newInstance) {
