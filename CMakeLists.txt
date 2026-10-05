@@ -51,9 +51,12 @@ add_library(nlm_core STATIC
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
+    src/neuromodulation/Curiosity.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp

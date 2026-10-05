@@ -510,9 +510,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create current sensory state for prediction
+        auto currentState = std::make_unique<SensoryInput>(pImpl->sensoryNeurons.size());
+        
+        // Encode current neural activity as sensory prediction
+        // Use sensory neuron activations as prediction input
+        float totalSensoryActivity = 0.0f;
+        size_t activeSensory = 0;
+        
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* sensoryNeuron = pImpl->sensoryNeurons[i];
+            if (sensoryNeuron && sensoryNeuron->isFiring()) {
+                float activation = std::abs(sensoryNeuron->getState().membranePotential - 
+                                         sensoryNeuron->getState().restingPotential);
+                currentState->setValue(i, activation);
+                totalSensoryActivity += activation;
+                activeSensory++;
+            }
+        }
+        
+        // Predict next sensory state using current activity patterns
+        auto predictedState = pImpl->predictionSystem->predictNextState(*currentState);
+        
+        // Update predictions based on actual sensory input
+        pImpl->predictionSystem->updatePredictions(*predictedState, *currentState);
+        
+        // Use prediction error to guide learning and attention
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Enhance neuromodulation with prediction error
+        if (pImpl->dopamine) {
+            // Prediction error modulates dopamine release (reward prediction error)
+            float errorModulation = predictionError * confidence;
+            if (errorModulation > 0.0f) {
+                pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() + errorModulation * 0.1f);
+            }
+        }
+        
+        // Update attention based on prediction surprise
+        if (pImpl->attention) {
+            // High prediction error increases attention to novel patterns
+            float attentionBoost = std::min(predictionError * 2.0f, 1.0f);
+            pImpl->attention->setAttentionBoost(attentionBoost);
+        }
+        
+        // Update concept formation with prediction errors
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->updateWithError(predictionError, currentState.get());
+        }
+        
+        // Track prediction accuracy for learning
+        if (predictionError < 0.1f) {
+            pImpl->predictionAccuracyCount++;
+        } else {
+            pImpl->predictionErrorCount++;
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +582,93 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract neural activity patterns from current experience
+        // Concept formation works on patterns, not symbolic data
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        // Encode current sensory input and neural activity as pattern
+        // This creates the raw material for concept formation
+        size_t patternSize = 0;
+        
+        // Collect sensory neuron activities as pattern features
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 64; ++i) {
+            auto* sensoryNeuron = pImpl->sensoryNeurons[i];
+            if (sensoryNeuron) {
+                float activation = std::abs(sensoryNeuron->getState().membranePotential - 
+                                         sensoryNeuron->getState().restingPotential);
+                currentPattern.push_back(activation);
+                currentFeatures.push_back(activation);
+            }
+        }
+        
+        patternSize = currentPattern.size();
+        
+        // Collect working memory activities as contextual features
+        if (pImpl->workingMemory) {
+            // Add working memory patterns as features
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                if (neuronId < patternSize) {
+                    // Get activation of memory neuron
+                    currentFeatures.push_back(pImpl->workingMemory->getTraceStrength(neuronId));
+                }
+            }
+        }
+        
+        // Present current experience to concept formation system
+        SimulationStep currentTime = static_cast<SimulationStep>(pImpl->currentStep);
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, currentFeatures,
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+            currentTime
+        );
+        
+        // Use prediction system to guide concept formation
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // High prediction error suggests need for new concepts
+            if (predictionError > 0.5f && conceptId == 0) {
+                // Force concept formation for surprising patterns
+                pImpl->conceptFormation->setFormationThreshold(0.5f);
+            }
+            
+            // Update concepts with prediction errors
+            if (conceptId > 0 && predictionError > 0.1f) {
+                pImpl->conceptFormation->updateConcept(conceptId, currentPattern, currentFeatures, predictionError);
+            }
+        }
+        
+        // Integrate concepts with episodic memory for consolidation
+        if (conceptId > 0 && pImpl->episodicMemory && currentStep % 50 == 0) {
+            // Every 50 steps, store concept-state relationship in episodic memory
+            EpisodicMemoryItem conceptEpisode;
+            conceptEpisode.timestamp = currentStep;
+            conceptEpisode.conceptId = conceptId;
+            conceptEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store concept prototype and current neural state
+            if (auto* concept = pImpl->conceptFormation->getConcept(conceptId)) {
+                conceptEpisode.conceptPrototype = concept->prototype;
+            }
+            
+            // Store active neurons as context
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            conceptEpisode.activeNeurons.push_back(neuron->getId());
+                            conceptEpisode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            pImpl->episodicMemory->storeEpisode(conceptEpisode);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,30 +829,147 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Integrated action selection with neural planning
+    // Combines reactive motor neuron activity with predictive planning
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
+    // Current reactive action (fallback if planning fails)
+    ActionType reactiveAction = ActionType::Wait;
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    if (!pImpl->motorNeurons.empty()) {
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // Fallback to reactive action if available
+        if (firingMotor > 0) {
+            reactiveAction = ActionType::MoveForward;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Integrated action selection with neural planning
+    ActionType plannedAction = ActionType::Wait;
+    float confidence = 0.0f;
+    
+    if (pImpl->planner) {
+        // Create current state vector for planning
+        std::vector<float> currentState;
+        
+        // Encode sensory state for planning
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 32; ++i) {
+            auto* sensoryNeuron = pImpl->sensoryNeurons[i];
+            if (sensoryNeuron) {
+                float activation = std::abs(sensoryNeuron->getState().membranePotential - 
+                                         sensoryNeuron->getState().restingPotential);
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Encode working memory state
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                if (neuronId < 32) {
+                    currentState.push_back(pImpl->workingMemory->getTraceStrength(neuronId));
+                }
+            }
+        }
+        
+        // Plan action using neural planner
+        // Set target based on prediction system or current goals
+        float targetReward = 0.5f;
+        if (pImpl->dopamine) {
+            targetReward = pImpl->dopamine->getLevel();
+        }
+        
+        plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        confidence = pImpl->planner->getPlanningConfidence();
+        
+        // Update planning with prediction errors
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.3f) {
+                // High prediction error suggests need for exploratory actions
+                // Increase planning depth to consider more alternatives
+                size_t originalDepth = pImpl->planner->getPlanningDepth();
+                pImpl->planner->setPlanningDepth(originalDepth + 1);
+                
+                // Re-plan with increased exploration
+                plannedAction = pImpl->planner->planAction(currentState, targetReward * 0.8f);
+                
+                // Restore original planning depth
+                pImpl->planner->setPlanningDepth(originalDepth);
+            }
+            
+            // Use prediction error to update action quality
+            pImpl->planner->setActionQuality(plannedAction, 1.0f - predictionError);
+        }
+        
+        // Integrate with concept formation for goal-driven planning
+        if (pImpl->conceptFormation && pImpl->planner->getCurrentGoal().empty()) {
+            // Derive goals from stable concepts
+            size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+            for (size_t i = 0; i < conceptCount && i < 3; ++i) {
+                if (auto* concept = pImpl->conceptFormation->getConcept(i)) {
+                    float stability = pImpl->conceptFormation->getConceptStability(i);
+                    if (stability > 0.7f) {
+                        // High stability concepts guide planning
+                        pImpl->planner->setCurrentGoal(concept->prototype);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Apply neuromodulation effects on planning
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            
+            // High dopamine increases exploration in planning
+            if (dopamineLevel > 1.0f) {
+                // Explore alternative actions
+                ActionType alternativeAction = ActionType::TurnLeft;
+                pImpl->planner->setActionQuality(alternativeAction, 0.6f);
+            }
+            
+            // Low dopamine increases exploitation of known actions
+            if (dopamineLevel < 0.3f) {
+                // Stick with planned action if confident
+                if (confidence < 0.5f) {
+                    // Low confidence and low dopamine - be conservative
+                    plannedAction = ActionType::Wait;
+                }
+            }
+        }
+        
+        // Update planning with episodic memory
+        if (pImpl->episodicMemory && currentStep % 100 == 0) {
+            // Review past successes and failures for planning guidance
+            auto successfulActions = pImpl->episodicMemory->getSuccessfulActions(5);
+            for (ActionType action : successfulActions) {
+                pImpl->planner->setActionQuality(action, 0.8f);
+            }
+        }
+        
+        // Determine final action using confidence-weighted integration
+        if (confidence > 0.7f) {
+            // High confidence - trust the plan
+            reactiveAction = plannedAction;
+        } else if (confidence > 0.3f) {
+            // Medium confidence - blend reactive and planned
+            if (reactiveAction == ActionType::Wait && plannedAction != ActionType::Wait) {
+                reactiveAction = plannedAction;
+            }
+        } else {
+            // Low confidence - favor reactive behavior
+            // Keep original reactive action
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return std::make_unique<Action>(reactiveAction);
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
