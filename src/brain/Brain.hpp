@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "Plugin.hpp"
 #include <memory>
 #include <string>
 
@@ -28,6 +29,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class PluginRegistry;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -183,6 +185,14 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== PLUGIN SYSTEM ==========
+    
+    // Plugin registry for cognitive modules
+    PluginRegistry& getPluginRegistry();
+    
+    // Check if plugin system is supported
+    bool supportsPlugins() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

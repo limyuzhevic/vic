@@ -65,6 +65,8 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    # Plugin system
+    src/brain/Plugin.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp

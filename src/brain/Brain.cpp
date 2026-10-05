@@ -1,24 +1,4 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "Plugin.hpp"
 
 namespace nlm {
 
@@ -44,11 +24,8 @@ struct Brain::Impl {
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // Plugin system for cognitive modules
+    std::unique_ptr<PluginRegistry> pluginRegistry;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -145,12 +122,8 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Initialize plugin registry
+        pluginRegistry = std::make_unique<PluginRegistry>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -403,7 +376,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Update working memory with current neural activity
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with attention system
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Attention selects from working memory based on current context
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention-based selection to working memory
+            std::vector<NeuronId> attendedNeurons = pImpl->attention->getSelectedNeurons();
+            pImpl->workingMemory->applyAttentionFilter(attendedNeurons);
+        }
+        
+        // Integrate working memory with planning system for action selection
+        if (pImpl->planner && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Planning system can use working memory contents for action planning
+            auto workingMemoryContent = pImpl->workingMemory->getCurrentTraceVector();
+            if (!workingMemoryContent.empty()) {
+                pImpl->planner->updateWorkingMemoryContext(workingMemoryContent);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -479,31 +473,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
+    
+    // Enhanced episodic memory storage with prediction error integration
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+            // Capture current brain state as an episode with enhanced features
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.predictionError = pImpl->predictionError ? pImpl->predictionError->getCurrentError() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons with more sophisticated encoding
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            // Enhanced activation encoding based on membrane potential
+                            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                            // Apply neuromodulation effects to activation strength
+                            if (pImpl->dopamine) {
+                                activation *= (1.0f + pImpl->dopamine->getLevel() * 0.5f);
+                            }
+                            if (pImpl->curiosity) {
+                                activation *= (1.0f + pImpl->curiosity->getLevel() * 0.3f);
+                            }
+                            episode.neuronActivations.push_back(activation);
                         }
                     }
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (with prediction error modulation)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            if (pImpl->predictionError) {
+                episode.rewardError = episode.reward - pImpl->predictionError->getExpectedReward();
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -511,8 +519,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // This provides predictive coding and temporal coherence
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Apply prediction to working memory to guide attention
+        if (pImpl->workingMemory && pImpl->attention) {
+            // Get prediction-based attention guidance
+            std::vector<NeuronId> predictedImportantNeurons = 
+                pImpl->predictionSystem->getPredictedImportantNeurons();
+            if (!predictedImportantNeurons.empty()) {
+                // Combine prediction-based attention with current working memory
+                pImpl->attention->applyPredictionGuidance(predictedImportantNeurons);
+            }
+        }
+        
+        // Update episodic memory with prediction errors for learning
+        if (pImpl->predictionError && pImpl->episodicMemory) {
+            // Use prediction errors to update episodic memory consolidation
+            float predictionError = pImpl->predictionError->getCurrentError();
+            if (std::abs(predictionError) > 0.1f) {  // Significant prediction error
+                // Mark current episode for enhanced consolidation based on prediction error
+                pImpl->predictionError->recordPredictionError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +558,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This integrates with working memory to extract abstract patterns
+        
+        // Get current working memory traces for concept formation
+        if (pImpl->workingMemory) {
+            auto workingMemoryTraces = pImpl->workingMemory->getCurrentTraceVector();
+            if (workingMemoryTraces.size() > 5) {  // Need sufficient data for concept formation
+                // Form new concepts or strengthen existing ones
+                pImpl->conceptFormation->processWorkingMemory(workingMemoryTraces, pImpl->timestep);
+                
+                // Apply formed concepts to guide planning
+                if (pImpl->planner) {
+                    auto formedConcepts = pImpl->conceptFormation->getCurrentConcepts();
+                    pImpl->planner->integrateConcepts(formedConcepts);
+                }
+                
+                // Apply concepts to episodic memory consolidation
+                if (pImpl->episodicMemory) {
+                    auto formedConcepts = pImpl->conceptFormation->getCurrentConcepts();
+                    pImpl->episodicMemory->applyConceptContext(formedConcepts);
+                }
+            }
+        }
+        
+        // Integrate with prediction system for abstract prediction
+        if (pImpl->predictionSystem) {
+            auto currentConcepts = pImpl->conceptFormation->getCurrentConcepts();
+            pImpl->predictionSystem->applyConceptualKnowledge(currentConcepts);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1114,4 +1171,50 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// Memory systems
+NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
+}
+
+NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+// Prediction system
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+// Cognition systems
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+// Development system
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+/**
+ * Plugin system implementation
+ */
+
+PluginRegistry& Brain::getPluginRegistry() {
+    return *pImpl->pluginRegistry;
+}
+
+bool Brain::supportsPlugins() const {
+    return pImpl->pluginRegistry != nullptr;
+}
