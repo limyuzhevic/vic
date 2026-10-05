@@ -194,6 +194,66 @@ public:
     void logStatus() const;
     
 private:
+    // ========== STEP 1: Process delayed spikes (deliver synaptic input) ==========
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    void updateNeurons(Timestamp currentTime);
+    
+    // ========== STEP 3: Detect spikes and schedule outgoing spike events ==========
+    void detectSpikesAndSchedule(SimulationStep currentStep, Timestamp currentTime);
+    bool detectAndProcessSpike(Neuron* neuron, const NeuralRegion& region, 
+                               SimulationStep currentStep, Timestamp currentTime);
+    void scheduleDelayedSpikes(Neuron* neuron, const NeuralRegion& region,
+                               SimulationStep currentStep, Timestamp currentTime);
+    
+    // ========== STEP 4: Update working memory ==========
+    void updateWorkingMemory();
+    
+    // ========== STEP 5: Apply neuromodulation effects ==========
+    void applyNeuromodulationEffects();
+    void applyDopamineExcitabilityModulation();
+    
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    void applyPlasticityRules();
+    void applySTDPWithNeuromodulation(Synapse* syn, float plasticityMod);
+    void applyHebbianLearning(Synapse* syn);
+    
+    // ========== STEP 7: Update episodic memory ==========
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void createAndStoreEpisodicMemory(SimulationStep currentStep);
+    std::vector<NeuronId> collectActiveNeuronIds() const;
+    std::vector<float> collectNeuronActivations() const;
+    
+    // ========== STEP 8: Update prediction system ==========
+    void updatePredictionSystem();
+    
+    // ========== STEP 9: Update attention system ==========
+    void updateAttentionSystem();
+    
+    // ========== STEP 10: Update concept formation ==========
+    void updateConceptFormation();
+    
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    
+    // ========== STEP 12: Replay important memories ==========
+    void replayMemories(SimulationStep currentStep);
+    
+    // ========== STEP 13: Apply development effects ==========
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void updateStructuralPlasticityWithDevelopment(StructuralPlasticity* sp);
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    void consolidateMemories(SimulationStep currentStep);
+    
+    // ========== STEP 15: Checkpoint management ==========
+    void updateCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Configuration manager helper
+    template<typename T>
+    T getConfigValue(const std::string& key, T defaultValue) const;
+    
     struct Impl;
     Impl* pImpl;
 };

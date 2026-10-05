@@ -1,5 +1,6 @@
 #include "NeuralRegion.hpp"
 #include <algorithm>
+#include <functional>  // Added for std::function
 #include <stdexcept>
 
 namespace nlm {
@@ -311,6 +312,71 @@ std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
     }
     return result;
+}
+
+void NeuralRegion::forEachNeuron(std::function<void(Neuron*)> func) {
+    for (auto& pop : pImpl->populations) {
+        for (auto* neuron : pop->getNeurons()) {
+            func(neuron);
+        }
+    }
+}
+
+template<typename F> void NeuralRegion::forEachNeuron(const F& func) const {
+    for (const auto& pop : pImpl->populations) {
+        for (const auto* neuron : pop->getNeurons()) {
+            func(const_cast<Neuron*>(neuron));
+        }
+    }
+}
+
+std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
+    std::vector<const Neuron*> result;
+    for (const auto& pop : pImpl->populations) {
+        auto popNeurons = pop->getNeurons();
+        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+    }
+    return result;
+}
+
+void NeuralRegion::forEachNeuron(std::function<void(Neuron*)> func) {
+    for (auto& pop : pImpl->populations) {
+        for (auto* neuron : pop->getNeurons()) {
+            func(neuron);
+        }
+    }
+}
+
+template<typename F> void NeuralRegion::forEachNeuron(const F& func) const {
+    for (const auto& pop : pImpl->populations) {
+        for (const auto* neuron : pop->getNeurons()) {
+            func(const_cast<Neuron*>(neuron));
+        }
+    }
+}
+
+void NeuralRegion::forEachSynapse(std::function<void(Synapse*)> func) {
+    for (auto& syn : pImpl->synapses) {
+        func(syn.get());
+    }
+}
+
+template<typename F> void NeuralRegion::forEachSynapse(const F& func) const {
+    for (const auto& syn : pImpl->synapses) {
+        func(const_cast<Synapse*>(syn.get()));
+    }
+}
+
+void NeuralRegion::forEachPopulation(std::function<void(NeuralPopulation*)> func) {
+    for (auto& pop : pImpl->populations) {
+        func(pop.get());
+    }
+}
+
+template<typename F> void NeuralRegion::forEachPopulation(const F& func) const {
+    for (const auto& pop : pImpl->populations) {
+        func(const_cast<NeuralPopulation*>(pop.get()));
+    }
 }
 
 } // namespace nlm

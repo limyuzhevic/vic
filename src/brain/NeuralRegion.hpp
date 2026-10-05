@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -78,6 +79,14 @@ public:
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
+    
+    // Convenience methods for iteration
+    void forEachNeuron(std::function<void(Neuron*)> func);
+    void forEachSynapse(std::function<void(Synapse*)> func);
+    template<typename F> void forEachNeuron(const F& func) const;
+    template<typename F> void forEachSynapse(const F& func) const;
+    void forEachPopulation(std::function<void(NeuralPopulation*)> func);
+    template<typename F> void forEachPopulation(const F& func) const;
     
 private:
     struct Impl;
