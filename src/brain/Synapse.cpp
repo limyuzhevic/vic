@@ -94,6 +94,8 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    // Validate weight is within bounds
+    if (weight < pImpl->MIN_WEIGHT || weight > pImpl->MAX_WEIGHT) return;
     pImpl->weight = weight;
 }
 
@@ -116,6 +118,10 @@ SynapseType Synapse::getType() const {
 }
 
 void Synapse::setType(SynapseType type) {
+    // Validate synapse type
+    if (type < SynapseType::Excitatory || type > SynapseType::GapJunction) {
+        return;
+    }
     pImpl->type = type;
 }
 
@@ -128,6 +134,9 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    // Validate timestamp
+    if (timestamp < 0.0f) return;
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +144,9 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    // Validate timestamp
+    if (timestamp < 0.0f) return;
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -152,6 +164,8 @@ const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
 void Synapse::clearHistory() {
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {

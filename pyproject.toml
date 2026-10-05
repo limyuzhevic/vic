@@ -33,6 +33,8 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "memory-profiler>=0.5.0",  # For memory profiling
+    "psutil>=5.8.0",          # For system monitoring
 ]
 
 [project.urls]
@@ -55,3 +57,59 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+addopts = "-v --tb=short --timeout=300"
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+show_contexts = true
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(\.eggs
+  |\.git
+  |\.hg
+  |\.mypy_cache
+  |\.tox
+  |\.venv
+  |_build
+  |buck-out
+  |build
+  |dist
+)/'
+```
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["pynlm"]
+known_third_party = ["pybind11", "numpy", "pytest"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = '''
+.*/tests/.*
+.*/build/.*
+'''

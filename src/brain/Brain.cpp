@@ -296,6 +296,18 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
     
+    // Log initialization summary
+    NLM_LOG_INFO("=== Brain Initialization Summary ===");
+    NLM_LOG_INFO("Network Architecture: " + std::to_string(getRegionCount()) + " regions");
+    NLM_LOG_INFO("Neurons per region: ~" + std::to_string(neuronCount / regionCount));
+    NLM_LOG_INFO("Synapse density: " + std::to_string(connectionProbability * 100) + "%");
+    NLM_LOG_INFO("Plasticity systems: STDP, Hebbian, Structural");
+    NLM_LOG_INFO("Memory systems: Working, Episodic, Associative");
+    NLM_LOG_INFO("Cognition systems: Planning, Attention, Concept Formation");
+    NLM_LOG_INFO("Neuromodulation: Dopamine, Curiosity, Novelty");
+    NLM_LOG_INFO("Development system enabled");
+}
+    
     return true;
 }
 

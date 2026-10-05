@@ -51,10 +51,18 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    // Validate type
+    if (type < NeuronType::Excitatory || type > NeuronType::Internal) {
+        return;
+    }
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate membrane potential range (reasonable biological range)
+    if (potential < -100.0f || potential > 50.0f) {
+        return;
+    }
     pImpl->state.membranePotential = potential;
 }
 
@@ -68,13 +76,18 @@ void Neuron::setThreshold(MembranePotential threshold) {
 
 void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
+    if (state == FiringState::Refractory) {
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+    }
 }
 
 void Neuron::decrementRefractory() {
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+            if (pImpl->state.firingState == FiringState::Refractory) {
+                pImpl->state.firingState = FiringState::Resting;
+            }
         }
     }
 }
@@ -84,6 +97,8 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    // Validate leak conductance is positive
+    if (conductance <= 0.0f) return;
     pImpl->state.leakConductance = conductance;
 }
 
@@ -92,6 +107,8 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    // Validate refractory period is reasonable (1-1000 steps)
+    if (steps == 0 || steps > 1000) return;
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +117,8 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate resting potential is reasonable for LIF neuron
+    if (potential < -90.0f || potential > -60.0f) return;
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +127,8 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Validate reset potential is slightly lower than resting potential
+    if (potential < -80.0f || potential > -65.0f) return;
     pImpl->state.resetPotential = potential;
 }
 
@@ -122,12 +143,14 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
+    if (amplitude < 0.0f) return;  // Validate amplitude is positive
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
+    if (amplitude < 0.0f) return;  // Validate amplitude is positive
     pImpl->synapticInput -= amplitude;
 }
 
