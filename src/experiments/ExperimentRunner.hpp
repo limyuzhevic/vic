@@ -23,6 +23,9 @@ public:
                       std::shared_ptr<Environment> environment,
                       SimulationStep maxSteps);
     
+    // Create fresh environment from template
+    std::shared_ptr<Environment> createFreshEnvironment(std::shared_ptr<Environment> templateEnv);
+    
     // Run batch of experiments
     std::vector<std::shared_ptr<Experiment>> runBatch(
         const std::vector<std::shared_ptr<Experiment>>& experiments,

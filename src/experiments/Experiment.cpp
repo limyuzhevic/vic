@@ -1,4 +1,6 @@
 #include "Experiment.hpp"
+#include <iomanip>
+#include <sstream>
 
 namespace nlm {
 
@@ -135,6 +137,46 @@ void Experiment::addNote(const std::string& note) {
 
 const std::vector<std::string>& Experiment::getNotes() const {
     return pImpl->notes;
+}
+
+std::string Experiment::getSummary() const {
+    std::ostringstream oss;
+    oss << "Experiment: " << pImpl->name << "\n";
+    oss << "Seed: " << pImpl->seed << "\n";
+    oss << "Steps recorded: " << pImpl->stepData.size() << "\n";
+    oss << "Metrics: " << pImpl->metrics.size() << "\n";
+    oss << "Notes: " << pImpl->notes.size() << "\n";
+    if (!pImpl->stepData.empty()) {
+        oss << "Time range: " << pImpl->stepData.front().step << " to " << pImpl->stepData.back().step << "\n";
+    }
+    return oss.str();
+}
+
+void Experiment::clear() {
+    pImpl->stepData.clear();
+    pImpl->metrics.clear();
+    pImpl->notes.clear();
+}
+
+bool Experiment::save(const std::string& filepath) const {
+    // TODO PHASE 2: Implement proper experiment saving
+    // For now, just save summary
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << getSummary() << "\n\n";
+    file << "Config:\n";
+    for (const auto& pair : pImpl->config) {
+        file << "  " << pair.first << " = " << pair.second << "\n";
+    }
+    file << "\nMetrics:\n";
+    for (const auto& pair : pImpl->metrics) {
+        file << "  " << pair.first << " = " << pair.second << "\n";
+    }
+    
+    return true;
 }
 
 } // namespace nlm

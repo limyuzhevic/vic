@@ -19,13 +19,31 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load configuration from JSON file
+    // For now, support both simple key=value format and JSON format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try to parse as JSON first
+    try {
+        // Check if it's likely JSON (starts with { or [)
+        if (!content.empty() && (content.find('{') == 0 || content.find('[') == 0)) {
+            return loadFromJSON(content);
+        }
+    } catch (...) {
+        // JSON parsing failed, fall back to simple format
+    }
+    
+    // Fallback to simple key=value format
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -50,6 +68,167 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& jsonContent) {
+    // Simple JSON parsing for basic configuration
+    // This is a minimal implementation that handles common JSON structures
+    // For production, consider using a proper JSON library
+    
+    // Remove whitespace and comments
+    std::string cleaned;
+    bool inString = false;
+    char quoteChar = 0;
+    
+    for (size_t i = 0; i < jsonContent.size(); ++i) {
+        char c = jsonContent[i];
+        
+        // Skip comments
+        if (!inString && c == '/' && i + 1 < jsonContent.size() && 
+            (jsonContent[i + 1] == '/' || jsonContent[i + 1] == '*')) {
+            while (i + 1 < jsonContent.size() && 
+                   !(jsonContent[i + 1] == '\n' && jsonContent[i] == '*')) {
+                i++;
+            }
+            continue;
+        }
+        
+        if (!inString && (c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+            // Skip whitespace
+            continue;
+        }
+        
+        if (c == '"' || c == '\'') {
+            if (!inString) {
+                inString = true;
+                quoteChar = c;
+                cleaned += c;
+            } else if (quoteChar == c) {
+                inString = false;
+                quoteChar = 0;
+                cleaned += c;
+            } else {
+                cleaned += c;
+            }
+        } else if (c == ',' && !inString) {
+            cleaned += ' ';
+        } else {
+            cleaned += c;
+        }
+    }
+    
+    // Now parse the cleaned content
+    // Very simple parser - for production use a proper JSON library
+    size_t pos = 0;
+    while (pos < cleaned.size()) {
+        // Find next key (either "key": or key:)
+        size_t keyPos = cleaned.find('"', pos);
+        if (keyPos == std::string::npos) {
+            keyPos = cleaned.find_first_of(':', pos);
+        }
+        
+        if (keyPos == std::string::npos) {
+            break;
+        }
+        
+        // Extract key
+        std::string key;
+        size_t valuePos;
+        
+        if (cleaned[keyPos] == '"') {
+            // JSON quoted key
+            size_t endQuote = cleaned.find('"', keyPos + 1);
+            if (endQuote == std::string::npos) break;
+            key = cleaned.substr(keyPos + 1, endQuote - keyPos - 1);
+            valuePos = cleaned.find(':', endQuote);
+            if (valuePos == std::string::npos) break;
+        } else {
+            // Unquoted key (simplified)
+            size_t endKey = cleaned.find(':', keyPos);
+            if (endKey == std::string::npos) break;
+            key = cleaned.substr(keyPos, endKey - keyPos);
+            valuePos = endKey;
+        }
+        
+        // Skip whitespace after key
+        while (valuePos < cleaned.size() && 
+               (cleaned[valuePos] == ' ' || cleaned[valuePos] == '\t' || 
+                cleaned[valuePos] == '\n' || cleaned[valuePos] == '\r')) {
+            valuePos++;
+        }
+        
+        if (valuePos >= cleaned.size() || cleaned[valuePos] != ':') {
+            break;
+        }
+        
+        valuePos++; // Skip colon
+        
+        // Skip whitespace after colon
+        while (valuePos < cleaned.size() && 
+               (cleaned[valuePos] == ' ' || cleaned[valuePos] == '\t' || 
+                cleaned[valuePos] == '\n' || cleaned[valuePos] == '\r')) {
+            valuePos++;
+        }
+        
+        // Extract value (simplified)
+        std::string value;
+        size_t endValue = cleaned.find_first_of(",}", valuePos);
+        if (endValue == std::string::npos) {
+            endValue = cleaned.size();
+        }
+        
+        value = cleaned.substr(valuePos, endValue - valuePos);
+        
+        // Trim value
+        value = trim(value);
+        
+        // Remove surrounding quotes from value
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Parse numeric values
+        bool isNumeric = false;
+        double doubleVal = 0.0;
+        if (std::isdigit(value[0]) || (value[0] == '-' && value.size() > 1 && std::isdigit(value[1]))) {
+            try {
+                size_t posAfter = 0;
+                doubleVal = std::stod(value, &posAfter);
+                if (posAfter == value.size()) {
+                    isNumeric = true;
+                }
+            } catch (...) {
+                isNumeric = false;
+            }
+        }
+        
+        // Parse boolean values
+        bool isBool = false;
+        bool boolVal = false;
+        if (value == "true") {
+            boolVal = true;
+            isBool = true;
+        } else if (value == "false") {
+            boolVal = false;
+            isBool = true;
+        }
+        
+        // Set the configuration value
+        if (isNumeric) {
+            // Use double as base type and convert to appropriate type later
+            set(key, doubleVal, ConfigSource::File);
+        } else if (isBool) {
+            set(key, boolVal, ConfigSource::File);
+        } else {
+            set(key, value, ConfigSource::File);
+        }
+        
+        pos = endValue + 1;
     }
     
     return true;
@@ -86,7 +265,26 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                               std::is_same_v<T, int64_t> ||
+                               std::is_same_v<T, double>) {
+                file << arg;
+            } else {
+                // For other types (not currently supported), use string conversion
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

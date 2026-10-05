@@ -1,4 +1,6 @@
-#include "ExperimentRunner.hpp"
+#include "Environment.hpp"
+#include "GridWorldEnvironment.hpp"
+#include "SimpleWorld.hpp"
 
 namespace nlm {
 
@@ -77,18 +79,69 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
+        // Initialize from template configuration
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
         brain->initialize();
         
-        // Would also create fresh environment here
+        // Create fresh environment based on template
+        auto environment = createFreshEnvironment(environmentTemplate);
         
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
+        if (runExperiment(exp, brain, environment, maxSteps)) {
             results.push_back(exp);
         }
     }
     
     return results;
+}
+
+std::shared_ptr<Environment> ExperimentRunner::createFreshEnvironment(
+    std::shared_ptr<Environment> templateEnv) {
+    
+    if (!templateEnv) {
+        return nullptr;
+    }
+    
+    // Create a new environment instance based on the template
+    // Check the template environment type and create appropriate fresh environment
+    const char* templateName = templateEnv->getName();
+    
+    if (strcmp(templateName, "GridWorld") == 0) {
+        // For GridWorld environments, extract dimensions and create fresh one
+        // This is a simplified approach - in practice, you'd need to access
+        // internal state of the template environment
+        try {
+            // Try to create a GridWorldEnvironment with default dimensions
+            auto gridWorldEnv = std::make_shared<GridWorldEnvironment>();
+            gridWorldEnv->initialize(16, 16); // Default size
+            return gridWorldEnv;
+        } catch (...) {
+            // Fallback to simple environment
+            NLM_LOG_ERROR("Failed to create fresh GridWorldEnvironment, using default");
+        }
+    } else if (strcmp(templateName, "SimpleWorld") == 0) {
+        // Handle SimpleWorld environment
+        try {
+            auto simpleWorldEnv = std::make_shared<SimpleWorld>();
+            simpleWorldEnv->initialize(16, 16);
+            return simpleWorldEnv;
+        } catch (...) {
+            NLM_LOG_ERROR("Failed to create fresh SimpleWorld environment, using default");
+        }
+    }
+    
+    // If template type is unknown or cloning fails, create a fresh environment
+    // with default parameters
+    try {
+        auto freshEnv = std::make_shared<Environment>();
+        freshEnv->initialize(16, 16);
+        return freshEnv;
+    } catch (...) {
+        // Last resort: create a minimal environment
+        NLM_LOG_ERROR("All environment cloning attempts failed, creating minimal environment");
+        auto freshEnv = std::make_shared<Environment>();
+        freshEnv->initialize(16, 16);
+        return freshEnv;
+    }
 }
 
 const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments() const {
