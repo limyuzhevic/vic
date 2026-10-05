@@ -36,27 +36,72 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// Implements spike-timing dependent plasticity modulated by reward signals
 class RewardModulatedSTDP : public PlasticityRule {
 public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Reward modulation parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setRewardModulation(float modulation);
+    float getRewardModulation() const;
+    void setBaseline(float baseline);
+    float getBaseline() const;
+    
+    // Update parameters from config
+    void configure(float ltpWeight, float ltdWeight, float tau, float learningRate, float rewardModulation);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
+// Implements triplet-based STDP for presynaptic and postsynaptic spike timing
 class TripletSTDP : public PlasticityRule {
 public:
+    TripletSTDP();
+    ~TripletSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "TripletSTDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Triplet parameters
+    void setA1Plus(float a1Plus);      // Presynaptic trace contribution
+    float getA1Plus() const;
+    void setA2Plus(float a2Plus);      // Postsynaptic trace contribution
+    float getA2Plus() const;
+    void setA1Minus(float a1Minus);    // Presynaptic depression trace
+    float getA1Minus() const;
+    void setA2Minus(float a2Minus);    // Postsynaptic depression trace
+    float getA2Minus() const;
+    void setTauPlus(float tauPlus);    // Time constant for potentiation
+    float getTauPlus() const;
+    void setTauMinus(float tauMinus);  // Time constant for depression
+    float getTauMinus() const;
+    
+    // Update parameters
+    void configure(float a1Plus, float a2Plus, float a1Minus, float a2Minus, float tauPlus, float tauMinus);
+    
+protected:  // Allow subclasses to access cleanTraces
+    void cleanTraces();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
