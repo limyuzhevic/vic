@@ -6,6 +6,15 @@
 #include <variant>
 #include <optional>
 
+// Forward declarations for external JSON/YAML libraries
+namespace nlohmann {
+    class json;
+}
+
+namespace YAML {
+    class Node;
+}
+
 namespace nlm {
 
 // Forward declarations
@@ -61,8 +70,21 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Load from environment variable
+    void setFromEnvironmentVariable(const std::string& varName);
+    
+    // Load from JSON file
+    bool tryParseJSONFile(const std::string& filepath);
+    
+    // Configuration validation
+    bool validate() const;
+    
+    // Configuration summary with validation
+    void printSummary() const;
+    
+    // Get validated configuration value
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key, const T& defaultValue) const;
     
     // Get values
     template<typename T>
@@ -100,6 +122,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper methods for enhanced file loading
+    friend bool tryParseJSON(const std::string& content, const std::string& filepath);
+    friend bool tryParseYAML(const std::string& content, const std::string& filepath);
+    friend void setConfigFromJSONValue(const std::string& key, const nlohmann::json& value);
+    friend void setConfigFromYAMLValue(const std::string& key, const YAML::Node& value);
 };
-
-} // namespace nlm

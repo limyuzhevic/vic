@@ -143,6 +143,13 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Helper methods for improved code organization
+    float calculateLeakContribution(MembranePotential V, MembranePotential V_rest);
+    float calculateSynapticContribution(MembranePotential synapticInput);
+    void updateAdaptationVariable();
+    bool checkForSpike(MembranePotential V, MembranePotential threshold,
+                      MembranePotential V_reset, Timestamp currentTime);
+    
 private:
     struct Impl;
     Impl* pImpl;

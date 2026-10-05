@@ -259,6 +259,44 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
+// Helper function to calculate leak contribution
+float Neuron::calculateLeakContribution(MembranePotential V, MembranePotential V_rest) {
+    const float tau = Impl::TIME_CONSTANT;  // ms
+    return (V_rest - V) / tau;
+}
+
+// Helper function to calculate synaptic contribution
+float Neuron::calculateSynapticContribution(MembranePotential synapticInput) {
+    const float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    return synapticInput / C;
+}
+
+// Helper function to update adaptation variable
+void Neuron::updateAdaptationVariable() {
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+}
+
+// Helper function to check and handle spike
+bool Neuron::checkForSpike(MembranePotential V, MembranePotential threshold, 
+                          MembranePotential V_reset, Timestamp currentTime) {
+    if (V >= threshold) {
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+        
+        return true;
+    }
+    return false;
+}
+
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
