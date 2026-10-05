@@ -1,21 +1,24 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+requires = ["setuptools>=61.0", "wheel>=0.37.0", "pybind11>=2.11.0", "scikit-build-core>=0.5.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "pynlm"
+name = "nlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "NLM (Neural Learning Machine) Python package with enhanced Python features"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neural Networks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -24,21 +27,149 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
 ]
-
-dependencies = []
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",
+    "pybind11>=2.11.0",
+    "scikit-build-core>=0.5.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+    "sphinx",
+    "sphinx-rtd-theme",
+]
+visualization = [
+    "matplotlib>=3.0",
+    "seaborn>=0.11.0",
+]
+jupyter = [
+    "jupyter",
+    "ipykernel",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+Discussions = "https://github.com/nlm-project/nlm/discussions"
+
+[project.scripts]
+nlm-simulate = "nlm.command_line:main"
+nlm-export = "nlm.command_line:main"
+nlm-import = "nlm.command_line:main"
+nlm-config = "nlm.command_line:main"
+nlm-init = "nlm.command_line:show_status"
+
+[tool.setuptools]
+packages = [
+    "nlm",
+    "nlm.core",
+    "nlm.brain",
+    "nlm.agent",
+    "nlm.world",
+    "nlm.visualization",
+]
+package-dir = {
+    "nlm" = "nlm",
+    "nlm.core" = "nlm/core",
+    "nlm.brain" = "nlm/brain",
+    "nlm.agent" = "nlm/agent",
+    "nlm.world" = "nlm/world",
+    "nlm.visualization" = "nlm/visualization",
+}
+
+[tool.setuptools.package-data]
+nlm = [
+    "py.typed",
+    "*.json",
+    "*.yaml",
+    "*.yml",
+    "*.cfg",
+    "*.ini",
+    "*.toml",
+]
+nlm.core = ["*.py"]
+nlm.brain = ["*.py"]
+nlm.agent = ["*.py"]
+nlm.world = ["*.py"]
+nlm.visualization = ["*.py"]
+
+[tool.setuptools.command.build_ext]
+compiler = "cxx"
+
+[tool.setuptools.command.install]
+zip-safe = false
+include-package-data = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["nlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+include_trailing_comma = true
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+ignore_missing_imports = true
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +178,32 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+[tool.ruff]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C",   # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long
+    "E203",  # whitespace before ':'
+    "W503",  # line break before binary operator
+]
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+
+[build-system]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+build-backend = "scikit_build_core.build"

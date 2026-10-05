@@ -13,13 +13,7 @@ class RandomGenerator {
 public:
     using result_type = uint32_t;
     
-    // Create with explicit seed
-    explicit RandomGenerator(uint64_t seed);
-    
-    // Create with time-based seed (not deterministic)
     RandomGenerator();
-    
-    ~RandomGenerator();
     
     // Disable copying
     RandomGenerator(const RandomGenerator&) = delete;
@@ -88,7 +82,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations

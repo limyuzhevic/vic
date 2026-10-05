@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/docs/vcpkg.json",
+  "name": "nlm",
+  "version-string": "0.1.0",
+  "homepage": "https://github.com/nlm-project/nlm",
+  "description": "Neural Learning Machine - Comprehensive neural simulation framework",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "python3",
+      "version>=" : "3.8"
+    },
+    {
+      "name": "pybind11",
+      "version>=" : "2.11.0"
+    },
+    {
+      "name": "nlohmann-json",
+      "features": ["with-unicode"]
+    },
+    {
+      "name": "googletest",
+      "default-features": false,
+      "features": ["gtest", "gtest_main"]
+    },
+    {
+      "name": "catch2",
+      "version>=" : "2.13.10"
+    },
+    {
+      "name": "cmake",
+      "version>=" : "3.22"
+    }
+  ],
+  "overrides": [],
+  "builtin-baseline": "a3b5c1e2-f1e7-4c8d-9a6b-2d5c7f9e3a8b"
+}

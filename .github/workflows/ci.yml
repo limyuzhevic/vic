@@ -1,0 +1,319 @@
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  CXXFLAGS: "-O2 -march=native"
+  PYTHON_VERSION: "3.11"
+  CMAKE_BUILD_TYPE: "Release"
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_COMPILERCHECK: content
+
+jobs:
+  # Code quality checks
+  lint:
+    runs-on: ubuntu-latest
+    name: Code Quality Checks
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy cppcheck
+
+      - name: Install Python dependencies
+        run: |
+          pip install black flake8 mypy pylint isort
+
+      - name: Run Python linting
+        run: |
+          black --check python/ src/ tests/ || exit 1
+          flake8 python/ src/ tests/ || exit 1
+          mypy python/ src/ || exit 1
+
+      - name: Install C++ dependencies
+        run: sudo apt-get install -y cmake
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Run C++ linting
+        run: |
+          cmake --build build --target lint
+          cd build && ctest --output-on-failure
+
+  # Build and test on different platforms
+  test-matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Debug, Release]
+        include:
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+          - os: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+
+    runs-on: ${{ matrix.os }}
+    name: Test on ${{ matrix.os }} (${{ matrix.build_type }})
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up C++ compiler
+        uses: actions/setup-cpp@v1
+        with:
+          compiler: ${{ matrix.c_compiler }}
+          cpp: true
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} \
+            -DNLM_BUILD_PYTHON_BINDINGS=ON \
+            -DNLM_BUILD_TESTS=ON \
+            -DNLM_BUILD_DEMOS=OFF
+
+      - name: Build project
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
+
+      - name: Run C++ tests
+        run: |
+          cd build
+          ctest --output-on-failure -C ${{ matrix.build_type }}
+
+      - name: Install Python dependencies
+        run: pip install -e .[dev,visualization]
+
+      - name: Run Python tests
+        run: |
+          cd python
+          pytest tests/ -v --cov=nlm --cov-report=xml
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./python/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Run benchmarks
+        run: cd build && ./nlm_benchmark
+
+  # Package testing and installation
+  package-tests:
+    runs-on: ubuntu-latest
+    name: Package and Installation Tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install package in development mode
+        run: pip install -e .[dev,visualization]
+
+      - name: Test Python package imports
+        run: |
+          python -c "import nlm; print(f'NLM version: {nlm.__version__}')"
+          python -c "from nlm.core import Config; print('Config import successful')"
+          python -c "from nlm.brain import Brain; print('Brain import successful')"
+
+      - name: Build Python wheel
+        run: python -m build
+
+      - name: Install built wheel
+        run: pip install dist/nlm-*.whl
+
+      - name: Test installed package
+        run: |
+          python -c "import nlm; print('Installed package import successful')"
+          python -m pytest python/tests/ -v
+
+  # Dependency management validation
+  dependency-management:
+    runs-on: ubuntu-latest
+    name: Dependency Management Validation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test vcpkg integration
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake curl
+          mkdir -p "${{ runner.temp }}/vcpkg"
+          git clone https://github.com/Microsoft/vcpkg "${{ runner.temp }}/vcpkg"
+          cd "${{ runner.temp }}/vcpkg"
+          ./bootstrap-vcpkg.sh
+          ./vcpkg integrate install
+          ./vcpkg install pybind11 nlohmann-json googletest
+
+      - name: Test Conan integration
+        run: |
+          pip install conan
+          conan profile detect
+          mkdir -p "${{ runner.temp }}/conan"
+          cd "${{ runner.temp }}/conan"
+          echo "[settings]" > conanfile.txt
+          echo "os=Linux" >> conanfile.txt
+          echo "arch=x86_64" >> conanfile.txt
+          echo "compiler=gcc" >> conanfile.txt
+          echo "compiler.version=11" >> conanfile.txt
+          echo "compiler.libcxx=libstdc++11" >> conanfile.txt
+          echo "build_type=Release" >> conanfile.txt
+          conan install . --build=missing
+
+  # Performance benchmarking
+  benchmark:
+    runs-on: ubuntu-latest
+    name: Performance Benchmarking
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DNLM_ENABLE_BENCHMARKS=ON
+
+      - name: Build benchmark
+        run: cmake --build build --parallel
+
+      - name: Run performance benchmarks
+        run: |
+          cd build
+          ./nlm_benchmark > benchmark_results.json
+
+      - name: Analyze benchmark results
+        run: python .github/scripts/analyze_benchmarks.py benchmark_results.json
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: benchmark_results.json
+
+  # Documentation generation
+  documentation:
+    runs-on: ubuntu-latest
+    name: Documentation Generation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install documentation dependencies
+        run: pip install sphinx sphinx-rtd-theme breathe doxygen
+
+      - name: Generate Doxygen documentation
+        run: doxygen Doxyfile
+
+      - name: Generate Sphinx documentation
+        run: |
+          cd docs
+          make html
+
+      - name: Deploy documentation
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/_build/html
+
+  # Release packaging
+  release:
+    needs: [lint, test-matrix, package-tests]
+    runs-on: ubuntu-latest
+    name: Release Packaging
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build package
+        run: python -m build
+
+      - name: Create release archive
+        run: |
+          mkdir -p release
+          cp dist/*.whl release/
+          tar -czf nlm-source.tar.gz --exclude=build --exclude=.git .
+          cp nlm-source.tar.gz release/
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: release/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            Automated release for NLM version ${{ github.ref_name }}
+            
+            This release includes:
+            - Built C++ library with all optimizations
+            - Python bindings with performance enhancements
+            - Comprehensive test suite
+            - Performance benchmarks
+            - Documentation updates
+            
+            See the documentation for detailed release notes.
+          draft: false
+          prerelease: false
