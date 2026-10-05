@@ -19,23 +19,26 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO: Implement proper JSON/YAML parser for future phases
+    // Current implementation uses a simple key=value format with basic JSON support
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Try to parse as JSON key=value pair
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,10 +51,78 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse value based on content
+            bool parsedSuccessfully = false;
+            
+            // Try integer
+            try {
+                size_t end;
+                long intVal = std::stol(value, &end);
+                if (end == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    parsedSuccessfully = true;
+                }
+            } catch (...) {}
+            
+            // Try double if integer parsing failed
+            if (!parsedSuccessfully) {
+                try {
+                    size_t end;
+                    double doubleVal = std::stod(value, &end);
+                    if (end == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        parsedSuccessfully = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try boolean if number parsing failed
+            if (!parsedSuccessfully) {
+                std::string lowerValue = toLower(value);
+                if (lowerValue == "true") {
+                    set(key, true, ConfigSource::File);
+                    parsedSuccessfully = true;
+                } else if (lowerValue == "false") {
+                    set(key, false, ConfigSource::File);
+                    parsedSuccessfully = true;
+                }
+            }
+            
+            // Fall back to string if all else fails
+            if (!parsedSuccessfully) {
+                set(key, value, ConfigSource::File);
+            }
+        } else {
+            // Try to parse as simple JSON object {"key": "value"}
+            if (line.size() >= 2 && line.front() == '{' && line.back() == '}') {
+                // Simple JSON object parsing
+                std::string content = line.substr(1, line.size() - 2);
+                size_t colonPos = content.find(':');
+                if (colonPos != std::string::npos) {
+                    std::string jsonKey = trim(content.substr(0, colonPos));
+                    std::string jsonValue = trim(content.substr(colonPos + 1));
+                    
+                    // Remove quotes from key
+                    if (jsonKey.size() >= 2 && 
+                        ((jsonKey.front() == '"' && jsonKey.back() == '"') ||
+                         (jsonKey.front() == '\'' && jsonKey.back() == '\''))) {
+                        jsonKey = jsonKey.substr(1, jsonKey.size() - 2);
+                    }
+                    
+                    // Remove quotes from value
+                    if (jsonValue.size() >= 2 && 
+                        ((jsonValue.front() == '"' && jsonValue.back() == '"') ||
+                         (jsonValue.front() == '\'' && jsonValue.back() == '\''))) {
+                        jsonValue = jsonValue.substr(1, jsonValue.size() - 2);
+                    }
+                    
+                    set(jsonKey, jsonValue, ConfigSource::File);
+                }
+            }
         }
     }
     
+    NLM_LOG_INFO("Loaded config file: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
@@ -81,14 +152,32 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write key
+        file << entry.key << " = ";
+        
+        // Write value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Saved config file: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 

@@ -589,30 +589,46 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    NLM_LOG_DEBUG("Brain: Processing sensory input of type " + std::to_string(static_cast<int>(input.getType())));
     
-    const auto& values = input.getData();
-    if (values.empty()) return;
+    // Validate input
+    if (!input.getData().empty() && input.getDimensions() > 0) {
+        NLM_LOG_ERROR("Brain: Invalid sensory input - data not empty but dimensions zero");
+        return;
+    }
     
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
-    
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
+    if (!pImpl->sensoryNeurons.empty()) {
+        size_t numSensory = std::min(pImpl->sensoryNeurons.size(), input.getDimensions());
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Validate neural connections
+        for (size_t i = 0; i < numSensory; ++i) {
+            if (!pImpl->sensoryNeurons[i]) {
+                NLM_LOG_ERROR("Brain: Null sensory neuron at index " + std::to_string(i));
+                continue;
+            }
+            
+            // Normalize input value to range [-10, 10] mV
+            float normalizedValue = 0.0f;
+            if (i < input.getData().size()) {
+                normalizedValue = static_cast<float>(input.getData()[i]) * 10.0f;
+            }
+            
+            // Validate current value
+            if (std::isnan(normalizedValue) || std::isinf(normalizedValue)) {
+                NLM_LOG_ERROR("Brain: Invalid neural current value: " + std::to_string(normalizedValue));
+                normalizedValue = 0.0f; // Clamp to safe value
+            }
+            
+            // Inject current into this sensory neuron
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            
+            // Also store in working memory if available and value is significant
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            }
         }
+    } else {
+        NLM_LOG_DEBUG("Brain: No sensory neurons configured - input ignored");
     }
 }
 

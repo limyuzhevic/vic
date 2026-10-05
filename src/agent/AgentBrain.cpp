@@ -85,14 +85,24 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain: Cannot process sensory input - brain not initialized");
+        return;
+    }
+    
+    NLM_LOG_DEBUG("AgentBrain: Processing sensory percept");
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
+            // Validate input value
             float current = vision[i] * 5.0f;  // Scale factor
+            if (std::isnan(current) || std::isinf(current)) {
+                NLM_LOG_ERROR("AgentBrain: Invalid vision input at index " + std::to_string(i));
+                current = 0.0f;
+            }
+            
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -102,6 +112,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            if (std::isnan(current) || std::isinf(current)) {
+                NLM_LOG_ERROR("AgentBrain: Invalid touch input at index " + std::to_string(i));
+                current = 0.0f;
+            }
+            
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -111,6 +126,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            if (std::isnan(current) || std::isinf(current)) {
+                NLM_LOG_ERROR("AgentBrain: Invalid internal input at index " + std::to_string(i));
+                current = 0.0f;
+            }
+            
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -120,6 +140,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            if (std::isnan(current) || std::isinf(current)) {
+                NLM_LOG_ERROR("AgentBrain: Invalid proprioception input at index " + std::to_string(i));
+                current = 0.0f;
+            }
+            
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
