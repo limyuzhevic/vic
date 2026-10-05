@@ -75,13 +75,22 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Total sensory input size based on sensory neuron distribution
+    // Vision (16x16 = 256) + touch (8) + internal (4) + proprioception (6)
+    size_t visionSize = 16 * 16;  // Configurable: 16x16 vision grid
+    size_t touchSize = 8;       // Configurable: 8 touch sensors
+    size_t internalSize = 4;    // Configurable: 4 internal signals
+    size_t proprioSize = 6;    // Configurable: 6 proprioceptive sensors
+    
+    return visionSize + touchSize + internalSize + proprioSize;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // Total motor output size based on action space
+    // Forward, Backward, TurnLeft, TurnRight, Interact, Wait
+    size_t motorActions = 6;  // Configurable: number of basic actions
+    
+    return motorActions;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -89,37 +98,43 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
+    float visionScale = 5.0f;  // Configurable: vision intensity scaling
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * visionScale;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
+    float touchScale = 8.0f;  // Configurable: touch intensity scaling
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * touchScale;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
+    float internalCenter = 1.0f;  // Configurable: internal signal center
+    float internalScale = 5.0f;   // Configurable: internal signal scaling
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * internalScale - internalCenter) * internalScale;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
+    float proprioCenter = 1.0f;  // Configurable: proprioception signal center
+    float proprioScale = 3.0f;   // Configurable: proprioception signal scaling
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * proprioScale - proprioCenter) * proprioScale;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
