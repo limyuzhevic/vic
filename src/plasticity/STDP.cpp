@@ -1,5 +1,5 @@
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "PlasticityRule.hpp"
 #include <cmath>
 #include <algorithm>
 

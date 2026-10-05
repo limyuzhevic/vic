@@ -1,5 +1,5 @@
 #include "Hebbian.hpp"
-#include "../../brain/Synapse.hpp"
+#include "PlasticityRule.hpp"
 #include <algorithm>
 
 namespace nlm {

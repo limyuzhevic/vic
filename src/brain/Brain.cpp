@@ -8,6 +8,7 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -551,7 +552,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
+        auto* sp = pImpl->structuralPlasticity.get();
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
@@ -813,7 +814,7 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
+            for (const auto& syn : region->getSynapses()) {
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());

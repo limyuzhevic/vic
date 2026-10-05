@@ -88,28 +88,31 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── HOW_TO_USE.md              # Python API usage guide
+├── easy_usage.md             # Beginner-friendly tutorial
+├── docs/                     # Extensive documentation collection
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   │   ├── EXPERIMENTS.md
+│   │   ├── LIMITATIONS.md
+│   │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── python/                   # Python bindings for C++ API
+└── src/                     # Main source code (hundreds of files)
+    ├── core/               # Core utilities (Types, Config, Random, Logger, SimulationClock)
+    ├── brain/              # Neural components (Neuron, Synapse, NeuralPopulation, NeuralRegion, Brain)
+    ├── dynamics/           # Neural dynamics (NeuralDynamics, SpikeSystem)
+    ├── plasticity/         # Plasticity rules (STDP, Hebbian, StructuralPlasticity)
+    ├── development/        # Developmental system (DevelopmentSystem, Synaptogenesis, Pruning, Maturation)
+    ├── neuromodulation/    # Neuromodulators (Dopamine, Reward, Novelty, Curiosity)
+    ├── memory/            # Memory systems (WorkingMemory, EpisodicMemory, ConceptFormation)
+    ├── prediction/         # Prediction systems (PredictionSystem, NeuralPrediction)
+    ├── cognition/         # Cognitive mechanisms (AttentionalSelection, NeuralPlanner)
+    ├── sensory/           # Sensory processing (Vision, Audio, InternalSignals)
+    ├── motor/             # Motor system (MotorSystem, Action)
+    ├── environment/       # Environment interface (Environment, Observation)
+    ├── experiments/       # Experiment framework (Phase3-6 experiments)
+    └── visualization/     # Visualization (VisualizationInterface)
 ├── tests/
 └── configs/
 ```

@@ -47,6 +47,18 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Increment operators for RegionId
+    constexpr RegionId& operator++() { // prefix increment
+        ++value;
+        return *this;
+    }
+    
+    constexpr RegionId operator++(int) { // postfix increment
+        RegionId temp = *this;
+        ++value;
+        return temp;
+    }
 };
 
 // Population identifier
