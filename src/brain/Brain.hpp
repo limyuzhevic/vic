@@ -6,16 +6,32 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Error.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <stdexcept>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
+// Forward declarations for circular dependencies
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
@@ -28,6 +44,32 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+
+// Brain initialization exception
+class BrainInitializationError : public NLMError {
+public:
+    BrainInitializationError(const std::string& message, const std::string& context = "", int errorCode = 0)
+        : NLMError(message, NLMErrorCategory::System, context, errorCode) {}
+};
+
+class BrainStepError : public NLMError {
+public:
+    BrainStepError(const std::string& message, const std::string& context = "", int errorCode = 0)
+        : NLMError(message, NLMErrorCategory::Simulation, context, errorCode) {}
+};
+
+class BrainMemoryError : public NLMError {
+public:
+    BrainMemoryError(const std::string& message, const std::string& context = "", int errorCode = 0)
+        : NLMError(message, NLMErrorCategory::Memory, context, errorCode) {}
+};
+
+class BrainCheckpointError : public NLMError {
+public:
+    BrainCheckpointError(const std::string& message, const std::string& context = "", int errorCode = 0)
+        : NLMError(message, NLMErrorCategory::System, context, errorCode) {}
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -44,13 +86,10 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+// Exception-safe Brain interface
 class Brain {
 public:
-    // Create brain with configuration
+    // Create brain with configuration - may throw BrainInitializationError
     explicit Brain(std::shared_ptr<Config> config);
     
     ~Brain();
@@ -61,17 +100,16 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    // Initialize brain with configuration - may throw BrainInitializationError
     bool initialize();
     
-    // Main simulation step
+    // Main simulation step - may throw BrainStepError
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step - may throw BrainStepError
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    // Receive sensory input from environment - may throw BrainMemoryError
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron
@@ -81,13 +119,13 @@ public:
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    SpikeSystem* getSpikeSystem() { return pImpl->spikeSystem.get(); }
+    const SpikeSystem* getSpikeSystem() const { return pImpl->spikeSystem.get(); }
     
     // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    STDP* getSTDP() { return pImpl->stdp.get(); }
+    Hebbian* getHebbian() { return pImpl->hebbian.get(); }
+    StructuralPlasticity* getStructuralPlasticity() { return pImpl->structuralPlasticity.get(); }
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -109,10 +147,10 @@ public:
     // Reset brain state
     void reset();
     
-    // Save brain state to file (checkpointing)
+    // Save brain state to file (checkpointing) - may throw BrainCheckpointError
     bool save(const std::string& filepath) const;
     
-    // Load brain state from file
+    // Load brain state from file - may throw BrainCheckpointError
     bool load(const std::string& filepath);
     
     // Region management
@@ -193,9 +231,35 @@ public:
     // Logging
     void logStatus() const;
     
+    // Exception-safe validation methods
+    bool isHealthy() const;
+    bool hasMemorySystems() const;
+    bool hasNeuromodulation() const;
+    bool hasPrediction() const;
+    bool hasCognition() const;
+    bool hasDevelopment() const;
+    
+    // Get error information for debugging
+    std::string getErrorSummary() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Exception-safe initialization helper
+    bool initializeImpl();
+    
+    // Exception-safe step helper
+    void stepImpl(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Exception-safe resource cleanup
+    void cleanup() noexcept;
+    
+    // Validate internal state
+    bool validateState() const;
+    
+    // Ensure required components exist
+    void ensureComponentsExist() const;
 };
 
 } // namespace nlm

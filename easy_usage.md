@@ -1,8 +1,8 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM — 熙然
+**An Experimental Artificial Developmental Brain**
+**PHASE 6: FINAL INTEGRATION** ✅ **COMPLETE**
 
-## What is NLM?
-
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM is a brain simulator for computers that creates virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -42,7 +42,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (NEW in Phase 6!)
 
 ```python
 import pynlm
@@ -69,6 +69,61 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Phase 6 Integration Example (NEW!)
+
+```python
+import pynlm
+
+# Create the complete integrated brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable all Phase 6 features
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)              # Explore novel things
+agent.enableDevelopment(True)           # Brain matures
+agent.enableStructuralPlasticity(True)  # Grow new connections
+
+print("=== Phase 6 Integrated Brain Demo ===")
+print("Brain has", brain.getTotalNeuronCount(), "neurons")
+print("Firing neurons:", brain.getFiringNeuronCount())
+
+# Run simulation
+for step in range(100):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process in brain
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get action
+    action = agent.decodeMotorCommand()
+    
+    # Do action
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # See development progress
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing, "
+              f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+              f"Development: {brain.getDevelopmentalStage()}")
+
+print("=== Phase 6 Integration Complete ===")
 ```
 
 ---
@@ -133,7 +188,7 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Brain Stats (Phase 6 New Features)
 
 ```python
 # Just add these inside your loop:
@@ -141,12 +196,14 @@ print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+print("Curiosity level:", agent.getCuriosityLevel())
+print("Novelty level:", agent.getNoveltyLevel())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (Phase 6 Complete Suite)
 
 ```python
-# These are all optional:
+# These are all optional Phase 6 features:
 agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
@@ -159,7 +216,6 @@ agent.enableCuriosity(True)             # Explore new things
 
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
 
 ### `brain.initialize()`
 Starts up the brain. Always call this before using the brain!
@@ -197,7 +253,7 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Project 2: Brain Watching a World (NEW in Phase 6!)
 
 ```python
 import pynlm
@@ -221,7 +277,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Phase 6 Integration
 
 ```python
 import pynlm
@@ -236,9 +292,11 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable ALL Phase 6 features
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
 
 # Run agent
 for step in range(100):
@@ -249,9 +307,11 @@ for step in range(100):
     world.applyMotorCommand(action, world.getSimulationTime())
     
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+              f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+              f"Development: {brain.getDevelopmentalStage()}")
 
-print("Agent simulation complete!")
+print("Phase 6 Agent simulation complete!")
 ```
 
 ---
@@ -268,6 +328,21 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Phase 6 features | `agent.enableRewardModulation(True)`, etc. |
+
+---
+
+## Phase 6 New Features
+
+With Phase 6 integration, you now have access to:
+
+- **Reward Modulation**: Learn from rewards and prediction errors
+- **Curiosity**: Drive exploration of novel stimuli
+- **Development**: Brain matures and changes over time
+- **Structural Plasticity**: Grow new connections and reorganize
+- **Prediction**: Predictive processing and anticipation
+- **Memory Integration**: Full working and episodic memory
+- **Neuromodulation**: Complex behavior regulation
 
 ---
 
@@ -285,13 +360,20 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Phase 6 features not working"**
+- Make sure you're using the latest NLM version
+- Check that agent features are enabled with `enableRewardModulation(True)`, etc.
+- Ensure the brain has enough neurons and connections
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for more technical details
+2. **Read `docs/ARCHITECTURE.md`** to understand how it all works
+3. **Try Phase 6 features** like `enableCuriosity(True)` and `enableDevelopment(True)`
+4. **Experiment with different configurations** in `configs/`
+
+That's it! You're now ready to use NLM with all Phase 6 integration features.
