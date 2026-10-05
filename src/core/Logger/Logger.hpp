@@ -52,9 +52,22 @@ public:
     void setUseColors(bool useColors);
     bool getUseColors() const;
     
+    // Enable/disable structured format
+    void setUseStructuredFormat(bool useStructured);
+    bool getUseStructuredFormat() const;
+    
+    // Set custom format string
+    void setFormatString(const std::string& format);
+    std::string getFormatString() const;
+    
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
+    
+    // Performance optimizations
+    void setBufferSize(size_t size);
+    void setFlushInterval(std::chrono::milliseconds interval);
+    void flush();
     
 private:
     struct Impl;
@@ -62,6 +75,9 @@ private:
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatTimestamp(const std::chrono::system_clock::time_point& timestamp) const;
+    std::string escapeString(const std::string& str) const;
+    std::string applyFormatString(const LogEntry& entry) const;
 };
 
 // Main Logger class
