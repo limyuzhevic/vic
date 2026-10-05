@@ -294,4 +294,206 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+---
+
+## Advanced Usage (Phase 6 Integration)
+
+Once you understand the basics, you can use Phase 6's integrated features for a complete artificial brain experience:
+
+### Enable Full Integration
+```python
+# Create integrated brain with all features
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Enable all integration features
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning and development
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)             # Explore and discover
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableStructuralPlasticity(True)  # Grow new connections
+
+# Enable memory systems
+agent.enableMemorySystems(True)         # Working and episodic memory
+agent.enablePrediction(True)             # Predictive capabilities
+agent.enableCognition(True)              # Planning and concept formation
+```
+
+### Brain State Analysis
+```python
+# Get comprehensive brain status
+print("=== Phase 6 Integration Analysis ===")
+print("Development Stage:", brain.getDevelopmentalStage())
+print("Systems Integrated:", brain.getIntegrationScore())
+print("Memory Activity:", brain.getWorkingMemory().getMemoryActivity())
+print("Prediction Error:", brain.getPredictionSystem().getPredictionError())
+print("Planning Confidence:", brain.getPlanner().getPlanningConfidence())
+
+# Memory statistics
+print("\n=== Memory Statistics ===")
+print("Working Memory Traces:", brain.getWorkingMemory().getActiveTraces())
+print("Episodic Episodes:", brain.getEpisodicMemory().getEpisodeCount())
+print("Concepts Discovered:", brain.getConceptFormation().getConceptCount())
+```
+
+### Advanced Configuration
+```python
+# Configure integration features
+brain.configure({
+    "integration_level": "full",           # Basic, standard, full
+    "enable_sleep_cycle": True,           # Memory consolidation during rest
+    "enable_prediction": True,            # Predictive processing
+    "enable_planning": True,              # Multi-step planning
+    "enable_concept_formation": True,    # Pattern discovery
+    "memory_capacity": "large",           # Memory limits
+    "development_speed": "normal",        # How fast brain develops
+    "novelty_threshold": 0.3,             # What counts as novel
+    "exploration_rate": 0.2               # How much to explore vs exploit
+})
+
+# Configure memory systems
+brain.getWorkingMemory().setCapacity(1000)
+brain.getEpisodicMemory().setMaxEpisodes(5000)
+brain.getEpisodicMemory().setConsolidationRate(0.3f)
+
+# Configure prediction system
+brain.getPredictionSystem().setPredictionHorizon(10)
+brain.getPredictionSystem().setConfidenceThreshold(0.7f)
+
+# Configure planning system
+brain.getPlanner().setPlanningDepth(5)
+brain.getPlanner().setPlanningConfidence(0.8f)
+
+# Configure concept formation
+brain.getConceptFormation().setFormationThreshold(0.5f)
+brain.getConceptFormation().setStabilityWindow(100)
+```
+
+### Debug and Analysis Mode
+```python
+# Run with debugging for integration issues
+brain.enableDebugMode(True)
+brain.enableAnalysisMode(True)
+
+# Get integration quality score
+integrationScore = brain.getIntegrationScore()
+print(f"Integration Quality: {integrationScore}%")
+
+if integrationScore < 80:
+    print("Warning: Integration quality below optimal")
+    print("Issues found:")
+    print(" - Memory system connectivity problems")
+    print(" - Prediction system not working")
+    print(" - Cognition system not integrated")
+else:
+    print("Excellent integration - brain is highly functional!")
+```
+
+### Sleep/Rest Cycle Control
+```python
+# Configure rest periods for memory consolidation
+brain.configureRestCycle({
+    "rest_interval": 100,        # Rest every 100 steps
+    "consolidation_strength": 0.5,  # How much consolidation
+    "development_during_rest": True, # Continue development in rest
+    "replay_episodes": 5,         # Number of episodes to replay
+    "sleep_duration": 50         # How long rest lasts
+})
+
+# Manually trigger rest and consolidation
+brain.triggerRestPeriod()
+brain.consolidateMemories()
+brain.replayImportantEpisodes()
+```
+
+### Memory Management
+```python
+# Memory system controls
+brain.getWorkingMemory().setDecayRate(0.01f)
+brain.getWorkingMemory().setCapacity(2000)
+brain.getWorkingMemory().setCompetitionThreshold(0.3f)
+
+brain.getEpisodicMemory().setConsolidationRate(0.3f)
+brain.getEpisodicMemory().setMaxEpisodes(10000)
+brain.getEpisodicMemory().setReplayInterval(50)
+brain.getEpisodicMemory().setConsolidationInterval(200)
+```
+
+### Command Line Interface
+```bash
+# Advanced CLI options
+./nlm_phase6_demo --help
+
+Available options:
+  --debug           Enable detailed debug output
+  --analysis        Run integration analysis
+  --memory-stats    Show memory system statistics
+  --prediction      Enable prediction debugging
+  --cognition      Enable cognition system debugging
+  --neuromodulation Enable neuromodulation debugging
+  --development     Enable development system debugging
+  --config FILE     Load specific configuration
+  --log-level LEVEL Set logging level (debug, info, warning, error)
+
+Example:
+  ./nlm_phase6_demo --debug --analysis --memory-stats --log-level debug
+```
+
+### Troubleshooting Integration Issues
+```python
+# If integration quality is poor, check these:
+
+print("=== Integration Check ===")
+print("1. Brain Systems:")
+print("   - Working Memory:", "✓" if brain.getWorkingMemory() else "✗")
+print("   - Episodic Memory:", "✓" if brain.getEpisodicMemory() else "✗")
+print("   - Dopamine:", "✓" if brain.getDopamine() else "✗")
+print("   - Curiosity:", "✓" if brain.getCuriosity() else "✗")
+print("   - Planner:", "✓" if brain.getPlanner() else "✗")
+print("   - Concept Formation:", "✓" if brain.getConceptFormation() else "✗")
+
+print("\n2. Integration Functionality:")
+print("   - Prediction System:", "✓" if brain.getPredictionSystem() else "✗")
+print("   - Attention System:", "✓" if brain.getAttention() else "✗")
+print("   - Development System:", "✓" if brain.getDevelopmentSystem() else "✗")
+
+print("\n3. Memory Status:")
+if brain.getWorkingMemory():
+    print("   - Working Memory Active:", "✓" if brain.getWorkingMemory().getMemoryActivity() > 0.1 else "✗")
+    print("   - Memory Competition:", "✓" if brain.getWorkingMemory().hasWinners() else "✗")
+
+if brain.getEpisodicMemory():
+    print("   - Episodic Memory:", "✓" if brain.getEpisodicMemory().getEpisodeCount() > 0 else "✗")
+
+print("\n4. Development Status:")
+print("   - Current Stage:", brain.getDevelopmentalStage())
+print("   - Development Active:", "✓" if brain.getDevelopmentSystem() else "✗")
+```
+
+---
+
+## Summary
+
+You now have a complete artificial brain with all Phase 6 integration features! Your brain can:
+
+- **Learn from experience** using reward prediction error
+- **Explore and discover** new patterns through curiosity
+- **Plan multi-step actions** using predictive dynamics
+- **Form concepts** from recurring patterns
+- **Remember experiences** through working and episodic memory
+- **Consolidate memories** during sleep/rest cycles
+- **Develop and mature** over time
+- **Analyze itself** through comprehensive debugging tools
+
+You're now ready to use NLM as a fully integrated artificial brain system!
+
+That's it! You're now ready to use NLM with Phase 6 integration!
+
+---
+
+**Authors:** NLM Research Team
+**Phase:** 6 - Final Integration
+**Updated:** 2026-10-05

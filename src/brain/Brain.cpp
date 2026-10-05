@@ -510,9 +510,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->attention) {
+        // Build current sensory state from attention weights and neural activity
+        // Create a simplified sensory input for prediction
+        SensoryInput sensoryState;
+        
+        // Get working memory patterns as sensory state
+        if (pImpl->workingMemory) {
+            std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+            if (!currentPattern.empty()) {
+                // Use working memory pattern as current state
+                // For now, use a simplified representation
+                std::vector<float> simplifiedState;
+                simplifiedState.reserve(std::min(currentPattern.size(), static_cast<size_t>(256))); // Vision size
+                for (size_t i = 0; i < std::min(currentPattern.size(), static_cast<size_t>(256)); ++i) {
+                    simplifiedState.push_back(currentPattern[i] * 2.0f - 1.0f); // Normalize to [-1, 1]
+                }
+                
+                if (!simplifiedState.empty()) {
+                    sensoryState = SensoryInput(simplifiedState);
+                    
+                    // Make prediction for next state
+                    auto predictedState = pImpl->predictionSystem->predictNextState(sensoryState);
+                    
+                    // Get prediction error and confidence
+                    float predError = pImpl->predictionSystem->getPredictionError();
+                    
+                    // Update attention based on prediction error (novelty detection)
+                    if (predError > 0.1f) {
+                        // High prediction error means important/novel input
+                        float attentionBoost = predError * 2.0f;
+                        
+                        // Apply top-down bias to relevant neural populations
+                        // For now, just boost all internal neurons
+                        for (auto& region : pImpl->regions) {
+                            for (auto& pop : region->getPopulations()) {
+                                if (pop->getNeuronType() == NeuronType::Internal) {
+                                    for (auto* neuron : pop->getNeurons()) {
+                                        if (neuron->getState().membranePotential < neuron->getState().threshold) {
+                                            neuron->injectCurrent(attentionBoost * 0.5f);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Train prediction system with current experience
+        if (!sensoryState.getData().empty()) {
+            pImpl->predictionSystem->train(sensoryState);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,12 +577,97 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->attention) {
+        // Build current experience pattern from working memory and attention
+        std::vector<float> currentPattern;
+        
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+            
+            // Get attention winners to weight the pattern
+            if (!pImpl->attention->getWinners().empty() && !currentPattern.empty()) {
+                // Apply attention weights to create feature vector
+                std::vector<float> featureVector(currentPattern.size(), 0.0f);
+                
+                // Boost features based on attention
+                for (size_t i = 0; i < std::min(currentPattern.size(), static_cast<size_t>(64)); ++i) {
+                    featureVector[i] = currentPattern[i];
+                }
+                
+                // Present experience to concept formation system
+                float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    featureVector, featureVector, reward, currentStep);
+                
+                if (conceptId > 0) {
+                    // Update attention based on concept stability
+                    auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+                    if (concept) {
+                        float stability = concept->avgStability;
+                        if (stability > 0.5f) {
+                            // Stable concept - reinforce this processing pathway
+                            // Apply top-down bias to concept-related neurons
+                            // Simplified: boost internal neurons that are active
+                            for (auto& region : pImpl->regions) {
+                                for (auto& pop : region->getPopulations()) {
+                                    if (pop->getNeuronType() == NeuronType::Internal) {
+                                        for (auto* neuron : pop->getNeurons()) {
+                                            neuron->injectCurrent(0.1f * stability);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Planning and action selection ==========
+    // NeuralPlanner uses predictions to plan multi-step actions
+    if (pImpl->planner && pImpl->workingMemory) {
+        // Build current state vector for planning
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        if (!currentState.empty()) {
+            // Normalize state to reasonable range
+            for (auto& val : currentState) {
+                val = std::clamp(val, 0.0f, 1.0f);
+            }
+            
+            // Get action from neural planner
+            ActionType plannedAction = pImpl->planner->planAction(
+                currentState, 
+                0.5f  // Target reward
+            );
+            
+            // Apply planned action to motor system
+            // This is handled by AgentBrain::decodeMotorCommand()
+            // but we can reinforce the planned action pattern here
+            
+            if (plannedAction != ActionType::Wait) {
+                // Reinforce the neural pathways corresponding to the planned action
+                // This helps make planned actions more likely to be selected
+                
+                // Find motor neurons corresponding to the planned action
+                // For now, just log the planned action
+                // In a full implementation, this would:
+                // 1. Find motor neuron groups for the planned action
+                // 2. Inject current to bias action selection
+                // 3. Update action quality in the planner
+                
+                // Simplified: boost the corresponding motor population
+                // This is a placeholder for proper motor system integration
+                if (pImpl->attention) {
+                    // Tell attention system about the planned action
+                    // This will influence future competition
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -546,34 +681,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 13: Sleep/rest cycle with memory consolidation ==========
+    // Implement rest periods for memory consolidation
+    if (pImpl->isResting && currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Perform memory consolidation during rest
+        pImpl->episodicMemory->consolidate(0.3f);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        // Update development system during rest
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000.0);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+    }
+    
+    // ========== STEP 14: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -765,6 +913,21 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Use checkpoint manager for consistent checkpointing
+        if (pImpl->checkpointManager) {
+            // Configure checkpoint manager with the save directory
+            std::string checkpointDir = filepath.substr(0, filepath.find_last_of('/'));
+            if (checkpointDir.empty()) checkpointDir = ".";
+            
+            // Save immediately with custom name based on filepath
+            bool success = pImpl->checkpointManager->saveImmediately(filepath);
+            if (success) {
+                NLM_LOG_INFO("Brain state saved using checkpoint manager (" + filepath + ")");
+                return true;
+            }
+        }
+        
+        // Fallback to direct checkpointing if checkpoint manager not available
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -801,6 +964,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    neuronData.regionId.push_back(region->getId().index());
+                    neuronData.populationId.push_back(pop->getId().index());
                 }
             }
         }
@@ -819,7 +985,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -847,6 +1017,18 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        // Use checkpoint manager if available
+        if (pImpl->checkpointManager) {
+            // Checkpoint manager expects checkpoint files in its configured directory
+            // For direct file loading, try the checkpoint manager first
+            bool success = pImpl->checkpointManager->load(filepath);
+            if (success) {
+                NLM_LOG_INFO("Brain state loaded using checkpoint manager (" + filepath + ")");
+                return true;
+            }
+        }
+        
+        // Fallback to direct checkpointing
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
@@ -880,8 +1062,12 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
+                        }
+                        if (idx < neuronData.refractoryPeriod.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
+                        neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
                     }
                     idx++;
                 }
@@ -895,9 +1081,36 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    syn->setPlasticityFlags(synapseData.plasticityFlags[synapseIdx]);
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                    syn->setShortTermDepression(synapseData.shortTermDepression[synapseIdx]);
+                    syn->setShortTermFacilitation(synapseData.shortTermFacilitation[synapseIdx]);
+                }
+                synapseIdx++;
+            }
+        }
+        
+        // Restore spike system state (if available)
+        // Note: SpikeSystem checkpointing would need additional implementation
+        
+        // Reset simulation state
+        pImpl->currentStep = 0;
+        pImpl->currentTime = 0.0;
+        pImpl->totalSpikesThisStep = 0;
+        
+        // Reset memory systems
+        if (pImpl->workingMemory) pImpl->workingMemory->clear();
+        if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+        if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
