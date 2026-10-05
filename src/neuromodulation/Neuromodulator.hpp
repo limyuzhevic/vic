@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <string>
 #include <vector>
 
@@ -32,7 +34,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Enhanced with realistic neuron dynamics, burst firing, adaptive baseline
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -47,6 +49,19 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Enhanced dopamine dynamics
+    void connectToPredictionError(PredictionError* predictionError);
+    float getPredictionError() const;
+    float getBurstLevel() const;
+    float getAdaptiveBaseline() const;
+    float getConcentrationHistory(size_t index) const;
+    float getRecentPredictionError() const;
+    
+    // Integration with prediction error system
+    std::vector<float> getAllConcentrationHistory() const;
+    std::vector<float> getAllRewardHistory() const;
+    std::vector<float> getAllPredictionErrorHistory() const;
     
 private:
     struct Impl;

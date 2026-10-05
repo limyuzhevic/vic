@@ -9,8 +9,7 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/Memory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -32,6 +31,10 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;  // Added for development integration
+    
+    // Add initialization of proceduralMemory in constructor
+    proceduralMemory = std::make_unique<ProceduralMemory>();
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -112,6 +115,7 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();  // Initialize procedural memory
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -477,42 +481,92 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
+    // ========== STEP 7: Update episodic memory with neural activity encoding ==========
+    // Store current neural activity pattern as an episode
+    if (pImpl->episodicMemory) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = currentStep;
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
         
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
+        // Encode current neural activity state
+        std::vector<float> currentSensoryState;
+        
+        // Collect sensory neuron activity
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            if (activation > 0.1f) {  // Only store active neurons
+                episode.activeNeurons.push_back(neuron->getId());
+                episode.neuronActivations.push_back(activation);
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
+        }
+        
+        // Get current working memory for episodic integration
+        std::vector<float> workingMemoryPattern;
+        if (pImpl->workingMemory) {
+            workingMemoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Store working memory as part of episodic context
+        episode.sensoryState = workingMemoryPattern;
+        
+        // Store in episodic memory
+        pImpl->episodicMemory->storeEpisode(episode);
+        
+        // Integrate with neuromodulation for memory consolidation
+        if (pImpl->dopamine && episode.reward > 0.5f) {
+            // High reward triggers memory consolidation
+            size_t episodeId = pImpl->episodicMemory->getEpisodeCount() - 1;
+            pImpl->episodicMemory->updateRelevance(episodeId, 0.5f * episode.reward);
+        }
+        
+        // Update prediction error based on new episode
+        if (pImpl->predictionError) {
+            // Calculate prediction error for this experience
+            // This would be compared with prediction system output
+            float predictionError = 0.3f;  // Placeholder - calculated from prediction system
+            if (predictionError > 0.1f) {
+                // Update episodic memory with prediction error signal
+                size_t episodeId = pImpl->episodicMemory->getEpisodeCount() - 1;
+                pImpl->episodicMemory->updateRelevance(episodeId, predictionError);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction with current working memory and episodic patterns
+        if (pImpl->workingMemory) {
+            std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+            if (!memoryPattern.empty()) {
+                // Predict next states based on working memory
+                // In full implementation, this would use prediction system
+                pImpl->predictionSystem->updatePrediction(memoryPattern);
+                
+                // Get prediction error
+                float error = pImpl->predictionSystem->getPredictionError();
+                
+                // Update working memory based on prediction error
+                if (pImpl->workingMemory && error > 0.5f) {
+                    // High prediction error triggers memory strengthening
+                    pImpl->workingMemory->strengthenMemory(1.0f + error);
+                }
+            }
+        }
+        
+        // Update curiosity system based on prediction errors
+        if (pImpl->curiosity && pImpl->predictionError) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            if (curiosityLevel > 0.7f) {
+                // High curiosity drives episodic exploration
+                if (pImpl->episodicMemory) {
+                    auto episodesToExplore = pImpl->episodicMemory->getRecentEpisodes(3);
+                    for (const auto* episode : episodesToExplore) {
+                        // Reactivate for exploration
+                        pImpl->episodicMemory->replayEpisode(episode);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +577,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Update attention based on neuromodulation
+            if (pImpl->dopamine) {
+                float dopamineLevel = pImpl->dopamine->getLevel();
+                if (dopamineLevel > 0.5f) {
+                    // High dopamine enhances attention to rewarded memories
+                    if (pImpl->episodicMemory) {
+                        auto highRewardEpisodes = pImpl->episodicMemory->retrieveTemporal(currentStep - 100, currentStep);
+                        if (!highRewardEpisodes.empty()) {
+                            // Focus attention on rewarded episodes
+                            for (const auto* episode : highRewardEpisodes) {
+                                pImpl->attention->applyBottomUpSalience(
+                                    episode->activeNeurons.size() > 0 ? 
+                                    episode->activeNeurons[0] : competitors[0], 
+                                    0.5f * episode->reward
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Apply attention to episodic memory retrieval
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
+            std::vector<float> currentMemory = pImpl->workingMemory->retrieve();
+            if (!currentMemory.empty()) {
+                // Retrieve similar episodes based on current working memory state
+                auto similarEpisodes = pImpl->episodicMemory->retrieveSimilar(currentMemory, 3);
+                for (const auto* episode : similarEpisodes) {
+                    // Apply attention to relevant neurons in the episode
+                    for (size_t i = 0; i < episode->activeNeurons.size() && i < episode->neuronActivations.size(); ++i) {
+                        if (episode->neuronActivations[i] > 0.5f) {
+                            pImpl->attention->applyBottomUpSalience(episode->activeNeurons[i], episode->neuronActivations[i]);
+                        }
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // This requires sensory state encoding and episodic integration
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
+            std::vector<const EpisodicMemoryItem*> recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+            
+            if (!recentEpisodes.empty() && !memoryPattern.empty()) {
+                pImpl->conceptFormation->updateConceptFormation(recentEpisodes, memoryPattern);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -547,10 +647,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    if (currentStep % 100 == 0) {  // Update development every 100 steps
+        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 100);
         
-        // Development affects plasticity rates
+        // Development affects structural plasticity
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -569,14 +669,203 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 case DevelopmentalStage::Adult:
                     plasticityMod = 0.2f;  // Stable
                     break;
+                case DevelopmentalStage::Aging:
+                    plasticityMod = 0.1f;  // Reduced
+                    break;
             }
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // ========== DEVELOPMENT EFFECTS ON NEUROMODULATION ==========
+        
+        // Development influences neuromodulator sensitivity
+        float devStage = static_cast<float>(pImpl->developmentalStage);
+        float stageFactor = devStage / static_cast<float>(DevelopmentalStage::Aging);
+        
+        // Dopamine development
+        if (pImpl->dopamine) {
+            // Young brains have higher dopamine baseline for learning
+            float baseLevel = 0.5f + stageFactor * 0.3f;
+            float learningMod = 1.0f - stageFactor * 0.3f;  // More learning in early stages
+            pImpl->dopamine->setLearningModulus(learningMod);
+        }
+        
+        // Curiosity development
+        if (pImpl->curiosity) {
+            // Curiosity peaks in early development
+            float curiosityLevel = 1.0f - stageFactor * 0.5f;
+            pImpl->curiosity->setExplorationStrength(curiosityLevel);
+        }
+        
+        // Novelty development  
+        if (pImpl->novelty) {
+            // Novelty sensitivity decreases with age
+            float noveltySensitivity = 1.0f - stageFactor * 0.4f;
+            pImpl->novelty->setDetectionThreshold(0.5f / (noveltySensitivity + 0.1f));
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON WORKING MEMORY ==========
+        
+        if (pImpl->workingMemory) {
+            // Working memory capacity develops with brain maturation
+            size_t baseCapacity = 10;
+            size_t capacityIncrease = static_cast<size_t>((stageFactor) * 40);  // Up to 50 total
+            pImpl->workingMemory->setCapacity(baseCapacity + capacityIncrease);
+            
+            // Decay rate develops - faster decay in young brains
+            float decayRate = 0.9f - stageFactor * 0.4f;  // From 0.9 to 0.5
+            pImpl->workingMemory->setDecayRate(decayRate);
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON EPISODIC MEMORY ==========
+        
+        if (pImpl->episodicMemory) {
+            // Episodic memory capacity develops
+            size_t maxEpisodes = 100;
+            size_t capacityGrowth = static_cast<size_t>(stageFactor * 900);  // Up to 1000
+            pImpl->episodicMemory->setMaxEpisodes(maxEpisodes + capacityGrowth);
+            
+            // Consolidation interval develops - shorter in young brains
+            size_t consolidationInterval = 100;
+            size_t intervalGrowth = static_cast<size_t>(stageFactor * 9000);  // Up to 10000
+            pImpl->consolidationInterval = consolidationInterval + intervalGrowth;
+            
+            // Memory stability develops - less stable in young brains
+            float stability = 0.3f + stageFactor * 0.5f;  // From 0.3 to 0.8
+            pImpl->episodicMemory->setMemoryStability(stability);
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON ATTENTION ==========
+        
+        if (pImpl->attention) {
+            // Attention strength develops
+            float attentionStrength = 0.5f + stageFactor * 0.5f;  // From 0.5 to 1.0
+            pImpl->attention->setInhibitionStrength(1.0f / attentionStrength);
+            pImpl->attention->setExcitationStrength(attentionStrength * 1.5f);
+            
+            // Attention span develops - improves with age
+            float attentionSpan = 0.5f + stageFactor * 0.5f;
+            pImpl->attention->setSpan(attentionSpan);
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON MOTOR CONTROL ==========
+        
+        // Motor neuron properties develop
+        for (auto* neuron : pImpl->motorNeurons) {
+            // Threshold develops - becomes more precise with age
+            float baseThreshold = -55.0f;
+            float thresholdAdjustment = stageFactor * 10.0f;  // More negative = higher threshold
+            neuron->setThreshold(baseThreshold - thresholdAdjustment);
+            
+            // Resting potential develops - stabilizes with age
+            float baseResting = -70.0f;
+            float restingAdjustment = -stageFactor * 5.0f;  // Stabilizes
+            neuron->setRestingPotential(baseResting + restingAdjustment);
+        }
+        
+        // Action selection behavior develops
+        // (Would be handled in action selection logic)
+        
+        // ========== DEVELOPMENT EFFECTS ON LEARNING SYSTEMS ==========
+        
+        // Procedural memory development
+        // Would involve integrating with other learning systems
+        
+        // STDP and Hebbian plasticity development
+        if (pImpl->stdp) {
+            // STDP learning rates develop
+            float ltpWeight = 0.01f + stageFactor * 0.02f;  // From 0.01 to 0.03
+            float ltdWeight = 0.012f + stageFactor * 0.02f;  // From 0.012 to 0.032
+            pImpl->stdp->configure(ltpWeight, ltdWeight, pImpl->stdp->getTau());
+        }
+        
+        if (pImpl->hebbian) {
+            // Hebbian learning develops
+            float hebbianLearningRate = 0.001f + stageFactor * 0.004f;
+            pImpl->hebbian->setLearningRate(hebbianLearningRate);
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON CONCEPT FORMATION ==========
+        
+        if (pImpl->conceptFormation) {
+            // Concept abstraction develops
+            float abstractionLevel = 0.3f + stageFactor * 0.7f;  // From 0.3 to 1.0
+            pImpl->conceptFormation->setAbstractionLevel(abstractionLevel);
+            
+            // Concept binding strength develops
+            float bindingStrength = 0.5f + stageFactor * 0.5f;
+            pImpl->conceptFormation->setBindingStrength(bindingStrength);
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON NEURAL PROPERTIES ==========
+        
+        // Update neural properties based on developmental stage
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Membrane time constant develops
+                    float timeConstant = neuron->getMembraneTimeConstant();
+                    float timeConstantMod = 1.0f + stageFactor * 0.5f;
+                    neuron->setMembraneTimeConstant(timeConstant * timeConstantMod);
+                    
+                    // Leak conductance develops
+                    float leakCond = neuron->getLeakConductance();
+                    float leakMod = 1.0f - stageFactor * 0.2f;  // Stabilizes
+                    neuron->setLeakConductance(leakCond * leakMod);
+                }
+            }
+        }
+        
+        // ========== DEVELOPMENT EFFECTS ON PROCEDURAL MEMORY ==========
+        
+        if (pImpl->proceduralMemory) {
+            // Procedural memory proficiency develops with brain maturation
+            size_t numSkills = pImpl->proceduralMemory->getAllSkills().size();
+            
+            // Developmental stage-specific skill development
+            if (pImpl->developmentalStage == DevelopmentalStage::Initial) {
+                // Initial skill exploration - high plasticity
+                float proficiencyGain = 0.1f;  // Large gains for initial learning
+                // Note: ProceduralMemory would need methods like updateProficiencyAll, boostRecentLearning, etc.
+            } else if (pImpl->developmentalStage == DevelopmentalStage::CriticalPeriod) {
+                // Critical period for skill acquisition
+                float proficiencyGain = 0.05f;  // Moderate gains
+            } else if (pImpl->developmentalStage == DevelopmentalStage::Maturation) {
+                // Maturation - refinement of existing skills
+                float proficiencyGain = 0.02f;  // Small gains
+            } else if (pImpl->developmentalStage == DevelopmentalStage::Adult) {
+                // Adult - maintenance and optimization
+                float proficiencyGain = 0.005f;  // Very small gains
+            }
+            
+            // Neuromodulatory effects on procedural memory learning
+            if (pImpl->dopamine) {
+                float dopamineLevel = pImpl->dopamine->getLevel();
+                // High dopamine enhances procedural memory consolidation
+                if (dopamineLevel > 0.7f) {
+                    // Boost learning for recently practiced skills
+                }
+            }
+            
+            if (pImpl->curiosity) {
+                float curiosityLevel = pImpl->curiosity->getLevel();
+                // High curiosity drives skill exploration and novel motor patterns
+                if (curiosityLevel > 0.7f) {
+                    // Create new motor skills through exploration
+                }
+            }
+            
+            if (pImpl->predictionError) {
+                float predictionError = pImpl->predictionError->getLevel();
+                // Prediction error signals reinforce motor memory updates
+                if (predictionError > 0.5f) {
+                    // Update motor memory based on prediction error
+                }
+            }
+        }
     }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
@@ -1015,6 +1304,10 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+}
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

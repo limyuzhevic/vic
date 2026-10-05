@@ -17,12 +17,14 @@ public:
     // Create new experiment
     std::shared_ptr<Experiment> createExperiment(const std::string& name);
     
-    // Run single experiment
-    bool runExperiment(std::shared_ptr<Experiment> experiment,
-                      std::shared_ptr<Brain> brain,
-                      std::shared_ptr<Environment> environment,
-                      SimulationStep maxSteps);
-    
+    // Enhanced experiment execution with monitoring integration
+    bool runExperimentWithMonitoring(std::shared_ptr<Experiment> experiment,
+                                     std::shared_ptr<Brain> brain,
+                                     std::shared_ptr<Environment> environment,
+                                     std::shared_ptr<VisualizationInterface> visualization,
+                                     std::shared_ptr<MonitoringSystem> monitoring,
+                                     SimulationStep maxSteps);
+
     // Run batch of experiments
     std::vector<std::shared_ptr<Experiment>> runBatch(
         const std::vector<std::shared_ptr<Experiment>>& experiments,
@@ -45,9 +47,7 @@ public:
     // Save experiment results
     bool saveResults(const std::string& filepath) const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
+    // Helper method for timestamp
+    std::string getCurrentTimestamp() const;
 
 } // namespace nlm

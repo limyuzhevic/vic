@@ -321,6 +321,132 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// CLI command processing functions
+
+void processBrainCommand(std::shared_ptr<Brain> brain, const std::string& cmd) {
+    NLM_LOG_INFO("Brain command: " + cmd);
+    if (cmd == "reset") {
+        brain->reset();
+        brain->initialize();
+        NLM_LOG_INFO("Brain reset and reinitialized");
+    } else if (cmd == "status") {
+        brain->logStatus();
+    } else if (cmd == "freeze") {
+        // To be implemented based on brain API
+        NLM_LOG_INFO("Brain freezing (placeholder)");
+    } else if (cmd == "thaw") {
+        // To be implemented based on brain API
+        NLM_LOG_INFO("Brain thawing (placeholder)");
+    } else if (cmd == "snapshot") {
+        // To be implemented based on brain API
+        NLM_LOG_INFO("Brain snapshot created (placeholder)");
+    } else {
+        NLM_LOG_INFO("Unknown brain command: " + cmd);
+    }
+}
+
+void processExplorationCommand(std::shared_ptr<Brain> brain, const std::string& mode, float value) {
+    NLM_LOG_INFO("Exploration mode: " + mode + " = " + std::to_string(value));
+    // To be implemented based on brain exploration API
+}
+
+void processActionCommand(std::shared_ptr<Brain> brain, const std::string& action) {
+    NLM_LOG_INFO("Action command: " + action);
+    // To be implemented based on brain action API
+}
+
+void processMotorActionCommand(std::shared_ptr<Brain> brain, const std::string& motorAction) {
+    NLM_LOG_INFO("Motor action command: " + motorAction);
+    // To be implemented based on brain motor API
+}
+
+void processMemoryCommand(std::shared_ptr<Brain> brain, const std::string& memoryType, const std::string& action) {
+    NLM_LOG_INFO("Memory command: " + memoryType + " " + action);
+    // To be implemented based on brain memory API
+}
+
+void processLearningControlCommand(std::shared_ptr<Brain> brain, const std::string& controlType, float value) {
+    NLM_LOG_INFO("Learning control: " + controlType + " = " + std::to_string(value));
+    // To be implemented based on brain learning API
+}
+
+void processCheckpointCommand(const std::string& action, const std::string& filename) {
+    NLM_LOG_INFO("Checkpoint command: " + action + " " + filename);
+    // To be implemented based on checkpoint API
+}
+
+void processMonitoringCommand(const std::string& monitorType, const std::string& action) {
+    NLM_LOG_INFO("Monitoring command: " + monitorType + " " + action);
+    // To be implemented based on monitoring API
+}
+
+void processDebugCommand(const std::string& debugType, const std::string& action) {
+    NLM_LOG_INFO("Debug command: " + debugType + " " + action);
+    // To be implemented based on debug API
+}
+
+void processDevelopmentCommand(std::shared_ptr<Brain> brain, const std::string& stage) {
+    NLM_LOG_INFO("Development stage command: " + stage);
+    // To be implemented based on development API
+}
+
+void printHelp() {
+    std::cout << R"(
+=== NLM CLI Commands ===
+
+Brain Control:
+  --brain-cmd CMD      Execute brain command (reset, status, freeze, thaw, snapshot)
+  --action ACTION      Execute action (explore, learn, record, playback)
+  --motor-action ACT   Execute motor action
+
+Exploration Control:
+  --explore LEVEL      Set exploration level (0.0 - 1.0)
+  --curiosity CUR      Set curiosity factor (0.0 - 1.0)
+  --novelty NOV        Set novelty threshold (0.0 - 1.0)
+
+Monitoring & Debugging:
+  --stats TYPE         Get statistics (neurons, synapses, spikes, firing)
+  --status             Display brain status
+  --debug TYPE         Debug mode (plasticity, stdp, connectivity, all)
+
+Checkpoint/Save/Load:
+  --save FILENAME      Save brain state to file
+  --load FILENAME      Load brain state from file
+  --checkpoint CMD     Checkpoint operation (create, list, delete)
+
+Learning Control:
+  --plasticity ENABLE  Enable/disable synaptic plasticity
+  --neuromodulation AMP Set neuromodulation amplitude (0.0 - 1.0)
+
+Memory Control:
+  --memory TYPE        Memory system control (working, episodic, semantic)
+  --working-memory LEN Set working memory length
+  --episodic ENABLE    Enable/disable episodic memory
+
+Development Control:
+  --development STAGE  Set development stage (embryonic, growth, mature, aging)
+
+Recording & Playback:
+  --record FILENAME    Record action sequence
+  --playback FILENAME  Playback recorded actions
+
+Real-time Monitoring:
+  --monitor STREAM     Start real-time monitoring stream
+  --log-level LEVEL    Set log level (debug, info, warning, error)
+
+Configuration:
+  --config FILE        Load configuration file (default: configs/default.cfg)
+  --help               Show this help message
+  --version            Show version information
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0 (Phase 2)" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
