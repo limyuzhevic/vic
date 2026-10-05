@@ -4,13 +4,17 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding, including social learning and self-model
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -51,6 +55,20 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
+    
+    // Get self-model confidence for action selection
+    float getSelfModelConfidence() const;
+    
+    // Social learning: observe and learn from other agents
+    void observeAgentAction(MotorCommand observedAction,
+                          const std::vector<float>& observerState,
+                          const std::vector<float>& resultingState);
+    
+    // Get preferred action based on self-model
+    MotorCommand getPreferredAction(const std::vector<float>& state);
+    
+    // Get social knowledge
+    float getSocialKnowledge() const;
     
     // Reset agent for new episode
     void reset();
@@ -102,6 +120,10 @@ private:
     // Development state
     double developmentalAge_;
     float plasticityModifier_;
+    
+    // Social learning and self-model systems
+    std::unique_ptr<SocialLearning> socialLearning_;
+    std::unique_ptr<SelfModel> selfModel_;
     
     // Configuration flags
     bool rewardModulationEnabled_;

@@ -30,8 +30,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +46,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -68,10 +68,15 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Initialize social learning and self-model systems
+    // These are now integrated with the brain systems for better learning
+    socialLearning_ = std::make_unique<SocialLearning>();
+    socialLearning_->initialize(brain_.get());
+    
+    selfModel_ = std::make_unique<SelfModel>();
+    selfModel_->initialize(brain_.get());
+    
+    NLM_LOG_INFO("AgentBrain initialized with social learning and self-model systems");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -150,8 +155,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
-    
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -332,6 +335,51 @@ float AgentBrain::getNoveltyLevel() const {
 
 float AgentBrain::getPredictionError() const {
     return predictionError_;
+}
+
+float AgentBrain::getSelfModelConfidence() const {
+    return selfModel_ ? selfModel_->getBodyAwareness() : 0.0f;
+}
+
+void AgentBrain::observeAgentAction(MotorCommand observedAction,
+                                   const std::vector<float>& observerState,
+                                   const std::vector<float>& resultingState) {
+    if (socialLearning_) {
+        // Use social learning to observe and learn from other agents
+        socialLearning_->observeAgentAction(observedAction, observerState, resultingState);
+    }
+    
+    // Update self-model with observed action and outcome
+    if (selfModel_) {
+        // Convert motor command to action type for self-model
+        ActionType actionType;
+        switch (observedAction) {
+            case MotorCommand::MoveForward: actionType = ActionType::MoveForward; break;
+            case MotorCommand::MoveBackward: actionType = ActionType::MoveBackward; break;
+            case MotorCommand::TurnLeft: actionType = ActionType::TurnLeft; break;
+            case MotorCommand::TurnRight: actionType = ActionType::TurnRight; break;
+            case MotorCommand::LookLeft: actionType = ActionType::LookLeft; break;
+            case MotorCommand::LookRight: actionType = ActionType::LookRight; break;
+            case MotorCommand::Interact: actionType = ActionType::Interact; break;
+            default: actionType = ActionType::Wait; break;
+        }
+        
+        // Record the action and its outcome in self-model
+        selfModel_->recordSelfAction(actionType, observerState, resultingState);
+    }
+}
+
+MotorCommand AgentBrain::getPreferredAction(const std::vector<float>& state) {
+    if (selfModel_) {
+        // Use self-model to predict action outcomes and choose preferred action
+        // For now, return wait action as placeholder
+        return MotorCommand::Wait;
+    }
+    return MotorCommand::Wait;
+}
+
+float AgentBrain::getSocialKnowledge() const {
+    return socialLearning_ ? socialLearning_->getSignalMeaning() : 0.0f;
 }
 
 void AgentBrain::reset() {
