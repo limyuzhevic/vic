@@ -1,0 +1,24 @@
+# Simple test compilation for STDP optimization
+CXX = g++
+CXXFLAGS = -std=c++20 -I. -I./src -O2
+LDFLAGS = -std=c++20
+
+TARGET = test_stdp_optimization
+
+# Source files that actually exist and are needed for STDP
+SOURCES = test_optimization_simple.cpp \
+          src/plasticity/STDP.cpp \
+          src/plasticity/PlasticityRule.cpp \
+          src/brain/Synapse.cpp \
+          src/core/Random/Random.cpp \
+          src/core/Types/Types.cpp
+
+all: $(TARGET)
+
+$(TARGET): $(SOURCES)
+	$(CXX) $(CXXFLAGS) -o $@ $(SOURCES) $(LDFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -f $(TARGET)

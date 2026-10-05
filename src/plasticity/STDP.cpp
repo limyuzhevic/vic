@@ -1,5 +1,5 @@
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -21,8 +21,8 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
+                   std::span<const Timestamp> preSpikes,
+                   std::span<const Timestamp> postSpikes,
                    TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
@@ -51,7 +51,7 @@ void STDP::update(Synapse* synapse,
      *   - Assumes single exponential window (more complex in biology)
      *   - Doesn't account for synaptic eligibility traces
      */
-    
+     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -59,19 +59,38 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    // OPTIMIZATION: Replace O(m×n) nested loops with O(n log n) binary search algorithm
+    // Create sorted copies of spike timestamps
+    std::vector<Timestamp> sortedPreSpikes(preSpikes.begin(), preSpikes.end());
+    std::vector<Timestamp> sortedPostSpikes(postSpikes.begin(), postSpikes.end());
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Binary search for efficient range queries
+    float cutoffTime = 3.0f * tau;
+    
+    for (size_t i = 0; i < sortedPreSpikes.size(); ++i) {
+        float preTime = static_cast<float>(sortedPreSpikes[i]);
+        
+        // Find post spikes within cutoffTime of preTime
+        Timestamp postMin = static_cast<Timestamp>(std::max(0.0f, preTime - cutoffTime));
+        Timestamp postMax = static_cast<Timestamp>(preTime + cutoffTime);
+        
+        // Use binary search to find range in sortedPostSpikes
+        auto lower = std::lower_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), postMin);
+        auto upper = std::upper_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), postMax);
+        
+        // Process all post spikes in this range
+        for (auto it = lower; it != upper; ++it) {
+            float dt = static_cast<float>(*it - sortedPreSpikes[i]);  // Δt in ms
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)

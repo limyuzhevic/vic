@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <span>
+#include <vector>
 
 namespace nlm {
 
@@ -50,8 +52,8 @@ public:
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getPreSpikeHistory() const;
-    const std::vector<Timestamp>& getPostSpikeHistory() const;
+    std::span<const Timestamp> getPreSpikeHistory() const;
+    std::span<const Timestamp> getPostSpikeHistory() const;
     void clearHistory();
     
     // Plasticity flags

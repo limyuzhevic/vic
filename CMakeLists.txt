@@ -29,12 +29,16 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain (Phase 6: Integrated Artificial Brain)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/BrainCore.cpp
+    src/brain/BrainSimulation.cpp
+    src/brain/BrainIO.cpp
+    src/brain/BrainState.cpp
+    src/brain/BrainIntegration.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp

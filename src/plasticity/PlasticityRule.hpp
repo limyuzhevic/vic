@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include <span>
 
 namespace nlm {
 
@@ -15,8 +16,8 @@ public:
     // Update synaptic weights based on pre/post synaptic activity
     // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
-                        const std::vector<Timestamp>& preSpikes,
-                        const std::vector<Timestamp>& postSpikes,
+                        std::span<const Timestamp> preSpikes,
+                        std::span<const Timestamp> postSpikes,
                         TimestepDuration dt) = 0;
     
     // Apply weight change
@@ -44,8 +45,8 @@ public:
     ~HebbianRule() override;
     
     void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
+                 std::span<const Timestamp> preSpikes,
+                 std::span<const Timestamp> postSpikes,
                  TimestepDuration dt) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
@@ -64,8 +65,8 @@ private:
 class AntiHebbianRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
+                 std::span<const Timestamp> preSpikes,
+                 std::span<const Timestamp> postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "AntiHebbian"; }
@@ -76,8 +77,8 @@ public:
 class BCMRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
+                 std::span<const Timestamp> preSpikes,
+                 std::span<const Timestamp> postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "BCM"; }

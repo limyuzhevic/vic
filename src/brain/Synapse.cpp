@@ -141,11 +141,11 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
     }
 }
 
-const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+std::span<const Timestamp> Synapse::getPreSpikeHistory() const {
     return pImpl->preSpikeHistory;
 }
 
-const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+std::span<const Timestamp> Synapse::getPostSpikeHistory() const {
     return pImpl->postSpikeHistory;
 }
 

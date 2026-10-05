@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PlasticityRule.hpp"
+#include <span>
 
 namespace nlm {
 
@@ -13,8 +14,8 @@ public:
     ~STDP() override;
     
     void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
+                 std::span<const Timestamp> preSpikes,
+                 std::span<const Timestamp> postSpikes,
                  TimestepDuration dt) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
@@ -40,8 +41,8 @@ private:
 class RewardModulatedSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
+                 std::span<const Timestamp> preSpikes,
+                 std::span<const Timestamp> postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "R-STDP"; }
@@ -52,8 +53,8 @@ public:
 class TripletSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
+                 std::span<const Timestamp> preSpikes,
+                 std::span<const Timestamp> postSpikes,
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "TripletSTDP"; }

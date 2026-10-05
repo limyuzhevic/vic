@@ -1,21 +1,18 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
-// Forward declarations
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
+// Forward declarations for all component systems
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
@@ -28,6 +25,17 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Forward declarations for brain components
+class BrainCore;
+class BrainSimulation;
+class BrainIO;
+class BrainState;
+class BrainIntegration;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -47,6 +55,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Refactored for improved modularity and maintainability
 
 class Brain {
 public:
@@ -66,8 +75,6 @@ public:
     
     // Main simulation step
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
@@ -79,20 +86,6 @@ public:
     
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
-    
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
-    
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
-    
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
@@ -136,6 +129,9 @@ public:
     size_t getActiveNeuronCount() const;
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
+    float getExcitationInhibitionRatio() const;
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
     
     // ========== MEMORY SYSTEMS ==========
     
@@ -189,6 +185,9 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Get core component (for internal use)
+    BrainCore* getCore();
     
     // Logging
     void logStatus() const;

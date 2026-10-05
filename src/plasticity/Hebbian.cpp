@@ -1,5 +1,5 @@
 #include "Hebbian.hpp"
-#include "../../brain/Synapse.hpp"
+#include "brain/Synapse.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -19,8 +19,8 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
+                      std::span<const Timestamp> preSpikes,
+                      std::span<const Timestamp> postSpikes,
                       TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
@@ -48,21 +48,29 @@ void Hebbian::update(Synapse* synapse,
      *   - Single learning rate (no separate potentiation/depression rates)
      *   - Assumes stationary statistics
      */
-    
+     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    // Count correlated spike pairs using O(n log n) algorithm
+    // Sort spike vectors for efficient range queries
+    std::vector<Timestamp> sortedPreSpikes(preSpikes.begin(), preSpikes.end());
+    std::vector<Timestamp> sortedPostSpikes(postSpikes.begin(), postSpikes.end());
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // For each pre spike, count post spikes within 100ms window using binary search
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    for (Timestamp preTime : sortedPreSpikes) {
+        // Find range of post spikes within [preTime - 100ms, preTime + 100ms]
+        auto lower = std::lower_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                      preTime - 100.0f);
+        auto upper = std::upper_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                      preTime + 100.0f);
+        
+        // Count spikes in range (upper - lower)
+        correlationCount += std::distance(lower, upper);
     }
     
     // Compute weight change based on correlation

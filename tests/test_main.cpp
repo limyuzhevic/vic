@@ -29,11 +29,7 @@ namespace test_synapse {
     void runAll();
 }
 
-namespace test_stdp {
-    void runAll();
-}
-
-namespace test_brain {
+namespace test_hebbian {
     void runAll();
 }
 
@@ -104,6 +100,15 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Hebbian tests..." << std::endl;
+    try {
+        test_hebbian::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <span>
 #include <vector>
 #include <array>
 
@@ -113,7 +114,7 @@ public:
     
     // Spike history (recent spikes for STDP)
     void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
+    std::span<const Timestamp> getSpikeHistory() const;
     void clearSpikeHistory();
     
     // Synapse management (incoming and outgoing)
