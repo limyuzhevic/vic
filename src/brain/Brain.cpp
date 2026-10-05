@@ -421,21 +421,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Apply comprehensive dopamine effects on neural dynamics and plasticity
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // 1. Dopamine modulates neural excitability and adaptation
+        float excitabilityMod = dopamineLevel * 0.5f;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    // Dopamine injects additional current to increase firing probability
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
+                    
+                    // Dopamine affects spike-frequency adaptation (modulatory input)
+                    neuron->receiveModulatoryInput(dopamineLevel * 0.1f);
                 }
             }
+        }
+        
+        // 2. Dopamine enhances synaptic efficacy and eligibility traces
+        float dopaminePlasticityEffect = dopamineLevel * 2.0f;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                // Increase synaptic efficacy for dopamine-modulated synapses
+                float currentEfficacy = syn->getEfficacy();
+                syn->setEfficacy(currentEfficacy * (1.0f + dopaminePlasticityEffect * 0.1f));
+                
+                // Enhance eligibility trace if dopamine-modulated
+                if (syn->getPlasticityFlags().reward_modulated) {
+                    float currentTrace = syn->getEligibilityTrace();
+                    syn->setEligibilityTrace(currentTrace + dopamineLevel * 0.5f);
+                }
+            }
+        }
+        
+        // 3. Dopamine affects working memory strength and consolidation priority
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel * 0.2f);
+        }
+        
+        // 4. Dopamine facilitates memory consolidation when level is high
+        if (pImpl->episodicMemory && dopamineLevel > 0.5f) {
+            pImpl->episodicMemory->setConsolidationPriority(1.0f);
         }
     }
     
@@ -512,7 +540,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // For now, integrate basic prediction error tracking
+        
+        // Update prediction error signal if available
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(pImpl->timestep);
+            
+            // Use prediction error to modulate learning rates
+            float predictionErrorLevel = pImpl->predictionError->getLevel();
+            
+            // Prediction error enhances plasticity for unexpected events
+            if (predictionErrorLevel > 0.0f) {
+                for (auto& region : pImpl->regions) {
+                    for (auto* syn : region->getSynapses()) {
+                        // Apply prediction error modulation to synaptic efficacy
+                        float currentEfficacy = syn->getEfficacy();
+                        float enhancedEfficacy = currentEfficacy * (1.0f + predictionErrorLevel * 0.5f);
+                        syn->setEfficacy(enhancedEfficacy);
+                        
+                        // Increase eligibility trace for prediction error-modulated synapses
+                        if (syn->getPlasticityFlags().reward_modulated) {
+                            float currentTrace = syn->getEligibilityTrace();
+                            syn->setEligibilityTrace(currentTrace + predictionErrorLevel * 0.3f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update curiosity-based exploration
+        if (pImpl->curiosity && pImpl->dopamine) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            
+            // Curiosity and dopamine together drive exploration
+            float explorationBonus = curiosityLevel * dopamineLevel;
+            if (explorationBonus > 0.1f) {
+                // Apply exploration bonus to action selection
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getType() == NeuronType::Motor) {
+                            // Enhance motor neuron activity for exploration
+                            neuron->injectCurrent(explorationBonus * 2.0f);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +602,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Integrate with working memory and attention
+        
+        // Collect current neural activity for concept formation
+        std::vector<std::pair<NeuronId, float>> neuralActivity;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Get current activation level
+                    float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                    if (std::abs(activation) > 1.0f) {
+                        neuralActivity.push_back(std::make_pair(neuron->getId(), activation));
+                    }
+                }
+            }
+        }
+        
+        // Filter to significant neural activity
+        std::vector<float> activityPattern;
+        for (const auto& pair : neuralActivity) {
+            activityPattern.push_back(pair.second);
+        }
+        
+        // Update concept formation with activity pattern
+        if (!activityPattern.empty()) {
+            pImpl->conceptFormation->updateConcept(activityPattern, pImpl->timestep);
+        }
+        
+        // Apply concept-guided attention if attended regions exist
+        if (pImpl->attention) {
+            // Let concepts influence attention selection
+            for (const auto& pair : neuralActivity) {
+                // Use high-activation neurons to influence attention focus
+                if (pair.second > 5.0f) {
+                    pImpl->attention->applyBottomUpSalience(pair.first, pair.second * 0.1f);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -550,29 +660,74 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Enhanced development effects on multiple systems
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        float plasticityMod = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                plasticityMod = 1.0f;  // High plasticity, rapid learning
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                plasticityMod = 0.8f;  // Slightly reduced but still high plasticity
+                break;
+            case DevelopmentalStage::Maturation:
+                plasticityMod = 0.5f;  // Moderate plasticity, focused learning
+                break;
+            case DevelopmentalStage::Adult:
+                plasticityMod = 0.2f;  // Stable, fine-tuning only
+                break;
+        }
+        
+        // Development affects multiple systems, not just plasticity
+        
+        // 1. Development affects structural plasticity rates
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // 2. Development affects working memory capacity and efficiency
+        if (pImpl->workingMemory) {
+            size_t capacity = static_cast<size_t>(getTotalNeuronCount() * 0.1f * plasticityMod);
+            pImpl->workingMemory->setCapacity(capacity);
+            
+            // Adjust decay rate based on developmental stage
+            pImpl->workingMemory->setDecayRate(0.01f / (plasticityMod + 0.5f));
+        }
+        
+        // 3. Development affects episodic memory consolidation
+        if (pImpl->episodicMemory) {
+            // In earlier stages, consolidate more frequently
+            if (stage == DevelopmentalStage::Initial || stage == DevelopmentalStage::CriticalPeriod) {
+                pImpl->episodicMemory->setConsolidationPriority(1.0f);
+            } else {
+                pImpl->episodicMemory->setConsolidationPriority(0.5f);
+            }
+        }
+        
+        // 4. Development affects neuromodulation sensitivity
+        if (pImpl->dopamine) {
+            // Dopaminergic sensitivity changes with development
+            float sensitivityMod = (stage == DevelopmentalStage::Initial) ? 1.2f : 1.0f;
+            // This would affect dopamine's effect on neural excitability and plasticity
+        }
+        
+        // 5. Development affects attentional selection parameters
+        if (pImpl->attention) {
+            // Attention mechanisms mature over time
+            if (stage == DevelopmentalStage::Adult) {
+                // Sharper, more focused attention
+                pImpl->attention->setInhibitionStrength(0.7f);
+                pImpl->attention->setExcitationStrength(2.0f);
+                pImpl->attention->setCompetitionThreshold(0.5f);
+            } else {
+                // More flexible attention in development
+                pImpl->attention->setInhibitionStrength(0.5f);
+                pImpl->attention->setExcitationStrength(1.5f);
+                pImpl->attention->setCompetitionThreshold(0.3f);
+            }
         }
     }
     
@@ -895,9 +1050,37 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to find matching synapses and restore their properties
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Restore synapse properties
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    
+                    // Restore plasticity flags
+                    PlasticityFlags flags;
+                    flags.stdp = (synapseData.plasticityFlags[synapseIdx] & 0x01) != 0;
+                    flags.hebbian = (synapseData.plasticityFlags[synapseIdx] & 0x02) != 0;
+                    flags.reward_modulated = (synapseData.plasticityFlags[synapseIdx] & 0x04) != 0;
+                    syn->setPlasticityFlags(flags);
+                    
+                    // Restore other synaptic properties
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                    syn->setShortTermDepression(synapseData.shortTermDepression[synapseIdx]);
+                    syn->setShortTermFacilitation(synapseData.shortTermFacilitation[synapseIdx]);
+                    
+                    synapseIdx++;
+                }
+            }
+        }
+        
+        if (synapseIdx < synapseData.weight.size()) {
+            NLM_LOG_WARNING("Not all synapses could be restored - some missing from current structure");
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

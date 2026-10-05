@@ -312,12 +312,70 @@ PYBIND11_MODULE(pynlm, m) {
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
+        // Convenience methods for common operations
+        .def("runSimulation", [](Brain& self, SimpleWorld& world, AgentBrain& agent, size_t steps) {
+            float totalReward = 0.0f;
+            for (size_t i = 0; i < steps; ++i) {
+                // Get sensory input
+                SensoryPercept percept = world.getSensoryPercept();
+                
+                // Process sensory input
+                agent.processSensoryInput(percept);
+                
+                // Brain step
+                self.step(i, i * 0.001);
+                
+                // Get motor command
+                MotorCommand cmd = agent.decodeMotorCommand();
+                
+                // Apply action to world
+                world.applyMotorCommand(cmd, i * 0.001);
+                
+                // Apply reward modulation (placeholder - world doesn't have computeReward)
+                agent.applyRewardModulation(0.0f, 0.0f);
+            }
+            return totalReward;
+        }, py::arg("world"), py::arg("agent"), py::arg("steps"),
+             "Run a complete simulation for specified number of steps")
+        
+        // Configuration convenience methods
+        .def("configureForTask", [](Brain& self, const std::string& taskType) {
+            auto config = std::make_shared<Config>();
+            if (taskType == "memory") {
+                config->set("neuron_count", 2000);
+                config->set("region_count", 2);
+                config->set("connection_probability", 0.15f);
+            } else if (taskType == "prediction") {
+                config->set("neuron_count", 3000);
+                config->set("region_count", 3);
+                config->set("connection_probability", 0.1f);
+            } else {
+                // Default configuration
+                config->set("neuron_count", 1000);
+                config->set("region_count", 1);
+                config->set("connection_probability", 0.1f);
+            }
+            return config;
+        }, py::arg("taskType"),
+             "Create configuration optimized for specific task type")
+        
+        // Simplified factory functions
+        .def("createDemoBrain", []() {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", 500);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.1f);
+            return std::make_shared<Brain>(config);
+        }, "Create a demo brain with default settings for testing")
+        
+        .def("createDemoWorld", []() {
+            return std::make_shared<SimpleWorld>();
+        }, "Create a demo world with default settings for testing")
+        
+        .def("createDemoAgent", [](std::shared_ptr<Brain> brain) {
+            return std::make_shared<AgentBrain>(brain);
+        }, py::arg("brain"),
+             "Create a demo agent brain interface");
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
              "Get a region by ID")
@@ -350,10 +408,70 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    // Enhanced error handling and type safety
+        .def("safeSave", [](Brain& self, const std::string& filepath) {
+            try {
+                bool success = self.save(filepath);
+                if (!success) {
+                    throw std::runtime_error("Failed to save brain state");
+                }
+                return success;
+            } catch (const std::exception& e) {
+                py::error_already_set();
+                return false;
+            }
+        }, py::arg("filepath"),
+             "Save brain state to file with error handling")
+        
+        .def("safeLoad", [](Brain& self, const std::string& filepath) {
+            try {
+                bool success = self.load(filepath);
+                if (!success) {
+                    throw std::runtime_error("Failed to load brain state");
+                }
+                return success;
+            } catch (const std::exception& e) {
+                py::error_already_set();
+                return false;
+            }
+        }, py::arg("filepath"),
+             "Load brain state from file with error handling")
+        
+        // Enhanced statistics and monitoring methods
+        .def("getStats", [](const Brain& self) {
+            py::dict stats;
+            stats["neuronCount"] = self.getTotalNeuronCount();
+            stats["synapseCount"] = self.getTotalSynapseCount();
+            stats["regionCount"] = self.getRegionCount();
+            stats["firingRate"] = self.getAverageFiringRate();
+            stats["totalSpikes"] = self.getTotalSpikeCount();
+            stats["activeNeurons"] = self.getActiveNeuronCount();
+            stats["eiriRatio"] = self.getExcitationInhibitionRatio();
+            
+            if (self.getWorkingMemory()) {
+                stats["workingMemoryActive"] = self.getWorkingMemory()->getActiveTraces();
+                stats["workingMemoryCapacity"] = self.getWorkingMemory()->getCapacity();
+            }
+            
+            if (self.getEpisodicMemory()) {
+                stats["episodicMemoryEpisodes"] = self.getEpisodicMemory()->getEpisodeCount();
+            }
+            
+            return stats;
+        }, "Get comprehensive brain statistics as dictionary")
+        
+        .def("getDevelopmentInfo", [](Brain& self) {
+            py::dict devInfo;
+            devInfo["stage"] = static_cast<int>(self.getDevelopmentalStage());
+            devInfo["age"] = self.getDevelopmentalStage() == DevelopmentalStage::Adult ? 100.0f : 10.0f;
+            
+            if (self.getDevelopmentSystem()) {
+                devInfo["developmentActive"] = true;
+                // Add more development system details here
+            }
+            
+            return devInfo;
+        }, "Get development system information as dictionary")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
