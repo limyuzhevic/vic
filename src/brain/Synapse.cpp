@@ -69,7 +69,7 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
-    if (this != &other) {
+    if (this != &other && pImpl != other.pImpl) {
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;

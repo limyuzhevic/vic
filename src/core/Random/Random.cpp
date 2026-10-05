@@ -21,7 +21,7 @@ RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other
 }
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
-    if (this != &other) {
+    if (this != &other && pImpl != other.pImpl) {
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;

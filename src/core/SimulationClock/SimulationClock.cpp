@@ -23,7 +23,7 @@ SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other
 }
 
 SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
-    if (this != &other) {
+    if (this != &other && pImpl != other.pImpl) {
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;

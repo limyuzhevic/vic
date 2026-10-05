@@ -1,289 +1,539 @@
-# NLM Architecture
+NLM Documentation
+================
+
+This document provides comprehensive information about using the NLM (Neural Learning Machine) framework for Phase 2: Real Neural Computation.
 
 ## Overview
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+NLM is an experimental artificial developmental brain project that simulates:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+
+## Key Components
+
+### 1. Core Neural Components
+
+#### Neurons (Neuron class)
+- **Type**: LIF (Leaky Integrate-and-Fire) neurons
+- **Features**:
+  - Real membrane potential dynamics
+  - Refractory periods
+  - Spike-frequency adaptation
+  - Synaptic input integration
+  - Plasticity state management
+
+#### Synapses (Synapse class)
+- **Type**: Event-driven synaptic transmission
+- **Features**:
+  - Synaptic delays
+  - Short-term plasticity (STP)
+  - Eligibility traces for reward-modulated learning
+  - Weight bounds and clamping
+  - Spike history recording
+
+#### Brain (Brain class)
+- **Type**: Neural system coordinator
+- **Features**:
+  - Integration of all neural components
+  - Multiple plasticity systems (STDP, Hebbian, structural)
+  - Neuromodulation systems (dopamine, curiosity, novelty)
+  - Memory systems (working, episodic, semantic)
+  - Prediction and cognition systems
+  - Development system
+
+### 2. Plasticity Systems
+
+#### STDP (Spike-Timing-Dependent Plasticity)
+- **Mechanism**: Pre-before-post spike pairs potentiate synapses (LTP)
+- **Formula**: Δw = A⁺ × exp(-Δt/τ⁺) for Δt > 0
+- **Formula**: Δw = -A⁻ × exp(Δt/τ⁻) for Δt < 0
+- **Parameters**:
+  - ltp_weight: Potentiation amplitude (default: 0.02)
+  - ltd_weight: Depression amplitude (default: 0.015)
+  - timeConstant: Time window (default: 20.0 ms)
+
+#### Hebbian Plasticity
+- **Mechanism**: Correlation-based learning
+- **Formula**: Δw = η × (coactivity - baseline)
+- **Features**:
+  - Covariance-based rule
+  - Threshold to prevent runaway potentiation
+  - Activity-dependent scaling
+
+#### Structural Plasticity
+- **Mechanism**: Synaptogenesis and pruning
+- **Features**:
+  - Activity-dependent synapse creation
+  - Weight-based synapse elimination
+  - Maximum synapse limits per neuron
+  - Global synapse budget
+
+### 3. Neuromodulation Systems
+
+#### Dopamine
+- **Function**: Reward prediction and reinforcement learning
+- **Effects**:
+  - Modulates synaptic plasticity
+  - Encodes prediction errors
+  - Regulates exploration vs. exploitation
+
+#### Curiosity
+- **Function**: Novelty detection and exploration motivation
+- **Formula**: Level = wₙ×novelty + wₚ×prediction_error
+- **Purpose**: Drive exploration through intrinsic motivation
+
+#### Novelty Detection
+- **Function**: Detects novel sensory inputs
+- **Mechanism**: Pattern comparison with history
+- **Application**: Drives curiosity and exploration
+
+#### Prediction Error
+- **Function**: Compares predictions with actual sensory input
+- **Application**: Improves forward models and prediction accuracy
+
+### 4. Memory Systems
+
+#### Working Memory
+- **Function**: Temporary active information storage
+- **Characteristics**:
+  - Limited capacity (approximately 7±2 items)
+  - Rapid decay without rehearsal
+  - Integration with attention
+
+#### Episodic Memory
+- **Function**: Experience encoding and replay
+- **Features**:
+  - Temporal ordering of events
+  - Pattern completion during recall
+  - Consolidation during sleep/rest cycles
+
+#### Semantic Memory
+- **Function**: Conceptual knowledge and patterns
+- **Features**:
+  - Distributed representation
+  - Similarity-based retrieval
+  - Continuous learning from experience
+
+### 5. Development System
+
+#### Developmental Stages
+- **Initial**: High plasticity, basic connectivity
+- **Critical Period**: Activity-dependent refinement
+- **Maturation**: Stabilization and optimization
+- **Adult**: Limited plasticity, expert performance
+- **Aging**: Gradual decline of performance
+
+#### Developmental Mechanisms
+- **Synaptogenesis**: Creation of new synapses
+- **Pruning**: Elimination of weak connections
+- **Maturation**: Refinement of synaptic strengths
+- **Experience-dependent**: Plasticity modulated by activity
+
+### 6. Prediction and Cognition Systems
+
+#### Prediction System
+- **Function**: Forward models and prediction
+- **Applications**:
+  - Action planning
+  - Error detection
+  - Anticipation of sensory input
+
+#### Neural Planner
+- **Function**: Action sequence evaluation
+- **Features**:
+  - Value-based planning
+  - Hierarchical action selection
+  - Resource allocation
+
+#### Concept Formation
+- **Function**: Pattern discovery and categorization
+- **Applications**:
+  - Object recognition
+  - Scene understanding
+  - Abstract reasoning
+
+### 7. Performance Optimizations
+
+#### SIMD Vectorization
+- **Implementation**: Efficient vector operations
+- **Benefits**:
+  - 4-10x speedup for neural computations
+  - Reduced memory bandwidth usage
+  - Better cache utilization
+
+#### Memory Pools
+- **Implementation**: Pre-allocated memory blocks
+- **Benefits**:
+  - Reduced memory fragmentation
+  - Faster memory allocation
+  - Better cache locality
+
+#### Parallel Processing
+- **Implementation**: Multi-core support
+- **Benefits**:
+  - Scalable to many CPU cores
+  - Improved simulation throughput
+  - Better resource utilization
+
+#### Checkpointing
+- **Implementation**: State persistence
+- **Features**:
+  - Periodic saving
+  - Resume capability
+  - Fault tolerance
+
+## Configuration System
+
+### Configuration File Format
+
+NLM uses a key=value configuration format with support for:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NLM Brain                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │   Sensory   │───▶│    Brain    │───▶│    Motor    │          │
-│  │   Input    │    │   Core      │    │    Output   │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│         │                  │                  │                 │
-│         ▼                  ▼                  ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │  Sensory    │    │  Memory     │    │   Action    │          │
-│  │  Processing │    │  Systems   │    │  Selection  │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │  Prediction │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │Neuromodul. │                              │
-│                    │  Signals    │                              │
-│                    └─────────────┘                              │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │ Development │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
-│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
-│  │  │         │  │         │  │         │  │Learning │       ││
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+# Comment
+key = value
+# Nested keys
+section.key = value
+# Boolean values
+flag = true/false
+# Numeric values
+number = 42
+float = 3.14
+# String values
+string = "example"
 ```
 
-## Core Components
+### Default Configuration Parameters
 
-### 1. Core Layer
-- **Types**: Strongly-typed identifiers (NeuronId, SynapseId, etc.)
-- **Config**: Configuration management system
-- **Random**: Deterministic random number generator
-- **Logger**: Structured logging system
-- **SimulationClock**: Time management for simulation
+#### Brain Configuration
+- `brain.neuron_count`: Total number of neurons (default: 1000)
+- `brain.synapse_density`: Synapse connectivity density (default: 0.1)
+- `brain.connection_probability`: Connection probability (default: 0.05)
+- `brain.initial_weight_mean`: Initial synaptic weight mean (default: 0.5)
+- `brain.initial_weight_std`: Initial synaptic weight standard deviation (default: 0.1)
 
-### 2. Brain Layer
-- **Neuron**: Individual neuron representation (LIF dynamics)
-- **Synapse**: Synaptic connection representation
-- **NeuralPopulation**: Group of neurons with shared properties
-- **NeuralRegion**: Brain region with multiple populations
-- **Brain**: Central coordinator
+#### Neuron Parameters
+- `brain.v_thresh`: Neuron threshold potential (default: -50.0 mV)
+- `brain.v_rest`: Resting potential (default: -70.0 mV)
+- `brain.v_reset`: Reset potential (default: -75.0 mV)
+- `brain.tau_mem`: Membrane time constant (default: 20.0 ms)
+- `brain.tau_ref`: Refractory period (default: 2.0 ms)
 
-### 3. Dynamics Layer
-- **NeuralDynamics**: Abstract base for neuron dynamics
-- **SpikeSystem**: Event-driven spike processing
+#### Plasticity Configuration
+- `plasticity.stdp.enable`: Enable STDP (default: true)
+- `plasticity.stdp.learning_rate`: STDP learning rate (default: 0.001)
+- `plasticity.stdp.tau_plus`: STDP time constant for LTP (default: 20.0 ms)
+- `plasticity.stdp.tau_minus`: STDP time constant for LTD (default: 20.0 ms)
+- `plasticity.hebbian.enable`: Enable Hebbian learning (default: true)
+- `plasticity.structural.enable`: Enable structural plasticity (default: true)
 
-### 4. Plasticity Layer
-- **PlasticityRule**: Abstract base for plasticity rules
-- **Hebbian**: Hebbian learning rule
-- **STDP**: Spike-Timing-Dependent Plasticity
-- **StructuralPlasticity**: Synapse formation/removal
+#### Neuromodulation Configuration
+- `neuromod.dopamine.scale`: Dopamine modulation scale (default: 1.0)
+- `neuromod.curiosity.enable`: Enable curiosity (default: true)
+- `neuromod.novelty.enable`: Enable novelty detection (default: true)
 
-### 5. Development Layer
-- **DevelopmentSystem**: Orchestrates development
-- **Synaptogenesis**: New synapse formation
-- **Pruning**: Weak synapse removal
-- **Maturation**: Adult property development
+### Advanced Configuration
 
-### 6. Neuromodulation Layer
-- **Neuromodulator**: Abstract base for neuromodulators
-- **Dopamine**: Reward and reinforcement
-- **Novelty**: Novelty detection
-- **Curiosity**: Exploration motivation
-- **PredictionError**: Error signals
+For more advanced usage, see:
+- `configs/advanced.cfg` - Advanced configuration
+- `configs/advanced_detailed.cfg` - Detailed configuration
+- `nlm.sh` - Command line interface
 
-### 7. Memory Layer (Phase 4)
-- **NeuralWorkingMemory**: Persistent activity for temporary storage
-- **NeuralEpisodicMemory**: Experience encoding in neural patterns
-- **NeuralAssociativeMemory**: Experience-based associations
-- **ConceptFormation**: Pattern discovery without labels
-- **SpatialRepresentation**: Learned spatial relationships
-- **TemporalRelation**: Before/after/sequence encoding
+## Programming Interface
 
-### 8. Prediction Layer (Phase 4)
-- **NeuralPrediction**: Temporal sequence learning
-- **ActionConsequencePredictor**: Action effect prediction
-- **PredictionErrorSignal**: Error computation for learning
+### C++ API
 
-### 9. Cognitive Layer (Phase 4)
-- **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
-- **NeuralPlanner**: Predictive action selection
-- **SelfModel**: Sensorimotor self-awareness
-- **SocialLearning**: Observation and imitation
+The NLM framework provides a comprehensive C++ API for:
 
-### 10. Sensory Layer
-- **SensoryInput**: Base class for sensory data
-- **Vision**: Visual input processing
-- **Audio**: Audio input processing
-- **InternalSignals**: Internal state signals
+#### Basic Usage
 
-### 11. Motor Layer
-- **Action**: Action representation
-- **MotorSystem**: Neural-to-action conversion
+```cpp
+#include "brain/Brain.hpp"
 
-### 12. Environment Layer
-- **Environment**: Abstract environment interface
-- **Observation**: Sensory observation wrapper
-- **Action**: Action wrapper
+// Create configuration
+auto config = std::make_shared<Config>();
+config->set("brain.neuron_count", 1000);
+config->set("plasticity.stdp.enable", true);
 
-### 13. Experiments Layer
-- **Experiment**: Single experiment recording
-- **ExperimentRunner**: Experiment execution
-- **Metrics**: Data analysis
-- **Phase4Experiment**: Phase 4 cognitive experiments
+// Create brain
+auto brain = std::make_shared<Brain>(config);
 
-## Data Flow
-
-### Phase 2: Neural Computation
-```
-Sensory Input (test signals)
-      ↓
-Brain.receiveSensoryInput()
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Plasticity (STDP, Hebbian)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
+// Initialize
+if (brain->initialize()) {
+    // Configure for simulation
+    // Run simulation loop
+}
 ```
 
-### Phase 3: World Interaction
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
-      ↓
-AgentBrain.processSensoryInput()
-      ↓
-Brain.receiveSensoryInput() → Sensory Neurons
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Motor Decoding → MotorCommand
-      ↓
-AgentBrain.decodeMotorCommand()
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT (reward, success)
-      ↓
-Reward Prediction Error
-      ↓
-Neuromodulation (dopamine-like signal)
-      ↓
-Eligibility Trace Update
-      ↓
-Plasticity (STDP, Hebbian, Reward-Modulated)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
-      ↓
-Development System (stage progression)
-```
+#### Complete Agent Example
 
-### Phase 4: Emerging Cognition
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT
-      ↓
-ATTENTION (competitive selection)
-      ↓
-NEURAL PROCESSING
-      ↓
-PREDICTION (temporal sequence learning)
-      ↓
-WORKING MEMORY (persistent activity)
-      ↓
-EPISODIC MEMORY (experience storage)
-      ↓
-CONCEPT FORMATION (pattern discovery)
-      ↓
-PLANNING (multi-step prediction)
-      ↓
-SELF-MODEL (sensorimotor learning)
-      ↓
-MOTOR ACTION
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT
-      ↓
-REWARD / ERROR
-      ↓
-NEUROMODULATION
-      ↓
-PLASTICITY
-      ↓
-SOCIAL LEARNING (observation/imitation)
+```cpp
+// Create brain
+config = pynlm.createDefaultConfig();
+brain = pynlm.createBrain(config);
+brain.initialize();
+
+// Create agent brain interface
+agent = pynlm.createAgentBrain(brain);
+
+// Create world
+world = pynlm.createSimpleWorld();
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8);
+world.reset();
+
+// Initialize agent with world
+agent.initialize(world);
+
+// Enable learning features
+agent.enableRewardModulation(true);
+agent.enableCuriosity(true);
+agent.enableDevelopment(true);
+
+// Run simulation loop
+for (step = 0; step < 1000; ++step) {
+    world.update(0.1);
+    
+    percept = world.getSensoryPercept();
+    agent.processSensoryInput(percept);
+    
+    brain.step(step);
+    
+    action = agent.decodeMotorCommand();
+    world.applyMotorCommand(action, world.getSimulationTime());
+    
+    reward = world.getSensoryPercept().getInternal()[0];
+    agent.applyRewardModulation(reward, 0.0);
+    
+    agent.updateDevelopment(0.1);
+}
 ```
 
-## Agent-Brain Interface
+### Python API
 
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+The NLM framework provides Python bindings for easier scripting:
 
-- **SensoryTransduction**: Converts world percepts to neural input
-- **MotorDecoding**: Converts neural activity to motor commands
-- **Neuromodulation**: Applies reward signals to plasticity
-- **Development**: Updates developmental stage
-- **Attention**: Selective processing through competition
-- **Planning**: Uses predictions to select actions
+#### Basic Usage
 
-## Key Design Principles
+```python
+import pynlm
 
-1. **No ML Frameworks**: NLM implements its own neural computation
-2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
-3. **Biological Inspiration**: Designed to be incrementally more biologically accurate
-4. **Modularity**: Clear interfaces between components
-5. **Determinism**: Reproducible experiments via explicit random seeds
-6. **Performance**: Data-oriented design for large-scale simulation
-7. **Extensibility**: Clear patterns for adding new components
-8. **No Predefined Knowledge**: All learning from experience
+# Create default configuration
+config = pynlm.createDefaultConfig()
 
-## Phase 4 Key Innovations
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
 
-### Prediction System
-- Learns temporal sequences from experience
-- Predicts action consequences
-- Multi-step prediction capability
-- Error signals modulate learning
+# Run simulation
+for i in range(100):
+    brain.step(i)
 
-### Working Memory
-- Persistent neural activity
-- Recurrent connections for maintenance
-- Competition for selective retention
-- Neural-grounded (not a vector store)
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
 
-### Episodic Memory
-- Experience encoded as neural patterns
-- Pattern completion retrieval
-- Temporal and spatial indexing
-- Replay during consolidation
+#### Complete Agent Example
 
-### Concept Formation
-- Discovers patterns without labels
-- Prototype formation through averaging
-- Stability measurement
-- Category hints from properties
+```python
+import pynlm
 
-### Attention
-- Lateral inhibition competition
-- Winner-take-more dynamics
-- Top-down and bottom-up bias
-- NOT Transformer QKV attention
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
 
-### Planning
-- Uses learned predictions
-- Evaluates potential futures
-- Selects actions leading to goals
-- Adapts based on outcomes
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
 
-### Self-Model
-- Learns body schema
-- Predicts action consequences
-- Self vs external distinction
-- Capability representation
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
 
-### Social Learning
-- Observes other agents
-- Learns action effects
-- Imitation capability
-- Simple communication signals
+# Run simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    agent.updateDevelopment(0.1)
+```
+
+## Performance Considerations
+
+### Memory Usage
+- **Default Configuration**: ~100 neurons, ~1,000 synapses
+- **Large Configuration**: ~2,000 neurons, ~20,000 synapses
+- **Memory Pools**: Reduces memory fragmentation
+- **SIMD Vectorization**: Improves cache efficiency
+
+### Computational Complexity
+- **Neuron Updates**: O(n) per simulation step
+- **Synaptic Transmission**: O(m) where m is number of synapses
+- **Plasticity Updates**: O(k) where k is number of active synapses
+- **Memory Operations**: O(1) with memory pools
+
+### Scalability
+- **Multi-core Support**: Parallel processing for large networks
+- **Distributed Computing**: Potential for distributed simulations
+- **Hardware Acceleration**: SIMD and GPU support
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. "Brain initialization failed"
+- **Cause**: Invalid configuration parameters
+- **Solution**: Check configuration values and file paths
+- **Debug**: Enable verbose logging
+
+#### 2. "Simulation too slow"
+- **Cause**: Inefficient implementation or small timestep
+- **Solution**:
+  - Increase simulation timestep
+  - Enable SIMD optimization
+  - Use memory pools
+  - Reduce network size
+
+#### 3. "Memory allocation failed"
+- **Cause**: Out of memory
+- **Solution**:
+  - Increase system memory
+  - Use memory pools
+  - Reduce network size
+  - Enable memory compression
+
+#### 4. "Plasticity not working"
+- **Cause**: Plasticity rules not enabled
+- **Solution**:
+  - Check plasticity configuration
+  - Enable plasticity rules in config
+  - Verify spike activity
+  - Check neuron membrane potentials
+
+### Error Messages and Meanings
+
+- **"Failed to initialize brain"**: Brain configuration invalid
+- **"No neurons found"**: Neuron count too low or region issues
+- **"Memory allocation failed"**: Insufficient memory
+- **"File not found"**: Configuration file missing
+- **"Invalid parameter value"**: Configuration parameter invalid
+
+### Debugging Tips
+
+1. **Enable verbose logging**:
+   - Add "verbose = true" to configuration
+   - Use command line `-v` flag
+
+2. **Check system resources**:
+   - Monitor memory usage
+   - Check CPU temperature
+   - Verify disk space
+
+3. **Validate configuration**:
+   - Use "nlm --config test.cfg start" to test
+   - Check configuration file syntax
+
+4. **Use debug mode**:
+   - Enable debug mode in configuration
+   - Use "nlm debug" command
+
+## Advanced Usage Examples
+
+### 1. Custom Neural Architecture
+
+```cpp
+// Create custom network with specific connectivity
+config.set("brain.neuron_count", 2000);
+config.set("brain.synapse_density", 0.2);
+config.set("brain.connection_probability", 0.15);
+config.set("network.layer_sizes", "500,300,200");
+```
+
+### 2. Learning Rate Scheduling
+
+```cpp
+// Dynamic learning rate adjustment
+config.set("learning.rate_schedule", "exponential");
+config.set("learning.initial_rate", 0.01);
+config.set("learning.decay_rate", 0.001);
+config.set("learning.min_rate", 0.0001);
+```
+
+### 3. Neuromodulation Tuning
+
+```cpp
+// Custom neuromodulation parameters
+config.set("neuromod.dopamine.baseline", 0.1);
+config.set("neuromod.dopamine.peak", 2.0);
+config.set("neuromod.curiosity.weight_novelty", 0.7);
+config.set("neuromod.curiosity.weight_prediction_error", 0.3);
+```
+
+### 4. Development Scheduling
+
+```cpp
+// Custom developmental stages
+config.set("development.stages.initial.duration", 30);
+config.set("development.stages.critical_period.duration", 150);
+config.set("development.stages.maturation.duration", 400);
+config.set("development.stage_plasticity.initial", 1.0);
+config.set("development.stage_plasticity.critical_period", 0.8);
+```
+
+## Future Enhancements
+
+### Planned Features
+
+1. **Multi-region Connectivity**
+   - Long-range connections between regions
+   - Top-down and bottom-up processing
+   - Hierarchical processing
+
+2. **Advanced Plasticity Rules**
+   - Spike-timing dependent plasticity
+   - Reward-modulated plasticity
+   - Homeostatic plasticity
+   - Metaplasticity
+
+3. **Enhanced Neuromodulation**
+   - Additional neuromodulators (acetylcholine, norepinephrine)
+   - Complex interactions between neuromodulators
+   - Real-time modulation
+
+4. **Improved Memory Systems**
+   - Working memory with active maintenance
+   - Episodic memory with temporal sequencing
+   - Semantic memory with embeddings
+   - Procedural memory with reinforcement learning
+
+5. **Advanced Cognition**
+   - Theory of mind
+   - Causal reasoning
+   - Counterfactual thinking
+   - Abstract planning
+
+6. **Hardware Acceleration**
+   - GPU implementation
+   - Neuromorphic hardware support
+   - Event-driven simulation
+
+## Conclusion
+
+The NLM framework provides a comprehensive platform for simulating artificial neural systems with:
+
+- **Realistic neuron dynamics** with LIF models
+- **Comprehensive plasticity** with multiple rules
+- **Integrated neuromodulation** for adaptive behavior
+- **Sophisticated memory** systems for information storage
+- **Advanced cognition** for intelligent behavior
+- **Performance optimizations** for efficient computation
+
+This documentation provides the foundation for using and extending the NLM framework for research and applications in computational neuroscience and artificial intelligence.
