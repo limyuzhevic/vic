@@ -1,0 +1,295 @@
+# Modern Development Environment Configuration
+# 
+# This file defines the development environment setup and tooling
+# for the NLM project, following modern Python development practices
+
+name: nlm-modern-dev
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  # Python and build settings
+  PYTHON_VERSION: "3.11"
+  C++_STANDARD: "c++20"
+  CMAKE_BUILD_TYPE: "Release"
+  
+  # Package versions
+  PYBIND11_VERSION: "2.11.0"
+  SCIBUILD_CORE_VERSION: "0.5.0"
+  NUMPY_VERSION: "1.24.0"
+  PYTEST_VERSION: "7.0.0"
+  
+  # Test and coverage settings
+  COVERAGE_THRESHOLD: "80%"
+  MAX_COMPLEXITY: "10"
+  
+  # Docker settings
+  DOCKER_TAG: "nlm:latest"
+  DOCKER_PLATFORM: "linux/amd64"
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    name: Quality Check
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev
+          
+      - name: Cache Python packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: python-${{ hashFiles('pyproject.toml') }}
+          
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install setuptools wheel scikit-build-core pybind11
+          
+      - name: Install development dependencies
+        run: |
+          python -m pip install -e .[dev]
+          
+      - name: Run black formatter check
+        run: |
+          black --check src/
+          black --check tests/
+          
+      - name: Run isort import sorter check
+        run: |
+          isort --check-only src/
+          isort --check-only tests/
+          
+      - name: Run flake8 linting
+        run: |
+          flake8 src/
+          flake8 tests/
+          
+      - name: Run mypy type checking
+        run: |
+          mypy src/
+          
+      - name: Build package
+        run: |
+          python -m build
+          
+      - name: Run pytest with coverage
+        run: |
+          pytest --cov=pynlm --cov-report=xml --cov-report=term-missing
+          
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true
+  
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: Build and Test
+    
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev
+          
+      - name: Cache build artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.local/share/pytest_pytest
+          key: build-${{ matrix.python-version }}-${{ hashFiles('src/') }}
+          restore-keys: |
+            build-${{ matrix.python-version }}-
+            build-main-
+            
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install setuptools wheel scikit-build-core pybind11
+          
+      - name: Install development dependencies
+        run: |
+          python -m pip install -e .[dev]
+          
+      - name: Build package
+        run: |
+          python -m build
+          
+      - name: Install built package
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          
+      - name: Run pytest
+        run: |
+          pytest tests/ -v --tb=short --cov=pynlm --cov-report=term-missing
+          
+      - name: Run example scripts
+        run: |
+          python -c "import pynlm; print(f'NLM Version: {pynlm.__version__}')"
+          
+      - name: Verify package structure
+        run: |
+          python -c "
+          import pynlm
+          print('Testing package imports...')
+          from pynlm import createDefaultConfig, createBrain, createSimpleWorld, createAgentBrain
+          print('✓ Core imports work')
+          
+          config = createDefaultConfig()
+          brain = createBrain(config)
+          brain.initialize()
+          print(f'✓ Brain created: {brain.getTotalNeuronCount()} neurons')
+          
+          world = createSimpleWorld()
+          agent = createAgentBrain(brain)
+          agent.initialize(world)
+          print('✓ Agent created and initialized')
+          
+          print('✓ All package functionality verified')
+          "
+          
+  docker-build:
+    runs-on: ubuntu-latest
+    name: Docker Build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Build NLM Docker image
+        run: |
+          docker build --platform ${{ env.DOCKER_PLATFORM }} \
+            --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
+            --tag ${{ env.DOCKER_TAG }} \
+            --file Dockerfile.ci \
+            .
+            
+      - name: Test Docker image
+        run: |
+          docker run --rm \
+            --name nlm-test \
+            ${{ env.DOCKER_TAG }} \
+            python -c "
+            import pynlm
+            print(f'NLM Docker Image: {pynlm.__version__}')
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            print(f'Brain test: {brain.getTotalNeuronCount()} neurons')
+            "
+            
+  performance-benchmark:
+    runs-on: ubuntu-latest
+    name: Performance Benchmark
+    
+    needs: [quality-check, build-and-test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev
+          
+      - name: Cache performance results
+        uses: actions/cache@v3
+        with:
+          path: benchmarks/
+          key: perf-${{ hashFiles('src/') }}
+          restore-keys: |
+            perf-main
+            perf-develop
+            
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+          
+      - name: Run performance benchmarks
+        run: |
+          # Run benchmarks and save results
+          python benchmarks/benchmark_perf.py --output benchmarks/results.json
+          
+      - name: Analyze performance
+        run: |
+          python benchmarks/analyze_perf.py --input benchmarks/results.json --report benchmarks/perf_report.md
+          
+      - name: Upload performance reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-reports
+          path: benchmarks/
+          
+      - name: Comment on PR with performance results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs')
+            const benchmarks = JSON.parse(fs.readFileSync('benchmarks/results.json', 'utf8'))
+            
+            const message = `## Performance Benchmark Results
+            
+            | Configuration | Time (s) | Neurons/sec | Memory (MB) |
+            |---------------|----------|-------------|-------------|
+            | ${benchmarks.results.map(r => `| ${r.config} | ${r.time} | ${r.neuronsPerSecond} | ${r.memoryUsage}`).join('\n')} |
+            
+            Performance regression detected!`
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              body: message,
+            })

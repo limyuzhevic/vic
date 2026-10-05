@@ -2,21 +2,31 @@
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
 
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "pynlm"
 version = "0.1.0"
 description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
 readme = "README.md"
+readme.encoding = "utf-8"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+maintainers = [
+    {name = "NLM Project"}
+]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neural-networks"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -25,6 +35,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries",
 ]
 
 dependencies = []
@@ -33,25 +45,81 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scikit-build-core>=0.5.0",
+    "pybind11>=2.11.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0",
+]
+
+[project.optional-dependencies]
+extended = [
+    "numpy>=1.20",
+    "scipy>=1.8.0",
+    "matplotlib>=3.5.0",
+    "jupyter>=1.0.0",
+]
+
+[project.optional-dependencies]
+all = [
+    "pynlm[dev]",
+    "pynlm[extended]",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+Changelog = "https://github.com/nlm-project/nlm/releases"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = find:
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.find]
+where = ["src"]
+include = ["pynlm*"]
+exclude = [
+    "tests",
+    "build",
+    "dist",
+    "*.egg-info",
 ]
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+[tool.setuptools.package-data]
+pynlm = [
+    "*.so",
+    "*.dll", 
+    "*.pyd",
+    "*.pyx",
+    "*.pxd",
+    "py.typed",
+]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+[tool.setuptools.exclude-package-data]
+pynlm = [
+    "*.pyc",
+    "__pycache__/",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "pynlm.__version__"}
+
+[tool.coverage.run]
+source = ["pynlm", "tests"]
+include = ["src/pynlm/*", "tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
