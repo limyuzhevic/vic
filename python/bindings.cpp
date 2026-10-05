@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <iostream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -18,6 +20,188 @@
 
 namespace py = pybind11;
 namespace nlm {
+
+// Pythonic error handling
+def python_error_handler(const std::exception& e) {
+    throw py::value_error(std::string("NLM Error: ") + e.what());
+}
+
+// Helper function to convert vision width/height to flat size
+inline size_t visionFlatSize(size_t width, size_t height) {
+    return width * height;
+}
+
+// Helper function to create vision vector with given dimensions
+inline std::vector<float> createVisionVector(size_t width, size_t height, float value = 0.0f) {
+    return std::vector<float>(width * height, value);
+}
+
+// Helper function to validate percept dimensions
+inline void validatePerceptDimensions(SensoryPercept& percept, size_t expectedVisionWidth, size_t expectedVisionHeight) {
+    if (percept.getVision().size() != expectedVisionWidth * expectedVisionHeight) {
+        throw py::value_error("Percept vision data size doesn't match expected dimensions");
+    }
+}
+
+// Convenience factory functions
+inline std::shared_ptr<Config> createDefaultConfig() {
+    return std::make_shared<Config>();
+}
+
+inline std::shared_ptr<Brain> createBrainWithConfig(std::shared_ptr<Config> config) {
+    return std::make_shared<Brain>(config);
+}
+
+inline std::shared_ptr<SimpleWorld> createWorld() {
+    return std::make_shared<SimpleWorld>();
+}
+
+inline std::shared_ptr<AgentBrain> createAgentBrain(std::shared_ptr<Brain> brain) {
+    return std::make_shared<AgentBrain>(brain);
+}
+
+// Type conversion helpers
+inline std::vector<float> numpyToVector(const py::array_t<float>& arr) {
+    return std::vector<float>(arr.data(), arr.data() + arr.size());
+}
+
+inline py::array_t<float> vectorToNumpy(const std::vector<float>& vec) {
+    return py::array_t<float>(vec);
+}
+
+// Convenience classes for Python users
+class PythonVisionWrapper {
+public:
+    PythonVisionWrapper(std::shared_ptr<Vision> vision) : vision_(vision) {}
+    
+    size_t width() const { return vision_->getWidth(); }
+    size_t height() const { return vision_->getHeight(); }
+    size_t channels() const { return vision_->getChannels(); }
+    
+    std::vector<float> data() const { return vision_->getData(); }
+    
+    void set_data(const std::vector<float>& data) { vision_->setData(data); }
+    void set_data(const py::array_t<float>& data) { vision_->setData(numpyToVector(data)); }
+    
+    float get_pixel(size_t y, size_t x) const {
+        size_t index = y * vision_->getWidth() + x;
+        return vision_->getData()[index];
+    }
+    
+    void set_pixel(size_t y, size_t x, float value) {
+        size_t index = y * vision_->getWidth() + x;
+        auto data = vision_->getData();
+        if (index < data.size()) {
+            data[index] = value;
+            vision_->setData(data);
+        }
+    }
+    
+    std::string repr() const {
+        return "Vision(width=" + std::to_string(vision_->getWidth()) +
+               ", height=" + std::to_string(vision_->getHeight()) +
+               ", channels=" + std::to_string(vision_->getChannels()) + ")";
+    }
+    
+private:
+    std::shared_ptr<Vision> vision_;
+};
+
+class PythonActionWrapper {
+public:
+    PythonActionWrapper(std::shared_ptr<Action> action) : action_(action) {}
+    
+    std::string type_name() const {
+        static const char* typeNames[] = {"MoveForward", "MoveBackward", "MoveLeft", "MoveRight", 
+                                          "TurnLeft", "TurnRight", "Look", "LookUp", "LookDown", 
+                                          "Interact", "Eat", "Drink", "Rest", "Wait", "Custom"};
+        size_t idx = static_cast<size_t>(action_->getType());
+        return idx < sizeof(typeNames)/sizeof(typeNames[0]) ? typeNames[idx] : "Unknown";
+    }
+    
+    std::vector<float> parameters() const { return action_->getParameters(); }
+    void parameters(const std::vector<float>& params) { action_->setParameters(params); }
+    
+    std::string name() const { return action_->getName(); }
+    
+    std::string repr() const {
+        return "Action(type=" + type_name() + ", parameters=" + std::to_string(parameters().size()) + " values)";
+    }
+    
+private:
+    std::shared_ptr<Action> action_;
+};
+
+class PythonSensoryPerceptWrapper {
+public:
+    PythonSensoryPerceptWrapper(std::shared_ptr<SensoryPercept> percept) : percept_(percept) {}
+    
+    // Vision access with Pythonic interface
+    PythonVisionWrapper vision() {
+        auto vision_ptr = std::dynamic_pointer_cast<Vision>(percept_->getVisionData());
+        if (!vision_ptr) {
+            throw py::value_error("Percept does not contain Vision data");
+        }
+        return PythonVisionWrapper(vision_ptr);
+    }
+    
+    std::vector<float> vision_data() const { return percept_->getVision(); }
+    size_t vision_width() const { return percept_->getVisionWidth(); }
+    size_t vision_height() const { return percept_->getVisionHeight(); }
+    
+    std::vector<float> touch() const { return percept_->getTouch(); }
+    std::vector<float> internal() const { return percept_->getInternal(); }
+    std::vector<float> proprioception() const { return percept_->getProprioception(); }
+    std::vector<float> audio() const { return percept_->getAudio(); }
+    
+    // Setters with validation
+    void set_vision(const py::array_t<float>& data) {
+        std::vector<float> vec = numpyToVector(data);
+        if (vec.size() != percept_->getVisionWidth() * percept_->getVisionHeight()) {
+            throw py::value_error("Vision data size doesn't match percept dimensions");
+        }
+        percept_->setVision(vec);
+    }
+    
+    void set_touch(const py::array_t<float>& data) {
+        percept_->setTouch(numpyToVector(data));
+    }
+    
+    void set_internal(const py::array_t<float>& data) {
+        percept_->setInternal(numpyToVector(data));
+    }
+    
+    void set_proprioception(const py::array_t<float>& data) {
+        percept_->setProprioception(numpyToVector(data));
+    }
+    
+    void set_audio(const py::array_t<float>& data) {
+        percept_->setAudio(numpyToVector(data));
+    }
+    
+    double timestamp() const { return percept_->getTimestamp(); }
+    void timestamp(double t) { percept_->setTimestamp(t); }
+    
+    // Convenience methods
+    float get_vision_pixel(size_t y, size_t x) const {
+        return percept_->getVision()[y * percept_->getVisionWidth() + x];
+    }
+    
+    void set_vision_pixel(size_t y, size_t x, float value) {
+        auto data = percept_->getVision();
+        data[y * percept_->getVisionWidth() + x] = value;
+        percept_->setVision(data);
+    }
+    
+    std::string repr() const {
+        return "SensoryPercept(vision_shape=[" + std::to_string(percept_->getVisionWidth()) + ", " +
+               std::to_string(percept_->getVisionHeight()) + "], touch=" + std::to_string(percept_->getTouch().size()) +
+               ", internal=" + std::to_string(percept_->getInternal().size()) + ")";
+    }
+    
+private:
+    std::shared_ptr<SensoryPercept> percept_;
+};
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(

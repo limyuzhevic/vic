@@ -10,6 +10,8 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
+This guide has been enhanced with improved Python bindings that provide a more intuitive, Pythonic API with better error handling and convenience methods.
+
 That's it! NLM simulates all of this.
 
 ---
@@ -133,24 +135,35 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Enhanced Brain Stats
 
 ```python
+# Enhanced stats collection with Pythonic API:
+import numpy as np
+
 # Just add these inside your loop:
 print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+print("Curiosity level:", agent.getCuriosityLevel())
+print("Novelty level:", agent.getNoveltyLevel())
+print("Prediction error:", agent.getPredictionError())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enhanced Agent Features
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+# These are all optional with enhanced error handling:
+try:
+    agent.enableRewardModulation(True)      # Learn from rewards
+    agent.enableStructuralPlasticity(True)  # Grow new connections
+    agent.enableDevelopment(True)           # Brain matures over time
+    agent.enableCuriosity(True)             # Explore new things
+    
+    print("✓ All learning subsystems enabled successfully")
+except Exception as e:
+    print(f"⚠ Warning: Some features couldn't be enabled: {e}")
 ```
 
 ---
@@ -197,61 +210,127 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Project 2: Brain Watching a World with Enhanced API
 
 ```python
 import pynlm
+import numpy as np
 
-# Setup
+# Enhanced setup with Pythonic API
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Watch the world for 30 steps
+# Enhanced: Enable learning features
+agent.enableCuriosity(True)
+agent.enableRewardModulation(True)
+
+# Watch the world for 30 steps with enhanced statistics
 for i in range(30):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
+    
+    # Enhanced: Get percept with Pythonic access
+    percept = world.getSensoryPercept()
+    
+    # Enhanced: Convert vision to numpy for processing
+    vision = np.array(percept.vision_data()).reshape(percept.vision_height(), percept.vision_width())
+    
+    # Example processing: normalize vision
+    vision_normalized = (vision - vision.mean()) / (vision.std() + 1e-8)
+    
+    # Set back processed vision
+    percept.set_vision(vision_normalized.flatten())
+    
+    agent.processSensoryInput(percept)
     brain.step(i)
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+    # Enhanced: Log detailed statistics
+    if i % 5 == 0:
+        print(f"Step {i}: Firing {brain.getFiringNeuronCount()} neurons, "
+              f"Curiosity: {agent.getCuriosityLevel():.3f}, Novelty: {agent.getNoveltyLevel():.3f}")
+
+print("Enhanced world watching complete!")
+print("Final firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Enhanced Features
 
 ```python
 import pynlm
+import numpy as np
 
-# Setup
+# Enhanced setup with advanced features
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enhanced: Enable all advanced learning features
 agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
-# Run agent
+print("Enhanced complete agent simulation:")
+
 for step in range(100):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
+    
+    # Enhanced: Get sensory input with Pythonic API
+    percept = world.getSensoryPercept()
+    
+    # Enhanced: Convert to numpy for advanced processing
+    vision = np.array(percept.vision_data()).reshape(percept.vision_height(), percept.vision_width())
+    
+    # Example: Apply simple edge detection
+    from scipy import ndimage
+    smoothed = ndimage.gaussian_filter(vision, sigma=0.5)
+    
+    # Set processed vision
+    percept.set_vision(smoothed.flatten())
+    
+    # Enhanced: Process sensory input
+    agent.processSensoryInput(percept)
     brain.step(step)
+    
+    # Enhanced: Get action with curiosity
     action = agent.decodeMotorCommand()
+    
+    # Enhanced: Apply action
     world.applyMotorCommand(action, world.getSimulationTime())
     
+    # Enhanced: Apply reward modulation with predictions
+    reward = np.mean(percept.internal()) if percept.internal() else 0.0
+    agent.applyRewardModulation(reward, reward * 0.5)  # Simple prediction
+    
+    # Enhanced: Update development
+    agent.updateDevelopment(0.1)
+    
+    # Enhanced: Log comprehensive statistics every 20 steps
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Step {step}:")
+        print(f"  🔋 Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  🧠 Development stage: {brain.getDevelopmentalStage()}")
+        print(f"  🔍 Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  ✨ Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  🎯 Prediction error: {agent.getPredictionError():.3f}")
+        print(f"  🧮 Average firing rate: {brain.getAverageFiringRate():.3f}")
 
-print("Agent simulation complete!")
+print("✓ Enhanced agent simulation complete!")
+print(f"  📊 Final statistics - Firing rate: {brain.getAverageFiringRate():.3f}")
+print(f"  🧠 Development: {brain.getDevelopmentalStage()}")
 ```
 
 ---
