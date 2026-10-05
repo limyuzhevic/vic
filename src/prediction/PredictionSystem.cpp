@@ -53,8 +53,20 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::initialize(Brain* brain) {
+    // Initialize prediction system with brain reference for accessing neural substrates
+    // This allows the prediction system to interact with neural activity patterns
+    // and brain state for predictive coding and error computation
+    // 
+    // Currently a placeholder - will use brain to:
+    // - Access neural activity for prediction
+    // - Compute prediction errors based on neural states
+    // - Integrate with working memory for expectation formation
+    // - Update prediction confidence based on neural reliability
+    //
+    // In Phase 2+, this will be fully implemented with real predictive coding
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
 }
 
 } // namespace nlm

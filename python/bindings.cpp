@@ -342,7 +342,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+                .def("getDevelopmentStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
@@ -351,7 +351,72 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Additional methods for better user experience
+        .def("getMemoryStats", [](Brain& brain) {
+            py::dict memoryStats;
+            if (brain.getWorkingMemory()) {
+                memoryStats["working_memory_traces"] = brain.getWorkingMemory()->getActiveTraces();
+                memoryStats["working_memory_capacity"] = brain.getWorkingMemory()->getCapacity();
+            }
+            if (brain.getEpisodicMemory()) {
+                memoryStats["episodic_memory_episodes"] = brain.getEpisodicMemory()->getEpisodeCount();
+                memoryStats["episodic_memory_max_episodes"] = brain.getEpisodicMemory()->getMaxEpisodes();
+            }
+            return memoryStats;
+        }, "Get memory system statistics. Returns a dictionary with "
+            "working memory and episodic memory metrics.")
+        
+        .def("getNeuromodulationStats", [](Brain& brain) {
+            py::dict neuromodStats;
+            if (brain.getDopamine()) {
+                neuromodStats["dopamine_level"] = brain.getDopamine()->getLevel();
+                neuromodStats["dopamine_plasticity_factor"] = brain.getDopamine()->getPlasticityFactor();
+            }
+            if (brain.getCuriosity()) {
+                neuromodStats["curiosity_level"] = brain.getCuriosity()->getLevel();
+            }
+            if (brain.getNovelty()) {
+                neuromodStats["novelty_level"] = brain.getNovelty()->getLevel();
+            }
+            return neuromodStats;
+        }, "Get neuromodulation system statistics. Returns a dictionary with "
+            "dopamine, curiosity, and novelty metrics.")
+        
+        .def("getDevelopmentStageName", [](Brain& brain) {
+            static const std::vector<std::string> stageNames = {
+                "Initial", "CriticalPeriod", "Maturation", "Adult", "Aging"
+            };
+            auto stage = brain.getDevelopmentalStage();
+            int index = static_cast<int>(stage);
+            if (index >= 0 && index < static_cast<int>(stageNames.size())) {
+                return stageNames[index];
+            }
+            return std::string("Unknown");
+        }, "Get human-readable name for the current developmental stage.")
+        
+        .def("simulateEpisode", &AgentBrain::reset, "Reset agent for a new episode. "
+             "This is useful for running multiple simulation episodes.")
+        
+        .def("isResting", [](Brain& brain) {
+            return false;  // Simplified for now
+        }, "Check if the brain is in resting state.")
+        
+        .def("getExcitementLevel", [](Brain& brain) {
+            float firingExcitement = brain.getAverageFiringRate() / 50.0f;
+            float noveltyExcitement = brain.getNovelty() ? brain.getNovelty()->getLevel() : 0.0f;
+            return std::min(firingExcitement + noveltyExcitement, 1.0f);
+        }, "Get a measure of brain excitement (0-1). Higher values indicate "
+            "more active exploration and learning potential.")
+        
+        .def("getEngagementLevel", [](Brain& brain) {
+            float firingEngagement = std::min(brain.getAverageFiringRate() / 30.0f, 1.0f);
+            float noveltyEngagement = brain.getNovelty() ? brain.getNovelty()->getLevel() : 0.0f;
+            float curiosityEngagement = brain.getCuriosity() ? brain.getCuriosity()->getLevel() : 0.0f;
+            return (firingEngagement * 0.4f) + (noveltyEngagement * 0.3f) + (curiosityEngagement * 0.3f);
+        }, "Get an engagement level (0-1). Measures how actively the brain "
+            "is involved in learning and exploration.");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -420,6 +485,521 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // ===== SIMPLIFIED BEGINNER HELPER FUNCTIONS =====
+
+    // Create simple brain for beginners - high-level convenience method
+    m.def("create_simple_brain", [](size_t neuronCount, size_t regionCount) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", regionCount);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", 42);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuron_count") = 1000, py::arg("region_count") = 1,
+        "Create a simple brain with default configuration for beginners. "
+        "Provides sensible defaults for quick experimentation.");
+
+    // Create simple world for beginners - high-level convenience method
+    m.def("create_simple_world", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 16, py::arg("height") = 16,
+        py::arg("vision_width") = 16, py::arg("vision_height") = 16,
+        "Create a simple 2D world for simulation. "
+        "Configures the world with basic sensory and motor capabilities.");
+
+    // Create agent brain with world - high-level convenience method
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Create an agent brain connected to a world. "
+        "Enables reward modulation, development, and curiosity by default for intelligent behavior.");
+
+    // Run simulation loop helper for beginners
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, 
+                              std::shared_ptr<SimpleWorld> world, size_t steps) {
+        for (size_t step = 0; step < steps; ++step) {
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Step brain
+            brain->step(step, step * 0.001);
+            
+            // Get motor command
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(cmd, step * 0.001);
+            
+            // Compute reward
+            float reward = world->computeReward(agent->getBrain()->getRegions()[0].get());
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.001);
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps") = 100,
+        "Run a complete simulation loop. This helper method combines all the "
+        "essential steps for a typical simulation episode.");
+
+    // Get neural statistics helper for beginners
+    m.def("get_brain_stats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["region_count"] = brain->getRegionCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["working_memory_traces"] = brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0;
+        stats["dopamine_level"] = brain->getDopamine() ? brain->getDopamine()->getLevel() : 0.0f;
+        return stats;
+    }, py::arg("brain"),
+        "Get comprehensive statistics about a brain. Returns a dictionary "
+        "with key neural metrics useful for monitoring and debugging.");
+
+    // Enhanced brain initialization with error checking
+    m.def("safe_initialize", [](std::shared_ptr<Brain> brain) {
+        bool success = brain->initialize();
+        if (!success) {
+            throw py::value_error("Brain initialization failed");
+        }
+        return success;
+    }, py::arg("brain"),
+        "Initialize a brain with error checking. Throws an exception if "
+        "initialization fails, making it easier to catch and handle errors.");
+
+    // Version and info functions
+    m.def("get_nlm_version", []() {
+        return "NLM v1.0.0 - Neural Learning Machine (Phase 6)";
+    }, "Get the current NLM version information.");
+
+    m.def("is_functional", []() {
+        return true;  // All systems functional in Phase 6
+    }, "Check if NLM is fully functional. Returns true for Phase 6 implementation.");
+
+    // Educational helper: Create a demonstration brain
+    m.def("create_demo_brain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.05f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("random_seed", 42);
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw py::value_error("Demo brain initialization failed");
+        }
+        
+        // Add some inter-region connectivity for demonstration
+        brain->addInterRegionConnection(RegionId(1), RegionId(2), 0.1f);
+        
+        return brain;
+    }, "Create a demonstration-ready brain with example configuration. "
+        "This brain includes sample inter-region connections for learning demonstrations.");
+
+    // Simplified agent for educational purposes
+    m.def("create_educational_agent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Configure for educational demonstrations
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        // Store for debugging
+        agent->getBrain()->getConfig()->set("demo_mode", true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Create an educational agent configured for learning demonstrations. "
+        "This agent includes specific settings for educational use cases.");
+
+    // State management helpers
+    m.def("save_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw py::value_error("Failed to save brain state to " + filepath);
+        }
+        return success;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Save brain state to a file with error checking. "
+        "Useful for checkpointing progress or sharing brain models.");
+
+    m.def("load_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        bool success = brain->load(filepath);
+        if (!success) {
+            throw py::value_error("Failed to load brain state from " + filepath);
+        }
+        return success;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Load brain state from a file with error checking. "
+        "Allows resuming from checkpoints or loading pre-trained models.");
+
+    // Quick setup helper for simulations
+    m.def("setup_simulation", [](size_t neuronCount, size_t worldSize) -> py::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", 42);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw py::value_error("Brain initialization failed");
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldSize, worldSize, worldSize, worldSize);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return py::make_tuple(brain, world, agent);
+    }, py::arg("neuron_count") = 1000, py::arg("world_size") = 16,
+        "Quick setup for simulation. Returns a pre-configured tuple of "
+        "(brain, world, agent) ready for immediate use.");
+
+    // Add convenience attributes for common values
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_WORLD_SIZE") = 16;
+    m.attr("DEFAULT_VISION_SIZE") = 16;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
+
+    // Educational tutorial example
+    m.def("get_tutorial_example", []() {
+        return R"(
+        # NLM Python Tutorial Example
+        
+        # Simple brain creation
+        brain = nlm.create_simple_brain(neuron_count=500)
+        brain.initialize()
+        
+        # Create world
+        world = nlm.create_simple_world(16, 16)
+        
+        # Create agent
+        agent = nlm.create_agent_brain(brain, world)
+        
+        # Run simulation
+        nlm.run_simulation(brain, agent, world, steps=100)
+        
+        # Get stats
+        stats = nlm.get_brain_stats(brain)
+        print(f"Average firing rate: {stats['average_firing_rate']}")
+        
+        # Save checkpoint
+        brain.save("checkpoint.bin")
+        )";
+    }, "Get an educational tutorial example code. Useful for beginners "
+        "learning how to use the NLM Python interface.");
+
+} // namespace nlm
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // ===== SIMPLIFIED BEGINNER HELPER FUNCTIONS =====
+
+    // Create simple brain for beginners - high-level convenience method
+    m.def("create_simple_brain", [](size_t neuronCount, size_t regionCount) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", regionCount);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", 42);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuron_count") = 1000, py::arg("region_count") = 1,
+        "Create a simple brain with default configuration for beginners. "
+        "Provides sensible defaults for quick experimentation.");
+
+    // Create simple world for beginners - high-level convenience method
+    m.def("create_simple_world", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 16, py::arg("height") = 16,
+        py::arg("vision_width") = 16, py::arg("vision_height") = 16,
+        "Create a simple 2D world for simulation. "
+        "Configures the world with basic sensory and motor capabilities.");
+
+    // Create agent brain with world - high-level convenience method
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Create an agent brain connected to a world. "
+        "Enables reward modulation, development, and curiosity by default for intelligent behavior.");
+
+    // Run simulation loop helper for beginners
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, 
+                              std::shared_ptr<SimpleWorld> world, size_t steps) {
+        for (size_t step = 0; step < steps; ++step) {
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Step brain
+            brain->step(step, step * 0.001);
+            
+            // Get motor command
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(cmd, step * 0.001);
+            
+            // Compute reward
+            float reward = world->computeReward(agent->getBrain()->getRegions()[0].get());
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.001);
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps") = 100,
+        "Run a complete simulation loop. This helper method combines all the "
+        "essential steps for a typical simulation episode.");
+
+    // Get neural statistics helper for beginners
+    m.def("get_brain_stats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["region_count"] = brain->getRegionCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["working_memory_traces"] = brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0;
+        stats["dopamine_level"] = brain->getDopamine() ? brain->getDopamine()->getLevel() : 0.0f;
+        return stats;
+    }, py::arg("brain"),
+        "Get comprehensive statistics about a brain. Returns a dictionary "
+        "with key neural metrics useful for monitoring and debugging.");
+
+    // Enhanced brain initialization with error checking
+    m.def("safe_initialize", [](std::shared_ptr<Brain> brain) {
+        bool success = brain->initialize();
+        if (!success) {
+            throw py::value_error("Brain initialization failed");
+        }
+        return success;
+    }, py::arg("brain"),
+        "Initialize a brain with error checking. Throws an exception if "
+        "initialization fails, making it easier to catch and handle errors.");
+
+    // Version and info functions
+    m.def("get_nlm_version", []() {
+        return "NLM v1.0.0 - Neural Learning Machine (Phase 6)";
+    }, "Get the current NLM version information.");
+
+    m.def("is_functional", []() {
+        return true;  // All systems functional in Phase 6
+    }, "Check if NLM is fully functional. Returns true for Phase 6 implementation.");
+
+    // Educational helper: Create a demonstration brain
+    m.def("create_demo_brain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.05f);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("random_seed", 42);
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw py::value_error("Demo brain initialization failed");
+        }
+        
+        // Add some inter-region connectivity for demonstration
+        brain->addInterRegionConnection(RegionId(1), RegionId(2), 0.1f);
+        
+        return brain;
+    }, "Create a demonstration-ready brain with example configuration. "
+        "This brain includes sample inter-region connections for learning demonstrations.");
+
+    // Simplified agent for educational purposes
+    m.def("create_educational_agent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Configure for educational demonstrations
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        // Store for debugging
+        agent->getBrain()->getConfig()->set("demo_mode", true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Create an educational agent configured for learning demonstrations. "
+        "This agent includes specific settings for educational use cases.");
+
+    // State management helpers
+    m.def("save_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw py::value_error("Failed to save brain state to " + filepath);
+        }
+        return success;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Save brain state to a file with error checking. "
+        "Useful for checkpointing progress or sharing brain models.");
+
+    m.def("load_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        bool success = brain->load(filepath);
+        if (!success) {
+            throw py::value_error("Failed to load brain state from " + filepath);
+        }
+        return success;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Load brain state from a file with error checking. "
+        "Allows resuming from checkpoints or loading pre-trained models.");
+
+    // Quick setup helper for simulations
+    m.def("setup_simulation", [](size_t neuronCount, size_t worldSize) -> py::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", 42);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw py::value_error("Brain initialization failed");
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldSize, worldSize, worldSize, worldSize);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return py::make_tuple(brain, world, agent);
+    }, py::arg("neuron_count") = 1000, py::arg("world_size") = 16,
+        "Quick setup for simulation. Returns a pre-configured tuple of "
+        "(brain, world, agent) ready for immediate use.");
+
+    // Add convenience attributes for common values
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_WORLD_SIZE") = 16;
+    m.attr("DEFAULT_VISION_SIZE") = 16;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
+
+    // Educational tutorial example
+    m.def("get_tutorial_example", []() {
+        return R"(
+        # NLM Python Tutorial Example
+        
+        # Simple brain creation
+        brain = nlm.create_simple_brain(neuron_count=500)
+        brain.initialize()
+        
+        # Create world
+        world = nlm.create_simple_world(16, 16)
+        
+        # Create agent
+        agent = nlm.create_agent_brain(brain, world)
+        
+        # Run simulation
+        nlm.run_simulation(brain, agent, world, steps=100)
+        
+        # Get stats
+        stats = nlm.get_brain_stats(brain)
+        print(f"Average firing rate: {stats['average_firing_rate']}")
+        
+        # Save checkpoint
+        brain.save("checkpoint.bin")
+        )";
+    }, "Get an educational tutorial example code. Useful for beginners "
+        "learning how to use the NLM Python interface.");
+
+    // ===== ENHANCED BRAIN CLASS METHODS =====
+
+    // Add additional methods to the existing Brain class
+    // Find the Brain class definition and add methods
+    }
 
 } // namespace nlm

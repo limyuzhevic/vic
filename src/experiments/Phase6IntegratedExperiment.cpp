@@ -49,7 +49,6 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
     

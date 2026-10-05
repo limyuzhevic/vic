@@ -224,42 +224,69 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Initialize random connectivity and synapse weights
+            // Initialize random connectivity and synapse weights with biologically plausible parameters
+            // Connection probability determines structural connectivity
+            // Excitatory weight range: 0.2 (strong) to 0.0 (no connection)
+            // Inhibitory weight range: -0.1 (strong inhibition) to 0.0 (no connection)
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
         }
     }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize working memory - stores transient information for immediate use
+    // Capacity scales with total neuron count to maintain proportional memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    // Initialize episodic memory - stores experience episodes for replay and consolidation
+    // Max episodes prevents memory overflow while allowing long-term learning
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    // Initialize associative memory - forms pattern associations and connections
+    // Uses working memory and neural activity to build learned associations
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize prediction system - anticipates future states and computes prediction errors
+    // Currently exists but doesn't have explicit initialize method - manages prediction errors and state expectations
+    // This system would update prediction errors based on sensory input discrepancies
+    // PredictionSystem is integrated but waiting for full implementation
+    pImpl->predictionSystem->initialize(this);
     
-    // Initialize cognition systems
+    // Initialize cognition systems - higher-level cognitive functions
+    
+    // Initialize neural planner - plans sequences of actions and strategies
+    // Planning depth determines how far ahead the system thinks (5 steps)
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    // Initialize concept formation - identifies abstract patterns and categories
+    // Processes neural activity patterns to form abstract concepts
     pImpl->conceptFormation->initialize(this);
     
+    // Initialize attentional selection - selects focus areas and filters information
+    // Inhibition strength (0.5) and excitation strength (1.5) balance attention selection
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize neuromodulation systems - chemical signals that modulate learning and behavior
+    
+    // Initialize novelty detection - detects unexpected sensory input
     pImpl->novelty->initialize(this);
+    
+    // Initialize curiosity - drives exploration and information seeking
     pImpl->curiosity->initialize(this);
     
+    // Initialize dopamine system - reward prediction error and reinforcement learning
+    pImpl->dopamine->initialize(this);
+    
+    // Initialize prediction error signal - specific error for prediction system
+    pImpl->predictionError->initialize(this);
+    
     // Register spike handlers for event-driven processing
+    // Count spikes for statistics and deliver synaptic input through delayed spikes
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
@@ -267,13 +294,15 @@ bool Brain::initialize() {
     });
     
     // Register delayed spike handler to deliver synaptic input
+    // Translates spike events into synaptic current in target neurons
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
+                    // Apply synaptic weight as current (scaled by factor)
+                    // Scale factor amplifies synaptic effect for biological plausibility
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
@@ -286,7 +315,7 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
+    // Configure checkpoint manager for state persistence
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     

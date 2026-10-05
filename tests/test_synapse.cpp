@@ -165,11 +165,11 @@ void testSynapsePlasticityFlags() {
     assert(!synapse.getPlasticityFlags().hebbian);
     assert(!synapse.getPlasticityFlags().stdp);
     
-    synapse.enablePlasticity(true, true, false);
+    synapse.enablePlasticity(true, true, true);
     
     assert(synapse.getPlasticityFlags().hebbian);
     assert(synapse.getPlasticityFlags().stdp);
-    assert(!synapse.getPlasticityFlags().reward_modulated);
+    assert(synapse.getPlasticityFlags().reward_modulated);
     
     std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
 }

@@ -214,7 +214,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            syn->enablePlasticity(true, true, true);  // Enable Hebbian, STDP, and reward-modulated plasticity
         }
     }
     
