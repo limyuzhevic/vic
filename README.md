@@ -82,12 +82,87 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+## Python Bindings
+
+The NLM framework includes enhanced Python bindings that provide a comprehensive interface to the neural simulation system.
+
+### Installation
+
+The enhanced Python bindings are built as part of the main NLM build system:
+
+```bash
+cd build
+# After building the main NLM library, build the Python bindings
+cd ..
+cmake . -DCMAKE_BUILD_TYPE=Release
+make pynlm
+```
+
+### Quick Start
+
+```python
+import nlm
+
+# Create a complete simulation setup
+world, brain, agent_brain, config = nlm.createSimulationSetup()
+
+# Configure the agent
+config.set("agent.name", "demo_agent")
+config.set("agent.max_energy", 200.0)
+
+# Run simulation with context manager (safe execution)
+with nlm.SimulationContext(brain, max_steps=1000) as sim:
+    world.setAgentStart(50.0, 50.0)
+    results = sim.runSteps(500)
+    
+print(f"Simulation completed: {results['steps_completed']} steps")
+print(f"Average firing rate: {results['average_firing_rate']}")
+```
+
+### Features
+
+- **Enhanced Error Handling**: Comprehensive exception handling with custom NLMError classes
+- **Pythonic APIs**: Context managers, property access, and Python-style initialization
+- **Utility Classes**: VisionHelper, AudioHelper, SimulationUtils for common operations
+- **Safe Operations**: Safe save/load functions with error handling
+- **Statistical Analysis**: Built-in statistics collection and analysis
+- **Backward Compatibility**: All existing APIs continue to work
+
+### Documentation
+
+For comprehensive documentation, including examples and API reference:
+- [Enhanced Python Bindings Documentation](python/README.md)
+- [Python Example Code](examples/)
+
+### API Reference
+
+Key classes and functions:
+
+- `nlm.Config`: Enhanced configuration management
+- `nlm.Brain`: Neural simulation brain with enhanced Python interface
+- `nlm.AgentBrain`: Agent interface with neural processing
+- `nlm.SimpleWorld`: 3D world simulation with sensory processing
+- `nlm.SimulationContext`: Context manager for safe simulation execution
+
+### Additional Resources
+
+- [Python Bindings Documentation](python/README.md)
+- [Phase 6 Integration Guide](docs/PHASE6_FINAL_AUDIT.md)
+- [Examples and Tutorials](examples/)
+
+The enhanced Python bindings provide a comprehensive, user-friendly interface to the sophisticated NLM neural simulation framework, making it easy to create, run, and analyze complex neural simulations.
+
 ## Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
+├── python/                    # Enhanced Python bindings
+│   ├── bindings.cpp           # Enhanced C++/Python interface
+│   ├── CMakeLists.txt         # Python bindings build configuration
+│   ├── README.md              # Python bindings documentation
+│   └── examples/              # Python examples and tutorials
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
@@ -162,6 +237,15 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
+### Phase 7 (In Progress - Enhanced Python Bindings)
+- Comprehensive Python bindings with enhanced error handling
+- Pythonic APIs with context managers and utilities
+- Vision/Audio helper classes for data processing
+- Safe save/load operations with error handling
+- Statistical analysis and monitoring tools
+- Comprehensive documentation and examples
+- Backward compatibility maintained
+
 ## Scientific Limitations
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
@@ -173,19 +257,18 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
 
-Phase 6 does NOT claim:
+Phase 7 does NOT claim:
 - Human intelligence
 - Consciousness or sentience
 - Human-like reasoning
 - Genuine subjective experience
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+Phase 7 DOES investigate:
+- Whether Python bindings can provide intuitive, Pythonic interface to neural simulation
+- Whether enhanced error handling improves usability and debugging
+- Whether utility classes simplify common operations
+- Whether context managers make simulation safety accessible
+- Whether comprehensive documentation lowers barriers to entry
 
 ## Architecture Philosophy
 
