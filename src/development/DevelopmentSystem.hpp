@@ -33,6 +33,9 @@ public:
     // Update development with full parameters
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
+    // Apply comprehensive developmental effects based on current stage
+    void applyDevelopmentalEffects(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
     
