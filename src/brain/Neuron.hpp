@@ -137,11 +137,25 @@ public:
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
+    // Apply neuromodulatory signals to neuron dynamics
+    // This can affect excitability, adaptation, and plasticity
+    void applyNeuromodulation(float modulationSignal, float timescale = 0.01f);
+    
+    // Calculate current neuromodulation level
+    float getNeuromodulationLevel() const;
+    
     // Reset to initial state
     void reset();
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Get recent spike count for plasticity calculations
+    size_t getRecentSpikeCount(Timestamp currentTime, float timeWindow) const;
+    
+    // Check if neuron is in specific state
+    bool isInState(FiringState state) const;
+    bool isInRefractoryPeriod() const;
     
 private:
     struct Impl;

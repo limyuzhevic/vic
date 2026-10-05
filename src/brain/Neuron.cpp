@@ -249,6 +249,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        
+        // Add spike to history for plasticity
+        pImpl->state.spikeHistory.push_back(currentTime);
+        if (pImpl->state.spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+            pImpl->state.spikeHistory.erase(pImpl->state.spikeHistory.begin());
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -299,4 +305,66 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+size_t Neuron::getRecentSpikeCount(Timestamp currentTime, float timeWindow) const {
+    size_t count = 0;
+    for (const auto& spikeTime : pImpl->spikeHistory) {
+        if (static_cast<float>(currentTime - spikeTime) <= timeWindow) {
+            count++;
+        }
+    }
+    return count;
+}
+
+bool Neuron::isInState(FiringState state) const {
+    return pImpl->state.firingState == state;
+}
+
+bool Neuron::isInRefractoryPeriod() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+void Neuron::applyNeuromodulation(float modulationSignal, float timescale) {
+    // Apply neuromodulatory signals to neuron dynamics
+    // This can affect excitability, adaptation, and plasticity
+    
+    // Dopamine-like modulation: increases excitability and learning rate
+    if (modulationSignal > 0.0f) {
+        // Increase leak conductance slightly to make neuron more responsive
+        pImpl->state.leakConductance *= (1.0f + modulationSignal * 0.2f);
+        
+        // Increase adaptation variable for homeostatic regulation
+        pImpl->state.adaptationVariable += modulationSignal * 0.5f;
+        
+        // Enhance plasticity eligibility
+        pImpl->plasticityFlags.reward_modulated = true;
+    }
+    
+    // Serotonin-like modulation: decreases excitability, promotes stability
+    else if (modulationSignal < 0.0f) {
+        // Decrease leak conductance to stabilize membrane potential
+        pImpl->state.leakConductance *= std::max(0.1f, 1.0f + modulationSignal * 0.3f);
+        
+        // Reduce adaptation variable
+        pImpl->state.adaptationVariable *= (1.0f + modulationSignal * 0.5f);
+    }
+    
+    // Decay modulation signal over time
+    pImpl->state.adaptationVariable *= std::max(0.01f, 1.0f - timescale * 0.01f);
+}
+
+float Neuron::getNeuromodulationLevel() const {
+    // Calculate current neuromodulation level based on adaptation and spike history
+    float modulation = 0.0f;
+    
+    // Base modulation from adaptation variable
+    modulation += pImpl->state.adaptationVariable * 0.1f;
+    
+    // Recent spikes increase neuromodulation
+    if (!pImpl->spikeHistory.empty()) {
+        float recentActivity = std::min(1.0f, static_cast<float>(pImpl->spikeHistory.size()) / 50.0f);
+        modulation += recentActivity * 0.2f;
+    }
+    
+    // Ensure modulation is within reasonable bounds
+    return std::clamp(modulation, -1.0f, 1.0f);
+}

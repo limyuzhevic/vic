@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 namespace nlm {
 
@@ -191,35 +192,65 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
+float Synapse::calculateRecentActivity() const {
+    // Calculate recent synaptic activity for metaplastic changes
+    float activity = 0.0f;
+    
+    Timestamp currentTime = 0;  // Would need current simulation time
+    
+    // Count recent spikes in history (last 100ms)
+    size_t recentPre = 0, recentPost = 0;
+    float window = 100.0f;  // 100ms window
+    
+    for (const auto& spikeTime : pImpl->preSpikeHistory) {
+        if (static_cast<float>(currentTime - spikeTime) <= window) {
+            recentPre++;
+        }
+    }
+    
+    for (const auto& spikeTime : pImpl->postSpikeHistory) {
+        if (static_cast<float>(currentTime - spikeTime) <= window) {
+            recentPost++;
+        }
+    }
+    
+    // Calculate normalized activity
+    activity = (static_cast<float>(recentPre + recentPost) / (2.0f * Impl::MAX_SPIKE_HISTORY));
+    return activity;
+}
+
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // 1. Update short-term plasticity state based on recent activity
+    // 2. Decay eligibility trace for reward-modulated learning
+    // 3. Update short-term depression/facilitation
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
-    }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
+    updateShortTermPlasticity(currentTime);
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
+    // Update synaptic efficacy based on recent use (metaplasticity)
+    float recentActivity = calculateRecentActivity();
+    setEfficacy(std::clamp(efficacy + recentActivity * 0.05f - 0.01f, 0.5f, 2.0f));
+    
+    // Apply STDP if both pre and post spikes have occurred recently
+    if (plasticityFlags.stdp && !preSpikeHistory.empty() && !postSpikeHistory.empty()) {
+        // Most recent spikes
+        Timestamp preSpike = preSpikeHistory.back();
+        Timestamp postSpike = postSpikeHistory.back();
+        
+        // Apply STDP update
+        applySTDP(preSpike, postSpike);
+        
+        // Clear spike history for this synapse to prevent multiple updates
+        clearHistory();
+        recordPreSpike(currentTime);
+        recordPostSpike(currentTime);
+    }
+    
     // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
@@ -228,6 +259,8 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
@@ -260,6 +293,149 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+}
+
+} // namespace nlm
+
+// STDP, Hebbian, and Reward-Modulated Learning Implementation
+
+namespace nlm {
+
+bool Synapse::isHebbianEnabled() const {
+    return pImpl->plasticityFlags.hebbian;
+}
+
+bool Synapse::isSTDPenabled() const {
+    return pImpl->plasticityFlags.stdp;
+}
+
+bool Synapse::isRewardModulatedEnabled() const {
+    return pImpl->plasticityFlags.reward_modulated;
+}
+
+void Synapse::applySTDP(Timestamp preSpikeTime, Timestamp postSpikeTime, float learningRate) {
+    if (!pImpl->plasticityFlags.stdp) return;
+    
+    float deltaTime = static_cast<float>(postSpikeTime - preSpikeTime);
+    
+    // STDP rule: Spike-Timing-Dependent Plasticity
+    // Long-Term Potentiation (LTP): pre fires before post (positive deltaTime)
+    // Long-Term Depression (LTD): post fires before pre (negative deltaTime)
+    
+    if (deltaTime > 0) {
+        // Pre before post: LTP (strengthen synapse)
+        float weightChange = learningRate * (1.0f - std::exp(-std::abs(deltaTime) / 20.0f));
+        addToWeight(weightChange);
+        NLM_LOG_DEBUG(std::string("STDP LTP: pre+post (Δt=" + std::to_string(deltaTime) + ") weight+=" + std::to_string(weightChange)));
+    } else {
+        // Post before pre: LTD (weaken synapse)
+        float weightChange = -learningRate * (1.0f - std::exp(-std::abs(deltaTime) / 20.0f));
+        addToWeight(weightChange);
+        NLM_LOG_DEBUG(std::string("STDP LTD: post+pre (Δt=" + std::to_string(deltaTime) + ") weight+=" + std::to_string(weightChange)));
+    }
+    
+    // Update eligibility trace
+    float eligibilityIncrement = std::abs(weightChange);
+    pImpl->eligibilityTrace += eligibilityIncrement;
+}
+
+void Synapse::applyHebbianLearning(float correlation, float learningRate) {
+    if (!pImpl->plasticityFlags.hebbian) return;
+    
+    // Hebbian rule: Correlated activity strengthens connections
+    // "Neurons that fire together, wire together"
+    
+    float weightChange = learningRate * correlation;
+    addToWeight(weightChange);
+    
+    // Hebbian learning affects eligibility trace
+    pImpl->eligibilityTrace += std::abs(weightChange) * 0.5f;
+    
+    NLM_LOG_DEBUG(std::string("Hebbian: correlation=" + std::to_string(correlation) + " weight+=" + std::to_string(weightChange)));
+}
+
+void Synapse::applyRewardModulatedLearning(float rewardPredictionError, float learningRate) {
+    if (!pImpl->plasticityFlags.reward_modulated) return;
+    
+    // Reward-modulated learning: combines eligibility trace with reward prediction error
+    // Rescorla-Wagner style learning: delta = learning_rate * (reward - prediction)
+    
+    float weightChange = learningRate * pImpl->eligibilityTrace * rewardPredictionError;
+    addToWeight(weightChange);
+    
+    // Decay eligibility trace after learning
+    decayEligibilityTrace(0.1f);
+    
+    NLM_LOG_DEBUG(std::string("RewardModulated: RPE=" + std::to_string(rewardPredictionError) + " eligibility=" + std::to_string(pImpl->eligibilityTrace) + " weight+=" + std::to_string(weightChange)));
+}
+
+void Synapse::updatePlasticity(Timestamp preSpikeTime, Timestamp postSpikeTime, 
+                             float correlation, float rewardError) {
+    // Combine all plasticity mechanisms for comprehensive learning
+    
+    if (pImpl->plasticityFlags.stdp) {
+        applySTDP(preSpikeTime, postSpikeTime);
+    }
+    
+    if (pImpl->plasticityFlags.hebbian) {
+        applyHebbianLearning(correlation);
+    }
+    
+    if (pImpl->plasticityFlags.reward_modulated) {
+        applyRewardModulatedLearning(rewardError);
+    }
+}
+
+SynapticWeight Synapse::getEffectiveWeight() const {
+    // Calculate effective synaptic strength considering multiple factors
+    float effectiveWeight = pImpl->weight;
+    
+    // Weight efficacy modulation
+    effectiveWeight *= pImpl->efficacy;
+    
+    // Short-term plasticity modulation
+    effectiveWeight *= (1.0f + (pImpl->shortTermFacilitation - 1.0f) * 0.3f - (1.0f - pImpl->shortTermDepression) * 0.2f);
+    
+    // Ensure bounds
+    effectiveWeight = std::clamp(effectiveWeight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    return effectiveWeight;
+}
+
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
+}
+
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::updateShortTermPlasticity(Timestamp currentTime) {
+    // Update short-term plasticity state (Tsodyks-Markram model)
+    
+    // Decay short-term facilitation (Tsodyks-Markram model)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    }
+    
+    // Decay short-term depression
+    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSinceActivity = std::max(
+            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+        );
+        // Recovery from depression toward 1.0
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    }
+}
+
+const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+    return pImpl->preSpikeHistory;
+}
+
+const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+    return pImpl->postSpikeHistory;
 }
 
 } // namespace nlm
