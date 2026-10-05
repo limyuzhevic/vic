@@ -3,8 +3,14 @@
 
 #include <iostream>
 #include <cassert>
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include "experiments/TestSuite.hpp"
 
-// Forward declarations of test functions
+namespace test_brain {
+    void runAll();
+}
+
 namespace test_types {
     void runAll();
 }
@@ -47,6 +53,7 @@ int main() {
     
     bool allPassed = true;
     
+    // Run existing tests
     std::cout << "Running Types tests..." << std::endl;
     try {
         test_types::runAll();
@@ -114,6 +121,34 @@ int main() {
     try {
         test_brain::runAll();
         std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    // Run Phase 2 integration tests
+    std::cout << std::endl;
+    std::cout << "Running Phase 2 Integration Tests..." << std::endl;
+    try {
+        // Create a minimal brain for testing
+        auto config = std::make_shared<nlm::Config>();
+        config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<nlm::Brain>(config);
+        if (!brain->initialize()) {
+            std::cout << "  FAILED: Brain initialization failed" << std::endl;
+            allPassed = false;
+        } else {
+            TestSuite testSuite;
+            if (!testSuite.runAllTests(brain)) {
+                std::cout << "  FAILED: TestSuite execution failed" << std::endl;
+                allPassed = false;
+            } else {
+                std::cout << "  PASSED" << std::endl;
+            }
+        }
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
