@@ -173,12 +173,33 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
+        std::visit([&oss](const auto& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
             } else {
-                oss << arg;
+                oss << std::to_string(arg);
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
 
@@ -21,6 +22,23 @@ struct NeuronId {
     constexpr uint64_t index() const { return value; }
 };
 
+// Hash function for NeuronId to support std::unordered_map
+struct NeuronIdHash {
+    size_t operator()(const NeuronId& id) const {
+        return std::hash<uint64_t>()(id.value);
+    }
+};
+
+// std::hash specialization for NeuronId
+namespace std {
+    template<>
+    struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
+}
+
 // Synapse identifier
 struct SynapseId {
     uint64_t value;
@@ -34,6 +52,23 @@ struct SynapseId {
     
     constexpr uint64_t index() const { return value; }
 };
+
+// Hash function for SynapseId
+struct SynapseIdHash {
+    size_t operator()(const SynapseId& id) const {
+        return std::hash<uint64_t>()(id.value);
+    }
+};
+
+// std::hash specialization for SynapseId
+namespace std {
+    template<>
+    struct hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
+}
 
 // Region identifier
 struct RegionId {
@@ -49,6 +84,23 @@ struct RegionId {
     constexpr uint64_t index() const { return value; }
 };
 
+// Hash function for RegionId
+struct RegionIdHash {
+    size_t operator()(const RegionId& id) const {
+        return std::hash<uint64_t>()(id.value);
+    }
+};
+
+// std::hash specialization for RegionId
+namespace std {
+    template<>
+    struct hash<nlm::RegionId> {
+        size_t operator()(const nlm::RegionId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
+}
+
 // Population identifier
 struct PopulationId {
     uint64_t value;
@@ -62,6 +114,23 @@ struct PopulationId {
     
     constexpr uint64_t index() const { return value; }
 };
+
+// Hash function for PopulationId
+struct PopulationIdHash {
+    size_t operator()(const PopulationId& id) const {
+        return std::hash<uint64_t>()(id.value);
+    }
+};
+
+// std::hash specialization for PopulationId
+namespace std {
+    template<>
+    struct hash<nlm::PopulationId> {
+        size_t operator()(const nlm::PopulationId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
+}
 
 // Simulation step counter
 using SimulationStep = uint64_t;
