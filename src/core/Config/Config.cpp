@@ -86,7 +86,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << "\", \"";
+                }
+                file << "\"]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -94,16 +127,20 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Find configuration entry by key
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        // Entry not found - return nullopt to indicate key doesn't exist
         return std::nullopt;
     }
     
     try {
+        // Extract value from variant, returning nullopt if type doesn't match
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Type mismatch - return nullopt to indicate value cannot be retrieved as requested type
         return std::nullopt;
     }
 }
@@ -200,16 +237,159 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+    template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+    template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
+    
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+    template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+    template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    std::ostringstream oss;
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << "\", \"";
+                }
+                oss << "\"]";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
 
-} // namespace nlm
+// Configuration validation and utilities
+bool Config::validateKey(const std::string& key) const {
+    if (key.empty()) return false;
+    if (key.find('=') != std::string::npos) return false;
+    if (key.find(' ') != std::string::npos) return false;
+    return true;
+}
+
+bool Config::validateValue(const ConfigValue& value) const {
+    std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            // String can be any value
+            return;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            // Vector<int> is valid
+            return;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            // Vector<double> is valid
+            return;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            // Vector<string> is valid
+            return;
+        } else {
+            static_assert(sizeof(T) == 0, "Unsupported type for validation");
+        }
+    }, value);
+    return true;
+}
+
+std::string Config::getValueAsString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+ConfigSource Config::getSource(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return ConfigSource::Default;
+    }
+    
+    return it->source;
+}
+
+bool Config::isSource(const std::string& key, ConfigSource source) const {
+    return getSource(key) == source;
+}
+
+std::vector<std::string> Config::getKeysFromSource(ConfigSource source) const {
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.source == source) {
+            keys.push_back(entry.key);
+        }
+    }
+    return keys;
+}
+
+void Config::removeFromSource(ConfigSource source) {
+    pImpl->entries.erase(
+        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&source](const ConfigEntry& e) { return e.source == source; }),
+        pImpl->entries.end()
+    );
+}
+
+void Config::merge(const Config& other) {
+    for (const auto& entry : other.pImpl->entries) {
+        // If other has a higher priority source, use it
+        // CommandLine > File > Default > Runtime
+        if (static_cast<int>(entry.source) > static_cast<int>(getSource(entry.key))) {
+            pImpl->entries.push_back(entry);
+        } else if (entry.source == getSource(entry.key)) {
+            // Same source, update value
+            auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+            if (it != pImpl->entries.end()) {
+                it->value = entry.value;
+                it->source = entry.source;
+            }
+        }
+    }
+}
+
+Config Config::clone() const {
+    Config cloned;
+    cloned.pImpl->entries = pImpl->entries;
+    return cloned;
+}

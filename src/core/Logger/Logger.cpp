@@ -182,8 +182,23 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    static std::shared_ptr<Logger> globalLogger = nullptr;
+    
+    if (logger) {
+        globalLogger = logger;
+    } else {
+        // Reset to default logger if null is passed
+        globalLogger = std::make_shared<Logger>();
+    }
+    
+    // Notify all existing loggers of the change
+    if (globalLogger) {
+        std::lock_guard<std::mutex> lock(globalLogger->pImpl->mutex);
+        for (auto& existingLogger : globalLogger->pImpl->loggers) {
+            existingLogger->setLevel(globalLogger->pImpl->loggers.empty() ? 
+                LogLevel::Info : globalLogger->pImpl->loggers[0]->getLevel());
+        }
+    }
 }
 
 // LogStream implementation

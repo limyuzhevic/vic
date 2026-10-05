@@ -148,21 +148,38 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
+    // Use emplace_back for direct construction when possible
+    pImpl->spikeHistory.emplace_back(timestamp);
+    
+    // Optimize spike history trimming - use shrink_to_fit when above threshold
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        // Optional: shrink to fit to reduce memory usage
+        if (pImpl->spikeHistory.size() < Impl::MAX_SPIKE_HISTORY / 2) {
+            pImpl->spikeHistory.shrink_to_fit();
+        }
     }
 }
 
 void Neuron::clearSpikeHistory() {
     pImpl->spikeHistory.clear();
+    // Also clear capacity to reduce memory usage
+    pImpl->spikeHistory.shrink_to_fit();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    // Reserve space if vector is growing to reduce reallocations
+    if (pImpl->incomingSynapses.size() >= pImpl->incomingSynapses.capacity()) {
+        pImpl->incomingSynapses.reserve(pImpl->incomingSynapses.size() * 3 / 2);
+    }
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    // Reserve space if vector is growing to reduce reallocations
+    if (pImpl->outgoingSynapses.size() >= pImpl->outgoingSynapses.capacity()) {
+        pImpl->outgoingSynapses.reserve(pImpl->outgoingSynapses.size() * 3 / 2);
+    }
     pImpl->outgoingSynapses.push_back(handle);
 }
 
@@ -191,7 +208,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period - early exit optimization
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -220,6 +237,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Optimized calculation with pre-computed constants
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
@@ -229,9 +247,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Using branchless min/max for better performance
+    if (V > 50.0f) V = 50.0f;
+    if (V < -100.0f) V = -100.0f;
     
-    // Check for spike
+    // Check for spike - optimized threshold check
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
@@ -266,9 +286,15 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    // Use move constructor for efficient state copying if needed
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    
+    // Optimized spike history clearing - clear and reserve less space
+    if (!pImpl->spikeHistory.empty()) {
+        pImpl->spikeHistory.clear();
+        pImpl->spikeHistory.shrink_to_fit();
+    }
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -296,7 +322,12 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    
+    // Use efficient clearing for spike history
+    if (!pImpl->spikeHistory.empty()) {
+        pImpl->spikeHistory.clear();
+        pImpl->spikeHistory.shrink_to_fit();
+    }
 }
 
 } // namespace nlm

@@ -75,8 +75,12 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -92,6 +96,32 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation and utilities
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    std::string getValueAsString(const ConfigValue& value) const;
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Check if key was set from a specific source
+    bool isSource(const std::string& key, ConfigSource source) const;
+    
+    // Get all keys from a specific source
+    std::vector<std::string> getKeysFromSource(ConfigSource source) const;
+    
+    // Remove all keys from a specific source
+    void removeFromSource(ConfigSource source);
+    
+    // Merge configurations (file, command-line override defaults)
+    // Keys from higher priority sources take precedence
+    void merge(const Config& other);
+    
+    // Clone configuration
+    Config clone() const;
+    
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    size_t getEntryCountFromSource(ConfigSource source) const;
     
 private:
     struct Impl;
