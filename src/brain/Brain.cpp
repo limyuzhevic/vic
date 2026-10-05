@@ -1089,6 +1089,82 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
+    // Memory usage statistics
+    NLM_LOG_INFO("=== MEMORY USAGE ===");
+    
+    // Estimate memory usage based on component sizes
+    size_t neuronMemoryKB = getTotalNeuronCount() * 256;  // ~256 bytes per neuron
+    size_t synapseMemoryKB = getTotalSynapseCount() * 128;  // ~128 bytes per synapse
+    size_t memorySystemsKB = 0;
+    
+    if (pImpl->workingMemory) {
+        memorySystemsKB += pImpl->workingMemory->getCapacity() * 64;  // ~64 bytes per trace
+    }
+    if (pImpl->episodicMemory) {
+        memorySystemsKB += pImpl->episodicMemory->getMaxEpisodes() * 1024;  // ~1KB per episode
+    }
+    if (pImpl->associativeMemory) {
+        memorySystemsKB += 512;  // Base memory system overhead
+    }
+    if (pImpl->predictionSystem) {
+        memorySystemsKB += 256;  // Prediction system overhead
+    }
+    if (pImpl->planner) {
+        memorySystemsKB += 128;  // Planner overhead
+    }
+    if (pImpl->conceptFormation) {
+        memorySystemsKB += 128;  // Concept formation overhead
+    }
+    if (pImpl->attention) {
+        memorySystemsKB += 64;  // Attention system overhead
+    }
+    if (pImpl->developmentSystem) {
+        memorySystemsKB += 256;  // Development system overhead
+    }
+    if (pImpl->dopamine) {
+        memorySystemsKB += 32;  // Neuromodulator overhead
+    }
+    if (pImpl->curiosity) {
+        memorySystemsKB += 32;  // Neuromodulator overhead
+    }
+    if (pImpl->predictionError) {
+        memorySystemsKB += 32;  // Neuromodulator overhead
+    }
+    if (pImpl->novelty) {
+        memorySystemsKB += 32;  // Neuromodulator overhead
+    }
+    if (pImpl->spikeSystem) {
+        memorySystemsKB += 128;  // Spike system overhead
+    }
+    if (pImpl->stdp) {
+        memorySystemsKB += 64;  // STDP system overhead
+    }
+    if (pImpl->hebbian) {
+        memorySystemsKB += 64;  // Hebbian system overhead
+    }
+    if (pImpl->structuralPlasticity) {
+        memorySystemsKB += 256;  // Structural plasticity overhead
+    }
+    
+    size_t totalMemoryKB = neuronMemoryKB + synapseMemoryKB + memorySystemsKB;
+    
+    NLM_LOG_INFO("Estimated memory usage:");
+    NLM_LOG_INFO("  Neurons: ~" + std::to_string(neuronMemoryKB) + " KB");
+    NLM_LOG_INFO("  Synapses: ~" + std::to_string(synapseMemoryKB) + " KB");
+    NLM_LOG_INFO("  Memory systems: ~" + std::to_string(memorySystemsKB) + " KB");
+    NLM_LOG_INFO("  TOTAL: ~" + std::to_string(totalMemoryKB) + " KB");
+    
+    // Memory efficiency metrics
+    if (getTotalNeuronCount() > 0) {
+        double memoryPerNeuron = static_cast<double>(totalMemoryKB) / getTotalNeuronCount();
+        NLM_LOG_INFO("Memory per neuron: ~" + std::to_string(memoryPerNeuron) + " bytes");
+    }
+    
+    if (getTotalSynapseCount() > 0) {
+        double memoryPerSynapse = static_cast<double>(totalMemoryKB) / getTotalSynapseCount();
+        NLM_LOG_INFO("Memory per synapse: ~" + std::to_string(memoryPerSynapse) + " bytes");
+    }
+    
     // Memory system status
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
