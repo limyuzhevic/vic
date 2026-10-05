@@ -29,17 +29,23 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
-// Inter-regional connection (long-range connectivity)
+// Inter-regional connection structure for long-range neural communication
 struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
+    RegionId sourceRegion;      ///< Origin brain region identifier
+    RegionId targetRegion;      ///< Destination brain region identifier  
+    float weight;               ///< Connection strength (positive=excitatory, negative=inhibitory)
+    Delay delay;                ///< Transmission delay in simulation steps
+    PlasticityFlags plasticityFlags; ///< Flags indicating plastic behavior (STDP, Hebbian)
     
+    /// Default constructor creates zero-weight connection
     InterRegionConnection()
         : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
     
+    /// Parameterized constructor
+    /// @param src Source region identifier
+    /// @param tgt Target region identifier
+    /// @param w Initial connection weight
+    /// @param d Transmission delay
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };

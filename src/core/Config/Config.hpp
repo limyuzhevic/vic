@@ -25,10 +25,15 @@ using ConfigValue = std::variant<
 
 // Configuration source
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+public:
+    /// Default values built into the code
+    Default = 0,
+    /// Values loaded from configuration files
+    File = 1,
+    /// Values from command line arguments
+    CommandLine = 2,
+    /// Values set at runtime (highest priority)
+    Runtime = 3
 };
 
 // Configuration entry
