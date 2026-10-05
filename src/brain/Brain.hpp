@@ -8,6 +8,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <functional>
+#include <vector>
 
 namespace nlm {
 
@@ -196,6 +198,79 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // ========== REFACTORED STEP FUNCTION COMPONENTS ==========
+    
+    // Step 1: Process pending delayed spikes (deliver synaptic input)
+    void processStep1_DeliveredSynapticInput(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 2: Update all neurons (LIF dynamics)
+    void processStep2_ThyLIFDynamics(Timestamp currentTime);
+    
+    // Step 3: Detect spikes and schedule outgoing spike events
+    void processStep3_DetectAndScheduleSpikes(Timestamp currentTime, SimulationStep currentStep);
+    
+    // Step 4: Update working memory (maintenance and competition)
+    void processStep4_UpdateWorkingMemory();
+    
+    // Step 5: Apply neuromodulation effects on neural excitability
+    void processStep5_ApplyNeuromodulationEffects();
+    
+    // Step 6: Apply plasticity rules (STDP, Hebbian)
+    void processStep6_ApplyPlasticityRules();
+    
+    // Step 7: Update episodic memory with current experience
+    void processStep7_UpdateEpisodicMemory();
+    
+    // Step 8: Update prediction system
+    void processStep8_UpdatePredictionSystem();
+    
+    // Step 9: Update attention system
+    void processStep9_UpdateAttentionSystem();
+    
+    // Step 10: Update concept formation
+    void processStep10_UpdateConceptFormation();
+    
+    // Step 11: Apply structural plasticity (synaptogenesis, pruning)
+    void processStep11_ApplyStructuralPlasticity(Timestamp currentTime, SimulationStep currentStep);
+    
+    // Step 12: Replay important memories (during rest or periodically)
+    void processStep12_ReplayMemories(Timestamp currentTime, SimulationStep currentStep);
+    
+    // Step 13: Apply development effects
+    void processStep13_ApplyDevelopmentEffects(Timestamp currentTime, SimulationStep currentStep);
+    
+    // Step 14: Collect statistics
+    void processStep14_CollectStatistics();
+    
+    // Helper methods
+    void updateNeuronPopulations(Timestamp currentTime);
+    void detectNeuronSpikes(Timestamp currentTime, SimulationStep currentStep);
+    void applyNeuromodulationToNeurons();
+    void updateAllMemorySystems();
+    void updateAllCognitiveSystems();
+    void applyPlasticityToAllSynapses(float plasticityMod);
+    bool shouldReplayMemories(Timestamp currentTime, SimulationStep currentStep);
+    bool shouldUpdateDevelopment(Timestamp currentTime, SimulationStep currentStep);
+    bool shouldConsolidateMemories(Timestamp currentTime, SimulationStep currentStep);
+    void applyDevelopmentEffects(Timestamp currentTime, SimulationStep currentStep);
+    
+    // Sensory integration
+    void integrateSensoryInput();
+    
+    // Motor integration
+    void integrateMotorOutput();
+    
+    // Checkpoint management
+    void updateCheckpointManager(Timestamp currentTime, SimulationStep currentStep);
+    
+    // Statistics collection
+    void collectStepStatistics();
+    void logIntegrationStatus() const;
+    
+    // Validation and error handling
+    void validateStepParameters(SimulationStep currentStep, Timestamp currentTime) const;
+    void handleStepErrors(const std::exception& e) const;
 };
 
 } // namespace nlm

@@ -6,6 +6,11 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
+#include <chrono>
+#include <filesystem>
 
 namespace nlm {
 
@@ -28,6 +33,12 @@ struct LogEntry {
     std::chrono::system_clock::time_point timestamp;
 };
 
+// Exception for logging errors
+class LoggerException : public std::runtime_error {
+public:
+    explicit LoggerException(const std::string& message) : std::runtime_error(message) {}
+};
+
 // Logger interface
 class ILogger {
 public:
@@ -35,18 +46,26 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    virtual void flush() = 0;
+    virtual bool isHealthy() const = 0;
 };
 
-// Console logger implementation
+// Console logger implementation with enhanced thread safety
 class ConsoleLogger : public ILogger {
 public:
     ConsoleLogger();
     explicit ConsoleLogger(LogLevel level);
     ~ConsoleLogger() override;
     
+    // Disable copying
+    ConsoleLogger(const ConsoleLogger&) = delete;
+    ConsoleLogger& operator=(const ConsoleLogger&) = delete;
+    
     void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
+    void flush() override;
+    bool isHealthy() const override;
     
     // Enable/disable colors
     void setUseColors(bool useColors);
@@ -56,15 +75,25 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // File size management
+    void setMaxFileSize(size_t maxBytes);
+    size_t getCurrentFileSize() const;
+    
+    // Thread safety methods
+    void setThreadSafetyEnabled(bool enabled);
+    bool isThreadSafetyEnabled() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    void validateEntry(const LogEntry& entry) const;
+    void writeToFile(const std::string& message);
 };
 
-// Main Logger class
+// Main Logger class with enhanced thread safety
 class Logger {
 public:
     Logger();
@@ -74,7 +103,7 @@ public:
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
     
-    // Add logger sink
+    // Add logger sink with validation
     void addLogger(std::shared_ptr<ILogger> logger);
     
     // Remove all loggers
@@ -83,7 +112,7 @@ public:
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
     
-    // Global logging functions
+    // Global logging functions with validation
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
@@ -103,10 +132,31 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Health check
+    bool isHealthy() const;
+    
+    // Flush all loggers
+    void flushAll();
+    
+    // Statistics
+    struct LoggerStats {
+        size_t totalLogs{0};
+        size_t totalErrors{0};
+        size_t totalDropped{0};
+        std::chrono::system_clock::time_point startTime;
+        size_t healthyLoggers{0};
+        size_t totalLoggers{0};
+    };
+    
+    LoggerStats getStats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    void validateMessage(const std::string& message) const;
+    void updateStats(bool success);
 };
 
 // Convenience macro for file/line/function info
@@ -116,7 +166,7 @@ private:
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
 
-// Stream-style logging helper
+// Stream-style logging helper with improved safety
 class LogStream {
 public:
     LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
@@ -124,7 +174,9 @@ public:
     
     template<typename T>
     LogStream& operator<<(const T& value) {
-        oss_ << value;
+        if (stream_ && stream_->isHealthy()) {
+            oss_ << value;
+        }
         return *this;
     }
     
@@ -134,6 +186,8 @@ private:
     std::string file_;
     int line_;
     std::string function_;
+    std::shared_ptr<Logger> logger_;
+    bool active_ = true;
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)

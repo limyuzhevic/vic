@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <algorithm>
+#include <filesystem>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -55,7 +60,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +98,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    std::vector<std::string> validate() const;
+    
+    // Get file extension
+    static std::string getFileExtension(const std::string& filename);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +111,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parse helpers
+    void parseJSONConfig(const nlohmann::json& json, ConfigSource source);
+    void parseYAMLConfig(const YAML::Node& yaml, ConfigSource source);
+    void parseSimpleConfig(const std::string& content, ConfigSource source);
 };
 
 } // namespace nlm
