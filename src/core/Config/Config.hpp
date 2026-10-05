@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <any>
+#include <chrono>
+#include <sstream>
 
 namespace nlm {
 
@@ -20,7 +25,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::map<std::string, std::any>
 >;
 
 // Configuration source
@@ -28,7 +34,9 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Environment,
+    Runtime,
+    Override
 };
 
 // Configuration entry
@@ -77,12 +85,19 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Set value only if key doesn't exist
+    void setIfNotSet(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void setIfNotSet(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void setIfNotSet(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setIfNotSet(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setIfNotSet(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Get all keys
     std::vector<std::string> getKeys() const;

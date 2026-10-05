@@ -199,6 +199,29 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+// SetIfNotSet implementations
+void Config::setIfNotSet(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (!has(key)) {
+        set(key, value, source);
+    }
+}
+
+void Config::setIfNotSet(const std::string& key, const std::string& value, ConfigSource source) {
+    setIfNotSet(key, ConfigValue(value), source);
+}
+
+void Config::setIfNotSet(const std::string& key, int value, ConfigSource source) {
+    setIfNotSet(key, ConfigValue(value), source);
+}
+
+void Config::setIfNotSet(const std::string& key, double value, ConfigSource source) {
+    setIfNotSet(key, ConfigValue(value), source);
+}
+
+void Config::setIfNotSet(const std::string& key, bool value, ConfigSource source) {
+    setIfNotSet(key, ConfigValue(value), source);
+}
+
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;

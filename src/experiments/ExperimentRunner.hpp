@@ -5,6 +5,7 @@
 #include "../environment/Environment.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -44,6 +45,14 @@ public:
     
     // Save experiment results
     bool saveResults(const std::string& filepath) const;
+    
+    // Enhanced experiment management
+    void setResultsFile(const std::string& filepath);
+    void enableVerboseLogging(bool enable);
+    
+    // Get experiment statistics
+    uint64_t getExperimentCount() const;
+    std::vector<std::string> getExperimentNames() const;
     
 private:
     struct Impl;

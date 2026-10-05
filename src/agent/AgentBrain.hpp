@@ -1,17 +1,22 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
+public:
+    // Constants for neuron grouping
+    static constexpr size_t MAX_MOTOR_GROUPS = 6;
+    static constexpr size_t MAX_SENSORY_GROUPS = 4;
+    static constexpr size_t MOTOR_GROUP_SIZE = 6;
+    static constexpr size_t SENSORY_GROUP_SIZE = 4;
+    
+    // Create neuron groups configuration structure
+    struct NeuronGroupConfig {
+        std::vector<Neuron*> neurons;
+        std::string name;
+        NeuronType type;
+    };
+    
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
@@ -69,6 +74,27 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced initialization methods
+    void initializeMotorGroups();
+    void initializeSensoryGroups();
+    bool validateBrainStructure() const;
+    void distributeNeuronsToGroups();
+    
+    // Configuration with defaults
+    void configureNeuronGroups(size_t motorGroups = MAX_MOTOR_GROUPS, 
+                              size_t sensoryGroups = MAX_SENSORY_GROUPS);
+    
+    // Get group statistics for debugging
+    size_t getMotorGroupCount() const { return motorForward_.size() + motorBackward_.size() + 
+                                               motorTurnLeft_.size() + motorTurnRight_.size() + 
+                                               motorInteract_.size() + motorWait_.size(); }
+    size_t getSensoryGroupCount() const { return sensoryVision_.size() + sensoryTouch_.size() + 
+                                              sensoryInternal_.size() + sensoryProprioception_.size(); }
+    
+    // Statistical helper methods
+    float calculateNeuronActivity(const std::vector<Neuron*>& neurons) const;
+    size_t countActiveNeurons(const std::vector<Neuron*>& neurons) const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -78,7 +104,11 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Neuron group configuration
+    size_t motorGroups_;
+    size_t sensoryGroups_;
+    
+    // Motor neuron groups (distributed)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,7 +116,7 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups (distributed)
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
