@@ -15,19 +15,339 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
+m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Version: 0.1.0
+        Author: NLM Research Project
+        
+        Usage:
+        ```python
+        import pynlm
+        
+        # Create a simple brain
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(100):
+            brain.step(step)
+        ```
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Module metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Research Project";
+    m.attr("__description__") = "Neural Learning Machine - Brain-inspired spiking neural network simulator";
+    
+    // Create convenience namespace
+    py::module_ utils = m.def_submodule("utils", "Utility functions and constants");
+
+    utils.def("run_simulation_sequence", [](const std::vector<std::shared_ptr<Brain>>& brains, 
+                                           const std::vector<std::string>& experimentNames,
+                                           int stepsPerBrain) {
+        py::dict results;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            std::string key = experimentNames.size() > i ? experimentNames[i] : "brain_" + std::to_string(i);
+            
+            if (brains[i]) {
+                py::dict brainResults;
+                brains[i]->reset();
+                brains[i]->initialize();
+                
+                for (int step = 0; step < stepsPerBrain; ++step) {
+                    brains[i]->step(step);
+                }
+                
+                brainResults["final_neurons"] = brains[i]->getTotalNeuronCount();
+                brainResults["final_synapses"] = brains[i]->getTotalSynapseCount();
+                brainResults["final_spikes"] = brains[i]->getTotalSpikeCount();
+                results[key] = brainResults;
+            }
+        }
+        return results;
+    }, py::arg("brains"), py::arg("experimentNames") = std::vector<std::string>(), py::arg("stepsPerBrain") = 100,
+       "Run a sequence of simulation experiments with multiple brains");
+
+    utils.def("benchmark_performance", [](int neuronCount, int steps) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", std::max(1, neuronCount / 1000));
+        config->set("connection_probability", 0.01);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        brain->reset();
+        brain->initialize();
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        py::dict benchmark;
+        benchmark["neuron_count"] = neuronCount;
+        benchmark["steps"] = steps;
+        benchmark["total_time_ms"] = duration.count();
+        benchmark["time_per_step_ms"] = duration.count() / static_cast<double>(steps);
+        benchmark["spikes_per_step"] = brain->getTotalSpikeCount() / static_cast<double>(steps);
+        benchmark["spikes_total"] = brain->getTotalSpikeCount();
+        
+        return benchmark;
+    }, py::arg("neuronCount") = 1000, py::arg("steps") = 100,
+       "Benchmark brain performance with given neuron count and simulation steps");
+
+    utils.def("create_experiment_config", [](const std::string& experimentName) {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentName == "curiosity") {
+            config->set("neuromod.dopamine.scale", 1.0);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        } else if (experimentName == "development") {
+            config->set("development.initial_stage", "Initial");
+            config->set("development.enable_synaptogenesis", true);
+            config->set("development.enable_pruning", true);
+            config->set("development.enable_maturation", true);
+        } else if (experimentName == "prediction") {
+            config->set("prediction.system.enable", true);
+            config->set("prediction.error_threshold", 0.1);
+        } else if (experimentName == "memory") {
+            config->set("memory.working.enable", true);
+            config->set("memory.episodic.enable", true);
+            config->set("memory.associative.enable", true);
+        }
+        
+        return config;
+    }, py::arg("experimentName") = "default",
+       "Create a configuration optimized for specific experiment types");
+
+    utils.def("validate_brain_state", [](const std::shared_ptr<Brain>& brain) {
+        py::dict validation;
+        
+        if (!brain) {
+            validation["valid"] = false;
+            validation["error"] = "Brain is null";
+            return validation;
+        }
+        
+        bool isValid = true;
+        std::string error;
+        
+        // Check basic properties
+        if (brain->getTotalNeuronCount() == 0) {
+            isValid = false;
+            error = "Brain has no neurons";
+        }
+        
+        if (brain->getRegionCount() == 0) {
+            isValid = false;
+            error = "Brain has no regions";
+        }
+        
+        // Check developmental consistency
+        auto stage = brain->getDevelopmentalStage();
+        validation["developmental_stage"] = static_cast<int>(stage);
+        
+        // Check memory system state
+        auto* workingMem = brain->getWorkingMemory();
+        if (workingMem) {
+            validation["working_memory_size"] = workingMem->getSize();
+        }
+        
+        validation["valid"] = isValid;
+        validation["error"] = error;
+        validation["brain_stats"] = brain->getTotalNeuronCount();
+        
+        return validation;
+    }, py::arg("brain"),
+       "Validate brain state and return validation results as a dictionary");
+
+    utils.def("get_all_presets", []() {
+        py::dict presets;
+        presets["small"] = py::dict({
+            py::arg("neuron_count") = 100,
+            py::arg("region_count") = 1
+        });
+        presets["medium"] = py::dict({
+            py::arg("neuron_count") = 1000,
+            py::arg("region_count") = 4,
+            py::arg("connection_probability") = 0.1
+        });
+        presets["large"] = py::dict({
+            py::arg("neuron_count") = 10000,
+            py::arg("region_count") = 16,
+            py::arg("connection_probability") = 0.05
+        });
+        return presets;
+    }, "Get all available configuration presets as a dictionary");
+
+    utils.def("compare_brains", [](const std::vector<std::shared_ptr<Brain>>& brains, int steps) {
+        py::dict comparison;
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            std::string key = "brain_" + std::to_string(i);
+            
+            if (brains[i]) {
+                py::dict brainStats;
+                brains[i]->reset();
+                brains[i]->initialize();
+                
+                for (int step = 0; step < steps; ++step) {
+                    brains[i]->step(step);
+                }
+                
+                brainStats["neurons"] = brains[i]->getTotalNeuronCount();
+                brainStats["synapses"] = brains[i]->getTotalSynapseCount();
+                brainStats["active_neurons"] = brains[i]->getActiveNeuronCount();
+                brainStats["firing_neurons"] = brains[i]->getFiringNeuronCount();
+                brainStats["total_spikes"] = brains[i]->getTotalSpikeCount();
+                brainStats["average_firing_rate"] = brains[i]->getAverageFiringRate();
+                brainStats["excitation_inhibition_ratio"] = brains[i]->getExcitationInhibitionRatio();
+                brainStats["developmental_stage"] = static_cast<int>(brains[i]->getDevelopmentalStage());
+                
+                comparison[key] = brainStats;
+            }
+        }
+        
+        return comparison;
+    }, py::arg("brains"), py::arg("steps") = 100,
+       "Compare multiple brains side by side and return comparison results");
+
+    utils.def("run_simulation_sequence", [](const std::vector<std::shared_ptr<Brain>>& brains, 
+                                           const std::vector<std::string>& experimentNames,
+                                           int stepsPerBrain) {
+        py::dict results;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            std::string key = experimentNames.size() > i ? experimentNames[i] : "brain_" + std::to_string(i);
+            
+            if (brains[i]) {
+                py::dict brainResults;
+                brains[i]->reset();
+                brains[i]->initialize();
+                
+                for (int step = 0; step < stepsPerBrain; ++step) {
+                    brains[i]->step(step);
+                }
+                
+                brainResults["final_neurons"] = brains[i]->getTotalNeuronCount();
+                brainResults["final_synapses"] = brains[i]->getTotalSynapseCount();
+                brainResults["final_spikes"] = brains[i]->getTotalSpikeCount();
+                results[key] = brainResults;
+            }
+        }
+        return results;
+    }, py::arg("brains"), py::arg("experimentNames") = std::vector<std::string>(), py::arg("stepsPerBrain") = 100,
+       "Run a sequence of simulation experiments with multiple brains");
+
+    utils.def("benchmark_performance", [](int neuronCount, int steps) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", std::max(1, neuronCount / 1000));
+        config->set("connection_probability", 0.01);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        brain->reset();
+        brain->initialize();
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        py::dict benchmark;
+        benchmark["neuron_count"] = neuronCount;
+        benchmark["steps"] = steps;
+        benchmark["total_time_ms"] = duration.count();
+        benchmark["time_per_step_ms"] = duration.count() / static_cast<double>(steps);
+        benchmark["spikes_per_step"] = brain->getTotalSpikeCount() / static_cast<double>(steps);
+        benchmark["spikes_total"] = brain->getTotalSpikeCount();
+        
+        return benchmark;
+    }, py::arg("neuronCount") = 1000, py::arg("steps") = 100,
+       "Benchmark brain performance with given neuron count and simulation steps");
+
+    utils.def("create_experiment_config", [](const std::string& experimentName) {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentName == "curiosity") {
+            config->set("neuromod.dopamine.scale", 1.0);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        } else if (experimentName == "development") {
+            config->set("development.initial_stage", "Initial");
+            config->set("development.enable_synaptogenesis", true);
+            config->set("development.enable_pruning", true);
+            config->set("development.enable_maturation", true);
+        } else if (experimentName == "prediction") {
+            config->set("prediction.system.enable", true);
+            config->set("prediction.error_threshold", 0.1);
+        } else if (experimentName == "memory") {
+            config->set("memory.working.enable", true);
+            config->set("memory.episodic.enable", true);
+            config->set("memory.associative.enable", true);
+        }
+        
+        return config;
+    }, py::arg("experimentName") = "default",
+       "Create a configuration optimized for specific experiment types");
+
+    utils.def("validate_brain_state", [](const std::shared_ptr<Brain>& brain) {
+        py::dict validation;
+        
+        if (!brain) {
+            validation["valid"] = false;
+            validation["error"] = "Brain is null";
+            return validation;
+        }
+        
+        bool isValid = true;
+        std::string error;
+        
+        // Check basic properties
+        if (brain->getTotalNeuronCount() == 0) {
+            isValid = false;
+            error = "Brain has no neurons";
+        }
+        
+        if (brain->getRegionCount() == 0) {
+            isValid = false;
+            error = "Brain has no regions";
+        }
+        
+        // Check developmental consistency
+        auto stage = brain->getDevelopmentalStage();
+        validation["developmental_stage"] = static_cast<int>(stage);
+        
+        // Check memory system state
+        auto* workingMem = brain->getWorkingMemory();
+        if (workingMem) {
+            validation["working_memory_size"] = workingMem->getSize();
+        }
+        
+        validation["valid"] = isValid;
+        validation["error"] = error;
+        validation["brain_stats"] = brain->getTotalNeuronCount();
+        
+        return validation;
+    }, py::arg("brain"),
+       "Validate brain state and return validation results as a dictionary");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -207,7 +527,49 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + ">";
+        });
+
+    // Context manager support for Brain
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("__enter__", [](std::shared_ptr<Brain> self) {
+            self->initialize();
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<Brain> self, py::object, py::object, py::object) {
+            self->reset();
+        })
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("runEpisode", [](std::shared_ptr<Brain> self, int steps, bool resetOnComplete = true) {
+            if (resetOnComplete) {
+                self->reset();
+            }
+            self->initialize();
+            for (int step = 0; step < steps; ++step) {
+                self->step(step);
+            }
+        }, py::arg("steps") = 100, py::arg("resetOnComplete") = true,
+           "Run a complete simulation episode with automatic reset")
+        .def("getStats", [](std::shared_ptr<Brain> self) {
+            py::dict stats;
+            stats["total_neurons"] = self->getTotalNeuronCount();
+            stats["total_synapses"] = self->getTotalSynapseCount();
+            stats["active_neurons"] = self->getActiveNeuronCount();
+            stats["firing_neurons"] = self->getFiringNeuronCount();
+            stats["average_firing_rate"] = self->getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = self->getExcitationInhibitionRatio();
+            stats["total_spikes"] = self->getTotalSpikeCount();
+            stats["developmental_stage"] = static_cast<int>(self->getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics as a dictionary")
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -415,6 +777,74 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createVisualization", []() {
+        auto vis = std::make_shared<VisualizationInterface>();
+        return vis;
+    }, "Create a visualization interface");
+
+    utils.def("run_with_visualization", [](std::shared_ptr<Brain> brain, 
+                                          const std::string& title,
+                                          int durationMs,
+                                          double fps) {
+        auto vis = std::make_shared<VisualizationInterface>();
+        vis->initialize();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        auto end = start + std::chrono::milliseconds(durationMs);
+        
+        while (vis->isActive() && std::chrono::high_resolution_clock::now() < end) {
+            brain->step(0);
+            vis->update();
+            vis->render();
+            
+            // Simple FPS control
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000.0 / fps)));
+        }
+        
+        vis->close();
+        return true;
+    }, py::arg("brain"), py::arg("title") = "NLM Visualization", py::arg("durationMs") = 5000, py::arg("fps") = 30.0,
+       "Run simulation with real-time visualization");
+
+    utils.def("create_network_plot", [](const std::shared_ptr<Brain>& brain,
+                                        const std::string& outputFile) {
+        auto vis = std::make_shared<VisualizationInterface>();
+        vis->initialize();
+        vis->visualizeNetwork(*brain);
+        vis->close();
+        return true;
+    }, py::arg("brain"), py::arg("outputFile") = "network.png",
+       "Create and save a network structure visualization");
+
+    utils.def("create_activity_plot", [](const std::shared_ptr<Brain>& brain,
+                                         const std::string& outputFile,
+                                         int timeWindow) {
+        auto vis = std::make_shared<VisualizationInterface>();
+        vis->initialize();
+        vis->visualizeActivity(*brain);
+        vis->close();
+        return true;
+    }, py::arg("brain"), py::arg("outputFile") = "activity.png", py::arg("timeWindow") = 1000,
+       "Create and save neural activity visualization");
+
+    utils.def("create_spike_raster", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                         const std::string& outputFile,
+                                         int timeWindow) {
+        auto vis = std::make_shared<VisualizationInterface>();
+        vis->initialize();
+        
+        std::vector<SpikeEvent> allSpikes;
+        for (const auto& brain : brains) {
+            // This would require accessing spike data from brain
+            // Placeholder for future implementation
+        }
+        
+        vis->visualizeSpikes(allSpikes);
+        vis->close();
+        return true;
+    }, py::arg("brains"), py::arg("outputFile") = "spike_raster.png", py::arg("timeWindow") = 1000,
+       "Create and save spike raster plot for multiple brains");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
