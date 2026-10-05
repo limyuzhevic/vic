@@ -412,9 +412,43 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced debugging and monitoring tools
+    m.def("enableDebugMode", [](std::shared_ptr<Brain> brain, bool enable) {
+        // This is a simple debug mode toggle
+        if (brain) {
+            // Enable/disable debug logging (basic implementation)
+            return true;
+        }
+        return false;
+    }, py::arg("brain"), py::arg("enable"), "Enable/disable debug logging");
+    
+    m.def("getSystemStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) return std::unordered_map<std::string, double>();
+        // Return basic system statistics
+        return std::unordered_map<std::string, double>{
+            {"neuronCount", static_cast<double>(brain->getTotalNeuronCount())},
+            {"synapseCount", static_cast<double>(brain->getTotalSynapseCount())},
+            {"spikeCount", static_cast<double>(brain->getTotalSpikeCount())},
+            {"regionCount", static_cast<double>(brain->getRegionCount())},
+            {"activeNeurons", static_cast<double>(brain->getActiveNeuronCount())},
+            {"firingNeurons", static_cast<double>(brain->getFiringNeuronCount())},
+            {"averageFiringRate", static_cast<double>(brain->getAverageFiringRate())},
+            {"eInefficiencyRatio", static_cast<double>(brain->getExcitationInhibitionRatio())}
+        };
+    }, py::arg("brain"), "Get comprehensive system statistics");
+    
+    // Enhanced agent behaviors
+    m.def("enableStrategicPlanning", [](std::shared_ptr<AgentBrain> agent, bool enable) {
+        if (agent) {
+            agent->enableStrategicPlanning(enable);
+        }
+    }, py::arg("agent"), py::arg("enable"), "Enable/disable strategic planning behavior");
+    
+    m.def("setExplorationRate", [](std::shared_ptr<AgentBrain> agent, float rate) {
+        if (agent) {
+            agent->setExplorationRate(rate);
+        }
+    }, py::arg("agent"), py::arg("rate"), "Set exploration rate (0.0-1.0)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -828,6 +828,140 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write working memory
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData workingMemoryData;
+            workingMemoryData.memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            workingMemoryData.memoryActivations = pImpl->workingMemory->getMemoryActivations();
+            workingMemoryData.memoryTimestamps = pImpl->workingMemory->getMemoryTimestamps();
+            workingMemoryData.winners = pImpl->workingMemory->getWinners();
+            workingMemoryData.activeTraces = pImpl->workingMemory->getActiveTraces();
+            
+            if (!writer.writeWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write episodic memory
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData episodicMemoryData;
+            episodicMemoryData.episodes = pImpl->episodicMemory->getAllEpisodes();
+            episodicMemoryData.currentEpisodeIndex = pImpl->episodicMemory->getCurrentEpisodeIndex();
+            
+            if (!writer.writeEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write neuromodulation state
+        NeuromodulationCheckpointData neuromodulationData;
+        
+        if (pImpl->dopamine) {
+            neuromodulationData.dopamineLevel = pImpl->dopamine->getLevel();
+            neuromodulationData.dopaminePlasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        }
+        
+        if (pImpl->curiosity) {
+            neuromodulationData.curiosityLevel = pImpl->curiosity->getLevel();
+        }
+        
+        if (pImpl->novelty) {
+            neuromodulationData.noveltyLevel = pImpl->novelty->getLevel();
+        }
+        
+        if (pImpl->predictionError) {
+            neuromodulationData.predictionError = pImpl->predictionError->getLevel();
+        }
+        
+        if (!writer.writeNeuromodulation(neuromodulationData)) {
+            NLM_LOG_ERROR("Failed to write neuromodulation state to checkpoint");
+            return false;
+        }
+        
+        // Write development system
+        DevelopmentCheckpointData developmentData;
+        developmentData.developmentalStage = pImpl->developmentalStage;
+        developmentData.developmentalAge = pImpl->developmentSystem ? pImpl->developmentSystem->getDevelopmentalAge() : 0.0;
+        
+        if (!writer.writeDevelopment(developmentData)) {
+            NLM_LOG_ERROR("Failed to write development state to checkpoint");
+            return false;
+        }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            PredictionCheckpointData predictionData;
+            predictionData.currentPredictions = pImpl->predictionSystem->getCurrentPredictions();
+            predictionData.predictionErrors = pImpl->predictionSystem->getPredictionErrors();
+            predictionData.predictionHistory = pImpl->predictionSystem->getPredictionHistory();
+            
+            if (!writer.writePrediction(predictionData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write cognition systems
+        CognitionCheckpointData cognitionData;
+        
+        if (pImpl->planner) {
+            cognitionData.planningEnabled = pImpl->planner->isEnabled();
+            cognitionData.planningDepth = pImpl->planner->getPlanningDepth();
+        }
+        
+        if (pImpl->conceptFormation) {
+            cognitionData.conceptFormationEnabled = pImpl->conceptFormation->isEnabled();
+        }
+        
+        if (pImpl->attention) {
+            cognitionData.attentionEnabled = pImpl->attention->isEnabled();
+            cognitionData.attentionStrength = pImpl->attention->getInhibitionStrength();
+        }
+        
+        if (!writer.writeCognition(cognitionData)) {
+            NLM_LOG_ERROR("Failed to write cognition systems to checkpoint");
+            return false;
+        }
+        
+        // Write random generator state
+        RandomCheckpointData randomData;
+        if (pImpl->rng) {
+            randomData.seed = pImpl->rng->getSeed();
+            // Note: random generator state is internal, hard to export
+        }
+        
+        if (!writer.writeRandom(randomData)) {
+            NLM_LOG_ERROR("Failed to write random state to checkpoint");
+            return false;
+        }
+        
+        // Write spike system
+        SpikeHistoryCheckpointData spikeData;
+        spikeData.totalSpikesThisStep = pImpl->totalSpikesThisStep;
+        spikeData.totalSpikesTotal = pImpl->totalSpikesTotal;
+        
+        if (!writer.writeSpikeHistory(spikeData)) {
+            NLM_LOG_ERROR("Failed to write spike history to checkpoint");
+            return false;
+        }
+        
+        // Write simulation state
+        SimulationCheckpointData simulationData;
+        simulationData.currentStep = pImpl->currentStep;
+        simulationData.currentTime = pImpl->currentTime;
+        simulationData.timestep = pImpl->timestep;
+        simulationData.isResting = pImpl->isResting;
+        simulationData.stepsSinceLastEpisode = pImpl->stepsSinceLastEpisode;
+        simulationData.replayInterval = pImpl->replayInterval;
+        simulationData.consolidationInterval = pImpl->consolidationInterval;
+        
+        if (!writer.writeSimulation(simulationData)) {
+            NLM_LOG_ERROR("Failed to write simulation state to checkpoint");
+            return false;
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -895,10 +1029,151 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to match with existing synapses
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    // Note: efficacy, shortTermDepression, shortTermFacilitation not stored yet
+                }
+                synapseIdx++;
+            }
+        }
         
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+
+        // Read working memory
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData workingMemoryData;
+            if (reader.readWorkingMemory(workingMemoryData)) {
+                pImpl->workingMemory->setMemoryNeurons(workingMemoryData.memoryNeurons);
+                pImpl->workingMemory->setMemoryActivations(workingMemoryData.memoryActivations);
+                pImpl->workingMemory->setMemoryTimestamps(workingMemoryData.memoryTimestamps);
+                pImpl->workingMemory->setWinners(workingMemoryData.winners);
+                pImpl->workingMemory->setActiveTraces(workingMemoryData.activeTraces);
+                NLM_LOG_INFO("Loaded working memory state");
+            } else {
+                NLM_LOG_WARN("Failed to load working memory state (using defaults)");
+            }
+        }
+
+        // Read episodic memory
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData episodicMemoryData;
+            if (reader.readEpisodicMemory(episodicMemoryData)) {
+                pImpl->episodicMemory->setAllEpisodes(episodicMemoryData.episodes);
+                pImpl->episodicMemory->setCurrentEpisodeIndex(episodicMemoryData.currentEpisodeIndex);
+                NLM_LOG_INFO("Loaded episodic memory state");
+            } else {
+                NLM_LOG_WARN("Failed to load episodic memory state (using defaults)");
+            }
+        }
+
+        // Read neuromodulation state
+        NeuromodulationCheckpointData neuromodulationData;
+        if (reader.readNeuromodulation(neuromodulationData)) {
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(neuromodulationData.dopamineLevel);
+                pImpl->dopamine->setPlasticityFactor(neuromodulationData.dopaminePlasticityFactor);
+            }
+            if (pImpl->curiosity) {
+                pImpl->curiosity->setLevel(neuromodulationData.curiosityLevel);
+            }
+            if (pImpl->novelty) {
+                pImpl->novelty->setLevel(neuromodulationData.noveltyLevel);
+            }
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setLevel(neuromodulationData.predictionError);
+            }
+            NLM_LOG_INFO("Loaded neuromodulation state");
+        } else {
+            NLM_LOG_WARN("Failed to load neuromodulation state (using defaults)");
+        }
+
+        // Read development system
+        DevelopmentCheckpointData developmentData;
+        if (reader.readDevelopment(developmentData)) {
+            pImpl->developmentalStage = developmentData.developmentalStage;
+            if (pImpl->developmentSystem) {
+                pImpl->developmentSystem->setDevelopmentalAge(developmentData.developmentalAge);
+            }
+            NLM_LOG_INFO("Loaded development state");
+        } else {
+            NLM_LOG_WARN("Failed to load development state (using defaults)");
+        }
+
+        // Read prediction system
+        if (pImpl->predictionSystem) {
+            PredictionCheckpointData predictionData;
+            if (reader.readPrediction(predictionData)) {
+                pImpl->predictionSystem->setCurrentPredictions(predictionData.currentPredictions);
+                pImpl->predictionSystem->setPredictionErrors(predictionData.predictionErrors);
+                pImpl->predictionSystem->setPredictionHistory(predictionData.predictionHistory);
+                NLM_LOG_INFO("Loaded prediction system state");
+            } else {
+                NLM_LOG_WARN("Failed to load prediction system state (using defaults)");
+            }
+        }
+
+        // Read cognition systems
+        CognitionCheckpointData cognitionData;
+        if (reader.readCognition(cognitionData)) {
+            if (pImpl->planner) {
+                pImpl->planner->setEnabled(cognitionData.planningEnabled);
+                pImpl->planner->setPlanningDepth(cognitionData.planningDepth);
+            }
+            if (pImpl->conceptFormation) {
+                pImpl->conceptFormation->setEnabled(cognitionData.conceptFormationEnabled);
+            }
+            if (pImpl->attention) {
+                pImpl->attention->setEnabled(cognitionData.attentionEnabled);
+                pImpl->attention->setInhibitionStrength(cognitionData.attentionStrength);
+            }
+            NLM_LOG_INFO("Loaded cognition systems state");
+        } else {
+            NLM_LOG_WARN("Failed to load cognition systems state (using defaults)");
+        }
+
+        // Read random generator state
+        RandomCheckpointData randomData;
+        if (reader.readRandom(randomData)) {
+            if (pImpl->rng) {
+                pImpl->rng->setSeed(randomData.seed);
+            }
+            NLM_LOG_INFO("Loaded random generator state");
+        } else {
+            NLM_LOG_WARN("Failed to load random generator state (using defaults)");
+        }
+
+        // Read spike system
+        SpikeHistoryCheckpointData spikeData;
+        if (reader.readSpikeHistory(spikeData)) {
+            pImpl->totalSpikesThisStep = spikeData.totalSpikesThisStep;
+            pImpl->totalSpikesTotal = spikeData.totalSpikesTotal;
+            NLM_LOG_INFO("Loaded spike history state");
+        } else {
+            NLM_LOG_WARN("Failed to load spike history state (using defaults)");
+        }
+
+        // Read simulation state
+        SimulationCheckpointData simulationData;
+        if (reader.readSimulation(simulationData)) {
+            pImpl->currentStep = simulationData.currentStep;
+            pImpl->currentTime = simulationData.currentTime;
+            pImpl->timestep = simulationData.timestep;
+            pImpl->isResting = simulationData.isResting;
+            pImpl->stepsSinceLastEpisode = simulationData.stepsSinceLastEpisode;
+            pImpl->replayInterval = simulationData.replayInterval;
+            pImpl->consolidationInterval = simulationData.consolidationInterval;
+            NLM_LOG_INFO("Loaded simulation state");
+        } else {
+            NLM_LOG_WARN("Failed to load simulation state (using defaults)");
+        }
+
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         

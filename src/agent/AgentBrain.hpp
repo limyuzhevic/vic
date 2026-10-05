@@ -7,11 +7,20 @@
 #include <memory>
 #include <vector>
 
-namespace nlm {
-
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
-class AgentBrain {
+// Exploration strategy enumeration
+    enum class ExplorationStrategy {
+        None,              // No exploration, purely exploitative
+        EpsilonGreedy,     // Simple epsilon-greedy exploration
+        Softmax,           // Temperature-based softmax action selection
+        ThompsonSampling,  // Thompson sampling for Bayesian learning
+        CuriosityDriven,   // Curiosity-driven exploration based on novelty/prediction error
+        Adaptive,          // Adaptive exploration that learns from experience
+        IntrinsicMotivation // Exploration based on intrinsic motivation
+    };
+    
+    // AgentBrain: Connects NLM brain to the world
+    // Handles sensory transduction and motor decoding
+    class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
@@ -69,12 +78,30 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced exploration configuration
+    void setExplorationStrategy(ExplorationStrategy strategy) { explorationStrategy_ = strategy; }
+    void setTemperature(float temp) { temperature_ = temp; }
+    void setAdaptiveEpsilon(float epsilon, float decayRate) { 
+        adaptiveEpsilon_ = epsilon; 
+        epsilonDecayRate_ = decayRate;
+    }
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    
+    ExplorationStrategy getExplorationStrategy() const { return explorationStrategy_; }
+    float getTemperature() const { return temperature_; }
+    float getExplorationRate() const { return explorationRate_; }
+    float getAdaptiveEpsilon() const { return adaptiveEpsilon_; }
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand selectWithExploration(MotorCommand defaultCmd);
+    MotorCommand softmaxActionSelection(const std::vector<float>& actionValues);
+    MotorCommand epsilonGreedyActionSelection(const std::vector<float>& actionValues, float epsilon);
+    MotorCommand thompsonSamplingActionSelection(const std::vector<float>& actionValues, const std::vector<float>& uncertainties);
     
     std::shared_ptr<Brain> brain_;
     
@@ -108,6 +135,23 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Enhanced exploration state
+    ExplorationStrategy explorationStrategy_;
+    float temperature_;
+    float explorationRate_;
+    float adaptiveEpsilon_;
+    float epsilonDecayRate_;
+    
+    // Action value estimation
+    std::vector<float> actionValues_;
+    std::vector<float> actionUncertainties_;
+    std::vector<float> actionRewards_;
+    std::vector<int> actionCounts_;
+    
+    // Exploration history
+    std::vector<float> explorationHistory_;
+    std::vector<float> learningProgress_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

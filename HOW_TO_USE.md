@@ -526,8 +526,12 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+    print(f"Step {step}:")
+    print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+    print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+    print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+# Run the simulation
+run_agent_simulation(1000)
+```

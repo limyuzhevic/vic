@@ -5,22 +5,73 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
+    // Update action values based on experience
+    void updateActionValues(float reward, MotorCommand action) {
+        // Find action index
+        int actionIndex = 0;
+        switch (action) {
+            case MotorCommand::MoveForward: actionIndex = 0; break;
+            case MotorCommand::MoveBackward: actionIndex = 1; break;
+            case MotorCommand::TurnLeft: actionIndex = 2; break;
+            case MotorCommand::TurnRight: actionIndex = 3; break;
+            case MotorCommand::LookLeft: actionIndex = 4; break;
+            case MotorCommand::LookRight: actionIndex = 5; break;
+            case MotorCommand::Interact: actionIndex = 6; break;
+            case MotorCommand::Wait: actionIndex = 7; break;
+        }
+        
+        if (actionIndex < actionValues_.size()) {
+            // Update action value (simple incremental update)
+            actionValues_[actionIndex] = 0.9f * actionValues_[actionIndex] + 0.1f * reward;
+            actionRewards_[actionIndex] = 0.9f * actionRewards_[actionIndex] + 0.1f * reward;
+            actionCounts_[actionIndex]++;
+            
+            // Update uncertainty (decrease with more trials)
+            if (actionCounts_[actionIndex] > 1) {
+                float variance = 0.0f;
+                for (int i = 0; i < actionCounts_[actionIndex]; ++i) {
+                    variance += (actionRewards_[actionIndex] - reward) * (actionRewards_[actionIndex] - reward);
+                }
+                actionUncertainties_[actionIndex] = std::sqrt(variance / actionCounts_[actionIndex]);
+            }
+            
+            // Record exploration history
+            explorationHistory_.push_back(explorationRate_);
+            learningProgress_.push_back(reward);
+            
+            // Keep history manageable
+            if (explorationHistory_.size() > 100) {
+                explorationHistory_.erase(explorationHistory_.begin());
+                learningProgress_.erase(learningProgress_.begin());
+            }
+        }
+    }
+    
+    // Calculate exploration rate based on learning progress
+    float calculateAdaptiveExploration() {
+        if (learningProgress_.empty()) {
+            return adaptiveEpsilon_;
+        }
+        
+        // Calculate average learning progress over recent history
+        float recentLearning = 0.0f;
+        int recentCount = std::min(10, (int)learningProgress_.size());
+        for (int i = 0; i < recentCount; ++i) {
+            recentLearning += learningProgress_[learningProgress_.size() - recentCount + i];
+        }
+        recentLearning /= recentCount;
+        
+        // Higher learning progress = lower exploration (exploitation)
+        // Lower learning progress = higher exploration (exploration)
+        float progressFactor = std::max(0.0f, std::min(1.0f, recentLearning * 2.0f));
+        float adaptiveEpsilon = adaptiveEpsilon_ * (1.0f - progressFactor * 0.5f);
+        
+        // Decay epsilon over time
+        adaptiveEpsilon *= (1.0f - epsilonDecayRate_);
+        
+        return std::max(0.01f, std::min(0.5f, adaptiveEpsilon));
+    }
+}
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -149,14 +200,13 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+    // Apply enhanced exploration strategy
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        decoded = selectWithExploration(decoded);
     }
     
     return decoded;
