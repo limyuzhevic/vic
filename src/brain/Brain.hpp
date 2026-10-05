@@ -25,9 +25,12 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
+    class Acetylcholine;
+    class Norepinephrine;
+    class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -170,10 +173,19 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // ========== FULL NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -183,6 +195,23 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
