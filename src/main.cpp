@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
@@ -322,6 +323,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -345,13 +348,103 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool quietMode = false;
+    bool profileMode = false;
+    std::string experimentMode = "all";
+    std::string checkpointFile = "";
+    
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 12) == "--experiment") {
+            if (arg.find('=') != std::string::npos) {
+                experimentMode = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                experimentMode = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 7) == "--steps") {
+            if (arg.find('=') != std::string::npos) {
+                size_t steps = std::stoul(arg.substr(arg.find('=') + 1));
+                config->set("max_simulation_steps", static_cast<int64_t>(steps), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                size_t steps = std::stoul(argv[++i]);
+                config->set("max_simulation_steps", static_cast<int64_t>(steps), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 8) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                double ts = std::stod(arg.substr(arg.find('=') + 1));
+                config->set("simulation_timestep", ts, ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                double ts = std::stod(argv[++i]);
+                config->set("simulation_timestep", ts, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 8) == "--neuron") {
+            if (arg.find('=') != std::string::npos) {
+                config->set("neuron_count", std::stoll(arg.substr(arg.find('=') + 1)), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("neuron_count", std::stoll(argv[++i]), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 14) == "--connection") {
+            if (arg.find('=') != std::string::npos) {
+                config->set("connection_probability", std::stod(arg.substr(arg.find('=') + 1)), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("connection_probability", std::stod(argv[++i]), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--enable-plasticity") {
+            config->set("plasticity.stdp.enable", true, ConfigSource::CommandLine);
+        }
+        else if (arg == "--disable-plasticity") {
+            config->set("plasticity.stdp.enable", false, ConfigSource::CommandLine);
+        }
+        else if (arg == "--enable-curiosity") {
+            config->set("neuromod.curiosity.enable", true, ConfigSource::CommandLine);
+        }
+        else if (arg == "--disable-curiosity") {
+            config->set("neuromod.curiosity.enable", false, ConfigSource::CommandLine);
+        }
+        else if (arg == "--enable-reward") {
+            config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::CommandLine);
+        }
+        else if (arg == "--disable-reward") {
+            config->set("neuromod.dopamine.scale", 0.0f, ConfigSource::CommandLine);
+        }
+        else if (arg == "--enable-development") {
+            config->set("development.enable", true, ConfigSource::CommandLine);
+        }
+        else if (arg == "--disable-development") {
+            config->set("development.enable", false, ConfigSource::CommandLine);
+        }
+        else if (arg == "--profile") {
+            profileMode = true;
+        }
+        else if (arg == "--quiet") {
+            quietMode = true;
+        }
+        else if (arg.substr(0, 11) == "--checkpoint") {
+            if (arg.find('=') != std::string::npos) {
+                checkpointFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 8) == "--load") {
+            if (arg.find('=') != std::string::npos) {
+                checkpointFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                checkpointFile = argv[++i];
             }
         }
     }
@@ -383,23 +476,33 @@ int main(int argc, char** argv) {
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    if (!quietMode) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration:");
+        NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+        NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+        NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+        NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+        NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+        NLM_LOG_INFO("  experiment_mode: " + experimentMode);
+        if (profileMode) NLM_LOG_INFO("  profile_mode: enabled");
+        if (quietMode) NLM_LOG_INFO("  quiet_mode: enabled");
+        if (!checkpointFile.empty()) NLM_LOG_INFO("  checkpoint: " + checkpointFile);
+        NLM_LOG_INFO("");
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    if (!quietMode) {
+        NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    }
     
     // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    if (!quietMode) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Initializing NLM Brain...");
+    }
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -409,41 +512,64 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests based on experiment mode
+    if (experimentMode == "connectivity" || experimentMode == "all") {
+        if (!quietMode) {
+            NLM_LOG_INFO("=== Running Basic Connectivity Test ===");
+        }
+        runBasicConnectivityTest(brain);
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (experimentMode == "plasticity" || experimentMode == "all") {
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        if (!quietMode) {
+            NLM_LOG_INFO("=== Running Plasticity Learning Experiment ===");
+        }
+        runPlasticityExperiment(brain);
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (experimentMode == "stdp" || experimentMode == "all") {
+        // Reset and run STDP verification
+        brain->reset();
+        brain->initialize();
+        if (!quietMode) {
+            NLM_LOG_INFO("=== Running STDP Verification ===");
+        }
+        runStdpVerification(brain);
+    }
     
     // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    if (!quietMode) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Final Brain Status ===");
+        brain->logStatus();
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Phase 2 Complete ===");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Phase 2 Objectives Completed:");
+        NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
+        NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  ✓ STDP plasticity rule");
+        NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+        NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+        NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
+        NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
+        NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+        NLM_LOG_INFO("");
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        if (profileMode) {
+            NLM_LOG_INFO("=== Performance Summary ===");
+            NLM_LOG_INFO("Total execution time: " + std::to_string(duration.count()) + " ms");
+        }
+    }
     
     return 0;
 }

@@ -84,7 +84,6 @@ public:
     // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
     std::vector<std::string> getKeys() const;
     
     // Clear all
@@ -92,6 +91,15 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    bool isValid() const;
+    bool validateConfiguration() const;
+    std::vector<std::string> getValidationErrors() const;
+    static std::string getDefaultForKey(const std::string& key);
+    
+    // Private validation helper
+    bool validateConfigEntry(const std::string& key, const std::string& value) const;
     
 private:
     struct Impl;

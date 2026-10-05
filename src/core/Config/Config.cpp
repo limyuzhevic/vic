@@ -43,16 +43,24 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
                 value = value.substr(1, value.size() - 2);
+            }
+            
+            // Validate the key-value pair before setting
+            if (!validateConfigEntry(key, value)) {
+                // Log validation error but continue processing
+                // TODO: Add proper error logging
+                continue;
             }
             
             set(key, value, ConfigSource::File);
         }
     }
     
-    return true;
+    // Validate configuration after loading
+    return validateConfiguration();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -65,6 +73,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate the key-value pair before setting
+                if (!validateConfigEntry(key, value)) {
+                    // Log validation error but continue processing
+                    // TODO: Add proper error logging
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,10 +88,18 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate the key-value pair before setting
+            if (!validateConfigEntry(key, value)) {
+                // Log validation error but continue processing
+                // TODO: Add proper error logging
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
-    return true;
+    return validateConfiguration();
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -199,17 +223,117 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    pImpl->entries.clear();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Configuration validation methods
+bool Config::validateConfigEntry(const std::string& key, const std::string& value) {
+    // Basic validation: key should not be empty
+    if (key.empty()) {
+        // TODO: Add error logging
+        return false;
+    }
+    
+    // Check for valid key characters (alphanumeric, underscores, dots, hyphens)
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '.' && c != '-') {
+            // TODO: Add error logging
+            return false;
+        }
+    }
+    
+    // Check for potentially dangerous values
+    if (value.find("..") != std::string::npos || value.find("//") != std::string::npos) {
+        // TODO: Add error logging
+        return false;
+    }
+    
+    return true;
+}
 
-} // namespace nlm
+bool Config::validateConfiguration() const {
+    // Check for required parameters
+    std::vector<std::string> requiredParams = {
+        "brain.neuron_count",
+        "simulation.timestep",
+        "logging.level"
+    };
+    
+    for (const std::string& param : requiredParams) {
+        if (!has(param)) {
+            // TODO: Add error logging for missing required parameter
+            // TODO: Set reasonable defaults for missing parameters
+            return false;
+        }
+    }
+    
+    // Validate specific parameter ranges and formats
+    if (has("brain.neuron_count")) {
+        auto neuronCount = get<int64_t>("brain.neuron_count");
+        if (neuronCount && (*neuronCount < 1 || *neuronCount > 1000000)) {
+            // TODO: Add error logging for invalid neuron count
+            return false;
+        }
+    }
+    
+    if (has("simulation.timestep")) {
+        auto timestep = get<double>("simulation.timestep");
+        if (timestep && (*timestep <= 0.0 || *timestep > 1.0)) {
+            // TODO: Add error logging for invalid timestep
+            return false;
+        }
+    }
+    
+    if (has("logging.level")) {
+        auto level = get<std::string>("logging.level");
+        if (level) {
+            std::string lowerLevel = toLower(*level);
+            if (lowerLevel != "debug" && lowerLevel != "info" && 
+                lowerLevel != "warning" && lowerLevel != "error") {
+                // TODO: Add error logging for invalid log level
+                return false;
+            }
+        }
+    }
+    
+    if (has("environment.width") && has("environment.height")) {
+        auto width = get<int64_t>("environment.width");
+        auto height = get<int64_t>("environment.height");
+        if (width && height && (*width < 1 || *height < 1 || *width > 10000 || *height > 10000)) {
+            // TODO: Add error logging for invalid world dimensions
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Configuration helper functions
+std::string Config::getDefaultForKey(const std::string& key) {
+    // Return sensible defaults for common configuration keys
+    std::string lowerKey = toLower(key);
+    
+    if (lowerKey == "brain.neuron_count") return "1000";
+    if (lowerKey == "brain.synapse_density") return "0.1";
+    if (lowerKey == "brain.connection_probability") return "0.05";
+    if (lowerKey == "simulation.timestep") return "0.001";
+    if (lowerKey == "logging.level") return "INFO";
+    if (lowerKey == "logging.to_file") return "false";
+    if (lowerKey == "environment.width") return "10";
+    if (lowerKey == "environment.height") return "10";
+    if (lowerKey == "environment.vision_width") return "8";
+    if (lowerKey == "environment.vision_height") return "8";
+    
+    return "";
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    // Return list of validation error messages
+    // TODO: Implement comprehensive error reporting
+    return std::vector<std::string>();
+}
+
+bool Config::isValid() const {
+    // Check if configuration is valid
+    return validateConfiguration();
+}
