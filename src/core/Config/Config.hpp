@@ -100,6 +100,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    template<typename T>
+    static ConfigValue jsonValueToConfigValue(const nlohmann::json& j);
+    static nlohmann::json configValueToJson(const ConfigValue& value);
 };
 
 } // namespace nlm
