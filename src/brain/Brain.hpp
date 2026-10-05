@@ -193,7 +193,84 @@ public:
     // Logging
     void logStatus() const;
     
-private:
+    // ========== CONVENIENCE METHODS ==========
+    
+    // Quick brain initialization with common configurations
+    bool initializeForSimulation(const std::string& preset = "standard");
+    
+    // Simple simulation loop with profiling
+    void runSimulation(SimulationStep steps, bool withProfiling = false);
+    
+    // Generate random sensory input patterns
+    void injectRandomSensoryInput(float intensity = 1.0f, bool correlated = false);
+    
+    // Count active neurons above threshold
+    size_t getActiveCountAboveThreshold(MembranePotential threshold) const;
+    
+    // Check if brain has reached stable state
+    bool isStable(float stabilityThreshold = 0.01f, size_t stabilitySteps = 100) const;
+    
+    // Reset and reinitialize brain safely
+    bool resetAndInitialize();
+    
+    // Safe step with parameter validation
+    bool safeStep(SimulationStep currentStep, Timestamp currentTime = 0.0);
+    
+    // Get comprehensive brain health status
+    struct BrainHealth {
+        bool isInitialized;
+        size_t totalNeuronCount;
+        size_t activeNeuronCount;
+        size_t firingNeuronCount;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        size_t totalSpikeCount;
+        size_t pendingEvents;
+        bool isStable;
+        float stabilityScore;
+        std::string statusMessage;
+        
+        BrainHealth()
+            : isInitialized(false), totalNeuronCount(0), activeNeuronCount(0), firingNeuronCount(0),
+              averageFiringRate(0.0f), excitationInhibitionRatio(0.0f), totalSpikeCount(0), pendingEvents(0),
+              isStable(false), stabilityScore(0.0f), statusMessage("Initialized") {}
+    };
+    
+    BrainHealth getBrainHealth() const;
+    
+    // Get neuron IDs in specific region
+    std::vector<NeuronId> getNeuronIdsInRegion(RegionId regionId) const;
+    
+    // Get detailed neuron statistics
+    struct NeuronStats {
+        size_t totalNeurons;
+        size_t activeNeurons;
+        float averageFiringRate;
+        float minFiringRate;
+        float maxFiringRate;
+        float averageMembranePotential;
+        float averageRestingPotential;
+        size_t neuronsAboveThreshold;
+        size_t neuronsBelowThreshold;
+        
+        NeuronStats()
+            : totalNeurons(0), activeNeurons(0), averageFiringRate(0.0f), minFiringRate(0.0f),
+              maxFiringRate(0.0f), averageMembranePotential(0.0f), averageRestingPotential(0.0f),
+              neuronsAboveThreshold(0), neuronsBelowThreshold(0) {}
+    };
+    
+    NeuronStats getNeuronStats(RegionId regionId = RegionId(-1)) const;
+    
+    // Check if brain has enough neurons for a task
+    bool hasEnoughNeurons(size_t requiredNeurons) const;
+    
+    // Safe configuration setting with validation
+    bool setConfigSafely(const std::string& key, const std::string& value);
+    bool setConfigSafely(const std::string& key, int value);
+    bool setConfigSafely(const std::string& key, float value);
+    bool setConfigSafely(const std::string& key, bool value);
+    
+    private:
     struct Impl;
     Impl* pImpl;
 };
