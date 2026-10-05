@@ -144,14 +144,33 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                py::set_error(PyExc_RuntimeError, e.what());
+                return false;
+            }
+        }, py::arg("filepath"),
+            "Load configuration from a JSON file. Returns True on success, False on error.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                return self.loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                py::set_error(PyExc_RuntimeError, e.what());
+                return false;
+            }
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+            "Load configuration from command line arguments. Returns True on success, False on error.")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                py::set_error(PyExc_RuntimeError, e.what());
+                return false;
+            }
+        }, py::arg("filepath"),
+            "Save configuration to a JSON file. Returns True on success, False on error.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -162,7 +181,54 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("getWithDefault", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            if (value) return *value;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a configuration key with fallback to default value")
+        .def("getIntWithDefault", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto value = self.get<int64_t>(key);
+            if (value) return *value;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get an integer configuration key with fallback to default value")
+        .def("getFloatWithDefault", [](const Config& self, const std::string& key, float defaultValue) {
+            auto value = self.get<float>(key);
+            if (value) return *value;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a float configuration key with fallback to default value")
+        .def("getBoolWithDefault", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            if (value) return *value;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a boolean configuration key with fallback to default value")
+        .def("validate", [](const Config& self) {
+            std::vector<std::string> errors;
+            // Basic validation
+            if (!self.has("neuron_count") || self.get<int64_t>("neuron_count", 0) <= 0) {
+                errors.push_back("neuron_count must be positive");
+            }
+            if (!self.has("connection_probability") || 
+                self.get<float>("connection_probability", 1.0f) < 0.0f || 
+                self.get<float>("connection_probability", 1.0f) > 1.0f) {
+                errors.push_back("connection_probability must be between 0.0 and 1.0");
+            }
+            return errors;
+        }, "Validate configuration and return any errors")
+        .def("validateAndThrow", [](const Config& self) {
+            std::vector<std::string> errors = self.validate();
+            if (!errors.empty()) {
+                std::string errorMsg = "Configuration validation failed:";
+                for (const auto& error : errors) {
+                    errorMsg += "\n  - " + error;
+                }
+                throw std::runtime_error(errorMsg);
+            }
+        }, "Validate configuration and throw exception if errors found");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -351,7 +417,101 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Advanced features
+        .def("batchInjectCurrent", [](Brain& self, const std::vector<std::pair<NeuronId, float>>& injections) {
+            for (const auto& injection : injections) {
+                self.injectCurrent(injection.first, injection.second);
+            }
+        }, py::arg("injections"),
+             "Inject current into multiple neurons at once")
+        .def("batchInjectCurrentByType", [](Brain& self, NeuronType type, float current, size_t count) {
+            for (size_t i = 0; i < count; ++i) {
+                self.injectCurrentToNeurons(type, current);
+            }
+        }, py::arg("type"), py::arg("current"), py::arg("count"),
+             "Inject current into multiple neurons of a specific type")
+        .def("runBatchSteps", [](Brain& self, size_t steps, float timestep = 0.001f) {
+            for (size_t step = 0; step < steps; ++step) {
+                self.step(static_cast<SimulationStep>(step), static_cast<Timestamp>(step * timestep));
+            }
+        }, py::arg("steps"), py::arg("timestep") = 0.001f,
+             "Run multiple simulation steps efficiently")
+        .def("getNeuronStats", [](const Brain& self) {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["average_firing_rate"] = self.getAverageFiringRate();
+            stats["excitatory_inhibition_ratio"] = self.getExcitationInhibitionRatio();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            return stats;
+        }, "Get comprehensive statistics about the brain")
+        .def("enableAllPlasticity", [](Brain& self) {
+            if (auto* stdp = self.getSTDP()) stdp->enablePlasticity(true, true, true);
+            if (auto* hebbian = self.getHebbian()) hebbian->enablePlasticity(true);
+            if (auto* structural = self.getStructuralPlasticity()) structural->enablePlasticity(true);
+        }, "Enable all plasticity mechanisms")
+        .def("disableAllPlasticity", [](Brain& self) {
+            if (auto* stdp = self.getSTDP()) stdp->enablePlasticity(false, false, false);
+            if (auto* hebbian = self.getHebbian()) hebbian->enablePlasticity(false);
+            if (auto* structural = self.getStructuralPlasticity()) structural->enablePlasticity(false);
+        }, "Disable all plasticity mechanisms")
+        .def("setLearningRate", [](Brain& self, float stdpRate, float hebbianRate, float structuralRate) {
+            auto config = self.getConfig();
+            if (config) {
+                config->set("stdp_ltp_weight", stdpRate, nlm::ConfigSource::User);
+                config->set("stdp_ltd_weight", stdpRate * 0.9f, nlm::ConfigSource::User);
+                config->set("plasticity_learning_rate", hebbianRate, nlm::ConfigSource::User);
+                config->set("synaptogenesis_rate", structuralRate, nlm::ConfigSource::User);
+                config->set("pruning_rate", structuralRate * 0.01f, nlm::ConfigSource::User);
+            }
+        }, py::arg("stdp_rate"), py::arg("hebbian_rate"), py::arg("structural_rate"),
+             "Set learning rates for all plasticity mechanisms")
+        .def("getPerformanceMetrics", [](const Brain& self) {
+            py::dict metrics;
+            metrics["neuron_count"] = self.getTotalNeuronCount();
+            metrics["synapse_count"] = self.getTotalSynapseCount();
+            metrics["spike_count"] = self.getTotalSpikeCount();
+            metrics["firing_rate"] = self.getAverageFiringRate();
+            metrics["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            return metrics;
+        }, "Get performance metrics for brain optimization")
+        .def("optimizeConfiguration", [](Brain& self) {
+            auto config = self.getConfig();
+            if (config) {
+                config->set("connection_probability", std::min(0.2f, config->get<float>("connection_probability", 0.1f)), nlm::ConfigSource::User);
+                config->set("plasticity_learning_rate", 0.005f, nlm::ConfigSource::User);
+                config->set("stdp_ltp_weight", 0.02f, nlm::ConfigSource::User);
+                config->set("stdp_ltd_weight", 0.018f, nlm::ConfigSource::User);
+            }
+        }, "Optimize brain configuration for balanced learning")
+        .def("simulateEpisode", [](Brain& self, const AgentBrain& agent, const SimpleWorld& world, size_t steps) {
+            world.reset();
+            for (size_t step = 0; step < steps; ++step) {
+                auto percept = world.getSensoryPercept();
+                agent.processSensoryInput(percept);
+                self.step(static_cast<SimulationStep>(step));
+                auto action = agent.decodeMotorCommand();
+                world.applyMotorCommand(action, static_cast<Timestamp>(step * 0.001f));
+            }
+        }, py::arg("agent"), py::arg("world"), py::arg("steps"),
+             "Run a complete simulation episode with agent and world")
+        .def("getRegionalStats", [](const Brain& self) {
+            py::list regional_stats;
+            for (const auto& region_id : self.getRegionIds()) {
+                py::dict region_stat;
+                if (auto* region = self.getRegion(region_id)) {
+                    region_stat["id"] = region_id.value;
+                    region_stat["neuron_count"] = region->getNeuronCount();
+                    region_stat["synapse_count"] = region->getSynapseCount();
+                    region_stat["firing_rate"] = region->getFiringRate();
+                }
+                regional_stats.append(region_stat);
+            }
+            return regional_stats;
+        }, "Get statistics for each brain region");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +558,42 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced agent features
+        .def("enableAllSystems", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all agent systems (reward, structural plasticity, development, curiosity)")
+        .def("disableAllSystems", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+        }, "Disable all agent systems")
+        .def("updateAllSystems", [](AgentBrain& self, const SensorPercept& percept, float timestep, float reward) {
+            self.processSensoryInput(percept);
+            self.updateDevelopment(timestep);
+            self.applyRewardModulation(reward, 0.0f);
+        }, py::arg("percept"), py::arg("timestep"), py::arg("reward"),
+             "Update all agent systems with sensory input and reward")
+        .def("getSystemStatus", [](const AgentBrain& self) {
+            py::dict status;
+            status["reward_modulation"] = self.isRewardModulationEnabled();
+            status["structural_plasticity"] = self.isStructuralPlasticityEnabled();
+            status["development"] = self.isDevelopmentEnabled();
+            status["curiosity"] = self.isCuriosityEnabled();
+            status["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            status["neuromodulation_level"] = self.getNeuromodulationLevel();
+            status["curiosity_level"] = self.getCuriosityLevel();
+            status["novelty_level"] = self.getNoveltyLevel();
+            status["prediction_error"] = self.getPredictionError();
+            return status;
+        }, "Get comprehensive status of all agent systems")
+        .def("resetSystems", [](AgentBrain& self) {
+            self.reset();
+        }, "Reset all agent systems for new episode")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
