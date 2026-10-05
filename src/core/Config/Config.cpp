@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  # Include JSON parser
 
 namespace nlm {
 
@@ -19,40 +20,317 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
+    // Try to parse as JSON first (preferred format)
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Parse JSON with nlohmann library
+        auto json = nlohmann::json::parse(file);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Convert JSON to config entries
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            ConfigSource source = ConfigSource::File;
+            
+            // Try to determine value type and set accordingly
+            try {
+                // Try different types in order of likelihood
+                if (it->is_boolean()) {
+                    set(key, it->get<bool>(), source);
+                } else if (it->is_number_integer()) {
+                    set(key, it->get<int64_t>(), source);
+                } else if (it->is_number_float()) {
+                    set(key, it->get<double>(), source);
+                } else if (it->is_string()) {
+                    set(key, it->get<std::string>(), source);
+                } else if (it->is_array()) {
+                    // Check array element type
+                    auto arr = it->get<std::vector<nlohmann::json>>();
+                    if (!arr.empty() && arr[0].is_number_integer()) {
+                        std::vector<int> intVec;
+                        intVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            intVec.push_back(item.get<int>());
+                        }
+                        set(key, intVec, source);
+                    } else if (!arr.empty() && arr[0].is_number_float()) {
+                        std::vector<double> doubleVec;
+                        doubleVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            doubleVec.push_back(item.get<double>());
+                        }
+                        set(key, doubleVec, source);
+                    } else if (!arr.empty() && arr[0].is_string()) {
+                        std::vector<std::string> stringVec;
+                        stringVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            stringVec.push_back(item.get<std::string>());
+                        }
+                        set(key, stringVec, source);
+                    }
+                }
+            } catch (const std::exception& e) {
+                // If conversion fails, log and continue with string representation
+                NLM_LOG_ERROR("Failed to convert config value '" + key + "' from JSON: " + e.what());
+                set(key, it->dump(), source);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Fallback to simple key=value format if JSON parsing fails
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
+            return false;
+        }
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to infer type from value string
+                bool isNumber = true;
+                float floatVal = 0.0f;
+                bool isBool = false;
+                
+                // Check if it's a number
+                try {
+                    size_t pos2;
+                    floatVal = std::stof(value, &pos2);
+                    if (pos2 == value.size()) {
+                        isNumber = true;
+                    }
+                } catch (...) {
+                    isNumber = false;
+                }
+                
+                // Check if it's a boolean
+                if (!isNumber) {
+                    if (value == "true" || value == "false") {
+                        isBool = true;
+                    }
+                }
+                
+                if (isBool) {
+                    set(key, value == "true", ConfigSource::File);
+                } else if (isNumber) {
+                    // Check if it's an integer or float
+                    try {
+                        size_t pos2;
+                        int intVal = std::stoi(value, &pos2);
+                        if (pos2 == value.size()) {
+                            set(key, intVal, ConfigSource::File);
+                        } else {
+                            set(key, floatVal, ConfigSource::File);
+                        }
+                    } catch (...) {
+                        // Keep as string if conversion fails
+                        set(key, value, ConfigSource::File);
+                    }
+                } else {
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        if (!pImpl->entries.empty()) {
+            NLM_LOG_INFO("Loaded configuration from simple file: " + filepath);
+            return true;
+        } else {
+            NLM_LOG_ERROR("Failed to parse configuration file: " + filepath);
+            return false;
+        }
+    }
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Simple key=value format for now, but properly serialize values
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = ";
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Properly serialize different value types
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
             }
-            
-            set(key, value, ConfigSource::File);
-        }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
+}
+
+// Configuration validation (new feature)
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Basic validation rules
+        if (entry.key.empty()) {
+            errors.push_back("Empty configuration key");
+            continue;
+        }
+        
+        // Check type-specific validation
+        std::visit([&errors, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                if (arg < -1000000 || arg > 1000000) {
+                    errors.push_back("Configuration value for key '" + entry.key + "' is out of range: " + std::to_string(arg));
+                }
+            } else if constexpr (std::is_same_v<T, double>) {
+                if (std::isnan(arg) || std::isinf(arg)) {
+                    errors.push_back("Configuration value for key '" + entry.key + "' is not a valid number");
+                } else if (arg < -1000000.0 || arg > 1000000.0) {
+                    errors.push_back("Configuration value for key '" + entry.key + "' is out of range: " + std::to_string(arg));
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                // No validation needed for booleans
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (arg.empty()) {
+                    errors.push_back("Configuration string value for key '" + entry.key + "' is empty");
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                if (arg.size() > 10000) {
+                    errors.push_back("Configuration vector for key '" + entry.key + "' is too large: " + std::to_string(arg.size()) + " elements");
+                }
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (arg[i] < -1000000 || arg[i] > 1000000) {
+                        errors.push_back("Configuration element " + std::to_string(i) + " for key '" + entry.key + "' is out of range: " + std::to_string(arg[i]));
+                        break;
+                    }
+                }
+            }
+        }, entry.value);
+    }
+    
+    return errors;
+}
+
+// Load from JSON string
+bool Config::loadFromJSON(const std::string& jsonStr) {
+    try {
+        auto json = nlohmann::json::parse(jsonStr);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Convert JSON to config entries
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            ConfigSource source = ConfigSource::Runtime;  // From JSON string
+            
+            // Try to determine value type and set accordingly
+            try {
+                // Try different types in order of likelihood
+                if (it->is_boolean()) {
+                    set(key, it->get<bool>(), source);
+                } else if (it->is_number_integer()) {
+                    set(key, it->get<int64_t>(), source);
+                } else if (it->is_number_float()) {
+                    set(key, it->get<double>(), source);
+                } else if (it->is_string()) {
+                    set(key, it->get<std::string>(), source);
+                } else if (it->is_array()) {
+                    // Check array element type
+                    auto arr = it->get<std::vector<nlohmann::json>>();
+                    if (!arr.empty() && arr[0].is_number_integer()) {
+                        std::vector<int> intVec;
+                        intVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            intVec.push_back(item.get<int>());
+                        }
+                        set(key, intVec, source);
+                    } else if (!arr.empty() && arr[0].is_number_float()) {
+                        std::vector<double> doubleVec;
+                        doubleVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            doubleVec.push_back(item.get<double>());
+                        }
+                        set(key, doubleVec, source);
+                    } else if (!arr.empty() && arr[0].is_string()) {
+                        std::vector<std::string> stringVec;
+                        stringVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            stringVec.push_back(item.get<std::string>());
+                        }
+                        set(key, stringVec, source);
+                    }
+                }
+            } catch (const std::exception& e) {
+                // If conversion fails, log and continue with string representation
+                NLM_LOG_ERROR("Failed to convert config value '" + key + "' from JSON: " + e.what());
+                set(key, it->dump(), source);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON string");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON configuration string: " + e.what());
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +362,159 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Simple key=value format for now, but properly serialize values
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize different value types
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
+}
+
+// Configuration validation (new feature)
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Basic validation rules
+        if (entry.key.empty()) {
+            errors.push_back("Empty configuration key");
+            continue;
+        }
+        
+        // Check type-specific validation
+        std::visit([&errors, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                if (arg < -1000000 || arg > 1000000) {
+                    errors.push_back("Configuration value for key '" + entry.key + "' is out of range: " + std::to_string(arg));
+                }
+            } else if constexpr (std::is_same_v<T, double>) {
+                if (std::isnan(arg) || std::isinf(arg)) {
+                    errors.push_back("Configuration value for key '" + entry.key + "' is not a valid number");
+                } else if (arg < -1000000.0 || arg > 1000000.0) {
+                    errors.push_back("Configuration value for key '" + entry.key + "' is out of range: " + std::to_string(arg));
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                // No validation needed for booleans
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (arg.empty()) {
+                    errors.push_back("Configuration string value for key '" + entry.key + "' is empty");
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                if (arg.size() > 10000) {
+                    errors.push_back("Configuration vector for key '" + entry.key + "' is too large: " + std::to_string(arg.size()) + " elements");
+                }
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (arg[i] < -1000000 || arg[i] > 1000000) {
+                        errors.push_back("Configuration element " + std::to_string(i) + " for key '" + entry.key + "' is out of range: " + std::to_string(arg[i]));
+                        break;
+                    }
+                }
+            }
+        }, entry.value);
+    }
+    
+    return errors;
+}
+
+// Load from JSON string
+bool Config::loadFromJSON(const std::string& jsonStr) {
+    try {
+        auto json = nlohmann::json::parse(jsonStr);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Convert JSON to config entries
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            ConfigSource source = ConfigSource::Runtime;  // From JSON string
+            
+            // Try to determine value type and set accordingly
+            try {
+                // Try different types in order of likelihood
+                if (it->is_boolean()) {
+                    set(key, it->get<bool>(), source);
+                } else if (it->is_number_integer()) {
+                    set(key, it->get<int64_t>(), source);
+                } else if (it->is_number_float()) {
+                    set(key, it->get<double>(), source);
+                } else if (it->is_string()) {
+                    set(key, it->get<std::string>(), source);
+                } else if (it->is_array()) {
+                    // Check array element type
+                    auto arr = it->get<std::vector<nlohmann::json>>();
+                    if (!arr.empty() && arr[0].is_number_integer()) {
+                        std::vector<int> intVec;
+                        intVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            intVec.push_back(item.get<int>());
+                        }
+                        set(key, intVec, source);
+                    } else if (!arr.empty() && arr[0].is_number_float()) {
+                        std::vector<double> doubleVec;
+                        doubleVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            doubleVec.push_back(item.get<double>());
+                        }
+                        set(key, doubleVec, source);
+                    } else if (!arr.empty() && arr[0].is_string()) {
+                        std::vector<std::string> stringVec;
+                        stringVec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            stringVec.push_back(item.get<std::string>());
+                        }
+                        set(key, stringVec, source);
+                    }
+                }
+            } catch (const std::exception& e) {
+                // If conversion fails, log and continue with string representation
+                NLM_LOG_ERROR("Failed to convert config value '" + key + "' from JSON: " + e.what());
+                set(key, it->dump(), source);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON string");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON configuration string: " + e.what());
+        return false;
+    }
 }
 
 template<typename T>

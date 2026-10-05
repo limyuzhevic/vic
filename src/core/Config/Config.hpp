@@ -11,6 +11,9 @@ namespace nlm {
 // Forward declarations
 class Config;
 
+// JSON parsing support
+#include <nlohmann/json.hpp>
+
 // Configuration value types
 using ConfigValue = std::variant<
     int,
@@ -55,13 +58,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, fallback to simple key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (proper format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -92,6 +95,12 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation (new feature)
+    std::vector<std::string> validate() const;
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
     
 private:
     struct Impl;
