@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (supports JSON and simple formats)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -96,6 +96,18 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Internal file format loaders
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Save to file format implementations
+    bool saveToJSONFile(const std::string& filepath) const;
+    bool saveToSimpleFile(const std::string& filepath) const;
+    
+    // String escaping for JSON output
+    static std::string escapeString(const std::string& str);
     
     // Internal helpers
     static std::string trim(const std::string& str);
