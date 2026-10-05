@@ -7,8 +7,6 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
-
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
@@ -21,7 +19,6 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +29,6 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,42 +44,85 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Memory consolidation effects
+    void enhanceMemoryConsolidation(Brain* brain, TimestepDuration dt);
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Acetylcholine: Attention and memory consolidation system
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention modulation
+    void enhanceAttention(Brain* brain, TimestepDuration dt);
+    void regulateAttention(Brain* brain, TimestepDuration dt);
+    
+    // Memory effects
+    void enhanceMemoryEncoding(Brain* brain, TimestepDuration dt);
+    void enhanceMemoryRetrieval(Brain* brain, TimestepDuration dt);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Norepinephrine: Arousal and vigilance system
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal modulation
+    void modulateArousal(Brain* brain, TimestepDuration dt);
+    void enhanceSensoryProcessing(Brain* brain, TimestepDuration dt);
+    
+    // Learning effects
+    void enhanceNoveltyEncoding(Brain* brain, TimestepDuration dt);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Serotonin: Mood, impulsivity, and social behavior system
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Behavioral regulation
+    void regulateImpulsivity(Brain* brain, TimestepDuration dt);
+    void modulateMood(Brain* brain, TimestepDuration dt);
+    
+    // Learning effects
+    void enhancePatternCompletion(Brain* brain, TimestepDuration dt);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

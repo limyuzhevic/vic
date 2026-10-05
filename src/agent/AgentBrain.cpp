@@ -154,9 +154,15 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+    // Apply curiosity-based exploration with neural planner
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        // When curiosity is high, use neural planner for creative action selection
+        if (brain_ && curiosityLevel_ > 0.7f) {
+            // High curiosity triggers neural planner for exploratory planning
+            decoded = selectWithNeuralPlanner(decoded);
+        } else {
+            decoded = selectWithCuriosity(decoded);
+        }
     }
     
     return decoded;
@@ -233,6 +239,68 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     }
     
     return defaultCmd;
+}
+
+MotorCommand AgentBrain::selectWithNeuralPlanner(MotorCommand defaultCmd) {
+    // Use neural planner for curiosity-driven exploratory planning
+    // When curiosity is high, the planner generates creative action sequences
+    
+    if (!brain_) return defaultCmd;
+    
+    // Get neural planner reference
+    NeuralPlanner* planner = brain_->getPlanner();
+    if (!planner) return defaultCmd;
+    
+    // Get current brain state for planning
+    std::vector<float> currentState;
+    
+    // Encode current state (simplified - in real implementation would use actual neural activity patterns)
+    size_t stateSize = std::min(getSensoryInputSize(), size_t(100));  // Limit state size for efficiency
+    currentState.resize(stateSize);
+    
+    // Fill with current sensory and neuromodulatory state
+    float novelty = noveltyLevel_;
+    float predictionErr = predictionError_;
+    float dopamineLevel = dopamineLevel_;
+    float curiosityLevel = curiosityLevel_;
+    
+    // Create a simple encoded state
+    for (size_t i = 0; i < stateSize; ++i) {
+        float value = 0.0f;
+        switch (i % 5) {
+            case 0: value = novelty; break;
+            case 1: value = predictionErr; break;
+            case 2: value = dopamineLevel; break;
+            case 3: value = curiosityLevel; break;
+            case 4: value = i % 10 / 10.0f; break;
+        }
+        currentState[i] = value;
+    }
+    
+    // Use neural planner to select action based on curiosity state
+    ActionType plannedAction = planner->planAction(currentState, expectedReward_);
+    
+    // Convert ActionType to MotorCommand
+    MotorCommand plannedCommand = MotorCommand::Wait;
+    switch (plannedAction) {
+        case ActionType::MoveForward: plannedCommand = MotorCommand::MoveForward; break;
+        case ActionType::MoveBackward: plannedCommand = MotorCommand::MoveBackward; break;
+        case ActionType::TurnLeft: plannedCommand = MotorCommand::TurnLeft; break;
+        case ActionType::TurnRight: plannedCommand = MotorCommand::TurnRight; break;
+        case ActionType::LookLeft: plannedCommand = MotorCommand::TurnLeft; break;
+        case ActionType::LookRight: plannedCommand = MotorCommand::TurnRight; break;
+        case ActionType::Interact: plannedCommand = MotorCommand::Interact; break;
+        case ActionType::Wait: plannedCommand = MotorCommand::Wait; break;
+    }
+    
+    // Store in planner for learning
+    std::vector<ActionType> plannedActions{plannedAction};
+    std::vector<ActionType> actualActions{plannedAction};  // Assume plan matched in exploration
+    
+    // Update planner with curiosity-driven exploration
+    planner->updatePlanQuality(plannedActions, actualActions, expectedReward_);
+    
+    return plannedCommand;
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

@@ -76,7 +76,13 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Neural planning for curiosity-driven exploration
+    MotorCommand selectWithNeuralPlanner(MotorCommand defaultCmd);
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Neural planner for curiosity-driven action selection
+    NeuralPlanner* neuralPlanner_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
