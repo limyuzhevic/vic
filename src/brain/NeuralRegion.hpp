@@ -79,9 +79,16 @@ public:
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
     
+    // Comparison operators for testing and debugging
+    bool operator==(const NeuralRegion& other) const;
+    bool operator!=(const NeuralRegion& other) const;
+    
+    // Hash for use in unordered containers
+    size_t hash() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

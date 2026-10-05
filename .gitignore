@@ -1,0 +1,32 @@
+# Build directories
+build/
+cleanup/
+*.pyc
+__pycache__/
+.DS_Store
+node_modules/
+.vscode/
+.idea/
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.log
+*.o
+*.obj
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+*~
+
+# Python files (for this project)
+*.pyc
+__pycache__/
+.pytest_cache/

@@ -1,5 +1,6 @@
 #include "SimulationClock.hpp"
 #include <chrono>
+#include <numeric>
 
 namespace nlm {
 
@@ -14,19 +15,17 @@ struct SimulationClock::Impl {
         : step(0), time(0.0), timestep(dt), realStartSet(false) {}
 };
 
-SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
+SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(std::make_unique<Impl>(timestep)) {
+}
 
 SimulationClock::~SimulationClock() = default;
 
-SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -98,13 +97,32 @@ double SimulationClock::getRealTimeElapsed() const {
         return 0.0;
     }
     auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(now - pImpl->realStart);
-    return duration.count();
+    auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - pImpl->realStart);
+    return elapsed.count();
 }
 
 void SimulationClock::setRealTimeStart() {
     pImpl->realStart = std::chrono::steady_clock::now();
     pImpl->realStartSet = true;
+}
+
+bool SimulationClock::operator==(const SimulationClock& other) const {
+    return pImpl->step == other.pImpl->step && 
+           pImpl->time == other.pImpl->time && 
+           pImpl->timestep == other.pImpl->timestep &&
+           pImpl->realStartSet == other.pImpl->realStartSet;
+}
+
+bool SimulationClock::operator!=(const SimulationClock& other) const {
+    return !(*this == other);
+}
+
+size_t SimulationClock::hash() const {
+    auto seed = std::hash<SimulationStep>{}(pImpl->step);
+    seed ^= std::hash<Timestamp>{}(pImpl->time) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<TimestepDuration>{}(pImpl->timestep) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<bool>{}(pImpl->realStartSet) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    return seed;
 }
 
 } // namespace nlm

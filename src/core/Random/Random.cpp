@@ -1,5 +1,7 @@
 #include "Random.hpp"
 #include <stdexcept>
+#include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -10,21 +12,20 @@ struct RandomGenerator::Impl {
     Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
 };
 
-RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
+RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(std::make_unique<Impl>(seed)) {
+}
 
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
+RandomGenerator::RandomGenerator() : pImpl(std::make_unique<Impl>(std::random_device{}())) {
+}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -109,26 +110,27 @@ uint32_t RandomGenerator::randomBit() {
     return uniformInt(0, 1);
 }
 
-uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
-    if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
-    }
-    return uniformInt(0, n - 1);
-}
-
-void RandomGenerator::fillBytes(void* data, size_t size) {
-    uint8_t* bytes = static_cast<uint8_t*>(data);
-    for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
-    }
-}
-
 std::mt19937_64& RandomGenerator::engine() {
     return pImpl->gen;
 }
 
 const std::mt19937_64& RandomGenerator::engine() const {
     return pImpl->gen;
+}
+
+bool RandomGenerator::operator==(const RandomGenerator& other) const {
+    // Note: This comparison is based on the current state of the generator,
+    // not the seed. Two generators with the same seed may have different
+    // states if they've been advanced differently.
+    return pImpl->currentSeed == other.pImpl->currentSeed;
+}
+
+bool RandomGenerator::operator!=(const RandomGenerator& other) const {
+    return !(*this == other);
+}
+
+size_t RandomGenerator::hash() const {
+    return std::hash<uint64_t>{}(pImpl->currentSeed);
 }
 
 } // namespace nlm

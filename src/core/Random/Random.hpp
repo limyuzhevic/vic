@@ -86,9 +86,16 @@ public:
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }
     
+    // Comparison operators for testing and debugging
+    bool operator==(const RandomGenerator& other) const;
+    bool operator!=(const RandomGenerator& other) const;
+    
+    // Hash for use in unordered containers
+    size_t hash() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations

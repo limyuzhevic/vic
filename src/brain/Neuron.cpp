@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -25,33 +26,52 @@ struct Neuron::Impl {
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
+    
+    Impl(NeuronId neuronId, NeuronType neuronType)
+        : id(neuronId), type(neuronType), regionId(), populationId(),
+          totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->type = NeuronType::Internal;
-    pImpl->regionId = INVALID_REGION_ID;
-    pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>(id)) {
+}
+
+Neuron::Neuron(NeuronId id, NeuronType type) : pImpl(std::make_unique<Impl>(id, type)) {
 }
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
 
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
@@ -62,12 +82,28 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
 }
 
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
 void Neuron::setThreshold(MembranePotential threshold) {
     pImpl->state.threshold = threshold;
 }
 
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
 void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
+}
+
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryPeriod = steps;
 }
 
 void Neuron::decrementRefractory() {
@@ -77,6 +113,10 @@ void Neuron::decrementRefractory() {
             pImpl->state.firingState = FiringState::Resting;
         }
     }
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
@@ -89,10 +129,6 @@ void Neuron::setLeakConductance(MembranePotential conductance) {
 
 MembranePotential Neuron::getLeakConductance() const {
     return pImpl->state.leakConductance;
-}
-
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -143,6 +179,10 @@ void Neuron::injectCurrent(MembranePotential current) {
     pImpl->synapticInput += current;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
@@ -152,6 +192,10 @@ void Neuron::recordSpike(Timestamp timestamp) {
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
 }
 
 void Neuron::clearSpikeHistory() {
@@ -166,8 +210,16 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
@@ -184,8 +236,28 @@ void Neuron::setRegionId(RegionId region) {
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+bool Neuron::operator==(const Neuron& other) const {
+    return pImpl->id == other.pImpl->id;
+}
+
+bool Neuron::operator!=(const Neuron& other) const {
+    return !(*this == other);
+}
+
+size_t Neuron::hash() const {
+    return std::hash<NeuronId>{}(pImpl->id);
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {

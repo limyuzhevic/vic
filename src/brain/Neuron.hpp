@@ -47,6 +47,9 @@ public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
+    // Create neuron with ID and initial type
+    Neuron(NeuronId id, NeuronType type);
+    
     ~Neuron();
     
     // Disable copying, enable moving
@@ -143,9 +146,16 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Comparison operators for testing and debugging
+    bool operator==(const Neuron& other) const;
+    bool operator!=(const Neuron& other) const;
+    
+    // Hash for use in unordered containers
+    size_t hash() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

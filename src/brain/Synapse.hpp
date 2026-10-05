@@ -70,6 +70,12 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    float getShortTermFacilitation() const;
+    float getLastPreSpikeTime() const;
+    float getLastPostSpikeTime() const;
+    
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
@@ -80,9 +86,16 @@ public:
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
+    // Comparison operators for testing and debugging
+    bool operator==(const Synapse& other) const;
+    bool operator!=(const Synapse& other) const;
+    
+    // Hash for use in unordered containers
+    size_t hash() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

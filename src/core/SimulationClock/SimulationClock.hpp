@@ -54,9 +54,16 @@ public:
     double getRealTimeElapsed() const;
     void setRealTimeStart();
     
+    // Comparison operators for testing and debugging
+    bool operator==(const SimulationClock& other) const;
+    bool operator!=(const SimulationClock& other) const;
+    
+    // Hash for use in unordered containers
+    size_t hash() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
