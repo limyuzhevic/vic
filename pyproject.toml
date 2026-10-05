@@ -12,7 +12,7 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "configuration", "advanced"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -33,6 +33,7 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "pyyaml>=6.0",
 ]
 
 [project.urls]
@@ -55,3 +56,7 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[project.scripts]
+config_builder = "python.examples.config_builder:main"
+advanced_config_demo = "python.examples.advanced_config_demo:main"
