@@ -125,7 +125,19 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 2 demo executable (legacy compatibility)
+add_executable(nlm_phase2_demo
+    src/experiments/Phase2Demo.cpp
+)
+target_link_libraries(nlm_phase2_demo PUBLIC nlm_core)
+
+# Phase 6 demo executable (recommended)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
