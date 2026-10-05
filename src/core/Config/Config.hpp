@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 
 namespace nlm {
 
@@ -55,7 +58,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -87,11 +90,25 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
+    // Clear all (keeps defaults)
     void clear();
     
-    // Get configuration summary
+    // Get configuration summary with enhanced information
     std::string summary() const;
+    
+    // Check file existence and format
+    static bool fileExists(const std::string& filepath);
+    static std::string getFileFormat(const std::string& filepath);
+    static std::string generateTimestampedFilename(const std::string& basePath);
+    
+    // Time utilities
+    static std::string getCurrentTimeString();
+    
+    // Configuration statistics
+    size_t getEntryCount(ConfigSource source = ConfigSource::Default) const;
+    std::string getLastLoadedFile() const;
+    bool getAutoBackupEnabled() const;
+    void setAutoBackupEnabled(bool enabled);
     
 private:
     struct Impl;
