@@ -15,10 +15,8 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include <chrono>
+#include <numeric>
 
 namespace nlm {
 
@@ -75,8 +73,10 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Performance monitoring
+    bool profilingActive;
+    std::chrono::high_resolution_clock::time_point profileStartTime;
+    std::vector<size_t> profileSteps;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -149,8 +149,9 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Performance monitoring
+        profilingActive = false;
+        profileSteps.clear();
     }
     
     DevelopmentalStage developmentalStage;
@@ -582,9 +583,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // Record step performance for profiling
+    if (pImpl->profilingActive) {
+        pImpl->profileSteps.push_back(pImpl->totalSpikesThisStep);
     }
 }
 

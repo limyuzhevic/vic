@@ -122,25 +122,42 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        NLM_LOG_WARN("Excitatory input amplitude out of range: " + std::to_string(amplitude));
+    }
     pImpl->synapticInput += amplitude;
+    pImpl->synapticInput = std::clamp(pImpl->synapticInput, -100.0f, 100.0f);
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        NLM_LOG_WARN("Inhibitory input amplitude out of range: " + std::to_string(amplitude));
+    }
     pImpl->synapticInput -= amplitude;
+    pImpl->synapticInput = std::clamp(pImpl->synapticInput, -100.0f, 100.0f);
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
+    if (std::abs(amplitude) > 10.0f) {
+        NLM_LOG_WARN("Modulatory input amplitude out of range: " + std::to_string(amplitude));
+    }
     pImpl->state.adaptationVariable += amplitude * 0.1f;
+    pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, -10.0f, 10.0f);
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
+    if (std::isnan(current) || current < -100.0f || current > 100.0f) {
+        NLM_LOG_WARN("Invalid current injection: " + std::to_string(current));
+        return;
+    }
     pImpl->synapticInput += current;
+    pImpl->synapticInput = std::clamp(pImpl->synapticInput, -100.0f, 100.0f);
 }
 
 void Neuron::clearTotalCurrent() {
@@ -191,6 +208,16 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate input parameters
+    if (std::isnan(currentTime) || currentTime < 0.0f) {
+        NLM_LOG_ERROR("Invalid current time: " + std::to_string(currentTime));
+        return false;
+    }
+    if (dt <= 0.0f || dt > 0.1f) {
+        NLM_LOG_ERROR("Invalid timestep duration: " + std::to_string(dt));
+        return false;
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -231,6 +258,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
+    // Validate membrane potential after clamping
+    if (std::isnan(V) || std::isinf(V)) {
+        NLM_LOG_ERROR("Invalid membrane potential after integration: " + std::to_string(V));
+        V = V_rest;  // Reset to resting potential
+    }
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -249,6 +282,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        
+        // Validate adaptation variable
+        if (std::isnan(pImpl->state.adaptationVariable)) {
+            pImpl->state.adaptationVariable = 0.0f;
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -269,6 +307,13 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Validate that reset worked correctly
+    if (std::isnan(pImpl->state.membranePotential) || 
+        std::isinf(pImpl->state.membranePotential)) {
+        NLM_LOG_ERROR("Reset failed - invalid membrane potential");
+        pImpl->state.membranePotential = pImpl->state.restingPotential;
+    }
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -297,6 +342,14 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Validate initialization results
+    if (std::isnan(pImpl->state.membranePotential) ||
+        std::isinf(pImpl->state.membranePotential)) {
+        NLM_LOG_ERROR("Random initialization failed - invalid membrane potential");
+        // Reset to sane defaults
+        pImpl->state.membranePotential = pImpl->state.restingPotential;
+    }
 }
 
 } // namespace nlm
