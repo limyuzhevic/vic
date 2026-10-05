@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -100,6 +103,39 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    static bool isJSONFormat(const std::string& extension);
+    static bool isYAMLFormat(const std::string& extension);
+    static bool isLegacyFormat(const std::string& extension);
+    
+    // JSON/YAML parsing helpers
+    static bool loadFromJSON(const std::string& filepath);
+    static bool loadFromYAML(const std::string& filepath);
+    static bool loadFromLegacy(const std::string& filepath);
+    
+    // JSON/YAML to ConfigValue conversion
+    static ConfigValue jsonToConfigValue(const nlohmann::json& j, const std::string& key);
+    static ConfigValue yamlToConfigValue(const YAML::Node& node, const std::string& key);
+    static nlohmann::json configValueToJSON(const ConfigValue& value);
+    static YAML::Node configValueToYAML(const ConfigValue& value);
+    
+    // Type checking and conversion
+    template<typename T>
+    static bool valueMatchesType(const ConfigValue& value);
+    static bool tryConvertToType(const ConfigValue& from, ConfigValue& to);
+    
+    // Error handling
+    static bool handleParseError(const std::string& error);
+    
+    // Configuration parsing
+    static void parseNestedConfig(const nlohmann::json& j, const std::string& prefix = "");
+    static void parseNestedConfig(const YAML::Node& node, const std::string& prefix = "");
+    
+    // Configuration saving
+    static nlohmann::json configValueToJSON(const ConfigValue& value, const std::string& key);
+    static YAML::Node configValueToYAML(const ConfigValue& value, const std::string& key);
 };
 
 } // namespace nlm

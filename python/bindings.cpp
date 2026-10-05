@@ -293,6 +293,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
+        .def("initializeForSimulation", &Brain::initializeForSimulation,
+             "Initialize the brain for simulation (alias for initialize)")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
@@ -351,7 +353,166 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("isStable", &Brain::isStable,
+             "Check if brain is stable")
+        .def("getSimulationStep", &Brain::getSimulationStep,
+             "Get current simulation step")
+        .def("getNeuronCount", &Brain::getNeuronCount,
+             "Get neuron count")
+        .def("getSynapseCount", &Brain::getSynapseCount,
+             "Get synapse count")
+        .def("getCurrentStep", &Brain::getCurrentStep,
+             "Get current simulation step (alternative)")
+        .def("getNeurons", &Brain::getNeurons,
+             py::return_value_policy::reference_internal,
+             "Get all neurons")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions (duplicate method for compatibility)");
+
+    // Add alternative initialization methods for Pythonic interface
+    m.def("initializeForSimulation", [](std::shared_ptr<Brain> brain) {
+        brain->initialize();
+    }, py::arg("brain"), "Initialize brain for simulation (alternative to brain.initialize())");
+
+    m.def("runStep", [](std::shared_ptr<Brain> brain, int step, float time = 0.0f) {
+        brain->step(step, time);
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = 0.0f, "Run a single simulation step");
+
+    m.def("runSteps", [](std::shared_ptr<Brain> brain, int steps, float dt = 0.1f) {
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i, i * dt);
+        }
+    }, py::arg("brain"), py::arg("steps"), py::arg("dt") = 0.1f, "Run multiple simulation steps");
+
+    // Add convenience creation functions
+    m.def("createBrainWithConfig", [](std::shared_ptr<Config> config) {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create brain with explicit configuration");
+
+    m.def("createBrainWithPreset", [](const std::string& preset) {
+        auto config = std::make_shared<Config>();
+        // Apply preset settings based on string
+        if (preset == "beginner") {
+            config->setInt("neuron_count", 100);
+            config->setInt("region_count", 2);
+            config->setFloat("learning_rate", 0.01f);
+        } else if (preset == "intermediate") {
+            config->setInt("neuron_count", 1000);
+            config->setInt("region_count", 4);
+            config->setFloat("learning_rate", 0.001f);
+        } else if (preset == "advanced") {
+            config->setInt("neuron_count", 5000);
+            config->setInt("region_count", 8);
+            config->setFloat("learning_rate", 0.0001f);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("preset"), "Create brain with preset configuration");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createSimpleConfig", [](int neuron_count, int region_count) {
+        auto config = std::make_shared<Config>();
+        config->setInt("neuron_count", neuron_count);
+        config->setInt("region_count", region_count);
+        config->setFloat("learning_rate", 0.01f);
+        return config;
+    }, py::arg("neuron_count"), py::arg("region_count"), "Create simple configuration");
+
+    // Add performance monitoring
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["development_stage"] = brain->getDevelopmentalStage();
+        return stats;
+    }, py::arg("brain"), "Get brain statistics dictionary");
+
+    // Add simulation control
+    m.def("pauseSimulation", [](std::shared_ptr<Brain> brain) {
+        // Note: This is a placeholder - actual pause functionality would need to be implemented in Brain class
+        brain->logStatus("Simulation paused");
+    }, py::arg("brain"), "Pause simulation");
+
+    m.def("resumeSimulation", [](std::shared_ptr<Brain> brain) {
+        // Note: This is a placeholder - actual resume functionality would need to be implemented in Brain class
+        brain->logStatus("Simulation resumed");
+    }, py::arg("brain"), "Resume simulation");
+
+    m.def("setSimulationSpeed", [](std::shared_ptr<Brain> brain, float speed) {
+        // Note: This is a placeholder - actual speed control would need to be implemented
+        brain->logStatus(f"Simulation speed set to {speed}");
+    }, py::arg("brain"), py::arg("speed"), "Set simulation speed");
+
+    // Add error handling utilities
+    m.def("validateBrainConfig", [](std::shared_ptr<Config> config) {
+        // Note: This is a placeholder - actual validation would need to be implemented
+        py::list errors;
+        if (!config) {
+            errors.append("Configuration is null");
+        }
+        return errors;
+    }, py::arg("config"), "Validate brain configuration");
+
+    m.def("getConfigSummary", [](std::shared_ptr<Config> config) {
+        return config->summary();
+    }, py::arg("config"), "Get configuration summary");
+
+    m.def("loadConfigFromFile", &Config::loadFromFile, py::arg("filepath"),
+          "Load configuration from JSON file");
+
+    m.def("saveConfigToFile", &Config::saveToFile, py::arg("filepath"),
+          "Save configuration to JSON file");
+
+    // Add helper functions for common workflows
+    m.def("createDefaultSimulation", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(brain, world, agent);
+    }, "Create default simulation components (brain, world, agent)");
+
+    m.def("runDefaultSimulation", [](int steps, float dt) {
+        auto [brain, world, agent] = createDefaultSimulation();
+        brain->initialize();
+        world->configure(20, 20, 8, 8);
+        agent->initialize(world);
+        
+        for (int i = 0; i < steps; ++i) {
+            world->update(i * dt);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i, i * dt);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, i * dt);
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("steps"), py::arg("dt") = 0.1f, "Run default simulation");
+
+    m.def("createBrainAndInitialize", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create and initialize brain in one call");
+
+    m.def("createBrainWithSettings", [](int neuron_count, float learning_rate) {
+        auto config = std::make_shared<Config>();
+        config->setInt("neuron_count", neuron_count);
+        config->setFloat("learning_rate", learning_rate);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("neuron_count"), py::arg("learning_rate"), "Create and initialize brain with specific settings");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

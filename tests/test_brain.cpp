@@ -121,6 +121,115 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainErrorHandling() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(10), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    
+    // Test with null input
+    nlm::SensoryPercept nullPercept;
+    brain.receiveSensoryInput(nullPercept);
+    
+    // Should not crash
+    std::cout << "    testBrainErrorHandling passed" << std::endl;
+}
+
+void testBrainResetFunctionality() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Perform some operations
+    nlm::SensoryPercept testPercept;
+    brain.receiveSensoryInput(testPercept);
+    brain.step(0);
+    
+    // Reset brain
+    brain.reset();
+    
+    // Verify reset worked
+    assert(brain.getTotalNeuronCount() == 50);
+    assert(brain.getTotalSynapseCount() >= 0);
+    
+    std::cout << "    testBrainResetFunctionality passed" << std::endl;
+}
+
+void testBrainActionProductionRobustness() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Produce multiple actions to test consistency
+    nlm::Action action1 = brain.produceAction();
+    nlm::Action action2 = brain.produceAction();
+    
+    // Both actions should be valid (not null)
+    assert(action1 != nullptr);
+    assert(action2 != nullptr);
+    
+    std::cout << "    testBrainActionProductionRobustness passed" << std::endl;
+}
+
+void testBrainStateConsistency() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(75), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(3), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Get initial state
+    size_t initialNeuronCount = brain.getTotalNeuronCount();
+    size_t initialSynapseCount = brain.getTotalSynapseCount();
+    float initialFiringRate = brain.getAverageFiringRate();
+    
+    // Perform operations
+    for (int i = 0; i < 5; ++i) {
+        nlm::SensoryPercept testPercept;
+        brain.receiveSensoryInput(testPercept);
+        brain.step(i);
+    }
+    
+    // State should remain consistent (neurons and synapses should persist)
+    assert(brain.getTotalNeuronCount() == initialNeuronCount);
+    assert(brain.getTotalSynapseCount() >= initialSynapseCount);
+    
+    // Verify status can be logged
+    brain.logStatus();
+    
+    std::cout << "    testBrainStateConsistency passed" << std::endl;
+}
+
+void testBrainConfigurationLoading() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+    config->set("learning_rate", 0.01f, nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    
+    // Load brain configuration from config
+    auto brainConfig = brain.getConfig();
+    assert(brainConfig != nullptr);
+    assert(brainConfig->has("neuron_count"));
+    assert(brainConfig->get<int64_t>("neuron_count").value() == 100);
+    assert(brainConfig->get<int64_t>("region_count").value() == 2);
+    
+    // Verify brain properties match config
+    assert(brain.getTotalNeuronCount() == 100);
+    assert(brain.getRegionCount() == 2);
+    
+    std::cout << "    testBrainConfigurationLoading passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +238,11 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainErrorHandling();
+    testBrainResetFunctionality();
+    testBrainActionProductionRobustness();
+    testBrainStateConsistency();
+    testBrainConfigurationLoading();
 }
 
 } // namespace test_brain

@@ -33,6 +33,10 @@ namespace test_stdp {
     void runAll();
 }
 
+namespace test_agentbrain {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
@@ -104,6 +108,15 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running AgentBrain tests..." << std::endl;
+    try {
+        test_agentbrain::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
