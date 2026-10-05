@@ -121,11 +121,32 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Brain manager (enhanced main functionality)
+add_library(nlm_brainmanager STATIC
+    src/brainmanager/BrainManager.cpp
+)
+target_include_directories(nlm_brainmanager PUBLIC src)
+target_link_libraries(nlm_brainmanager PUBLIC nlm_core)
+
+# Configuration manager (enhanced configuration)
+add_library(nlm_configmanager STATIC
+    src/configmanager/ConfigManager.cpp
+)
+target_include_directories(nlm_configmanager PUBLIC src)
+target_link_libraries(nlm_configmanager PUBLIC nlm_core)
+
+# Advanced features (expert tools and analysis)
+add_library(nlm_advanced STATIC
+    src/advanced/AdvancedFeatures.cpp
+)
+target_include_directories(nlm_advanced PUBLIC src)
+target_link_libraries(nlm_advanced PUBLIC nlm_core)
+
+# Main executable (enhanced with CLI and advanced features)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_brainmanager nlm_configmanager nlm_advanced)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
