@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# JSON library for config
+find_package(nlohmann_json REQUIRED)
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -54,6 +57,10 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Dopamine.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -89,6 +96,7 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Config>
     $<INSTALL_INTERFACE:include>
 )
 

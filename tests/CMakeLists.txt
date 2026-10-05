@@ -8,6 +8,7 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_json.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
@@ -15,6 +16,9 @@ add_executable(nlm_test
     test_stdp.cpp
     test_brain.cpp
 )
+
+target_link_libraries(nlm_test PRIVATE nlm_core)
+target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
