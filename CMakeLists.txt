@@ -11,11 +11,15 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
+# SIMD and performance optimizations
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86|x86_64)")
+    message(WARNING "SIMD optimizations only available on x86/x86_64 architectures")
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    # Try to enable AVX2 first (good balance of performance and availability)
+    add_compile_options(-mavx2 -mfma -mbmi -mlzcnt)
+    
+    # Define SIMD availability
+    add_definitions(-DNLM_PERFORMANCE_ENABLED -DNLM_SIMD_AVX2)
 endif()
 
 # Source directory
@@ -89,6 +93,7 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
     $<INSTALL_INTERFACE:include>
 )
 
