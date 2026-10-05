@@ -9,6 +9,7 @@ namespace nlm {
 // Forward declarations
 class Synapse;
 class RandomGenerator;
+class NeuronLIFIntegration;
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -146,6 +147,7 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    std::unique_ptr<NeuronLIFIntegration> lifIntegration;
 };
 
 } // namespace nlm

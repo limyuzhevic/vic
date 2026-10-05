@@ -31,10 +31,15 @@ add_library(nlm_core STATIC
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
+    src/brain/NeuronLIFIntegration.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainStepHandler.cpp
+    src/brain/BrainMemorySystem.cpp
+    src/brain/BrainPlasticitySystem.cpp
+    src/brain/BrainCognitionSystem.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -83,6 +88,9 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase2ConnectivityTest.cpp
+    src/experiments/Phase2LearningExperiment.cpp
+    src/experiments/Phase2StdpVerification.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
