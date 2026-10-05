@@ -2,66 +2,70 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <string>
+#include <format>
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
+// Template-based identifier system - eliminates code duplication
+// while maintaining type safety and Pythonic interfaces
 
-// Neuron identifier
-struct NeuronId {
-    uint64_t value;
+template<typename Derived, typename ValueType = uint64_t>
+class TypedId {
+public:
+    ValueType value;
+
+    // Constructors
+    constexpr TypedId() : value(0) {}
+    explicit constexpr TypedId(ValueType v) : value(v) {}
+
+    // Comparison operators
+    constexpr bool operator==(const TypedId& other) const = default;
+    constexpr bool operator!=(const TypedId& other) const = default;
+    constexpr bool operator<(const TypedId& other) const { return value < other.value; }
+    constexpr bool operator<=(const TypedId& other) const { return value <= other.value; }
+    constexpr bool operator>(const TypedId& other) const { return value > other.value; }
+    constexpr bool operator>=(const TypedId& other) const { return value >= other.value; }
+
+    // Type conversion
+    constexpr operator ValueType() const { return value; }
+
+    // Utility methods
+    constexpr ValueType index() const { return value; }
     
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+    // String representation for Python
+    std::string str() const {
+        return std::format("<{}: {}>", getTypeName(), value);
+    }
+
+    std::string repr() const {
+        return std::format("<{} object at {}>", getTypeName(), 
+                          static_cast<void*>(this));
+    }
+
+    // Type conversion helpers
+    static TypedId from_value(ValueType v) {
+        return TypedId(v);
+    }
+
+protected:
+    static std::string getTypeName() {
+        std::string name = typeid(Derived).name();
+        // Simple demangling for common types
+        if (name.find("class nlm::") == 0) {
+            name = name.substr(11);
+        } else if (name.find("struct nlm::") == 0) {
+            name = name.substr(13);
+        }
+        return name;
+    }
 };
 
-// Synapse identifier
-struct SynapseId {
-    uint64_t value;
-    
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Region identifier
-struct RegionId {
-    uint64_t value;
-    
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Population identifier
-struct PopulationId {
-    uint64_t value;
-    
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
+// Specific ID types using the template - eliminates duplication
+using NeuronId = TypedId<NeuronId, uint64_t>;
+using SynapseId = TypedId<SynapseId, uint64_t>;
+using RegionId = TypedId<RegionId, uint64_t>;
+using PopulationId = TypedId<PopulationId, uint64_t>;
 
 // Simulation step counter
 using SimulationStep = uint64_t;
@@ -183,10 +187,61 @@ enum class FiringState : uint8_t {
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
-// Invalid ID sentinel
+// Invalid ID sentinel - uses the new TypedId system
 constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+
+// Enhanced enum utilities for Python integration
+namespace enums {
+
+    // Enhanced string conversion utilities
+    template<typename T>
+    std::string enumToString(T value) {
+        static_assert(std::is_enum_v<T>, "T must be an enum type");
+        return std::format("{}({})", enumClassName<T>(), static_cast<uint8_t>(value));
+    }
+
+    template<typename T>
+    std::string enumClassName() {
+        std::string name = typeid(T).name();
+        if (name.find("enum nlm::") == 0) {
+            name = name.substr(10);
+        } else if (name.find("enum enums::") == 0) {
+            name = name.substr(15);
+        }
+        return name;
+    }
+
+    // String to enum conversion with error handling
+    template<typename T>
+    T stringToEnum(const std::string& name) {
+        static_assert(std::is_enum_v<T>, "T must be an enum type");
+        // Simple string-to-enum conversion for common values
+        if constexpr (std::is_same_v<T, NeuronType>) {
+            if (name == "Excitatory") return NeuronType::Excitatory;
+            if (name == "Inhibitory") return NeuronType::Inhibitory;
+            if (name == "Modulatory") return NeuronType::Modulatory;
+            if (name == "Sensory") return NeuronType::Sensory;
+            if (name == "Motor") return NeuronType::Motor;
+            if (name == "Internal") return NeuronType::Internal;
+        } else if constexpr (std::is_same_v<T, SynapseType>) {
+            if (name == "Excitatory") return SynapseType::Excitatory;
+            if (name == "Inhibitory") return SynapseType::Inhibitory;
+            if (name == "Modulatory") return SynapseType::Modulatory;
+            if (name == "Electrical") return SynapseType::Electrical;
+            if (name == "GapJunction") return SynapseType::GapJunction;
+        } else if constexpr (std::is_same_v<T, DevelopmentalStage>) {
+            if (name == "Initial") return DevelopmentalStage::Initial;
+            if (name == "CriticalPeriod") return DevelopmentalStage::CriticalPeriod;
+            if (name == "Maturation") return DevelopmentalStage::Maturation;
+            if (name == "Adult") return DevelopmentalStage::Adult;
+            if (name == "Aging") return DevelopmentalStage::Aging;
+        }
+        throw std::invalid_argument("Unknown enum value: " + name);
+    }
+
+} // namespace enums
 
 } // namespace nlm

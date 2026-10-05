@@ -87,7 +87,15 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Option to build improved bindings (default: use original)
+if(PYNLM_USE_IMPROVED_BINDINGS)
+    message(STATUS "Building NLM Python bindings with improved interface")
+    pybind11_add_module(pynlm bindings_improved.cpp)
+else()
+    message(STATUS "Building NLM Python bindings with original interface")
+    pybind11_add_module(pynlm bindings.cpp)
+endif()
+
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
