@@ -5,81 +5,113 @@
  * that all brain systems are properly connected.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "Phase6Demo.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
+#include <string>
 
-using namespace nlm;
+namespace nlm {
+
+static std::string getCurrentTimeString() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+} // namespace nlm
+
+void printUsage() {
+    std::cout << "Usage: ./nlm_phase6_demo [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Phase 6 Integration Demo - Advanced Command Line Interface" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --quick                 Run in quick mode (skip some tests for faster execution)" << std::endl;
+    std::cout << "  --neurons N             Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --steps N               Maximum simulation steps (default: 2000)" << std::endl;
+    std::cout << "  --checkpoint PATH       Checkpoint file path (default: ./nlm_checkpoint.bin)" << std::endl;
+    std::cout << "  --no-checkpointing      Disable checkpointing" << std::endl;
+    std::cout << "  --no-replay             Disable replay system" << std::endl;
+    std::cout << "  --no-development        Disable development system" << std::endl;
+    std::cout << "  --help                  Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm_phase6_demo                                    # Default run" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --quick                           # Quick test (faster)" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --neurons 1000 --steps 5000       # Larger simulation" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --checkpoint ./my_checkpoint.bin   # Custom checkpoint" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --no-checkpointing                # Run without checkpointing" << std::endl;
+}
+
+bool parseArguments(int argc, char* argv[], nlm::Phase6Config& config, bool& quickMode) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help") {
+            printUsage();
+            exit(0);
+        } else if (arg == "--quick") {
+            quickMode = true;
+        } else if (arg == "--no-checkpointing") {
+            config.enableCheckpointing = false;
+        } else if (arg == "--no-replay") {
+            config.enableReplay = false;
+        } else if (arg == "--no-development") {
+            config.enableDevelopment = false;
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            config.neuronCount = std::stoul(argv[++i]);
+        } else if (arg == "--steps" && i + 1 < argc) {
+            config.maxSteps = static_cast<uint64_t>(std::stoul(argv[++i]));
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            config.checkpointPath = argv[++i];
+        } else {
+            std::cerr << "Unknown option: " << arg << std::endl;
+            printUsage();
+            return false;
+        }
+    }
+    return true;
+}
 
 int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
+    std::cout << "=== NLM Phase 6 Integration Demo (Advanced CLI) ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
-    // Create experiment
-    Phase6IntegratedExperiment experiment;
+    // Create demo
+    nlm::Phase6Demo demo;
     
-    // First, run the quick integration verification
-    std::cout << "--- Integration Verification ---" << std::endl;
-    bool integrationOK = experiment.verifyIntegration();
+    // Phase 6 configuration
+    nlm::Phase6Config config;
+    bool quickMode = false;
     
-    std::cout << std::endl;
-    
-    if (!integrationOK) {
-        std::cerr << "ERROR: Integration verification failed!" << std::endl;
+    // Parse command line arguments
+    if (!parseArguments(argc, argv, config, quickMode)) {
         return 1;
     }
     
-    std::cout << "Integration verification passed!" << std::endl << std::endl;
+    if (quickMode) {
+        std::cout << "Quick mode enabled - skipping some tests for faster execution" << std::endl << std::endl;
+    }
     
-    // Test individual systems
-    std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    std::cout << "=== NLM Phase 6 Integration Demo (Advanced CLI) ===" << std::endl;
+    std::cout << "Run time: " << getCurrentTimeString() << "" << std::endl << std::endl;
+    std::cout << "Command line arguments:" << std::endl;
+    std::cout << "  Neurons: " << config.neuronCount << std::endl;
+    std::cout << "  Max steps: " << config.maxSteps << std::endl;
+    std::cout << "  Checkpointing: " << (config.enableCheckpointing ? "ENABLED" : "DISABLED") << std::endl;
+    std::cout << "  Replay: " << (config.enableReplay ? "ENABLED" : "DISABLED") << std::endl;
+    std::cout << "  Development: " << (config.enableDevelopment ? "ENABLED" : "DISABLED") << std::endl;
+    std::cout << "  Checkpoint path: " << config.checkpointPath << std::endl;
+    std::cout << "  Quick mode: " << (quickMode ? "ENABLED" : "DISABLED") << std::endl;
     std::cout << std::endl;
     
-    std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
-    std::cout << std::endl;
-    
-    std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
-    std::cout << std::endl;
-    
-    std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
-    std::cout << std::endl;
-    
-    // Run full experiment with smaller settings for demo
-    std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
-    
-    auto result = experiment.run(config);
-    
-    std::cout << std::endl;
-    std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
-    std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
-    std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
-    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
-    std::cout << std::endl;
-    
-    std::cout << "=== INTEGRATION STATUS ===" << std::endl;
-    std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
-    std::cout << std::endl;
-    
-    std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    // Run the complete Phase 6 integration demo
+    demo.run(config, quickMode);
     
     return 0;
 }
