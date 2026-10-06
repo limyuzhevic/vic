@@ -142,14 +142,14 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -163,6 +163,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Configuration validation function for Python
+    m.def("validateConfiguration", [](std::shared_ptr<Config> config) {
+        ValidationResult result = nlm::validateConfiguration(config);
+        py::dict resultDict;
+        resultDict["valid"] = result.valid;
+        resultDict["message"] = result.message;
+        
+        py::dict warningsDict;
+        for (const auto& warning : result.warnings) {
+            warningsDict[warning.first.c_str()] = warning.second;
+        }
+        resultDict["warnings"] = warningsDict;
+        
+        py::dict errorsDict;
+        for (const auto& error : result.errors) {
+            errorsDict[error.first.c_str()] = error.second;
+        }
+        resultDict["errors"] = errorsDict;
+        
+        return resultDict;
+    }, py::arg("config"), "Validate configuration and return result");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
