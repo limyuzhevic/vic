@@ -100,6 +100,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    template<typename T>
+    static std::string valueToString(const T& value);
+    template<typename T>
+    static std::string valueToString(const std::vector<T>& value);
 };
 
 } // namespace nlm
