@@ -66,6 +66,21 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### From Source (Recommended)
+
+```bash
+# Install build dependencies
+pip install scikit-build-core pybind11 pytest numpy
+
+# Build and install
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
+### Using CMake
+
 ```bash
 mkdir build
 cd build
@@ -76,25 +91,92 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
-./nlm_phase6_demo
+./nlm_test
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Test Suite
+
+The improved test suite provides:
+- **Basic Connectivity Test**: Verifies spike propagation through neural networks
+- **Plasticity Experiment**: Demonstrates learning through synaptic weight changes
+- **STDP Verification**: Tests spike timing dependent plasticity
+- **Integration Verification**: Checks that all integrated systems work together
+
+Run specific tests:
+```bash
+./nlm_test --test1        # Basic connectivity test
+./nlm_test --test2        # Plasticity experiment  
+./nlm_test --test3        # STDP verification
+./nlm_test --test4        # Integration verification
+./nlm_test               # Run all tests
+```
+
+## Python API Improvements
+
+The NLM Python API has been significantly enhanced with:
+
+### Enhanced Configuration
+```python
+import pynlm
+
+# Create brain with advanced configuration
+config = pynlm.createDefaultConfig()
+
+# NEW: Advanced configuration options
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.002)
+config.set("plasticity.hebbian.enable", True)
+config.set("neuromodulation.curiosity.enable", True)
+config.set("neuromodulation.novelty.enable", True)
+config.set("development.enable_development", True)
+config.set("brain.development_stage", pynlm.DevelopmentalStage.Maturation)
+```
+
+### Enhanced Learning Capabilities
+```python
+# Enable advanced learning subsystems
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableCuriosity(True)             # Explore new things
+```
+
+### Improved Error Handling
+```python
+# Better validation with descriptive error messages
+config.set("brain.neuron_count", 1000)  # Valid
+config.set("brain.neuron_count", -100)  # Invalid - caught/handled gracefully
+```
+
+### Performance Monitoring
+```python
+# Comprehensive monitoring tools
+brain.logStatus()  # Detailed brain system status
+print(f"E/I Ratio: {brain.getExcitationInhibitionRatio():.3f}")
+print(f"Firing Rate: {brain.getAverageFiringRate():.3f} Hz")
+print(f"Curiosity Level: {agent.getCuriosityLevel():.3f}")
+print(f"Novelty Level: {agent.getNoveltyLevel():.3f}")
+```
+
+### Checkpointing
+```python
+# Save and load brain state
+brain.save("my_brain.nlc")
+# Later...
+new_brain = pynlm.createBrain(config)
+new_brain.load("my_brain.nlc")
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
@@ -109,9 +191,25 @@ NLM/
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── visualization/ # Visualization
+├── python/             # Python bindings
+│   ├── bindings.cpp    # PyBind11 bindings
+│   └── CMakeLists.txt  # Python bindings build
+├── tests/             # Test framework
+│   ├── test_*.cpp     # Unit tests
+│   └── test_runner.cpp # New modular test runner
+├── docs/              # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── configs/           # Configuration files
+│   └── default.cfg
+├── demo_improved_api.py  # Python API demonstration
+├── easy_usage.md         # Easy usage guide
+├── HOW_TO_USE.md         # Comprehensive documentation
+└── pyproject.toml       # Modern Python packaging
 ```
 
 ## Phase Summary

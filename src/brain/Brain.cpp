@@ -192,24 +192,36 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0) {
+        NLM_LOG_ERROR("Config: neuron_count must be greater than region_count for proper distribution");
+        return false;
+    }
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            // Add populations with validation
+            size_t neuronsPerPop = neuronsPerRegion / 3;
+            if (neuronsPerPop == 0) neuronsPerPop = 1;  // Ensure at least 1 neuron per population
             
-            // Collect sensory and motor neurons for I/O
+            auto sensoryPopId = region->addPopulation(neuronsPerPop, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(neuronsPerPop, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(neuronsPerPop, NeuronType::Motor);
+            
+            // Collect sensory and motor neurons for I/O (improved memory management)
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
+                const auto& neurons = sensoryPop->getNeurons();
+                pImpl->sensoryNeurons.reserve(pImpl->sensoryNeurons.size() + neurons.size());
+                for (auto* neuron : neurons) {
                     pImpl->sensoryNeurons.push_back(neuron);
                 }
             }
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
+                const auto& neurons = motorPop->getNeurons();
+                pImpl->motorNeurons.reserve(pImpl->motorNeurons.size() + neurons.size());
+                for (auto* neuron : neurons) {
                     pImpl->motorNeurons.push_back(neuron);
                 }
             }
