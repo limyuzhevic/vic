@@ -24,8 +24,206 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides a Python interface to the NLM brain simulation system,
+        which implements a biologically-inspired spiking neural network with
+        learning, memory, and cognitive capabilities.
+        
+        Key Features:
+        * Real-time neural simulation with event-driven spike propagation
+        * Support for multiple plasticity rules (STDP, Hebbian, structural)
+        * Integrated memory systems (working, episodic, semantic, procedural)
+        * Neuromodulation with dopamine, curiosity, and novelty detection
+        * Cognitive functions including prediction, planning, and attention
+        * Developmental systems that modulate plasticity over time
+        * Sensorimotor integration with world interaction
+        * Comprehensive configuration and experiment management
+        
+        Usage Examples:
+        
+        Basic Brain Simulation:
+            import pynlm
+            
+            # Create and initialize brain
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            # Run simulation steps
+            for step in range(1000):
+                brain.step(step, step * 0.001)
+            
+            # Get statistics
+            print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+            print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        
+        Complete Agent in World Simulation:
+            import pynlm
+            
+            # Create brain, world, and agent
+            brain = pynlm.createBrain(pynlm.createDefaultConfig())
+            brain.initialize()
+            world = pynlm.createSimpleWorld()
+            agent = pynlm.createAgentBrain(brain)
+            agent.initialize(world)
+            
+            # Enable advanced features
+            agent.enableRewardModulation(True)
+            agent.enableDevelopment(True)
+            agent.enableCuriosity(True)
+            agent.enableStructuralPlasticity(True)
+            
+            # Run episode
+            for step in range(100):
+                # Observe world
+                percept = world.getSensoryPercept(agent.getBrain())
+                
+                # Process sensory input
+                agent.processSensoryInput(percept)
+                
+                # Step brain
+                brain.step(step, step * 0.001)
+                
+                # Get action and execute in world
+                cmd = agent.decodeMotorCommand()
+                world.applyMotorCommand(cmd, step * 0.001)
+            
+            # Get performance metrics
+            print(f"Total reward: {world.getTotalReward():.2f}")
+            print(f"Curiosity level: {agent.getCuriosityLevel():.2f}")
+            print(f"Novelty level: {agent.getNoveltyLevel():.2f}")
+        
+        Experiment Management:
+            import pynlm
+            
+            # Create configuration for experiment
+            config = pynlm.createDefaultConfig()
+            
+            # Set experiment parameters
+            config.set("neuron_count", 1000)
+            config.set("region_count", 2)
+            config.set("connection_probability", 0.1)
+            
+            # Run experiment
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            # Run test sequence
+            brain.step(0, 0.0)
+            brain.step(1, 0.001)
+            # ... more steps
+            
+            # Save results
+            brain.save("experiment_results.bin")
+        
+        Advanced Configuration:
+            import pynlm
+            
+            config = pynlm.createDefaultConfig()
+            
+            # Override configuration with command-line arguments
+            config.loadFromArgs(len(sys.argv), sys.argv)
+            
+            # Access and modify configuration values
+            print(f"Neuron count: {config.get('neuron_count')}")
+            print(f"Connection probability: {config.get('connection_probability')}")
+            
+            # Save custom configuration
+            config.saveToFile("my_config.cfg")
+        
+        Memory Management:
+            import pynlm
+            
+            brain = pynlm.createBrain(pynlm.createDefaultConfig())
+            brain.initialize()
+            
+            # Access memory systems
+            working_memory = brain.getWorkingMemory()
+            episodic_memory = brain.getEpisodicMemory()
+            semantic_memory = brain.getSemanticMemory()
+            
+            if working_memory:
+                print(f"Active working memory traces: {working_memory.getActiveTraces()}")
+            
+            if episodic_memory:
+                print(f"Episodic memory episodes: {episodic_memory.getEpisodeCount()}")
+            
+            if semantic_memory:
+                print(f"Semantic memory concepts: {semantic_memory.getConceptCount()}")
     )pbdoc";
+
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    py::register_exception<std::runtime_error>(m, "NLMError");
+    
+    // Define type aliases for Python convenience
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Create convenience functions for common use cases
+    m.def("createExperimentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1);
+        config->set("simulation_timestep", 0.001);
+        return config;
+    }, "Create a configuration optimized for general experiments");
+    
+    m.def("createSimpleConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a simple default configuration");
+    
+    m.def("createWorldConfig", [](size_t width, size_t height) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("environment_name", std::string("GridWorld"));
+        config->set("environment_width", static_cast<int64_t>(width));
+        config->set("environment_height", static_cast<int64_t>(height));
+        return config;
+    }, py::arg("width") = 16, py::arg("height") = 16,
+       "Create a configuration optimized for world simulation");
+    
+    m.def("runQuickTest", [](size_t steps = 100) -> bool {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.2);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            return false;
+        }
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(static_cast<SimulationStep>(step), step * 0.001);
+        }
+        
+        return true;
+    }, py::arg("steps") = 100,
+       "Run a quick test simulation with default parameters");
+    
+    m.def("getVersionInfo", []() {
+        py::dict info;
+        info["version"] = "0.1.0";
+        info["phase"] = "Phase 2";
+        info["description"] = "Real Neural Computation";
+        info["language"] = "C++20";
+        info["features"] = py::list({
+            "LIF neuron dynamics",
+            "Event-driven spike propagation",
+            "STDP plasticity",
+            "Hebbian plasticity",
+            "Structural plasticity",
+            "Memory systems",
+            "Neuromodulation",
+            "Cognitive functions",
+            "World interaction"
+        });
+        return info;
+    }, "Get version and feature information");
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 

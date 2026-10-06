@@ -25,8 +25,34 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <filesystem>
 
 using namespace nlm;
+
+void printVersion() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "C++20 with modern CMake" << std::endl;
+    std::cout << "Spiking Neural Network Simulator" << std::endl;
+}
+
+void listAvailableConfigs() {
+    std::cout << "Available configuration files:" << std::endl;
+    std::cout << "  configs/default.cfg - Default configuration" << std::endl;
+    
+    // Check for other config files
+    std::filesystem::path configsDir = "configs";
+    if (std::filesystem::exists(configsDir) && std::filesystem::is_directory(configsDir)) {
+        for (const auto& entry : std::filesystem::directory_iterator(configsDir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
+                std::string filename = entry.path().filename().string();
+                if (filename != "default.cfg") {
+                    std::cout << "  configs/" << filename << " - " << filename << std::endl;
+                }
+            }
+        }
+    }
+}
 
 void printBanner() {
     std::cout << R"(
@@ -322,13 +348,45 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help/version options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        } else if (arg == "--list-configs") {
+            listAvailableConfigs();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with enhanced log level support
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    // Parse verbose/quiet options for log level
+    LogLevel logLevel = LogLevel::Info;
+    bool verbose = false;
+    bool quiet = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--verbose" || arg == "-V") {
+            verbose = true;
+            logLevel = LogLevel::Debug;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+            logLevel = LogLevel::Error;
+        }
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -356,11 +414,29 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (warn if explicitly specified file not found)
+    bool fileProvided = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            fileProvided = true;
+            break;
+        }
+    }
+    
     if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        if (fileProvided && configFile == "configs/default.cfg") {
+            NLM_LOG_INFO("Loaded default configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        }
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        if (fileProvided) {
+            NLM_LOG_WARNING("Failed to load specified configuration file: " + configFile);
+            NLM_LOG_WARNING("Using default configuration.");
+        } else {
+            NLM_LOG_INFO("Using default configuration.");
+        }
     }
     
     // Override with command line args
@@ -409,20 +485,74 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Parse demo mode
+    std::string demoMode = "basic"; // default
+    size_t simulationSteps = 1000; // default
+    bool benchmarkMode = false;
+    std::string saveFile = "";
+    std::string loadFile = "";
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.substr(0, 12) == "--demo-mode=") {
+            demoMode = arg.substr(12);
+        } else if (arg.substr(0, 10) == "--steps=") {
+            simulationSteps = std::stoul(arg.substr(10));
+        } else if (arg == "--benchmark") {
+            benchmarkMode = true;
+        } else if (arg.substr(0, 7) == "--save=") {
+            saveFile = arg.substr(7);
+        } else if (arg.substr(0, 7) == "--load=") {
+            loadFile = arg.substr(7);
+        } else if (arg.substr(0, 18) == "--neuron-count=") {
+            config->set("neuron_count", static_cast<int64_t>(std::stoul(arg.substr(18))), ConfigSource::CommandLine);
+        } else if (arg.substr(0, 17) == "--region-count=") {
+            config->set("region_count", static_cast<int64_t>(std::stoul(arg.substr(17))), ConfigSource::CommandLine);
+        } else if (arg.substr(0, 23) == "--connection-prob=") {
+            config->set("connection_probability", std::stof(arg.substr(23)), ConfigSource::CommandLine);
+        } else if (arg.substr(0, 28) == "--simulation-timestep=") {
+            config->set("simulation_timestep", std::stod(arg.substr(28)), ConfigSource::CommandLine);
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Handle load/save functionality
+    if (!loadFile.empty()) {
+        NLM_LOG_INFO("Loading brain state from: " + loadFile);
+        if (!brain->load(loadFile)) {
+            NLM_LOG_ERROR("Failed to load brain state!");
+            return 1;
+        }
+        NLM_LOG_INFO("Brain state loaded successfully");
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run in the specified demo mode
+    if (demoMode == "basic") {
+        runDemoModeBasic(brain);
+    } else if (demoMode == "plasticity") {
+        runDemoModePlasticity(brain);
+    } else if (demoMode == "stdp") {
+        runDemoModeStdp(brain);
+    } else if (demoMode == "full") {
+        runDemoModeFull(brain);
+    } else {
+        NLM_LOG_WARNING("Unknown demo mode: " + demoMode + ". Running basic mode.");
+        runDemoModeBasic(brain);
+    }
+    
+    // Run benchmark mode if requested
+    if (benchmarkMode) {
+        runBenchmarkTests(brain, simulationSteps);
+    }
+    
+    // Save brain state if requested
+    if (!saveFile.empty()) {
+        NLM_LOG_INFO("Saving brain state to: " + saveFile);
+        if (brain->save(saveFile)) {
+            NLM_LOG_INFO("Brain state saved successfully");
+        } else {
+            NLM_LOG_ERROR("Failed to save brain state!");
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
