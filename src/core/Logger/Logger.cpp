@@ -1,197 +1,201 @@
+// Comprehensive Logging and Error Handling Implementation
+// Phase 6: Advanced Logging and Safety Improvements
+
 #include "Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <mutex>
+#include <stdexcept>
+#include <ctime>
+#include <algorithm>
+#include <filesystem>
 
 namespace nlm {
 
-struct ConsoleLogger::Impl {
-    LogLevel level = LogLevel::Info;
-    bool useColors = true;
-    std::ofstream fileOut;
-    std::mutex mutex;
-};
-
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
-
-ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
-    pImpl->level = level;
+namespace {
+    // Get current timestamp string
+    std::string getCurrentTimestamp() {
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()) % 1000;
+        
+        std::ostringstream oss;
+        oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+            << "." << std::setfill('0') << std::setw(3) << ms.count();
+        return oss.str();
+    }
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
-
-void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
-        return;
-    }
+// ConsoleLogSink implementation
+void ConsoleLogSink::write(const LogEntry& entry) {
+    if (entry.level < minLevel) return;
     
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    auto timePoint = entry.timestamp;
+    auto time = std::chrono::system_clock::to_time_t(timePoint);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        timePoint.time_since_epoch()) % 1000;
     
     std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
+    oss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+        << "." << std::setfill('0') << std::setw(3) << ms.count()
+        << "] [" << getLevelString(entry.level) << "]"
+        << " [" << getCategoryString(entry.category) << "]"
+        << " " << entry.message;
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
-    }
-}
-
-void ConsoleLogger::setLevel(LogLevel level) {
-    pImpl->level = level;
-}
-
-LogLevel ConsoleLogger::getLevel() const {
-    return pImpl->level;
-}
-
-void ConsoleLogger::setUseColors(bool useColors) {
-    pImpl->useColors = useColors;
-}
-
-bool ConsoleLogger::getUseColors() const {
-    return pImpl->useColors;
-}
-
-void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
-    }
-}
-
-std::string ConsoleLogger::levelToString(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "DEBUG";
-        case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
-        case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRIT";
-        default: return "UNKNOWN";
-    }
-}
-
-std::string ConsoleLogger::levelToColor(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "\033[36m";    // Cyan
-        case LogLevel::Info: return "\033[32m";      // Green
-        case LogLevel::Warning: return "\033[33m";   // Yellow
-        case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
-        default: return "\033[0m";
-    }
-}
-
-// Logger class implementation
-struct Logger::Impl {
-    std::vector<std::shared_ptr<ILogger>> loggers;
-    std::mutex mutex;
-};
-
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
-
-Logger::~Logger() = default;
-
-void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
-}
-
-void Logger::clearLoggers() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
-}
-
-void Logger::setLevel(LogLevel level) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
-    }
-}
-
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
-    }
-}
-
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
-}
-
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
-}
-
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
-}
-
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
-}
-
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
-}
-
-bool Logger::isEnabled(LogLevel level) const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
+    if (!entry.sourceFile.empty()) {
+        oss << " (" << entry.sourceFile;
+        if (!entry.sourceFunction.empty()) {
+            oss << "::" << entry.sourceFunction;
         }
+        oss << ":" << entry.sourceLine << ")";
     }
-    return false;
+    
+    std::cout << getColorCode(entry.level) << oss.str() << getResetColor() << std::endl;
+    
+    // Output metadata if present
+    for (const auto& [key, value] : entry.metadata) {
+        std::cout << "    Metadata: " << key << " = " << value << std::endl;
+    }
 }
 
-Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+void ConsoleLogSink::flush() {
+    std::cout.flush();
 }
 
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+// FileLogSink implementation
+void FileLogSink::write(const LogEntry& entry) {
+    if (entry.level < minLevel) return;
+    
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    // Check file rotation
+    if (useRotation && currentSize >= maxFileSize) {
+        rotateFile();
+    }
+    
+    // Write entry to file
+    std::ostringstream oss;
+    
+    auto timePoint = entry.timestamp;
+    auto time = std::chrono::system_clock::to_time_t(timePoint);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        timePoint.time_since_epoch()) % 1000;
+    
+    oss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+        << "." << std::setfill('0') << std::setw(3) << ms.count()
+        << "] [" << static_cast<int>(entry.level) << "]"
+        << " [" << static_cast<int>(entry.category) << "]"
+        << " " << entry.message << std::endl;
+    
+    file << oss.str();
+    currentSize += oss.str().size();
 }
 
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+void FileLogSink::flush() {
+    std::lock_guard<std::mutex> lock(mutex);
+    file.flush();
+}
 
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+void FileLogSink::rotateFile() {
+    if (!useRotation) return;
+    
+    file.close();
+    
+    // Close current file
+    while (std::filesystem::exists(filepath + "." + std::to_string(fileNumber))) {
+        fileNumber++;
+    }
+    
+    // Rename current file
+    std::filesystem::rename(filepath, filepath + "." + std::to_string(fileNumber));
+    
+    // Create new file
+    file.open(filepath, std::ios::app);
+    currentSize = 0;
+}
+
+// EnhancedErrorHandler implementation
+void EnhancedErrorHandler::handleError(const std::string& message, 
+                                     const std::string& source,
+                                     int line) {
+    std::string enhancedMessage = message;
+    
+    if (captureStackTrace) {
+        enhancedMessage += "\nStack trace:\n";
+        enhancedMessage += getStackTrace();
+    }
+    
+    if (!source.empty()) {
+        enhancedMessage += "\nSource: " + source;
+    }
+    
+    if (line > 0) {
+        enhancedMessage += "\nLine: " + std::to_string(line);
+    }
+    
+    // Handle through all registered handlers
+    for (const auto& handler : handlers) {
+        handler->handleError(enhancedMessage, "", 0);
+    }
+}
+
+std::string EnhancedErrorHandler::getStackTrace() {
+    std::ostringstream oss;
+    oss << "  Stack trace not implemented (consider using backtrace library)";
+    return oss.str();
 }
 
 } // namespace nlm
+
+// Initialize global logger instance
+nlm::GlobalLogger::getInstance();
+
+// Test the enhanced logging system
+#ifdef TEST_LOGGING
+#include <iostream>
+
+void testLogging() {
+    std::cout << "=== Testing Enhanced Logging System ===" << std::endl;
+    
+    // Test different log levels
+    nlm::GlobalLogger::logger().info("This is an info message");
+    nlm::GlobalLogger::logger().warning("This is a warning message");
+    nlm::GlobalLogger::logger().error("This is an error message");
+    
+    // Test categories
+    nlm::GlobalLogger::logger().log(
+        nlm::LogLevel::Debug,
+        nlm::LogCategory::Brain,
+        "Debug message for brain simulation"
+    );
+    
+    nlm::GlobalLogger::logger().log(
+        nlm::LogLevel::Info,
+        nlm::LogCategory::Memory,
+        "Memory system status update"
+    );
+    
+    // Test error handling
+    try {
+        NLM_LOG_ERROR("Test error message");
+        throw std::runtime_error("Simulated error for testing");
+    } catch (const std::exception& e) {
+        std::cout << "Caught exception: " << e.what() << std::endl;
+    }
+    
+    std::cout << "=== Logging test completed ===" << std::endl;
+}
+#endif
+
+// Convenience function for easy logging setup
+void setupDefaultLogging(const std::string& name, nlm::LogLevel level) {
+    nlm::GlobalLogger::getInstance().setLevel(level);
+    nlm::GlobalLogger::getInstance().addConsoleSink(level);
+    std::cout << "Logging initialized for: " << name << std::endl;
+}
+
+void setupFileLogging(const std::string& filepath, nlm::LogLevel level) {
+    nlm::GlobalLogger::getInstance().setLevel(level);
+    nlm::GlobalLogger::getInstance().addFileSink(filepath, level);
+    std::cout << "File logging initialized: " << filepath << std::endl;
+}

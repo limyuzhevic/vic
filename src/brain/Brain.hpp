@@ -193,6 +193,57 @@ public:
     // Logging
     void logStatus() const;
     
+    // Performance optimization: Batch statistics calculation
+    void updateCachedStatistics();
+    
+    // Performance optimization: Create execution plan for step
+    void createExecutionPlan(Impl::StepExecutionPlan& plan);
+    
+    // Performance optimization: Execute step 1 (delayed spikes)
+    void executeStep1_ProcessDelayedSpikes();
+    
+    // Performance optimization: Execute step 2 (neuron dynamics)
+    void executeStep2_UpdateNeurons();
+    
+    // Performance optimization: Execute step 3 (spike detection)
+    void executeStep3_DetectAndScheduleSpikes();
+    
+    // Performance optimization: Execute step 4 (working memory)
+    void executeStep4_UpdateWorkingMemory();
+    
+    // Performance optimization: Execute step 5 (neuromodulation)
+    void executeStep5_ApplyNeuromodulation();
+    
+    // Performance optimization: Execute step 6 (plasticity)
+    void executeStep6_ApplyPlasticity();
+    
+    // Performance optimization: Execute step 7 (episodic memory)
+    void executeStep7_UpdateEpisodicMemory();
+    
+    // Performance optimization: Execute step 8 (prediction system)
+    void executeStep8_UpdatePredictionSystem();
+    
+    // Performance optimization: Execute step 9 (attention)
+    void executeStep9_UpdateAttention();
+    
+    // Performance optimization: Execute step 10 (concept formation)
+    void executeStep10_UpdateConceptFormation();
+    
+    // Performance optimization: Execute step 11 (structural plasticity)
+    void executeStep11_ApplyStructuralPlasticity();
+    
+    // Performance optimization: Execute step 12 (memory replay)
+    void executeStep12_ReplayMemories();
+    
+    // Performance optimization: Execute step 13 (development)
+    void executeStep13_ApplyDevelopmentEffects();
+    
+    // Performance optimization: Execute step 14 (memory consolidation)
+    void executeStep14_ConsolidateMemories();
+    
+    // Performance optimization: Execute step 15 (checkpoint management)
+    void executeStep15_UpdateCheckpoints();
+    
 private:
     struct Impl;
     Impl* pImpl;

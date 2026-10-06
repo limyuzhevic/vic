@@ -1,11 +1,10 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <cmath>
+#include <algorithm>
 
 namespace nlm {
-
-// Forward declaration
-class Neuron;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
@@ -71,7 +70,6 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -79,6 +77,18 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
+    
+    // Get spike delta for STDP calculation
+    float getSTDPWeightChange(const std::vector<Timestamp>& preHistory,
+                             const std::vector<Timestamp>& postHistory,
+                             float ltpWeight, float ltdWeight,
+                             float tau) const;
+    
+    // Check if synapse is active for plasticity
+    bool isActiveForPlasticity() const;
+    
+    // Get time since last spike
+    float getTimeSinceLastSpike(Timestamp currentTime) const;
     
 private:
     struct Impl;
