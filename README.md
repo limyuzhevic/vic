@@ -1,10 +1,10 @@
-# NLM — 熙然
+# NLM — Neural Learning Machine
 
 **An Experimental Artificial Developmental Brain**
 
 ## What is NLM?
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM (Neural Learning Machine) is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
 NLM is NOT:
 - A transformer or LLM
