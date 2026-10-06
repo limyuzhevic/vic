@@ -142,7 +142,8 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Enhanced configuration class with all new functionality
+    py::class_<Config>(m, "Config", R"pbdoc(Enhanced Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -160,9 +161,166 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate,
+             "Validate the entire configuration")
+        .def("hasParameter", &Config::hasParameter, py::arg("key"),
+             "Check if a parameter is defined")
+        .def("getParameterInfo", &Config::getParameterInfo, py::arg("key"),
+             "Get parameter metadata")
+        .def("merge", &Config::merge, py::arg("other"), py::arg("source") = ConfigSource::Runtime,
+             "Merge configuration with precedence rules")
+        .def("clone", &Config::clone,
+             "Create copy of configuration")
+        .def("diff", &Config::diff, py::arg("other"),
+             "Create difference between configurations")
+        .def("addParameter", &Config::addParameter, py::arg("param"),
+             "Add a configuration parameter definition")
+        .def("setEnvironment", &Config::setEnvironment, py::arg("environment"),
+             "Set the environment (dev/test/prod)")
+        .def("getEnvironment", &Config::getEnvironment,
+             "Get the current environment")
+        .def("enableValidation", &Config::enableValidation, py::arg("enabled"),
+             "Enable/disable validation")
+        .def("isValidationEnabled", &Config::isValidationEnabled,
+             "Check if validation is enabled")
+        .def("toBinary", &Config::toBinary,
+             "Serialize configuration to binary format")
+        .def_static("fromBinary", &Config::fromBinary, py::arg("data"),
+                    "Deserialize configuration from binary format")
+        .def("addToHistory", &Config::addToHistory, py::arg("action"), py::arg("description"),
+             "Add entry to configuration history")
+        .def("getHistory", &Config::getHistory,
+             "Get configuration history")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Configuration parameter class
+    py::class_<ConfigParameter>(m, "ConfigParameter", R"pbdoc(Configuration parameter definition)pbdoc")
+        .def(py::init<std::string, ConfigParameter::Type, std::string, std::any, bool>(),
+             py::arg("key"), py::arg("type"), py::arg("description"),
+             py::arg("default_value") = std::any(), py::arg("required") = false)
+        .def("getKey", &ConfigParameter::getKey)
+        .def("getType", &ConfigParameter::getType)
+        .def("getInfo", &ConfigParameter::getInfo)
+        .def("setSource", &ConfigParameter::setSource, py::arg("source"))
+        .def("isRequired", &ConfigParameter::isRequired)
+        .def("isReadonly", &ConfigParameter::isReadonly)
+        .def("getDefaultValue", &ConfigParameter::getDefaultValue)
+        .def("addValidationRule", &ConfigParameter::addValidationRule, py::arg("rule"))
+        .def("setConstraint", &ConfigParameter::setConstraint, py::arg("constraint"), py::arg("value"));
+
+    // Configuration validator class
+    py::class_<ConfigValidator>(m, "ConfigValidator", R"pbdoc(Configuration validation utilities)pbdoc")
+        .def_static("validateValue", &ConfigValidator::validateValue, py::arg("value"), py::arg("param_info"))
+        .def_static("validateEntry", &ConfigValidator::validateEntry, py::arg("entry"), py::arg("param_info"));
+
+    // Configuration schema class
+    py::class_<ConfigSchema>(m, "ConfigSchema", R"pbdoc(Configuration schema management)pbdoc")
+        .def(py::init<>())
+        .def("addParameter", &ConfigSchema::addParameter, py::arg("param"))
+        .def("getParameters", &ConfigSchema::getParameters)
+        .def("getParameter", &ConfigSchema::getParameter, py::arg("key"))
+        .def("validateSchema", &ConfigSchema::validateSchema, py::arg("entries"))
+        .def("setEnvironmentPreset", &ConfigSchema::setEnvironmentPreset, py::arg("environment"))
+        .def("getValidationErrors", &ConfigSchema::getValidationErrors, py::arg("entries"));
+
+    // Configuration environment class
+    py::class_<ConfigEnvironment>(m, "ConfigEnvironment", R"pbdoc(Environment-specific configuration)pbdoc")
+        .def(py::init<std::string>())
+        .def("setDefault", &ConfigEnvironment::setDefault, py::arg("key"), py::arg("value"))
+        .def("getDefault", &ConfigEnvironment::getDefault, py::arg("key"))
+        .def("addValidationRule", &ConfigEnvironment::addValidationRule, py::arg("key"), py::arg("rule"));
+
+    // Configuration builder class
+    py::class_<ConfigBuilder>(m, "ConfigBuilder", R"pbdoc(Configuration builder for creating presets)pbdoc")
+        .def(py::init<>())
+        .def("set", [](ConfigBuilder& self, const std::string& key, int value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("set", [](ConfigBuilder& self, const std::string& key, double value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("set", [](ConfigBuilder& self, const std::string& key, bool value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("set", [](ConfigBuilder& self, const std::string& key, const std::string& value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("set", [](ConfigBuilder& self, const std::string& key, const std::vector<int>& value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("set", [](ConfigBuilder& self, const std::string& key, const std::vector<double>& value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("set", [](ConfigBuilder& self, const std::string& key, const std::vector<std::string>& value) { self.set(key, value); },
+             py::arg("key"), py::arg("value"))
+        .def("build", &ConfigBuilder::build);
+
+    // Configuration exception hierarchy
+    py::register_exception<ConfigValidationException>(m, "ConfigValidationException");
+    py::register_exception<ConfigSchemaException>(m, "ConfigSchemaException");
+    py::register_exception<ConfigLoadException>(m, "ConfigLoadException");
+
+    // Configuration preset functions
+    m.def("createResearchConfig", &createResearchConfig,
+          "Create experimental configuration for research");
+    m.def("createProductionConfig", &createProductionConfig,
+          "Create production configuration for deployment");
+    m.def("createSimulationConfig", &createSimulationConfig, py::arg("scenario_name"),
+          "Create simulation configuration for different scenarios");
+    m.def("createPerformanceConfig", &createPerformanceConfig,
+          "Create performance optimization configuration");
+
+    // Python API helper functions
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        return config->validate();
+    }, py::arg("config"), "Validate configuration");
+    
+    m.def("get_config_metadata", [](const std::shared_ptr<Config>& config, const std::string& key) {
+        return config->getParameterInfo(key);
+    }, py::arg("config"), py::arg("key"), "Get parameter metadata");
+    
+    m.def("create_config_from_dict", [](const std::map<std::string, std::any>& dict) {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : dict) {
+            // Type conversion from std::any to ConfigValue
+            if (std::holds_alternative<int>(pair.second)) {
+                config->set(pair.first, std::any_cast<int>(pair.second));
+            } else if (std::holds_alternative<double>(pair.second)) {
+                config->set(pair.first, std::any_cast<double>(pair.second));
+            } else if (std::holds_alternative<bool>(pair.second)) {
+                config->set(pair.first, std::any_cast<bool>(pair.second));
+            } else if (std::holds_alternative<std::string>(pair.second)) {
+                config->set(pair.first, std::any_cast<std::string>(pair.second));
+            }
+        }
+        return config;
+    }, "Create configuration from dictionary");
+    
+    m.def("get_config_presets", []() {
+        std::map<std::string, std::shared_ptr<Config>> presets;
+        presets["research"] = createResearchConfig();
+        presets["production"] = createProductionConfig();
+        presets["performance"] = createPerformanceConfig();
+        return presets;
+    }, "Get available configuration presets");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
