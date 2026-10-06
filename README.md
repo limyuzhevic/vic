@@ -77,12 +77,17 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
+./nlm
+```
+
+This runs the comprehensive integration test verifying all brain systems are connected.
+
+### Phase 6 Standalone Demo
+```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
-
-## Project Structure
+This provides additional verification of the Phase 6 integration with detailed logging.
 
 ```
 NLM/
