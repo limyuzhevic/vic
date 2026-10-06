@@ -19,14 +19,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Phase 2: Enhanced configuration parsing with JSON/YAML support
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try JSON first if available
+#ifdef WITH_JSON
+    if (json::try_parse_file(filepath, pImpl->entries)) {
+        return true;
+    }
+#endif
+    
+    // Try YAML second if available
+#ifdef WITH_YAML
+    if (yaml::try_parse_file(filepath, pImpl->entries)) {
+        return true;
+    }
+#endif
+    
+    // Fall back to simple key=value format (Phase 1)
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments

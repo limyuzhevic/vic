@@ -289,7 +289,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    // Advanced Brain Operations for Power Users
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -351,54 +352,105 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             "Log brain status")
+        
+        // Advanced Power User Methods
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+             "Get performance metrics for monitoring")
+        .def("getMemoryUsage", &Brain::getMemoryUsage,
+             "Get memory usage statistics")
+        .def("getSimulationTime", &Brain::getSimulationTime,
+             "Get current simulation time")
+        .def("getTimeStep", &Brain::getTimeStep,
+             "Get current time step duration")
+        .def("getRandomSeed", &Brain::getRandomSeed,
+             "Get current random seed")
+        .def("setRandomSeed", &Brain::setRandomSeed,
+             py::arg("seed"),
+             "Set random seed for reproducible results")
+        .def("getTotalSpikesPerRegion", &Brain::getTotalSpikesPerRegion,
+             "Get total spikes per region")
+        .def("getAverageWeightPerSynapse", &Brain::getAverageWeightPerSynapse,
+             "Get average synaptic weight")
+        .def("getNeuronStats", &Brain::getNeuronStats,
+             "Get detailed neuron statistics")
+        .def("getSynapticStats", &Brain::getSynapticStats,
+             "Get detailed synaptic statistics")
+        .def("getConnectionDensity", &Brain::getConnectionDensity,
+             "Get connection density")
+        .def("getInformationProcessingRate", &Brain::getInformationProcessingRate,
+             "Get information processing rate (spikes/sec)")
+        .def("setLearningRate", &Brain::setLearningRate,
+             py::arg("rate"),
+             "Set global learning rate")
+        .def("getLearningRate", &Brain::getLearningRate,
+             "Get current learning rate")
+        .def("enableDebugMode", &Brain::enableDebugMode,
+             py::arg("enable"),
+             "Enable debug mode for verbose logging")
+        .def("isDebugModeEnabled", &Brain::isDebugModeEnabled,
+             "Check if debug mode is enabled")
+        .def("exportNetworkTopology", &Brain::exportNetworkTopology,
+             py::arg("filepath"),
+             "Export network topology to file")
+        .def("exportSpikeTrain", &Brain::exportSpikeTrain,
+             py::arg("filepath"),
+             "Export spike train data to file")
+        .def("exportSynapticWeights", &Brain::exportSynapticWeights,
+             py::arg("filepath"),
+             "Export synaptic weights to file")
+        .def("importNetworkTopology", &Brain::importNetworkTopology,
+             py::arg("filepath"),
+             "Import network topology from file")
+        .def("applyCustomPlasticityRule", &Brain::applyCustomPlasticityRule,
+             py::arg("rule_name"), py::arg("parameters"),
+             "Apply custom plasticity rule")
+        .def("getPlasticityRules", &Brain::getPlasticityRules,
+             "Get list of active plasticity rules")
+        .def("clearPlasticity", &Brain::clearPlasticity,
+             "Clear all synaptic changes")
+        .def("resetPlasticity", &Brain::resetPlasticity,
+             "Reset synaptic weights to initial values")
+        .def("getNetworkEfficiency", &Brain::getNetworkEfficiency,
+             "Get network efficiency metric")
+        .def("getRobustness", &Brain::getRobustness,
+             "Get network robustness metric")
+        .def("getCriticality", &Brain::getCriticality,
+             "Get criticality metric (optimal complexity)")
+        .def("simulateLearningEpoch", &Brain::simulateLearningEpoch,
+             py::arg("num_steps"), py::arg("replay_enabled"),
+             "Simulate a learning epoch with memory replay")
+        .def("getLearningProgress", &Brain::getLearningProgress,
+             "Get learning progress metrics")
+        .def("optimizeParameters", &Brain::optimizeParameters,
+             py::arg("algorithm"),
+             "Optimize network parameters using specified algorithm")
+        .def("runSimulationBenchmark", &Brain::runSimulationBenchmark,
+             py::arg("duration_seconds"),
+             "Run simulation benchmark test")
+        .def("getBenchmarkResults", &Brain::getBenchmarkResults,
+             "Get benchmark results")
+        .def("exportBrainState", &Brain::exportBrainState,
+             py::arg("filepath"), py::arg("format"),
+             "Export complete brain state to file")
+        .def("importBrainState", &Brain::importBrainState,
+             py::arg("filepath"), py::arg("format"),
+             "Import complete brain state from file")
+        .def("createSnapshot", &Brain::createSnapshot,
+             py::arg("description"),
+             "Create a named snapshot of current brain state")
+        .def("restoreSnapshot", &Brain::restoreSnapshot,
+             py::arg("name"),
+             "Restore from a named snapshot")
+        .def("getSnapshotNames", &Brain::getSnapshotNames,
+             "Get list of saved snapshot names")
+        .def("deleteSnapshot", &Brain::deleteSnapshot,
+             py::arg("name"),
+             "Delete a snapshot")
+        .def("getDebugInfo", &Brain::getDebugInfo,
+             "Get comprehensive debug information")
+        .def("clearDebugInfo", &Brain::clearDebugInfo,
+             "Clear debug information");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -415,11 +467,3 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm

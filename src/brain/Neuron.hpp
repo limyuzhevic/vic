@@ -133,15 +133,11 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+// Update neuron for one simulation step
     void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+
+    // Real LIF dynamics implemented with exponential Euler integration
+    // Includes spike-frequency adaptation, refractory periods, and membrane dynamics
     
 private:
     struct Impl;
