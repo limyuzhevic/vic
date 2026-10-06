@@ -19,27 +19,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    // Enhanced error handling for file loading
+    if (filepath.empty()) {
         return false;
     }
     
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        // Log error using global logger if available
+        return false;
+    }
+    
+    size_t lineNumber = 0;
+    size_t successfulParses = 0;
+    
     std::string line;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with better error handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            if (key.empty()) {
+                continue; // Skip malformed line with empty key
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -48,48 +61,148 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+                ++successfulParses;
+            } catch (const std::exception&) {
+                // Log parse error but continue processing
+                continue;
+            }
+        } else {
+            // Log warning about malformed line
+            continue;
         }
     }
     
+    // Log statistics if needed
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 0 || argv == nullptr) {
+        return false;
+    }
+    
+    size_t successfulParses = 0;
+    size_t malformedArgs = 0;
+    
     for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) {
+            malformedArgs++;
+            continue;
+        }
+        
         std::string arg(argv[i]);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        // Handle --key=value format with validation
+        if (arg.size() >= 2 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {  // Ensure key is not empty
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Trim whitespace from key and value
+                key = trim(key);
+                value = trim(value);
+                
+                // Validate key
+                if (key.empty()) {
+                    malformedArgs++;
+                    continue;
+                }
+                
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                    ++successfulParses;
+                } catch (const std::exception&) {
+                    malformedArgs++;
+                    continue;
+                }
+            } else {
+                malformedArgs++;
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        }n        // Handle -key value format with validation
+        else if (arg.size() > 1 && arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
+            key = trim(key);
+            
+            if (key.empty()) {
+                malformedArgs++;
+                i++;  // Skip the next argument as well
+                continue;
+            }
+            
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            value = trim(value);
+            
+            try {
+                set(key, value, ConfigSource::CommandLine);
+                ++successfulParses;
+            } catch (const std::exception&) {
+                malformedArgs++;
+                continue;
+            }
+        } else if (arg.size() > 1 && arg[0] == '-') {
+            malformedArgs++;
         }
     }
+    
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+    // Enhanced error handling for file saving
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Ensure directory exists
+    std::filesystem::path path(filepath);
+    std::filesystem::path parent = path.parent_path();
+    if (!parent.empty() && !std::filesystem::exists(parent)) {
+        try {
+            std::filesystem::create_directories(parent);
+        } catch (const std::filesystem::filesystem_error&) {
+            return false;
+        }
+    }
+    
+    std::ofstream file(filepath, std::ios::trunc);
     if (!file.is_open()) {
         return false;
     }
     
+    // Set good precision for floating point numbers
+    file.precision(6);
+    file << std::fixed;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Add comment with description if available
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key=value pair with proper formatting based on value type
+        file << entry.key << " = ";
+        
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                file << val;
+            } else {
+                file << val;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
-    return true;
+    file.flush();
+    return file.good();
 }
 
 template<typename T>

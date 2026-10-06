@@ -37,18 +37,26 @@ public:
     virtual LogLevel getLevel() const = 0;
 };
 
-// Console logger implementation
-class ConsoleLogger : public ILogger {
+// Enhanced Console logger implementation
+class EnhancedConsoleLogger : public ILogger {
 public:
-    ConsoleLogger();
-    explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
+    struct Config {
+        LogLevel minLevel = LogLevel::Info;
+        bool useColors = true;
+        bool useTimestamps = true;
+        bool useThreadIds = true;
+        bool useProcessIds = true;
+        std::string colorReset = "\033[0m";
+    };
+    
+    EnhancedConsoleLogger(const Config& config = Config());
+    ~EnhancedConsoleLogger() override;
     
     void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
     
-    // Enable/disable colors
+    // Console logger specific methods
     void setUseColors(bool useColors);
     bool getUseColors() const;
     
@@ -59,12 +67,9 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
 };
 
-// Main Logger class
+// Enhanced main Logger class with improved architecture
 class Logger {
 public:
     Logger();
@@ -103,7 +108,11 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Buffer management methods (new features)
+    void clearLogBuffer();
+    std::vector<LogEntry> getRecentLogs(size_t count);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -137,5 +146,16 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Factory functions for creating different logger types
+inline std::shared_ptr<ILogger> createConsoleLogger(const EnhancedConsoleLogger::Config& config = EnhancedConsoleLogger::Config()) {
+    return std::make_shared<EnhancedConsoleLogger>(config);
+}
+
+inline std::shared_ptr<ILogger> createFileLogger(const std::string& filepath, const EnhancedConsoleLogger::Config& config = EnhancedConsoleLogger::Config()) {
+    auto logger = std::make_shared<EnhancedConsoleLogger>(config);
+    logger->setOutputFile(filepath);
+    return logger;
+}
 
 } // namespace nlm
