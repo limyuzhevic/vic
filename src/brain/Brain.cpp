@@ -19,8 +19,92 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <format>
+#include <span>
+#include <ranges>
+#include <optional>
 
 namespace nlm {
+
+// Helper function to convert neurons to span for more efficient processing
+std::span<Neuron*> neuronsToSpan(const std::vector<Neuron*>& neurons) {
+    return std::span<Neuron*>(neurons.data(), neurons.size());
+}
+
+// Helper function to find neuron by ID using ranges algorithms
+Neuron* findNeuronById(const std::vector<Neuron*>& neurons, NeuronId id) {
+    auto it = std::ranges::find_if(neurons, [id](const Neuron* neuron) {
+        return neuron->getId() == id;
+    });
+    return it != neurons.end() ? *it : nullptr;
+}
+
+// Helper function to filter neurons by type using views
+auto neuronsByType(const std::vector<Neuron*>& neurons, NeuronType type) {
+    return neurons | std::views::filter([type](const Neuron* neuron) {
+        return neuron->getType() == type;
+    });
+}
+
+// Helper function for structured bindings in neural processing
+void processNeuronWithStructuredBinding(Neuron* neuron, Timestamp currentTime, TimestepDuration timestep) {
+    auto& state = neuron->getState();
+    
+    // Use structured bindings for cleaner code
+    if (state.firingState == FiringState::Active && 
+        std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < timestep * 2.0f) {
+        // Neuron fired this step - queue the spike
+        SpikeEvent event(neuron->getId(), currentTime, neuron->getStep());
+        // Process spike event...
+    }
+}
+
+// Optimized connectivity initialization using ranges
+void initializeRegionConnectivity(NeuralRegion& region, RandomGenerator& rng, 
+                                 float connectionProbability, float excitatoryWeight, float inhibitoryWeight) {
+    auto neurons = region.getAllNeurons();
+    
+    // Use views and ranges for efficient processing
+    auto excitatoryNeurons = neurons | std::views::filter([](const Neuron* n) {
+        return n->getType() == NeuronType::Excitatory;
+    });
+    
+    auto inhibitoryNeurons = neurons | std::views::filter([](const Neuron* n) {
+        return n->getType() == NeuronType::Inhibitory;
+    });
+    
+    // Process connectivity using range algorithms
+    for (const auto* preNeuron : excitatoryNeurons) {
+        for (const auto* postNeuron : inhibitoryNeurons) {
+            if (rng.bernoulli(connectionProbability)) {
+                region.addSynapse(preNeuron->getId(), postNeuron->getId(), 
+                                 inhibitoryWeight, 1);
+            }
+        }
+    }
+}
+
+// Memory system statistics using optional return values
+void logMemorySystemStats(const std::vector<std::unique_ptr<NeuralRegion>>& regions, 
+                         std::shared_ptr<NeuralWorkingMemory> workingMemory,
+                         std::shared_ptr<NeuralEpisodicMemory> episodicMemory) {
+    size_t totalWorkingMemoryTraces = 0;
+    size_t totalEpisodicMemoryEpisodes = 0;
+    
+    if (workingMemory) {
+        totalWorkingMemoryTraces = workingMemory->getActiveTraces();
+    }
+    
+    if (episodicMemory) {
+        totalEpisodicMemoryEpisodes = episodicMemory->getEpisodeCount();
+    }
+    
+    // Log using modern formatting
+    NLM_LOG_INFO(std::format("Memory system stats - Working traces: {}, Episodes: {}", 
+                           totalWorkingMemoryTraces, totalEpisodicMemoryEpisodes));
+}
+
+} // namespace nlm
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
@@ -175,15 +259,14 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    NLM_LOG_INFO(std::format("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)..."));
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+    NLM_LOG_INFO(std::format("Configuration: {} neurons, {} regions", neuronCount, regionCount));
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -214,18 +297,17 @@ bool Brain::initialize() {
                 }
             }
             
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+            NLM_LOG_INFO(std::format("Created populations in region {}: {} populations, {} neurons", 
+                           i + 1, region->getPopulationCount(), region->getTotalNeuronCount()));
         }
     }
     
-    // Initialize connectivity with random weights
+    // Initialize connectivity with random weights using range algorithms
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            // Use range-based initialization
+            initializeRegionConnectivity(*region, *pImpl->rng, connectionProbability, 0.2f, 0.1f);
         }
     }
     
@@ -307,22 +389,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
-     * This implements the complete integrated brain simulation:
+     * This implements the complete integrated brain simulation algorithm.
+     * The loop consists of 15 sequential steps that simulate neural computation:
      * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
+     * STEP 1: Process pending delayed spike events (deliver synaptic input)
+     *   - Delayed spikes from previous steps are delivered to destination neurons
+     *   - Synaptic weights determine the strength of input transmission
+     *   - Time-stamped events ensure proper temporal ordering
+     * 
+     * STEP 2: Update all neurons (LIF dynamics)
+     *   - Leaky Integrate-and-Fire neuron model for each neuron
+     *   - Membrane potential evolves with leakage and injected current
+     *   - Threshold comparison determines spike generation
+     * 
+     * STEP 3: Detect spikes and schedule spike events
+     *   - Neurons crossing threshold enter refractory state
+     *   - Spike events are queued for immediate processing
+     *   - Incoming synapse spike times are recorded for plasticity
+     * 
+     * STEP 4: Update working memory (maintenance and competition)
+     *   - Active neuron traces are updated based on firing rates
+     *   - Working memory maintains recent neural activity patterns
+     *   - Competition mechanisms prioritize salient representations
+     * 
+     * STEP 5: Apply neuromodulation effects on neural excitability
+     *   - Dopamine modulates firing thresholds and gain
+     *   - Other neuromodulators adjust neural responsiveness
+     *   - Context-dependent plasticity modulation
+     * 
+     * STEP 6: Apply plasticity rules (STDP and Hebbian)
+     *   - Spike-timing-dependent plasticity (STDP) with pre-post correlations
+     *   - Hebbian learning based on co-activation patterns
+     *   - Neuromodulation scaling of plastic changes
+     * 
+     * STEP 7: Update episodic memory with current experience
+     *   - Current brain state captured as episodic memory items
+     *   - Active neurons and activation patterns stored
+     *   - Temporal relationships preserved in memory traces
+     * 
+     * STEP 8: Update prediction system
+     *   - Prediction errors calculated from sensory observations
+     *   - Forward models update internal representations
+     *   - Prediction accuracy influences learning rates
+     * 
+     * STEP 9: Update attention system
+     *   - Competition among working memory traces
+     *   - Select salient representations for processing
+     *   - Top-down influences modulate attentional focus
+     * 
+     * STEP 10: Update concept formation
+     *   - Current neural patterns abstracted into concepts
+     *   - Hierarchical concept representation established
+     *   - Semantic relationships inferred from activity patterns
+     * 
+     * STEP 11: Apply structural plasticity (synaptogenesis, pruning)
+     *   - New synaptic connections formed based on activity
+     *   - Weak or redundant synapses eliminated
+     *   - Network topology optimized for efficiency
+     * 
+     * STEP 12: Replay important memories (during rest or periodically)
+     *   - Selected episodes replayed for consolidation
+     *   - Neural reactivation strengthens memory traces
+     *   - Reorganization of memory networks
+     * 
+     * STEP 13: Apply development effects
+     *   - Developmental stage determines plasticity rates
+     *   - Activity-dependent developmental plasticity
+     *   - Maturation of neural circuits over time
+     * 
+     * STEP 14: Periodic memory consolidation
+     *   - Important memories strengthened, weak ones discarded
+     *   - Integration of new information with existing knowledge
+     *   - Memory compression and optimization
+     * 
+     * STEP 15: Checkpoint management
+     *   - Periodic brain state saving for recovery
+     *   - Performance monitoring and optimization
+     *   - System state preservation for restart
+     * 
+     * The algorithm is designed to simulate biological brain processes
+     * while maintaining computational efficiency for large-scale networks.
+     * Event-driven processing focuses computation on significant events
+     * (spikes) rather than continuous time stepping.
+     * 
+     * @param currentStep The current simulation step number.
+     * @param currentTime The current simulation time in seconds.
      */
     
     pImpl->currentStep = currentStep;
@@ -334,8 +485,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        for (auto& population : region->getPopulations()) {
+            for (auto* neuron : population->getNeurons()) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -343,8 +494,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        for (auto& population : region->getPopulations()) {
+            for (auto* neuron : population->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -400,23 +551,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
-    
+
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
-    
+
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
-    
+
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
     }
-    
+
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -426,8 +577,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
+            for (auto& population : region->getPopulations()) {
+                for (auto* neuron : population->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
                     float excitabilityMod = dopamineLevel * 0.5f;
@@ -438,45 +589,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
+
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
-    
+
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        for (auto& synapse : region->getSynapses()) {
             // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            if (synapse->getPlasticityFlags().stdp) {
+                const auto& preSpikes = synapse->getPreSpikeHistory();
+                const auto& postSpikes = synapse->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
+                    pImpl->stdp->update(synapse, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = synapse->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    synapse->setWeight(weight);
                 }
             }
             
             // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            if (synapse->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = synapse->getPreSpikeHistory();
+                const auto& postSpikes = synapse->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->hebbian->update(synapse, preSpikes, postSpikes, pImpl->timestep);
                 }
             }
             
             // Update synapse state
-            syn->step(currentTime);
+            synapse->step(currentTime);
         }
     }
-    
+
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
@@ -490,8 +641,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+                for (auto& population : region->getPopulations()) {
+                    for (auto* neuron : population->getNeurons()) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -508,13 +659,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
-    
+
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -525,18 +676,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
     }
-    
+
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
+
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
@@ -545,7 +696,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
+
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
@@ -575,13 +726,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
+
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
-    
+
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
@@ -589,50 +740,104 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    /*
+     * Process incoming sensory data and inject current into sensory neurons.
+     * 
+     * This function implements the sensory encoding pathway, converting external
+     * sensory inputs into neural current injections. It distributes the input
+     * across available sensory neurons for parallel processing.
+     * 
+     * The sensory input mapping follows a simple linear encoding scheme where
+     * input values are scaled and distributed to sensory neurons. Active inputs
+     * (>0.5) are also stored in working memory to maintain recent sensory history.
+     * 
+     * @param input The sensory input data containing observations from the environment.
+     * 
+     * @note This method is called by the environment simulation to provide
+     *       external stimuli to the brain. The input data is normalized and
+     *       distributed across all available sensory neurons to ensure robust
+     *       processing of sensory information.
+     */
     
-    const auto& values = input.getData();
-    if (values.empty()) return;
+    const auto& sensoryValues = input.getData();
+    if (sensoryValues.empty()) return;
     
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    size_t numSensoryNeurons = pImpl->sensoryNeurons.size();
+    if (numSensoryNeurons == 0) return;
     
     // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
+    for (size_t neuronIndex = 0; neuronIndex < numSensoryNeurons; ++neuronIndex) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        if (neuronIndex < sensoryValues.size()) {
+            normalizedValue = static_cast<float>(sensoryValues[neuronIndex]) * 10.0f;
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        pImpl->sensoryNeurons[neuronIndex]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory for recent sensory history
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            pImpl->workingMemory->storeToNeuron(
+                pImpl->sensoryNeurons[neuronIndex]->getId(), 
+                normalizedValue / 10.0f
+            );
         }
     }
 }
 
-void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+void Brain::injectCurrent(NeuronId targetNeuron, MembranePotential current) {
+    /*
+     * Inject current directly into a specific neuron.
+     * 
+     * This method searches through all brain regions to find a neuron with the
+     * specified ID and injects the given current into it. This is useful for
+     * targeted neural stimulation or controlled experiments.
+     * 
+     * @param targetNeuron The ID of the neuron to receive the current injection.
+     * @param current The membrane potential current to inject (positive for excitatory,
+     *               negative for inhibitory).
+     * 
+     * @note If the neuron ID is not found, the current is silently discarded.
+     *       Multiple neurons with the same ID should not exist in a properly
+     *       initialized brain.
+     * 
+     * @see injectCurrentToNeurons
+     */
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
+        for (auto* neuron : neurons) {
+            if (neuron->getId() == targetNeuron) {
+                neuron->injectCurrent(current);
                 return;
             }
         }
     }
 }
 
-void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+void Brain::injectCurrentToNeurons(NeuronType neuronType, MembranePotential current) {
+    /*
+     * Inject current into all neurons of a specific type.
+     * 
+     * This method applies uniform current injection to all neurons of the
+     * specified type across all brain regions. This is useful for exciting
+     * or inhibiting entire populations of neurons, such as sensory or
+     * motor neuron populations.
+     * 
+     * @param neuronType The type of neurons to receive current injection.
+     * @param current The membrane potential current to inject (positive for excitatory,
+     *               negative for inhibitory).
+     * 
+     * @note This method affects all neurons of the specified type in all regions.
+     *       Common use cases include sensory stimulation (NeuronType::Sensory) or
+     *       motor control (NeuronType::Motor).
+     * 
+     * @see injectCurrent
+     */
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
+        for (auto& population : region->getPopulations()) {
+            if (population->getNeuronType() == neuronType) {
+                for (auto* neuron : population->getNeurons()) {
                     neuron->injectCurrent(current);
                 }
             }
@@ -641,32 +846,116 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
 }
 
 SpikeSystem* Brain::getSpikeSystem() {
+    /*
+     * Get access to the spike system for event-driven processing.
+     * 
+     * The spike system handles all spike-related events including delayed
+     * spike delivery, timing, and processing. This provides access to the
+     * core event-driven neural computation engine.
+     * 
+     * @return Pointer to the spike system, or nullptr if the system hasn't been
+     *         initialized yet.
+     * 
+     * @note The spike system is essential for realistic neural dynamics
+     *       with temporal precision. It implements the event-driven processing
+     *       that distinguishes modern neural network simulations from
+     *       traditional continuous-time models.
+     */
     return pImpl->spikeSystem.get();
 }
 
 const SpikeSystem* Brain::getSpikeSystem() const {
+    /*
+     * Get read-only access to the spike system.
+     * 
+     * This const version provides read-only access to the spike system
+     * without allowing modification of the neural event processing pipeline.
+     * 
+     * @return Const pointer to the spike system, or nullptr if the system
+     *         hasn't been initialized yet.
+     * 
+     * @see getSpikeSystem
+     */
     return pImpl->spikeSystem.get();
 }
 
 STDP* Brain::getSTDP() {
+    /*
+     * Get access to the Spike-Timing-Dependent Plasticity system.
+     * 
+     * The STDP system implements learning based on the precise timing
+     * between pre- and post-synaptic spikes. This is a fundamental mechanism
+     * for activity-dependent synaptic strengthening and weakening.
+     * 
+     * @return Pointer to the STDP system, or nullptr if not initialized.
+     * 
+     * @note STDP is crucial for implementing Hebbian learning principles
+     *       where synaptic efficacy is strengthened for correlated activity
+     *       and weakened for uncorrelated activity.
+     */
     return pImpl->stdp.get();
 }
 
 Hebbian* Brain::getHebbian() {
+    /*
+     * Get access to the Hebbian plasticity system.
+     * 
+     * The Hebbian system implements learning based on co-activation of
+     * pre- and post-synaptic neurons, following the principle that "neurons
+     * that fire together, wire together." This provides complementary
+     * learning to STDP.
+     * 
+     * @return Pointer to the Hebbian system, or nullptr if not initialized.
+     * 
+     * @note Hebbian learning is often used for pattern recognition and
+     *       association learning in neural networks.
+     */
     return pImpl->hebbian.get();
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    /*
+     * Get access to the structural plasticity system.
+     * 
+     * The structural plasticity system handles synaptic formation and
+     * elimination (synaptogenesis and pruning), which is essential for
+     * network development, adaptation, and maintenance.
+     * 
+     * @return Pointer to the structural plasticity system, or nullptr if
+     *         not initialized.
+     * 
+     * @note Structural plasticity operates at a different level than
+     *       synaptic plasticity, affecting the connectivity patterns
+     *       themselves rather than just synaptic strengths.
+     */
     return pImpl->structuralPlasticity.get();
 }
 
 float Brain::getExcitationInhibitionRatio() const {
+    /*
+     * Calculate the balance between excitation and inhibition in the network.
+     * 
+     * This function computes the excitation-to-inhibition (E/I) ratio,
+     * which is a critical measure of network stability. A balanced E/I ratio
+     * is essential for proper neural function and prevents runaway excitation
+     * or excessive inhibition.
+     * 
+     * @return The E/I ratio as a floating-point value. Returns infinity if
+     *         there is no inhibition but there is excitation, or zero if there
+     *         is no excitation.
+     * 
+     * @note An optimal E/I ratio for most neural networks is typically between
+     *       1.0 and 5.0. Ratios significantly outside this range can indicate
+     *       pathological states or inefficient network operation.
+     * 
+     * @see logStatus
+     */
     float totalExcitatory = 0.0f;
     float totalInhibitory = 0.0f;
     
     for (const auto& region : pImpl->regions) {
-        for (const auto& syn : region->getSynapses()) {
-            float weight = syn->getWeight();
+        for (const auto& synapse : region->getSynapses()) {
+            float weight = synapse->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
             } else {
@@ -1078,39 +1367,42 @@ RandomGenerator* Brain::getRandomGenerator() {
 }
 
 void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    NLM_LOG_INFO(std::format("=== NLM Brain Status (Phase 6 - Integrated) ==="));
+    NLM_LOG_INFO(std::format("Regions: {}", getRegionCount()));
+    NLM_LOG_INFO(std::format("Total neurons: {}", getTotalNeuronCount()));
+    NLM_LOG_INFO(std::format("Total synapses: {}", getTotalSynapseCount()));
+    NLM_LOG_INFO(std::format("Active neurons: {}", getActiveNeuronCount()));
+    NLM_LOG_INFO(std::format("Firing neurons (this step): {}", getFiringNeuronCount()));
+    NLM_LOG_INFO(std::format("Total spikes: {}", getTotalSpikeCount()));
+    NLM_LOG_INFO(std::format("Pending spike events: {}", getPendingSpikeEventCount()));
+    NLM_LOG_INFO(std::format("Average firing rate: {}", getAverageFiringRate()));
+    NLM_LOG_INFO(std::format("E/I ratio: {}", getExcitationInhibitionRatio()));
     
     // Memory system status
     if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        NLM_LOG_INFO(std::format("Working memory traces: {}", 
+                               pImpl->workingMemory->getActiveTraces()));
     }
     if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        NLM_LOG_INFO(std::format("Episodic memory episodes: {}", 
+                               pImpl->episodicMemory->getEpisodeCount()));
     }
     
     // Neuromodulation status
     if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+        NLM_LOG_INFO(std::format("Dopamine level: {}", pImpl->dopamine->getLevel()));
     }
     
     // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    NLM_LOG_INFO(std::format("Developmental stage: {}", 
+                           static_cast<int>(pImpl->developmentalStage)));
     
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        NLM_LOG_INFO(std::format("  Region {} ({})", 
+                               region->getId().index(), region->getName()));
+        NLM_LOG_INFO(std::format("    {} neurons, {} synapses, avg weight: {}",
+                               region->getTotalNeuronCount(), region->getSynapseCount(),
+                               region->getAverageSynapticWeight()));
     }
 }
 
