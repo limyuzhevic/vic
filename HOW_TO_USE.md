@@ -184,40 +184,69 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Advanced Usage Examples
+
+#### Complex Agent Simulation
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_advanced_simulation(config_params=None, num_steps=2000):
+    """Run an advanced agent simulation with brain and world."""
     
-    # 1. Create configuration
+    # 1. Create and configure brain
     config = pynlm.createDefaultConfig()
     
-    # 2. Create brain and initialize
+    if config_params:
+        for key, value in config_params.items():
+            config.set(key, value)
+    
+    # Configure advanced settings
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.synapse_density", 0.15)
+    config.set("plasticity.stdp.learning_rate", 0.002)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    config.set("brain.enable_development", True)
+    
+    # Create and initialize brain
     brain = pynlm.createBrain(config)
     brain.initialize()
     
-    # 3. Create agent brain interface
+    # 2. Create agent brain interface with world integration
     agent = pynlm.createAgentBrain(brain)
     
-    # 4. Create and configure world
+    # 3. Create and configure world
     world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
+    world.configure(
+        width=30, 
+        height=30, 
+        visionWidth=12, 
+        visionHeight=12
+    )
+    world.setAgentStart(15.0, 15.0)
     
-    # 5. Initialize agent with world
+    # Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 4. Enable advanced learning subsystems
     agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    agent.enableStructuralPlasticity(True)  # Brain can grow new connections
+    agent.enableDevelopment(True)           # Brain matures over time
+    agent.enableCuriosity(True)             # Agent explores unknown areas
     
-    # 7. Run simulation loop
+    # 5. Run detailed simulation loop with monitoring
+    print("Starting advanced agent simulation...")
+    print(f"Configuration: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+    
+    metrics = {
+        'rewards': [],
+        'firing_rates': [],
+        'curiosity_levels': [],
+        'novelty_levels': [],
+        'development_stages': []
+    }
+    
     for step in range(num_steps):
         # Update world
         world.update(timestep=0.1)
@@ -237,23 +266,146 @@ def run_agent_simulation(num_steps=1000):
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
+        # Compute and track metrics
         reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
+        metrics['rewards'].append(reward)
+        metrics['firing_rates'].append(brain.getAverageFiringRate())
+        metrics['curiosity_levels'].append(agent.getCuriosityLevel())
+        metrics['novelty_levels'].append(agent.getNoveltyLevel())
+        metrics['development_stages'].append(brain.getDevelopmentalStage())
+        
+        # Apply reward modulation with prediction error
+        predicted_reward = 0.0  # Could use prediction system here
+        agent.applyRewardModulation(reward, predicted_reward)
         
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
-        if step % 100 == 0:
+        # Print progress periodically
+        if step % 200 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Average firing rate: {brain.getAverageFiringRate():.3f}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Reward: {reward:.3f}")
+    
+    # 6. Analyze and return results
+    avg_reward = sum(metrics['rewards']) / len(metrics['rewards'])
+    avg_firing_rate = sum(metrics['firing_rates']) / len(metrics['firing_rates'])
+    
+    print(f"\n=== Simulation Complete ===")
+    print(f"Average reward: {avg_reward:.3f}")
+    print(f"Average firing rate: {avg_firing_rate:.3f}")
+    print(f"Final curiosity level: {metrics['curiosity_levels'][-1]:.3f}")
+    print(f"Final development stage: {metrics['development_stages'][-1]}")
+    
+    return metrics
 
 # Run the simulation
-run_agent_simulation(1000)
+results = run_advanced_simulation()
+```
+
+#### Brain State Management
+
+```python
+import pynlm
+import os
+
+def brain_state_manager(brain, config, steps_per_save=1000, num_episodes=5):
+    """Manage brain state saving and loading with checkpointing."""
+    
+    checkpoint_dir = "./nlm_checkpoints"
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
+    all_results = []
+    
+    for episode in range(num_episodes):
+        print(f"\n=== Episode {episode + 1}/{num_episodes} ===")
+        
+        # Reset brain for new episode
+        brain.reset()
+        brain.initialize()
+        
+        # Create fresh agent for new episode
+        agent = pynlm.createAgentBrain(brain)
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.setAgentStart(10.0, 10.0)
+        agent.initialize(world)
+        
+        # Enable learning for this episode
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        
+        # Run episode
+        episode_rewards = []
+        for step in range(steps_per_save):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            episode_rewards.append(reward)
+            agent.applyRewardModulation(reward, 0.0)
+            agent.updateDevelopment(0.1)
+        
+        # Calculate episode statistics
+        avg_reward = sum(episode_rewards) / len(episode_rewards)
+        max_reward = max(episode_rewards)
+        min_reward = min(episode_rewards)
+        
+        print(f"Episode {episode + 1} Results:")
+        print(f"  Average reward: {avg_reward:.3f}")
+        print(f"  Max reward: {max_reward:.3f}")
+        print(f"  Min reward: {min_reward:.3f}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        
+        # Save checkpoint at end of episode
+        checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_episode_{episode + 1}.bin")
+        if brain.save(checkpoint_path):
+            print(f"  Checkpoint saved: {checkpoint_path}")
+        else:
+            print(f"  Failed to save checkpoint")
+        
+        # Record episode results
+        episode_data = {
+            'episode': episode + 1,
+            'avg_reward': avg_reward,
+            'max_reward': max_reward,
+            'min_reward': min_reward,
+            'total_spikes': brain.getTotalSpikeCount(),
+            'firing_neurons': brain.getFiringNeuronCount(),
+            'final_development_stage': brain.getDevelopmentalStage(),
+            'curiosity_level': agent.getCuriosityLevel(),
+            'novelty_level': agent.getNoveltyLevel()
+        }
+        all_results.append(episode_data)
+    
+    # Save summary of all episodes
+    summary_path = os.path.join(checkpoint_dir, "simulation_summary.txt")
+    with open(summary_path, 'w') as f:
+        f.write("NLM Simulation Summary\n")
+        f.write("=" * 50 + "\n\n")
+        f.write(f"Total episodes: {num_episodes}\n")
+        f.write(f"Steps per episode: {steps_per_save}\n\n")
+        
+        for result in all_results:
+            f.write(f"Episode {result['episode']}:\n")
+            f.write(f"  Average reward: {result['avg_reward']:.3f}\n")
+            f.write(f"  Development stage: {result['final_development_stage']}\n")
+            f.write(f"  Curiosiy level: {result['curiosity_level']:.3f}\n")
+            f.write(f"  Novelty level: {result['novelty_level']:.3f}\n\n")
+    
+    print(f"\nSummary saved to: {summary_path}")
+    return all_results
+
+# Run multiple episodes with checkpointing
+results = brain_state_manager(brain, config)
 ```
 
 ### Key Classes and Methods
@@ -269,12 +421,12 @@ brain.initialize()
 
 # Simulation
 brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
+brain.step(step_number, time)     # Run step with timestamp
 brain.reset()                     # Reset brain state
 
 # Input/Output
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+action = brain.produceAction()           # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -387,9 +539,9 @@ world.setMaxEnergy(100.0)
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
 # Developmental stages

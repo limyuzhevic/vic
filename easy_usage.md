@@ -6,11 +6,44 @@ NLM is a **brain simulator** for computers. It lets you create virtual brains th
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
+- **Neuromodulation** = Teaching signals that affect learning and behavior
+- **Development** = The brain maturing and changing over time
 
-That's it! NLM simulates all of this.
+That's it! NLM simulates all of this with advanced brain systems:
+
+### Core Brain Systems:
+- **Neurons & Synapses**: Real LIF neuron dynamics with STDP and Hebbian learning
+- **Working Memory**: Persistent neural activity for holding information
+- **Episodic Memory**: Storing experiences as patterns
+- **Neuromodulation**: Dopamine, curiosity, novelty signals
+- **Cognition**: Planning, attention, concept formation
+- **Prediction**: Anticipating future states
+- **Development**: Maturing brain over time
+
+### Advanced Features:
+- **Structural Plasticity**: Growing new connections and pruning old ones
+- **Checkpointing**: Saving and loading brain states
+- **Replay Systems**: Replaying important memories for consolidation
+- **Agent Integration**: Connecting brains to environments
+
+### Python API Features:
+- **Easy Setup**: One-line commands to create brains, worlds, agents
+- **Rich Configuration**: Extensive control over brain parameters
+- **Real-time Monitoring**: Track firing rates, memory usage, learning metrics
+- **Advanced Control**: Fine-tune every aspect of brain operation
+
+The Python API makes it easy to:
+- Create and initialize virtual brains
+- Connect brains to simulated environments
+- Enable learning and development subsystems
+- Monitor brain activity and statistics
+- Save and load trained models
+- Run complex experiments
+
+These features allow you to explore artificial developmental brains with unprecedented flexibility and control.
 
 ---
 
