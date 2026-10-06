@@ -260,8 +260,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getAudio", &SensoryPercept::getAudio)
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("__repr__", [](const SensoryPercept& self) {
+            auto vision = self.getVision();
+            std::string info = "SensoryPercept";
+            if (vision) {
+                info += " vision:" + std::to_string(vision->getWidth()) + "x" + 
+                        std::to_string(vision->getHeight());
+            }
+            return info;
+        });
+        .def("__repr__", [](const SensoryPercept& self) {
+            auto vision = self.getVision();
+            std::string info = "SensoryPercept";
+            if (vision) {
+                info += " vision:" + std::to_string(vision->getWidth()) + "x" + 
+                        std::to_string(vision->getHeight());
+            }
+            return info;
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
