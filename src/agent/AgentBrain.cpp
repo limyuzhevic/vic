@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -20,43 +21,126 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
+    // Validate input
+    if (!brain) {
+        NLM_LOG_ERROR("AgentBrain constructor: Brain pointer is null");
+        return;
+    }
+    
+    try {
+        // Initialize motor and sensory neuron groups with error handling
+        initializeNeuronGroups();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("AgentBrain constructor: Exception during neuron group initialization: " + std::string(e.what()));
+    }
+}
+
+void AgentBrain::initializeNeuronGroups() {
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::initializeNeuronGroups: Brain is null");
+        return;
+    }
+    
+    for (const auto& region : brain_->getRegions()) {
+        if (!region) {
+            NLM_LOG_WARNING("AgentBrain::initializeNeuronGroups: Null region found");
+            continue;
+        }
+        
+        for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_WARNING("AgentBrain::initializeNeuronGroups: Null population found");
+                continue;
             }
+            
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                distributeMotorNeurons(pop);
+            } else if (type == NeuronType::Sensory) {
+                distributeSensoryNeurons(pop);
+            }
+        }
+    }
+}
+
+void AgentBrain::distributeMotorNeurons(std::shared_ptr<NeuralPopulation> population) {
+    if (!population) {
+        NLM_LOG_ERROR("AgentBrain::distributeMotorNeurons: Population is null");
+        return;
+    }
+    
+    auto neurons = population->getNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_WARNING("AgentBrain::distributeMotorNeurons: Population has no neurons");
+        return;
+    }
+    
+    for (Neuron* n : neurons) {
+        if (!n) {
+            NLM_LOG_WARNING("AgentBrain::distributeMotorNeurons: Null neuron found");
+            continue;
+        }
+        
+        // Distribute motor neurons to different action groups
+        size_t idx = motorForward_.size() + motorBackward_.size() + 
+                    motorTurnLeft_.size() + motorTurnRight_.size() +
+                    motorInteract_.size() + motorWait_.size();
+        
+        if (idx >= neurons.size()) {
+            NLM_LOG_WARNING("AgentBrain::distributeMotorNeurons: Index out of bounds");
+            break;
+        }
+        
+        switch (idx % 6) {
+            case 0: motorForward_.push_back(n); break;
+            case 1: motorBackward_.push_back(n); break;
+            case 2: motorTurnLeft_.push_back(n); break;
+            case 3: motorTurnRight_.push_back(n); break;
+            case 4: motorInteract_.push_back(n); break;
+            case 5: motorWait_.push_back(n); break;
+            default: 
+                NLM_LOG_WARNING("AgentBrain::distributeMotorNeurons: Unexpected index " + std::to_string(idx));
+                break;
+        }
+    }
+}
+
+void AgentBrain::distributeSensoryNeurons(std::shared_ptr<NeuralPopulation> population) {
+    if (!population) {
+        NLM_LOG_ERROR("AgentBrain::distributeSensoryNeurons: Population is null");
+        return;
+    }
+    
+    auto neurons = population->getNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_WARNING("AgentBrain::distributeSensoryNeurons: Population has no neurons");
+        return;
+    }
+    
+    for (Neuron* n : neurons) {
+        if (!n) {
+            NLM_LOG_WARNING("AgentBrain::distributeSensoryNeurons: Null neuron found");
+            continue;
+        }
+        
+        // Distribute sensory neurons with improved error handling
+        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                    sensoryInternal_.size() + sensoryProprioception_.size();
+        
+        if (idx >= neurons.size()) {
+            NLM_LOG_WARNING("AgentBrain::distributeSensoryNeurons: Index out of bounds");
+            break;
+        }
+        
+        switch (idx % 4) {
+            case 0: sensoryVision_.push_back(n); break;
+            case 1: sensoryTouch_.push_back(n); break;
+            case 2: sensoryInternal_.push_back(n); break;
+            case 3: sensoryProprioception_.push_back(n); break;
+            default: 
+                NLM_LOG_WARNING("AgentBrain::distributeSensoryNeurons: Unexpected index " + std::to_string(idx));
+                break;
         }
     }
 }
