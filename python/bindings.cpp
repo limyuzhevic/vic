@@ -16,6 +16,16 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/functional.h>
+#include <pybind11/chrono.h>
+#include <memory>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <iomanip>
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -25,6 +35,20 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides a comprehensive Python API for creating and simulating
+        brain-inspired spiking neural networks with multiple memory systems,
+        prediction mechanisms, and neuromodulation.
+        
+        Features:
+        - Spike-based neural dynamics (LIF neurons)
+        - Multiple memory systems (working, episodic, associative)
+        - Prediction and planning capabilities
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Developmental plasticity
+        - Real-time interaction with simulated environments
+        - Checkpoint/save functionality
+        - Comprehensive statistics and monitoring
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -65,45 +89,20 @@ PYBIND11_MODULE(pynlm, m) {
             return "<RegionId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+        py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
-
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
-
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
-
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const PopulationId& id) {
+            return std::to_string(id.value);
+        });
 
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
@@ -142,7 +141,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -162,7 +161,143 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Pythonic convenience methods
+        .def("get_int", [](Config& self, const std::string& key, int defaultValue = 0) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("default") = 0,
+           "Get integer configuration value (Pythonic)")
+        .def("get_double", [](Config& self, const std::string& key, double defaultValue = 0.0) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("default") = 0.0,
+           "Get double configuration value (Pythonic)")
+        .def("get_string", [](Config& self, const std::string& key, const std::string& defaultValue = "") {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("default") = "",
+           "Get string configuration value (Pythonic)")
+        .def("get_bool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("default") = false,
+           "Get boolean configuration value (Pythonic)")
+        // Set methods with Pythonic signatures
+        .def("set_int", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, nlm::ConfigSource::Programmatic);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        .def("set_double", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, nlm::ConfigSource::Programmatic);
+        }, py::arg("key"), py::arg("value"),
+           "Set double configuration value")
+        .def("set_string", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::Programmatic);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        .def("set_bool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::Programmatic);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        // Configuration templates for common NLM configurations
+        .def("set_default_brain_config", [](Config& self) {
+            // Default brain configuration
+            self.set("brain.neuron_count", 1000, nlm::ConfigSource::Default);
+            self.set("brain.region_count", 1, nlm::ConfigSource::Default);
+            self.set("brain.connection_probability", 0.1f, nlm::ConfigSource::Default);
+            self.set("brain.initial_weight_mean", 0.5f, nlm::ConfigSource::Default);
+            self.set("brain.initial_weight_std", 0.1f, nlm::ConfigSource::Default);
+            self.set("brain.v_thresh", -50.0f, nlm::ConfigSource::Default);
+            self.set("brain.v_rest", -70.0f, nlm::ConfigSource::Default);
+            self.set("brain.v_reset", -75.0f, nlm::ConfigSource::Default);
+            self.set("brain.tau_mem", 20.0f, nlm::ConfigSource::Default);
+            self.set("brain.tau_ref", 2.0f, nlm::ConfigSource::Default);
+            
+            // Plasticity configuration
+            self.set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+            self.set("plasticity.stdp.learning_rate", 0.001f, nlm::ConfigSource::Default);
+            self.set("plasticity.stdp.tau_plus", 20.0f, nlm::ConfigSource::Default);
+            self.set("plasticity.stdp.tau_minus", 20.0f, nlm::ConfigSource::Default);
+            self.set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+            self.set("plasticity.structural.enable", true, nlm::ConfigSource::Default);
+            
+            // Neuromodulation configuration
+            self.set("neuromod.dopamine.scale", 1.0f, nlm::ConfigSource::Default);
+            self.set("neuromod.curiosity.enable", true, nlm::ConfigSource::Default);
+            self.set("neuromod.novelty.enable", true, nlm::ConfigSource::Default);
+            
+            // Memory configuration
+            self.set("memory.working_memory.capacity", 100, nlm::ConfigSource::Default);
+            self.set("memory.episodic.max_episodes", 1000, nlm::ConfigSource::Default);
+            
+            // Development configuration
+            self.set("development.initial_plasticity_rate", 1.0f, nlm::ConfigSource::Default);
+            self.set("development.critical_period_length", 300.0f, nlm::ConfigSource::Default);
+            
+            // Simulation configuration
+            self.set("simulation.timestep", 0.001, nlm::ConfigSource::Default);
+            self.set("simulation.max_steps", 10000, nlm::ConfigSource::Default);
+        }, "Set default NLM brain configuration")
+        .def("set_performance_config", [](Config& self) {
+            // Performance-oriented configuration
+            self.set("brain.neuron_count", 500, nlm::ConfigSource::Default);
+            self.set("brain.region_count", 2, nlm::ConfigSource::Default);
+            self.set("brain.connection_probability", 0.05f, nlm::ConfigSource::Default);
+            self.set("plasticity.stdp.learning_rate", 0.0015f, nlm::ConfigSource::Default);
+            self.set("plasticity.structural.enable", false, nlm::ConfigSource::Default);  // For performance
+            self.set("memory.working_memory.capacity", 50, nlm::ConfigSource::Default);
+        }, "Set performance-optimized configuration")
+        .def("set_research_config", [](Config& self) {
+            // Research-oriented configuration with full capabilities
+            self.set("brain.neuron_count", 5000, nlm::ConfigSource::Default);
+            self.set("brain.region_count", 4, nlm::ConfigSource::Default);
+            self.set("brain.connection_probability", 0.2f, nlm::ConfigSource::Default);
+            self.set("plasticity.stdp.learning_rate", 0.0005f, nlm::ConfigSource::Default);
+            self.set("plasticity.structural.enable", true, nlm::ConfigSource::Default);
+            self.set("memory.working_memory.capacity", 500, nlm::ConfigSource::Default);
+            self.set("memory.episodic.max_episodes", 10000, nlm::ConfigSource::Default);
+            self.set("neuromod.curiosity.enable", true, nlm::ConfigSource::Default);
+            self.set("neuromod.novelty.enable", true, nlm::ConfigSource::Default);
+        }, "Set research-oriented configuration")
+        }, py::arg("dict"), "Load configuration from Python dictionary");
+        
+        // Advanced configuration methods
+        .def("merge_config", [](Config& self, const Config& other) {
+            // Merge another config into this one (other takes precedence)
+            for (const auto& key : other.getKeys()) {
+                auto val = other.get<std::string>(key);
+                if (val) {
+                    self.set(key, *val, nlm::ConfigSource::Programmatic);
+                }
+            }
+            return true;
+        }, py::arg("other"), "Merge another configuration into this one")
+        .def("get_config_subset", [](const Config& self, const std::vector<std::string>& keys) {
+            py::dict result;
+            for (const auto& key : keys) {
+                if (self.has(key)) {
+                    auto val = self.get<std::string>(key);
+                    if (val) {
+                        result[key] = *val;
+                    }
+                }
+            }
+            return result;
+        }, py::arg("keys"), "Get a subset of configuration keys as dictionary")
+        .def("clone", []() {
+            return std::make_shared<Config>();
+        }, "Create a new empty configuration")
+        .def("copy_from", [](Config& self, const Config& other) {
+            self.clear();
+            for (const auto& key : other.getKeys()) {
+                auto val = other.get<std::string>(key);
+                if (val) {
+                    self.set(key, *val, nlm::ConfigSource::Programmatic);
+                }
+            }
+            return true;
+        }, py::arg("other"), "Copy configuration from another config");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

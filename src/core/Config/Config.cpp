@@ -3,11 +3,180 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <map>
+#include <set>
 
 namespace nlm {
 
+// Configuration validation rules
+struct ConfigValidationRules {
+    std::map<std::string, std::function<bool(const ConfigValue&)>> validators;
+    std::set<std::string> requiredKeys;
+    std::map<std::string, ConfigValue> defaults;
+};
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unique_ptr<ConfigValidationRules> validationRules;
+    
+    Impl() : validationRules(std::make_unique<ConfigValidationRules>()) {
+        // Initialize validation rules
+        initializeValidationRules();
+    }
+    
+    void initializeValidationRules() {
+        // Brain configuration validation
+        validationRules->validators["brain.neuron_count"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<int64_t>(v) && std::get<int64_t>(v) > 0 && std::get<int64_t>(v) <= 100000; };
+        
+        validationRules->validators["brain.region_count"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<int64_t>(v) && std::get<int64_t>(v) > 0 && std::get<int64_t>(v) <= 100; };
+        
+        validationRules->validators["brain.connection_probability"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0 && std::get<double>(v) <= 1.0; };
+        
+        // Plasticity configuration validation
+        validationRules->validators["plasticity.stdp.learning_rate"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0 && std::get<double>(v) <= 0.1; };
+        
+        validationRules->validators["plasticity.hebbian.learning_rate"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0 && std::get<double>(v) <= 0.1; };
+        
+        // Neuromodulation validation
+        validationRules->validators["neuromod.dopamine.scale"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0; };
+        
+        validationRules->validators["neuromod.curiosity.threshold"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0 && std::get<double>(v) <= 1.0; };
+        
+        // Memory validation
+        validationRules->validators["memory.working_memory.capacity"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<int64_t>(v) && std::get<int64_t>(v) > 0; };
+        
+        // Development validation
+        validationRules->validators["development.initial_plasticity_rate"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0 && std::get<double>(v) <= 1.0; };
+        
+        // Simulation validation
+        validationRules->validators["simulation.timestep"] = 
+            [](const ConfigValue& v) { return std::holds_alternative<double>(v) && std::get<double>(v) > 0.0 && std::get<double>(v) <= 0.1; };
+        
+        // Required keys
+        validationRules->requiredKeys = {
+            "brain.neuron_count",
+            "brain.connection_probability",
+            "plasticity.stdp.learning_rate",
+            "neuromod.curiosity.enable"
+        };
+        
+        // Default values for missing keys
+        validationRules->defaults = {
+            {"brain.region_count", int64_t(1)},
+            {"brain.initial_weight_mean", double(0.5)},
+            {"brain.initial_weight_std", double(0.1)},
+            {"brain.v_thresh", double(-50.0)},
+            {"brain.v_rest", double(-70.0)},
+            {"brain.v_reset", double(-75.0)},
+            {"brain.tau_mem", double(20.0)},
+            {"brain.tau_ref", double(2.0)},
+            {"plasticity.stdp.tau_plus", double(20.0)},
+            {"plasticity.stdp.tau_minus", double(20.0)},
+            {"plasticity.hebbian.enable", bool(true)},
+            {"plasticity.structural.enable", bool(true)},
+            {"neuromod.dopamine.scale", double(1.0)},
+            {"neuromod.curiosity.enable", bool(true)},
+            {"neuromod.novelty.enable", bool(true)},
+            {"neuromod.curiosity.threshold", double(0.5)},
+            {"memory.working_memory.capacity", int64_t(100)},
+            {"memory.episodic.max_episodes", int64_t(1000)},
+            {"development.initial_plasticity_rate", double(1.0)},
+            {"development.critical_period_length", double(300.0)},
+            {"simulation.timestep", double(0.001)},
+            {"simulation.max_steps", int64_t(10000)}
+        };
+    }
+    
+    bool validate() const {
+        std::vector<std::string> errors;
+        
+        // Check required keys
+        for (const auto& requiredKey : validationRules->requiredKeys) {
+            if (!hasKey(requiredKey)) {
+                errors.push_back("Missing required key: " + requiredKey);
+            }
+        }
+        
+        // Validate all entries
+        for (const auto& entry : entries) {
+            auto it = validationRules->validators.find(entry.key);
+            if (it != validationRules->validators.end()) {
+                if (!it->second(entry.value)) {
+                    errors.push_back("Invalid value for key '" + entry.key + "': " + configValueToString(entry.value));
+                }
+            }
+        }
+        
+        // Check for inconsistencies
+        auto neuronCount = get<int64_t>("brain.neuron_count");
+        auto regionCount = get<int64_t>("brain.region_count");
+        if (neuronCount && regionCount && *neuronCount < *regionCount) {
+            errors.push_back("brain.neuron_count must be >= brain.region_count");
+        }
+        
+        return errors.empty();
+    }
+    
+    std::vector<std::string> getValidationErrors() const {
+        std::vector<std::string> errors;
+        
+        for (const auto& entry : entries) {
+            auto it = validationRules->validators.find(entry.key);
+            if (it != validationRules->validators.end()) {
+                if (!it->second(entry.value)) {
+                    errors.push_back("Invalid value for key '" + entry.key + "': " + configValueToString(entry.value));
+                }
+            }
+        }
+        
+        return errors;
+    }
+    
+    std::string configValueToString(const ConfigValue& value) const {
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << arg;
+            }
+        }, value);
+        return oss.str();
+    }
+    
+    bool hasKey(const std::string& key) const {
+        return std::any_of(entries.begin(), entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+    }
+    
+    template<typename T>
+    std::optional<T> get(const std::string& key) const {
+        auto it = std::find_if(entries.begin(), entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == entries.end()) {
+            return std::nullopt;
+        }
+        
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
+    }
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,36 +188,76 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to load as JSON first (modern approach)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    file.close();
+    
+    std::string content = buffer.str();
+    
+    // Try JSON parsing first
+    try {
+        auto json = nlohmann::json::parse(content);
+        clear(); // Clear existing config
+        
+        // Convert JSON to Config entries
+        for (const auto& item : json.items()) {
+            const std::string& key = item.key();
+            
+            if (item.is_boolean()) {
+                set(key, item.get<bool>(), ConfigSource::File);
+            } else if (item.is_number_integer()) {
+                set(key, item.get<int64_t>(), ConfigSource::File);
+            } else if (item.is_number_float()) {
+                set(key, item.get<double>(), ConfigSource::File);
+            } else if (item.is_string()) {
+                set(key, item.get<std::string>(), ConfigSource::File);
+            } else if (item.is_array()) {
+                // Handle arrays - currently only support string arrays
+                std::vector<std::string> strArray;
+                for (const auto& element : item) {
+                    strArray.push_back(element.get<std::string>());
+                }
+                set(key, ConfigValue(strArray), ConfigSource::File);
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        return true;
+    } catch (const nlohmann::json::parse_error&) {
+        // JSON parsing failed, try old format
+        file.open(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     

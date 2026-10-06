@@ -18,6 +18,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find nlohmann/json for modern configuration file parsing
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -83,6 +86,15 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    # Advanced experiments and tools
+    src/experiments/AdvancedNLMSystemIntegration.cpp
+    src/experiments/AdvancedNLMSystemMain.cpp
+    src/experiments/DemoAdvancedConfigManager.cpp
+    src/experiments/DemoPerformanceProfiler.cpp
+    src/experiments/DemoDataExportTool.cpp
+    src/experiments/DemoMemoryAnalysis.cpp
+    src/experiments/DemoVisualization.cpp
+    src/experiments/DemoDebuggingTools.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -127,17 +139,53 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Advanced system demo executable
+add_executable(nlm_advanced_system_demo
+    src/experiments/AdvancedNLMSystemMain.cpp
+)
+target_link_libraries(nlm_advanced_system_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Advanced configuration manager demo executable
+add_executable(nlm_advanced_config_demo
+    src/experiments/DemoAdvancedConfigManager.cpp
+)
+target_link_libraries(nlm_advanced_config_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+# Advanced performance profiler demo executable
+add_executable(nlm_advanced_perf_demo
+    src/experiments/DemoPerformanceProfiler.cpp
+)
+target_link_libraries(nlm_advanced_perf_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Advanced data export demo executable
+add_executable(nlm_advanced_data_export_demo
+    src/experiments/DemoDataExportTool.cpp
+)
+target_link_libraries(nlm_advanced_data_export_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Advanced memory analysis demo executable
+add_executable(nlm_advanced_memory_demo
+    src/experiments/DemoMemoryAnalysis.cpp
+)
+target_link_libraries(nlm_advanced_memory_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Advanced visualization demo executable
+add_executable(nlm_advanced_viz_demo
+    src/experiments/DemoVisualization.cpp
+)
+target_link_libraries(nlm_advanced_viz_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Advanced debugging demo executable
+add_executable(nlm_advanced_debug_demo
+    src/experiments/DemoDebuggingTools.cpp
+)
+target_link_libraries(nlm_advanced_debug_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Testing
 enable_testing()

@@ -73,111 +73,198 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Advanced Usage: Learning and Memory
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Example 3: Learning Brain with Memory
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create configuration for learning
+config = pynlm.createDefaultConfig()
+config.set_int("brain.neuron_count", 2000)
+config.set_double("plasticity.stdp.learning_rate", 0.01)
+config.set_bool("neuromod.curiosity.enable", True)
+config.set_bool("neuromod.novelty.enable", True)
+config.set_bool("memory.working_memory.capacity", 200)
+config.set_bool("memory.episodic.max_episodes", 500)
 
-# Initialize it
+# Create brain with learning capabilities
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Make it active
-brain.step(0)
+# Create agent with learning
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)  # Enable reward-based learning
+agent.enableCuriosity(True)         # Enable curiosity-driven exploration
+agent.enableDevelopment(True)       # Enable developmental changes
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Create environment
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run learning simulation
+for step in range(200):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process and learn
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    # Act
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply learning if curiosity or reward is enabled
+    if agent.isCuriosityEnabled() or agent.isRewardModulationEnabled():
+        # Simulate reward based on world state
+        reward = percept.getInternal()[0] if not percept.getInternal().empty() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        agent.updateDevelopment(0.1)
+    
+    # Print progress
+    if step % 40 == 0:
+        print(f"Step {step}:")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+        print(f"  Prediction error: {agent.getPredictionError():.3f}")
+        print(f"  Developmental stage: {agent.getDevelopmentalStage()}")
+
+print("Learning simulation complete!")
 ```
 
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
+### Example 4: Complete Agent with All Features
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
+import pynlm
+
+def run_advanced_agent_simulation(num_steps=500):
+    """Run a complete agent simulation with all NLM features enabled."""
+    
+    # 1. Create configuration with all systems enabled
+    config = pynlm.createDefaultConfig()
+    
+    # Brain configuration
+    config.set_int("brain.neuron_count", 3000)
+    config.set_int("brain.region_count", 2)
+    config.set_double("brain.connection_probability", 0.15)
+    
+    # Learning configuration  
+    config.set_bool("plasticity.stdp.enable", True)
+    config.set_double("plasticity.stdp.learning_rate", 0.005)
+    config.set_bool("plasticity.hebbian.enable", True)
+    config.set_bool("plasticity.structural.enable", True)
+    
+    # Neuromodulation
+    config.set_bool("neuromod.curiosity.enable", True)
+    config.set_bool("neuromod.novelty.enable", True)
+    config.set_double("neuromod.curiosity.threshold", 0.3)
+    
+    # Memory systems
+    config.set_int("memory.working_memory.capacity", 300)
+    config.set_int("memory.episodic.max_episodes", 1000)
+    
+    # Development
+    config.set_double("development.initial_plasticity_rate", 1.0)
+    config.set_double("development.critical_period_length", 500.0)
+    
+    # Simulation
+    config.set_double("simulation.timestep", 0.001)
+    config.set_int("simulation.max_steps", num_steps)
+    
+    # 2. Create and initialize all components
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    
+    # Configure world
+    world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(15.0, 15.0)
+    
+    # Initialize agent with world
+    agent.initialize(world)
+    
+    # Enable all advanced subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 3. Run the simulation loop
+    print("Starting advanced agent simulation...")
+    print(f"Configuration: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+    
     for step in range(num_steps):
-        # 1. Update world
+        # Update world environment
         world.update(0.1)
         
-        # 2. Get what the agent sees
+        # Get sensory input from world
         percept = world.getSensoryPercept()
         
-        # 3. Tell the brain
+        # Process sensory input through agent
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # Run brain simulation step
         brain.step(step)
         
-        # 5. Get action from brain
+        # Decode action from brain
         action = agent.decodeMotorCommand()
         
-        # 6. Do action in world
+        # Apply action in world
         world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply learning and development if enabled
+        if agent.isRewardModulationEnabled():
+            # Calculate reward based on world state
+            reward = 0.0
+            if not percept.getInternal().empty():
+                reward = percept.getInternal()[0];
+            
+            # Get predicted reward for comparison
+            predicted_reward = 0.0
+            if not percept.getInternal().empty():
+                predicted_reward = percept.getInternal()[0] * 0.8; // Simple prediction
+            
+            agent.applyRewardModulation(reward, predicted_reward);
+        
+        if agent.isDevelopmentEnabled():
+            agent.updateDevelopment(0.1);
+        
+        # Print detailed statistics every 50 steps
+        if step % 50 == 0:
+            print(f"\nStep {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount():6d}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount():6d}")
+            print(f"  E/I ratio: {brain.getExcitationInhibitionRatio():8.3f}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():8.3f}")
+            print(f"  Novelty:   {agent.getNoveltyLevel():8.3f}")
+            print(f"  Prediction error: {agent.getPredictionError():8.3f}")
+            print(f"  Dev stage: {agent.getDevelopmentalStage()}")
+            print(f"  Memory episodes: {agent.getEpisodicMemory() ? agent.getEpisodicMemory()->getEpisodeCount() : 0}")
+    
+    print(f"\nSimulation completed!")
+    print(f"Final statistics:")
+    print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"  Final firing rate: {brain.getAverageFiringRate():.3f} Hz")
+    print(f"  Final curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"  Final developmental stage: {agent.getDevelopmentalStage()}")
+    
+    return brain, agent, world
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+# Run the advanced simulation
+if __name__ == "__main__":
+    advanced_brain, advanced_agent, advanced_world = run_advanced_agent_simulation(500)
 ```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
 
 ---
 
@@ -221,7 +308,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Learning Agent
 
 ```python
 import pynlm
@@ -258,6 +345,8 @@ print("Agent simulation complete!")
 
 ## Quick Reference
 
+### Core Classes
+
 | What you want | Code |
 |--------------|------|
 | Create brain | `pynlm.createBrain(config)` |
@@ -268,6 +357,19 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+### Advanced Features
+
+| Feature | Code |
+|---------|------|
+| Enable learning | `agent.enableRewardModulation(True)` |
+| Enable curiosity | `agent.enableCuriosity(True)` |
+| Enable development | `agent.enableDevelopment(True)` |
+| Get curiosity level | `agent.getCuriosityLevel()` |
+| Get novelty level | `agent.getNoveltyLevel()` |
+| Get prediction error | `agent.getPredictionError()` |
+| Save brain state | `brain.save("checkpoint.bin")` |
+| Load brain state | `brain.load("checkpoint.bin")` |
 
 ---
 
@@ -295,3 +397,66 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+---
+
+## Advanced Configuration Examples
+
+### High-Performance Configuration
+
+```python
+config = pynlm.createDefaultConfig()
+config.set_int("brain.neuron_count", 500)      # Fewer neurons for speed
+config.set_int("brain.region_count", 2)        # Fewer regions
+config.set_double("brain.connection_probability", 0.05)  # Fewer connections
+config.set_bool("plasticity.structural.enable", False)  # Disable structural plasticity
+config.set_int("memory.working_memory.capacity", 50)     # Smaller memory
+```
+
+### Research Configuration
+
+```python
+config = pynlm.createDefaultConfig()
+config.set_int("brain.neuron_count", 5000)     # More neurons for research
+config.set_int("brain.region_count", 4)       # More regions
+config.set_double("brain.connection_probability", 0.2)    # More connections
+config.set_double("plasticity.stdp.learning_rate", 0.0005) # Slower learning
+config.set_bool("plasticity.structural.enable", True)     # Full structural plasticity
+config.set_int("memory.working_memory.capacity", 500)     # Larger memory
+config.set_int("memory.episodic.max_episodes", 10000)     # More memory episodes
+config.set_bool("neuromod.curiosity.enable", True)        # Full neuromodulation
+config.set_bool("neuromod.novelty.enable", True)
+```
+
+### Development Configuration
+
+```python
+config = pynlm.createDefaultConfig()
+config.set_int("brain.neuron_count", 1000)
+config.set_double("development.initial_plasticity_rate", 1.0)  # High initial plasticity
+config.set_double("development.critical_period_length", 1000.0)  # Longer critical period
+config.set_double("simulation.timestep", 0.001)  # Fine time resolution
+```
+
+---
+
+## Configuration Templates
+
+The NLM API includes several pre-configured templates for common use cases:
+
+- `set_default_brain_config()` - Balanced, full-featured brain
+- `set_performance_config()` - Optimized for speed
+- `set_research_config()` - Optimized for research
+
+These can be called directly on any `Config` object:
+
+```python
+config = pynlm.createDefaultConfig()
+config.set_default_brain_config()  # Use default settings
+# or
+config.set_performance_config()   # Use performance settings
+# or
+config.set_research_config()      # Use research settings
+```
+
+This ensures you get sensible defaults for any application.
