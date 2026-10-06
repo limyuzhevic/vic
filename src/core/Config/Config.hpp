@@ -5,11 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <spdlog/spdlog.h>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigManager;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -43,7 +45,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class - now using ConfigManager for enhanced functionality
 class Config {
 public:
     Config();
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (now uses ConfigManager for better format support)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,9 +95,14 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get reference to the underlying config manager
+    ConfigManager& getConfigManager() { return *configManager_; }
+    const ConfigManager& getConfigManager() const { return *configManager_; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::unique_ptr<ConfigManager> configManager_;
     
     // Internal helpers
     static std::string trim(const std::string& str);
