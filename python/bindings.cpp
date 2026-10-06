@@ -152,6 +152,37 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        // Set methods with various types
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value as string")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value as int")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value as double")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value as boolean")
+        // Get methods with type conversion
+        .def("get", [](Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : "";
+        }, py::arg("key"), "Get configuration value as string (empty if not found)")
+        .def("get_int", [](Config& self, const std::string& key, int defaultValue = 0) {
+            auto value = self.get<int>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get configuration value as int")
+        .def("get_float", [](Config& self, const std::string& key, double defaultValue = 0.0) {
+            auto value = self.get<double>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0, "Get configuration value as float")
+        .def("get_bool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get configuration value as boolean")
+        // Check existence
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
