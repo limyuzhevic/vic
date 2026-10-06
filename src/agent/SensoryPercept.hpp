@@ -4,6 +4,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include <memory>
 #include <vector>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -21,6 +22,12 @@ public:
     size_t getVisionWidth() const { return visionWidth_; }
     size_t getVisionHeight() const { return visionHeight_; }
     
+    // Set vision with validation
+    void setVisionWithValidation(const std::vector<float>& v);
+    
+    // Set vision grid with custom dimensions
+    void setVisionGrid(size_t width, size_t height, const std::vector<float>& grid);
+    
     // Touch/proximity sensors (binary collision signals)
     const std::vector<float>& getTouch() const { return touch_; }
     void setTouch(const std::vector<float>& t) { touch_ = t; }
@@ -36,6 +43,10 @@ public:
     // Audio-like signals (if enabled)
     const std::vector<float>& getAudio() const { return audio_; }
     void setAudio(const std::vector<float>& a) { audio_ = a; }
+    void enableAudio(size_t samples, float sampleRate);
+    void addAudioSample(float sample);
+    std::vector<float> getAudioSamples() const;
+    size_t getAudioSampleRate() const;
     
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
@@ -43,6 +54,20 @@ public:
     // Timestamp
     double getTimestamp() const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }
+    
+    // Enhanced utility methods
+    float getVisionSum() const;
+    float getVisionMax() const;
+    float getVisionAverage() const;
+    std::vector<float> getVisionHistogram(size_t bins) const;
+    
+    // Noise and signal processing
+    void addNoise(float noiseLevel);
+    
+    // Reset functionality
+    void clear();
+    
+    void validateAll() const;
     
 private:
     std::vector<float> vision_;
@@ -53,6 +78,7 @@ private:
     std::vector<float> proprioception_;
     std::vector<float> audio_;
     double timestamp_;
+    size_t audioSampleRate_;  // Sample rate for audio signals
 };
 
 } // namespace nlm

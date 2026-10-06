@@ -3,6 +3,9 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <algorithm>
+#include <stdexcept>
+#include <cmath>
 
 namespace nlm {
 
@@ -40,6 +43,18 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
+// Constants for LIF neuron dynamics
+namespace NeuronConstants {
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
+    static constexpr float TIME_CONSTANT = 20.0f;       // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float MIN_POTENTIAL = -100.0f;
+    static constexpr float MAX_POTENTIAL = 50.0f;
+    static constexpr float DEFAULT_ADAPTATION = 1.0f;
+    static constexpr float ADAPTATION_DECAY = 0.95f;
+    static constexpr float ADAPTATION_EFFECT = 0.01f;
+}
+
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
@@ -56,47 +71,60 @@ public:
     Neuron& operator=(Neuron&&) noexcept;
     
     // Identity
-    NeuronId getId() const;
+    NeuronId getId() const { return id_; }
     
     // Type
-    NeuronType getType() const;
-    void setType(NeuronType type);
+    NeuronType getType() const { return type_; }
+    void setType(NeuronType type) { type_ = type; }
     
     // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
+    const NeuronState& getState() const { return state_; }
+    NeuronState& getState() { return state_; }
     
     // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
+    MembranePotential getMembranePotential() const { return state_.membranePotential; }
+    void setMembranePotential(MembranePotential potential) { 
+        state_.membranePotential = potential; 
+        validatePotential(); 
+    }
+    void addToMembranePotential(MembranePotential delta) {
+        state_.membranePotential += delta;
+        validatePotential();
+    }
     
     // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
+    MembranePotential getThreshold() const { return state_.threshold; }
+    void setThreshold(MembranePotential threshold) { state_.threshold = threshold; }
     
     // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
-    void setFiringState(FiringState state);
-    void setRefractoryPeriod(uint32_t steps);
-    void decrementRefractory();
+    bool isFiring() const { return state_.firingState == FiringState::Active; }
+    bool isRefractory() const { return state_.refractoryRemaining > 0; }
+    void setFiringState(FiringState state) { state_.firingState = state; }
+    void setRefractoryPeriod(uint32_t steps) { state_.refractoryPeriod = steps; }
+    void decrementRefractory() {
+        if (state_.refractoryRemaining > 0) {
+            --state_.refractoryRemaining;
+            if (state_.refractoryRemaining == 0) {
+                state_.firingState = FiringState::Resting;
+            }
+        }
+    }
     
     // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
+    FiringRate getFiringRate() const { return state_.firingRate; }
+    void setFiringRate(FiringRate rate) { state_.firingRate = rate; }
     
     // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
-    void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
-    void setResetPotential(MembranePotential potential);
+    void setLeakConductance(MembranePotential conductance) { state_.leakConductance = conductance; }
+    MembranePotential getLeakConductance() const { return state_.leakConductance; }
+    uint32_t getRefractoryPeriod() const { return state_.refractoryPeriod; }
+    void setRestingPotential(MembranePotential potential) { state_.restingPotential = potential; }
+    MembranePotential getRestingPotential() const { return state_.restingPotential; }
+    void setResetPotential(MembranePotential potential) { state_.resetPotential = potential; }
     
     // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
+    bool checkThreshold() const { return state_.membranePotential >= state_.threshold; }
+    float getLastSpikeTime() const { return state_.lastSpikeTime; }
     
     // LIF step function - returns true if neuron fired
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
@@ -108,33 +136,36 @@ public:
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
+    MembranePotential getTotalCurrent() const { return totalCurrent_; }
+    void clearTotalCurrent() { totalCurrent_ = 0.0f; }
     
     // Spike history (recent spikes for STDP)
     void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
-    void clearSpikeHistory();
+    const std::vector<Timestamp>& getSpikeHistory() const { return spikeHistory_; }
+    void clearSpikeHistory() { spikeHistory_.clear(); }
     
     // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
+    void addIncomingSynapse(SynapseHandle handle) { incomingSynapses_.push_back(handle); }
+    void addOutgoingSynapse(SynapseHandle handle) { outgoingSynapses_.push_back(handle); }
+    const std::vector<SynapseHandle>& getIncomingSynapses() const { return incomingSynapses_; }
+    const std::vector<SynapseHandle>& getOutgoingSynapses() const { return outgoingSynapses_; }
     
     // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    const PlasticityFlags& getPlasticityFlags() const { return plasticityFlags_; }
+    PlasticityFlags& getPlasticityFlags() { return plasticityFlags_; }
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+        plasticityFlags_.hebbian = hebbian;
+        plasticityFlags_.stdp = stdp;
+        plasticityFlags_.reward_modulated = rewardModulated;
+    }
     
     // Region/population membership
-    void setRegionId(RegionId region);
-    RegionId getRegionId() const;
-    void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
+    void setRegionId(RegionId region) { regionId_ = region; }
+    RegionId getRegionId() const { return regionId_; }
+    void setPopulationId(PopulationId population) { populationId_ = population; }
+    PopulationId getPopulationId() const { return populationId_; }
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -143,9 +174,37 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Validation functions
+    void validatePotential() const {
+        if (state_.membranePotential < NeuronConstants::MIN_POTENTIAL) {
+            state_.membranePotential = NeuronConstants::MIN_POTENTIAL;
+        }
+        if (state_.membranePotential > NeuronConstants::MAX_POTENTIAL) {
+            state_.membranePotential = NeuronConstants::MAX_POTENTIAL;
+        }
+    }
+    
+    void validateSpikeHistory() {
+        if (spikeHistory_.size() > NeuronConstants::MAX_SPIKE_HISTORY) {
+            spikeHistory_.erase(spikeHistory_.begin());
+        }
+    }
+    
+    bool isSafe() const {
+        return std::isfinite(state_.membranePotential) &&
+               std::isfinite(state_.threshold) &&
+               state_.refractoryRemaining <= state_.refractoryPeriod;
+    }
+    
 private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    NeuronId id_;
+    NeuronType type_;
+    NeuronState state_;
+    RegionId regionId_;
+    PopulationId populationId_;
+    MembranePotential totalCurrent_;  // Total synaptic current input this step
+    std::vector<Timestamp> spikeHistory_;
+    std::vector<SynapseHandle> incomingSynapses_;
+    std::vector<SynapseHandle> outgoingSynapses_;
+    PlasticityFlags plasticityFlags_;
+}; // namespace nlm
