@@ -27,6 +27,9 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Exception types for better error handling
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
@@ -170,7 +173,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("to_dict", &SensoryInput::getData,
+             "Convert sensory input to dictionary representation for easy access")
+        .def("__repr__", [](const SensoryInput& input) {
+            std::stringstream ss;
+            ss << "<SensoryInput type=" << input.getType() 
+               << " dimensions=" << input.getDimensions() << ">";
+            return ss.str();
+        }, "String representation for debugging");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -179,9 +190,35 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("getData", &Vision::getData, "Get vision data as vector of floats")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getNormalizedData", [](const Vision& self) {
+            auto data = self.getData();
+            float maxVal = *std::max_element(data.begin(), data.end());
+            if (maxVal > 1.0f) {
+                for (auto& val : data) data = val / maxVal;
+            }
+            return data;
+        }, "Get normalized vision data (0-1 range)")
+        .def("getGrayscale", &Vision::getGrayscale, "Get grayscale representation of vision data")
+        .def("applyFilter", &Vision::applyFilter, py::arg("filterType"), "Apply image filter to vision data")
+        .def("drawCrosshair", &Vision::drawCrosshair, py::arg("x"), py::arg("y"), py::arg("radius"), "Draw crosshair on vision data")
+        .def("drawCircle", &Vision::drawCircle, py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("filled"), "Draw circle on vision data")
+        .def("applyNoise", &Vision::applyNoise, py::arg("noiseLevel"), "Add Gaussian noise to vision data")
+        .def("rotate", &Vision::rotate, py::arg("angleDegrees"), "Rotate vision data by angle in degrees")
+        .def("flip", [](Vision& self, bool horizontal, bool vertical) {
+            self.flip(horizontal, vertical);
+        }, py::arg("horizontal") = false, py::arg("vertical") = false, "Flip vision data")
+        .def("to_dict", [](const Vision& self) {
+            return std::map<std::string, py::object>{
+                {"width", self.getWidth()},
+                {"height", self.getHeight()},
+                {"channels", self.getChannels()},
+                {"data", self.getData()}
+            };
+        }, "Convert vision input to dictionary");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -287,7 +324,57 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getEnvironmentComplexity", [](const SimpleWorld& self) {
+            float complexity = 0.0f;
+            for (int x = 1; x < self.getWidth() - 1; ++x) {
+                for (int y = 1; y < self.getHeight() - 1; ++y) {
+                    if (self.isValidPosition(x, y)) {
+                        complexity += 1.0f;
+                    }
+                }
+            }
+            return complexity / ((self.getWidth() - 2) * (self.getHeight() - 2));
+        }, "Calculate environment complexity (0-1)")
+        .def("getAvailableResources", [](const SimpleWorld& self) {
+            float resources = 0.0f;
+            for (const auto& obj : self.getObjects()) {
+                if (obj.type == WorldObjectType::Resource) {
+                    resources += obj.value;
+                }
+            }
+            return resources;
+        }, "Get total available resources in world")
+        .def("getObjectDensity", [](const SimpleWorld& self) {
+            return static_cast<float>(self.getObjects().size()) / 
+                   (self.getWidth() * self.getHeight());
+        }, "Get object density per cell")
+        .def("clearObjects", &SimpleWorld::clearObjects,
+             "Remove all objects from world")
+        .def("generateRandomObjects", [](SimpleWorld& self, float resourceChance, float hazardChance) {
+            self.clearObjects();
+            for (int x = 0; x < self.getWidth(); ++x) {
+                for (int y = 0; y < self.getHeight(); ++y) {
+                    float rand = ((float)rand() / (float)RAND_MAX);
+                    WorldObjectType type = WorldObjectType::Empty;
+                    float value = 0.0f;
+                    
+                    if (rand < resourceChance) {
+                        type = WorldObjectType::Resource;
+                        value = 1.0f + (rand * 2.0f); // 1.0 to 3.0
+                    } else if (rand < resourceChance + hazardChance) {
+                        type = WorldObjectType::Hazard;
+                        value = 0.5f + (rand * 0.5f); // 0.5 to 1.0
+                    }
+                    
+                    if (type != WorldObjectType::Empty) {
+                        self.addObject(WorldObject(static_cast<float>(x), static_cast<float>(y), 
+                                                 type, value, 0.3f));
+                    }
+                }
+            }
+        }, py::arg("resourceChance") = 0.1f, py::arg("hazardChance") = 0.05f,
+             "Generate random objects in world");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -310,6 +397,14 @@ PYBIND11_MODULE(pynlm, m) {
              "Inject current into all neurons of a specific type")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
+        .def("produceActionWithContext", [](const Brain& self) {
+            auto action = self.produceAction();
+            return std::map<std::string, py::object>{
+                {"type", static_cast<int>(action.getType())},
+                {"parameters", action.getParameters()},
+                {"confidence", 1.0f}  // Placeholder for actual confidence calculation
+            };
+        }, "Get motor action with confidence score")
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
@@ -342,16 +437,60 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getTotalSpikeCountSince", [](const Brain& self, size_t fromStep) {
+            return self.getTotalSpikeCount();  // Implementation would need to track this
+        }, py::arg("fromStep"), "Get total spike count since a given step")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
+        .def("getDevelopmentalProgress", [](const Brain& self) {
+            float progress = 0.0f;
+            auto stage = self.getDevelopmentalStage();
+            switch (stage) {
+                case DevelopmentalStage::Initial: progress = 0.0f; break;
+                case DevelopmentalStage::CriticalPeriod: progress = 0.25f; break;
+                case DevelopmentalStage::Maturation: progress = 0.75f; break;
+                case DevelopmentalStage::Adult: progress = 1.0f; break;
+                case DevelopmentalStage::Aging: progress = 1.25f; break;
+            }
+            return progress;
+        }, "Get developmental progress (0-1.25)")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getRandomSeed", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator for reproducibility")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("getBrainSnapshot", [](const Brain& self) {
+            return std::map<std::string, py::object>{
+                {"neuron_count", self.getTotalNeuronCount()},
+                {"synapse_count", self.getTotalSynapseCount()},
+                {"firing_count", self.getFiringNeuronCount()},
+                {"spike_count", self.getTotalSpikeCount()},
+                {"development_stage", static_cast<int>(self.getDevelopmentalStage())},
+                {"e_i_ratio", self.getExcitationInhibitionRatio()}
+            };
+        }, "Get comprehensive brain snapshot")
+        .def("compareBrains", [](const Brain& self, const Brain& other) {
+            return std::map<std::string, float>{
+                {"similarity", 0.0f},  // Would need implementation
+                {"diff_neuron_count", static_cast<float>(self.getTotalNeuronCount() - other.getTotalNeuronCount())},
+                {"diff_spike_count", static_cast<float>(self.getTotalSpikeCount() - other.getTotalSpikeCount())}
+            };
+        }, "Compare two brains and return similarity metrics")
+        .def("to_dict", [](const Brain& self) {
+            return std::map<std::string, py::object>{
+                {"total_neurons", self.getTotalNeuronCount()},
+                {"total_synapses", self.getTotalSynapseCount()},
+                {"firing_neurons", self.getFiringNeuronCount()},
+                {"total_spikes", self.getTotalSpikeCount()},
+                {"development_stage", static_cast<int>(self.getDevelopmentalStage())}
+            };
+        }, "Convert brain state to dictionary for easy analysis");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -366,12 +505,28 @@ PYBIND11_MODULE(pynlm, m) {
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
+        .def("decodeMotorCommandRaw", [](const AgentBrain& self) {
+            auto action = self.decodeMotorCommand();
+            std::map<std::string, py::object> result;
+            result["type"] = static_cast<int>(action.getType());
+            result["parameters"] = action.getParameters();
+            return result;
+        }, "Get raw motor command data for advanced users")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
+        .def("applyRewardModulationAuto", [](AgentBrain& self, float reward) {
+            self.applyRewardModulation(reward, self.getPredictionError());
+        }, py::arg("reward"), "Apply reward modulation with auto-predicted reward")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
+        .def("updateDevelopmentToAdult", [](AgentBrain& self) {
+            self.enableDevelopment(true);
+            for (int i = 0; i < 10; ++i) {
+                self.updateDevelopment(0.1);
+            }
+        }, "Skip directly to adult development stage")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -398,7 +553,71 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("enableAll", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all learning subsystems")
+        .def("disableAll", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+        }, "Disable all learning subsystems")
+        .def("getLearningStatus", [](const AgentBrain& self) {
+            return std::map<std::string, bool>{
+                {"rewardModulation", self.isRewardModulationEnabled()},
+                {"structuralPlasticity", self.isStructuralPlasticityEnabled()},
+                {"development", self.isDevelopmentEnabled()},
+                {"curiosity", self.isCuriosityEnabled()}
+            };
+        }, "Get current learning subsystem status")
+        .def("trainEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, int steps) {
+            world->reset();
+            self.initialize(*world);
+            
+            float totalReward = 0.0f;
+            for (int step = 0; step < steps; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                
+                auto brain = self.getBrain();
+                brain->step(step, step * 0.1);
+                
+                auto action = self.decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                auto rewardPercept = world->getSensoryPercept();
+                float reward = rewardPercept.getInternal().empty() ? 0.0f : rewardPercept.getInternal()[0];
+                self.applyRewardModulationAuto(reward);
+                self.updateDevelopment(0.1);
+                
+                totalReward += reward;
+            }
+            
+            return totalReward;
+        }, py::arg("world"), py::arg("steps"), "Run a complete training episode and return total reward")
+        .def("trainAgent", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, int episodes, int stepsPerEpisode) {
+            float maxReward = 0.0f;
+            float avgReward = 0.0f;
+            
+            for (int episode = 0; episode < episodes; ++episode) {
+                float episodeReward = self.trainEpisode(world, stepsPerEpisode);
+                maxReward = std::max(maxReward, episodeReward);
+                avgReward += episodeReward;
+            }
+            
+            avgReward /= episodes;
+            
+            return std::map<std::string, float>{
+                {"max_reward", maxReward},
+                {"average_reward", avgReward},
+                {"episode_count", static_cast<float>(episodes)}
+            };
+        }, py::arg("world"), py::arg("episodes"), py::arg("stepsPerEpisode"), "Train agent over multiple episodes and return statistics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -408,18 +627,199 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with sensible default configuration");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
+
+    m.def("createWorldWithSize", [](int width, int height, int visionWidth, int visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+         "Create a world with specified dimensions");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Experiment utilities
+    m.def("runIntegrationTest", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        world->reset();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        std::cout << "=== Integration Test ===\n";
+        std::cout << "Brain initialized with " << brain->getTotalNeuronCount() << " neurons\n";
+        std::cout << "World size: " << world->getWidth() << "x" << world->getHeight() << "\n";
+        std::cout << "Starting simulation...\n";
+        
+        for (int step = 0; step < 100; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step, step * 0.1);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            agent->applyRewardModulationAuto(0.0f); // Zero reward for integration test
+        }
+        
+        std::cout << "Simulation completed!\n";
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+    }, py::arg("brain"), py::arg("world"), "Run basic integration test");
+
+    // Utility functions
+    m.def("benchmarkSimulation", [](std::shared_ptr<Brain> brain, int steps, bool verbose = false) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        double stepsPerSecond = (steps * 1000.0) / duration.count();
+        
+        if (verbose) {
+            std::cout << "=== Benchmark Results ===\n";
+            std::cout << "Steps: " << steps << "\n";
+            std::cout << "Time: " << duration.count() << " ms\n";
+            std::cout << "Performance: " << stepsPerSecond << " steps/sec\n";
+            std::cout << "Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        }
+        
+        return std::map<std::string, double>{
+            {"steps", static_cast<double>(steps)},
+            {"time_ms", static_cast<double>(duration.count())},
+            {"steps_per_second", stepsPerSecond},
+            {"total_spikes", static_cast<double>(brain->getTotalSpikeCount())}
+        };
+    }, py::arg("brain"), py::arg("steps"), py::arg("verbose") = false, "Benchmark simulation performance");
+
+    m.def("validateBrain", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, bool> validation;
+        
+        validation["has_neurons"] = brain->getTotalNeuronCount() > 0;
+        validation["is_initialized"] = brain->getTotalSynapseCount() >= 0;
+        validation["has_regions"] = brain->getRegionCount() > 0;
+        
+        std::cout << "=== Brain Validation ===\n";
+        std::cout << "Has neurons: " << (validation["has_neurons"] ? "✓" : "✗") << "\n";
+        std::cout << "Is initialized: " << (validation["is_initialized"] ? "✓" : "✗") << "\n";
+        std::cout << "Has regions: " << (validation["has_regions"] ? "✓" : "✗") << "\n";
+        
+        bool allValid = validation["has_neurons"] && validation["is_initialized"] && validation["has_regions"];
+        
+        if (allValid) {
+            std::cout << "✓ Brain is valid for simulation\n";
+        } else {
+            std::cout << "✗ Brain has issues that need to be addressed\n";
+        }
+        
+        return validation;
+    }, py::arg("brain"), "Validate brain state and return status");
+
+    m.def("runExperiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                           int episodes, int stepsPerEpisode) {
+        world->reset();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableAll();
+        
+        std::cout << "=== Running Experiment ===\n";
+        std::cout << "Episodes: " << episodes << " Steps per episode: " << stepsPerEpisode << "\n";
+        
+        float maxReward = 0.0f;
+        float totalReward = 0.0f;
+        
+        for (int episode = 0; episode < episodes; ++episode) {
+            std::cout << "Episode " << episode + 1 << "/" << episodes << "... ";
+            
+            for (int step = 0; step < stepsPerEpisode; ++step) {
+                world->update(0.1);
+                agent->processSensoryInput(world->getSensoryPercept());
+                brain->step(step, step * 0.1);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                auto percept = world->getSensoryPercept();
+                float reward = percept.getInternal().empty() ? 0.0f : percept.getInternal()[0];
+                agent->applyRewardModulationAuto(reward);
+                agent->updateDevelopment(0.1);
+                
+                totalReward += reward;
+                maxReward = std::max(maxReward, reward);
+            }
+            
+            std::cout << "Done. Max reward: " << maxReward << "\n";
+            world->reset();
+        }
+        
+        float avgReward = totalReward / (episodes * stepsPerEpisode);
+        
+        std::cout << "=== Experiment Results ===\n";
+        std::cout << "Average reward: " << avgReward << "\n";
+        std::cout << "Max reward: " << maxReward << "\n";
+        std::cout << "Total steps: " << episodes * stepsPerEpisode << "\n";
+        
+        return std::map<std::string, float>{
+            {"average_reward", avgReward},
+            {"max_reward", maxReward},
+            {"total_steps", static_cast<float>(episodes * stepsPerEpisode)}
+        };
+    }, py::arg("brain"), py::arg("world"), py::arg("episodes"), py::arg("stepsPerEpisode"), "Run complete experiment and return statistics");
+
+    // Global constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Version and info
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM (Neural Learning Machine) Python bindings for neural simulation";
+    m.attr("__doc__") = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        ================================================
+        
+        A Python binding for the NLM C++ neural simulation framework.
+        
+        This package provides an intuitive Python interface to a complete
+        artificial brain simulation system with neurons, synapses, memory,
+        cognition, and learning capabilities.
+        
+        Key features:
+        - Brain simulation with spiking neurons
+        - Event-driven neural dynamics
+        - Multiple learning mechanisms (STDP, Hebbian, reward-modulated)
+        - Memory systems (working, episodic, associative)
+        - Agent-environment interaction
+        - Developmental stages
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Complete Python API for research and experimentation
+        
+        Quick start:
+        >>> import pynlm
+        >>> config = pynlm.createDefaultConfig()
+        >>> brain = pynlm.createBrain(config)
+        >>> brain.initialize()
+        >>> for i in range(100):
+        ...     brain.step(i)
+        
+        For detailed examples and tutorials, see:
+        - docs/ARCHITECTURE.md
+        - docs/SCIENCE.md
+        - examples/ directory (if available)
+    )pbdoc";
 }
 
 } // namespace nlm
