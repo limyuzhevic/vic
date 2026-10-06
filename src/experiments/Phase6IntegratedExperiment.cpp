@@ -101,10 +101,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
-    
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
+    
+    // Calculate average synaptic weight if available
+    float totalWeight = 0.0f;
+    size_t synapseCount = 0;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            totalWeight += syn->getWeight();
+            ++synapseCount;
+        }
+    }
+    result.avgSynapticWeight = synapseCount > 0 ? totalWeight / synapseCount : 0.0f;
+    
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();

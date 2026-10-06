@@ -12,8 +12,48 @@
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    Phase6Config config;
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    
+    // Parse command line arguments for Phase 6 demo
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--neurons" && i + 1 < argc) {
+            config.neuronCount = std::stoi(argv[++i]);
+        } else if (arg == "--steps" && i + 1 < argc) {
+            config.maxSteps = std::stoi(argv[++i]);
+        } else if (arg == "--regions" && i + 1 < argc) {
+            config.regionCount = std::stoi(argv[++i]);
+        } else if (arg == "--connection-prob" && i + 1 < argc) {
+            config.connectionProbability = std::stof(argv[++i]);
+        } else if (arg == "--enable-dev") {
+            config.enableDevelopment = true;
+        } else if (arg == "--no-dev") {
+            config.enableDevelopment = false;
+        } else if (arg == "--no-checkpoint") {
+            config.enableCheckpointing = false;
+        } else if (arg == "--no-replay") {
+            config.enableReplay = false;
+        }         else if (arg == "--help") {
+            std::cout << "Phase 6 Demo Options:" << std::endl;
+            std::cout << "  --neurons N      Number of neurons (default: 500)" << std::endl;
+            std::cout << "  --steps S        Maximum simulation steps (default: 2000)" << std::endl;
+            std::cout << "  --regions R      Number of brain regions (default: 1)" << std::endl;
+            std::cout << "  --connection-prob P Connection probability (default: 0.15)" << std::endl;
+            std::cout << "  --enable-dev     Enable developmental plasticity" << std::endl;
+            std::cout << "  --no-dev         Disable developmental plasticity" << std::endl;
+            std::cout << "  --no-checkpoint  Disable checkpointing" << std::endl;
+            std::cout << "  --no-replay      Disable replay" << std::endl;
+            std::cout << "  --checkpoint PATH Checkpoint file path (default: ./checkpoint.bin)" << std::endl;
+            std::cout << "  --help           Show this help message" << std::endl;
+            return 0;
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            config.checkpointPath = argv[++i];
+        }
+    }
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -66,6 +106,7 @@ int main(int argc, char* argv[]) {
     std::cout << "=== FINAL RESULTS ===" << std::endl;
     std::cout << "Total reward: " << result.totalReward << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
+    std::cout << "Avg synaptic weight: " << result.avgSynapticWeight << std::endl;  // NEW: Added avg synaptic weight
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
     std::cout << std::endl;

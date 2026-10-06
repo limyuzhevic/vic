@@ -41,7 +41,7 @@ struct Phase6IntegrationResult {
     // Metrics
     float totalReward;
     float avgFiringRate;
-    float avgSynapticWeight;
+    float avgSynapticWeight;  // NEW: Added average synaptic weight
     float memoryEpisodesStored;
     float noveltyLevel;
     float curiosityLevel;
@@ -62,7 +62,7 @@ struct Phase6IntegrationResult {
         , replayWorks(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
-        , avgSynapticWeight(0.0f)
+        , avgSynapticWeight(0.0f)  // NEW: Initialize avgSynapticWeight
         , memoryEpisodesStored(0.0f)
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
