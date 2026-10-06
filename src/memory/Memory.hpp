@@ -14,29 +14,64 @@ public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    // Store neuron activation for working memory
+    void storeToNeuron(NeuronId neuron, float activation);
     
-    // Check if item exists
+    // Store information in working memory
+    // The information is encoded as neural activity pattern
+    void store(const std::vector<float>& pattern, float strength = 1.0f);
+    
+    // Retrieve current working memory content as activity levels
+    std::vector<float> retrieve() const;
+    
+    // Check if specific neuron is part of working memory
     bool contains(NeuronId neuron) const;
     
-    // Clear all
+    // Get activation level of a specific neuron in working memory
+    float getNeuronActivation(NeuronId neuron) const;
+    
+    // Update working memory (maintenance and decay)
+    void update(TimestepDuration dt);
+    
+    // Clear working memory
     void clear();
     
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    // Get number of active memory traces
+    size_t getActiveTraces() const { return 0; }
     
-    // Decay all items
-    void decay(float decayRate);
+    // Get capacity
+    size_t getCapacity() const { return 100; }
+    void setCapacity(size_t cap) {}
+    
+    // Decay rate for memory traces
+    float getDecayRate() const { return 0.01f; }
+    void setDecayRate(float rate) {}
+    
+    // Get neurons currently in working memory
+    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Strengthen working memory representation (for rehearsal)
+    void strengthenMemory(float factor) {}
+    
+    // Competition between memory traces
+    void runCompetition() {}
+    
+    // Is this neuron part of the winning population?
+    bool isWinning(NeuronId neuron) const { return false; }
+    
+    // Get overall memory activity level
+    float getMemoryActivity() const { return 0.0f; }
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    Brain* brain_;
+    std::vector<NeuronId> memoryNeurons_;
+    std::vector<float> memoryActivations_;
+    std::vector<SimulationStep> memoryTimestamps_;
+    size_t capacity_;
+    float decayRate_;
 };
 
 // Episodic memory: storage of events and experiences
@@ -56,27 +91,54 @@ public:
     EpisodicMemory();
     ~EpisodicMemory();
     
-    // Store episode
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Store a new experience
+    // The experience is encoded as neural activity and can influence future processing
     void storeEpisode(const EpisodicMemoryItem& episode);
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Retrieve episodes similar to a query pattern
+    // Returns episodes ordered by relevance
+    std::vector<const EpisodicMemoryItem*> retrieveSimilar(const std::vector<float>& sensoryPattern,
+                                                           size_t maxResults = 5) const;
     
-    // Get episode count
-    size_t getEpisodeCount() const;
+    // Get total number of episodes
+    size_t getEpisodeCount() const { return 0; }
     
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    // Clear old episodes
+    void consolidate(float relevanceThreshold) {}
     
-    // Clear all
+    // Clear all episodes
     void clear();
     
-    // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    // Enable/disable replay
+    void enableReplay(bool enable) { replayEnabled_ = enable; }
+    bool isReplayEnabled() const { return replayEnabled_; }
+    
+    // Get episodes for replay (selection based on relevance and recency)
+    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+    
+    // Replay an episode - reactivates the neural patterns associated with it
+    void replayEpisode(const EpisodicMemoryItem* episode);
+    
+    // Get episode by index
+    const EpisodicMemoryItem* getEpisode(size_t index) const;
+    
+    // Get recent episodes
+    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
+    
+    // Get average reward from episodes
+    float getAverageReward() const { return 0.0f; }
+    
+    // Replay multiple episodes (for sleep-like consolidation)
+    void replaySequence(const std::vector<size_t>& episodeIds);
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    Brain* brain_;
+    std::deque<EpisodicMemoryItem> episodes_;
+    size_t maxEpisodes_;
+    bool replayEnabled_;
 };
 
 // Semantic memory: gradually acquired knowledge

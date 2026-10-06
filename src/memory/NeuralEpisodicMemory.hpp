@@ -105,8 +105,34 @@ public:
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
 
-    // Get average reward from episodes
-    float getAverageReward() const;
+    // Export memory traces for analysis
+    bool exportMemoryTraces(const std::string& filename) const;
+    bool exportMemoryTracesJSON(const std::string& filename) const;
+    bool exportMemoryTracesCSV(const std::string& filename) const;
+    
+    // Import memory traces
+    bool importMemoryTraces(const std::string& filename);
+    
+    // Get memory statistics
+    struct MemoryStatistics {
+        size_t episodeCount;
+        size_t replayEnabled;
+        size_t activeNeurons;
+        float averageReward;
+        float averageNovelty;
+        float averageEnergy;
+        size_t maxEpisodes;
+        
+        MemoryStatistics() 
+            : episodeCount(0), replayEnabled(0), activeNeurons(0), 
+              averageReward(0), averageNovelty(0), averageEnergy(0), maxEpisodes(0) {}
+    };
+    
+    MemoryStatistics getStatistics() const;
+    
+    // Test memory functionality
+    bool testMemoryExport() const;
+    std::string getDebugInfo() const;
 
     // Clear old episodes
     void consolidate(float relevanceThreshold);

@@ -70,8 +70,13 @@ public:
     void setSequenceMemorySize(size_t size) { sequenceMemorySize_ = size; }
     void setPredictionHorizon(size_t steps) { predictionHorizon_ = steps; }
 
-    // Get neurons involved in prediction
+    // Store neuron activation for prediction
+    void storeToPredictionNeuron(NeuronId neuron, float activation);
+    
+    // Get prediction neurons
     std::vector<NeuronId> getPredictionNeurons() const;
+    
+    // Get sequence prediction neurons
     std::vector<NeuronId> getSequenceNeurons() const;
 
 private:

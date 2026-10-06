@@ -363,24 +363,157 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Add command-line options for brain control
+    // These override config file settings
+    bool enableDebugOutput = false;
+    bool enableVisualization = false;
+    bool enableVerboseLogging = false;
+    bool enableExperimentalMode = false;
+    bool enableMemoryExport = false;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = false;
+    std::string outputDirectory = "./output";
+    std::string checkpointPath = "./checkpoints/latest.bin";
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Parse additional command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Brain control options
+        if (arg.substr(0, 10) == "--debug") {
+            enableDebugOutput = true;
+            enableVerboseLogging = true;
+            enableDebugOutput = arg.find("=" ) != std::string::npos ? 
+                arg.substr(arg.find("=") + 1) == "1" : true;
+        } else if (arg.substr(0, 16) == "--visualization") {
+            enableVisualization = true;
+            if (arg.find("=" ) != std::string::npos) {
+                enableVisualization = arg.substr(arg.find("=") + 1) == "1";
+            }
+        } else if (arg.substr(0, 18) == "--verbose_logging") {
+            enableVerboseLogging = true;
+            if (arg.find("=" ) != std::string::npos) {
+                enableVerboseLogging = arg.substr(arg.find("=") + 1) == "1";
+            }
+        } else if (arg.substr(0, 18) == "--experimental") {
+            enableExperimentalMode = true;
+            if (arg.find("=" ) != std::string::npos) {
+                enableExperimentalMode = arg.substr(arg.find("=") + 1) == "1";
+            }
+        } else if (arg.substr(0, 16) == "--memory_export") {
+            enableMemoryExport = true;
+            if (arg.find("=" ) != std::string::npos) {
+                enableMemoryExport = arg.substr(arg.find("=") + 1) == "1";
+            }
+        } else if (arg.substr(0, 17) == "--checkpointing") {
+            enableCheckpointing = false;
+            if (arg.find("=" ) != std::string::npos) {
+                enableCheckpointing = arg.substr(arg.find("=") + 1) == "1";
+            }
+        } else if (arg.substr(0, 12) == "--no_replay") {
+            enableReplay = false;
+            if (arg.find("=" ) != std::string::npos) {
+                enableReplay = arg.substr(arg.find("=") + 1) != "1";
+            }
+        } else if (arg.substr(0, 18) == "--development") {
+            enableDevelopment = true;
+            if (arg.find("=" ) != std::string::npos) {
+                enableDevelopment = arg.substr(arg.find("=") + 1) == "1";
+            }
+        } else if (arg.substr(0, 13) == "--output_dir") {
+            if (arg.find("=" ) != std::string::npos) {
+                outputDirectory = arg.substr(arg.find("=") + 1);
+            } else if (i + 1 < argc) {
+                outputDirectory = argv[++i];
+            }
+        } else if (arg.substr(0, 18) == "--checkpoint_path") {
+            if (arg.find("=" ) != std::string::npos) {
+                checkpointPath = arg.substr(arg.find("=") + 1);
+            } else if (i + 1 < argc) {
+                checkpointPath = argv[++i];
+            }
+        }
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Apply command line overrides
+    if (enableDebugOutput) {
+        config->set("debug.level", 3, ConfigSource::CommandLine);
+        config->set("debug.enable", true, ConfigSource::CommandLine);
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (enableVisualization) {
+        config->set("visualization.enabled", true, ConfigSource::CommandLine);
+    }
+    
+    if (enableVerboseLogging) {
+        config->set("logging.level", "Verbose", ConfigSource::CommandLine);
+    }
+    
+    if (enableExperimentalMode) {
+        config->set("experimental.mode", true, ConfigSource::CommandLine);
+    }
+    
+    if (enableMemoryExport) {
+        config->set("export.memory.enabled", true, ConfigSource::CommandLine);
+        config->set("export.memory.path", outputDirectory + "/memory_traces/", ConfigSource::CommandLine);
+    }
+    
+    if (!enableCheckpointing) {
+        config->set("checkpointing.enabled", false, ConfigSource::CommandLine);
+    }
+    
+    if (!enableReplay) {
+        config->set("replay.enabled", false, ConfigSource::CommandLine);
+    }
+    
+    if (enableDevelopment) {
+        config->set("development.enabled", true, ConfigSource::CommandLine);
+    }
+    
+    config->set("output.directory", outputDirectory, ConfigSource::CommandLine);
+    config->set("checkpoint.path", checkpointPath, ConfigSource::CommandLine);
+    
+// Configuration options for advanced users
+    // These can be set via command line or config file
+    
+    // Memory system configuration
+    config->set("working_memory.capacity", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("working_memory.decay_rate", 0.01f, ConfigSource::Default);
+    config->set("episodic_memory.max_episodes", static_cast<int64_t>(2000), ConfigSource::Default);
+    config->set("episodic_memory.replay_enabled", true, ConfigSource::Default);
+    
+    // Prediction system configuration
+    config->set("prediction.temporal_prediction_enabled", true, ConfigSource::Default);
+    config->set("prediction.action_consequence_enabled", true, ConfigSource::Default);
+    config->set("prediction.sequence_memory_size", 100, ConfigSource::Default);
+    config->set("prediction.prediction_horizon", 10, ConfigSource::Default);
+    
+    // Cognitive system configuration
+    config->set("planner.planning_depth", 5, ConfigSource::Default);
+    config->set("planner.planning_confidence_threshold", 0.5f, ConfigSource::Default);
+    config->set("concept_formation.formation_threshold", 0.7f, ConfigSource::Default);
+    config->set("concept_formation.stability_threshold", 0.8f, ConfigSource::Default);
+    
+    // Neuromodulation configuration
+    config->set("dopamine.level", 0.5f, ConfigSource::Default);
+    config->set("dopamine.plasticity_factor", 1.0f, ConfigSource::Default);
+    config->set("curiosity.level", 0.5f, ConfigSource::Default);
+    config->set("novelty.threshold", 0.3f, ConfigSource::Default);
+    
+    // Development configuration
+    config->set("development.initial_stage", 0, ConfigSource::Default);
+    config->set("development.enable_critical_period", true, ConfigSource::Default);
+    
+    // Performance configuration
+    config->set("performance.checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    config->set("performance.checkpoint_interval", 1000, ConfigSource::Default);
+    config->set("performance.max_checkpoints", 10, ConfigSource::Default);
+    
+    // Visualization configuration
+    config->set("visualization.enabled", true, ConfigSource::Default);
+    config->set("visualization.update_rate", 30, ConfigSource::Default);
+    config->set("visualization.window_size", 1024, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");

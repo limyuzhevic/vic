@@ -574,4 +574,219 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-} // namespace nlm
+bool NeuralEpisodicMemory::testMemoryExport() const {
+    return !episodes_.empty();
+}
+
+std::string NeuralEpisodicMemory::getDebugInfo() const {
+    std::ostringstream oss;
+    oss << "NeuralEpisodicMemory Debug Info:\n";
+    oss << "  Episode count: " << episodes_.size() << "\n";
+    oss << "  Max episodes: " << maxEpisodes_ << "\n";
+    oss << "  Replay enabled: " << (replayEnabled_ ? "yes" : "no") << "\n";
+    oss << "  Average reward: " << getAverageReward() << "\n";
+    oss << "  Average novelty: " << (episodes_.empty() ? 0 : episodes_.back().novelty) << "\n";
+    oss << "  Average energy: " << (episodes_.empty() ? 0 : episodes_.back().energy) << "\n";
+    return oss.str();
+}
+
+bool NeuralEpisodicMemory::exportMemoryTraces(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for memory export: " + filename);
+        return false;
+    }
+    
+    file << "Neural Episodic Memory Trace\n";
+    file << "Timestamp: " << std::time(nullptr) << "\n";
+    file << "Total episodes: " << episodes_.size() << "\n";
+    file << "Max episodes: " << maxEpisodes_ << "\n";
+    file << "Replay enabled: " << (replayEnabled_ ? "true" : "false") << "\n";
+    file << "\nEpisodic Memory Items:\n";
+    
+    size_t episodeIndex = 0;
+    for (const auto& episode : episodes_) {
+        file << "=== Episode " << episodeIndex++ << " ===\n";
+        file << "Timestamp: " << episode.timestamp << "\n";
+        file << "Reward: " << episode.reward << "\n";
+        file << "Novelty: " << episode.novelty << "\n";
+        file << "Energy: " << episode.energy << "\n";
+        file << "Age: " << episode.age << "\n";
+        file << "Action: " << static_cast<int>(episode.action) << "\n";
+        
+        if (!episode.sensoryState.empty()) {
+            file << "Sensory state (first 10 values): ";
+            for (size_t i = 0; i < std::min(size_t(10), episode.sensoryState.size()); ++i) {
+                file << episode.sensoryState[i];
+                if (i < episode.sensoryState.size() - 1) file << ", ";
+            }
+            file << "\n";
+        }
+        
+        file << "Active neurons: [";
+        for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+            file << episode.activeNeurons[i].getId();
+            if (i < episode.activeNeurons.size() - 1) file << ", ";
+        }
+        file << "]\n";
+        
+        if (!episode.neuronActivations.empty()) {
+            file << "Neuron activations (first 10): ";
+            for (size_t i = 0; i < std::min(size_t(10), episode.neuronActivations.size()); ++i) {
+                file << episode.neuronActivations[i];
+                if (i < episode.neuronActivations.size() - 1) file << ", ";
+            }
+            file << "\n";
+        }
+        
+        file << "\n";
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Memory traces exported to: " + filename);
+    return true;
+}
+
+bool NeuralEpisodicMemory::exportMemoryTracesJSON(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    file << "  \"type\": \"NeuralEpisodicMemory\",\n";
+    file << "  \"timestamp\": " << std::time(nullptr) << ",\n";
+    file << "  \"maxEpisodes\": " << maxEpisodes_ << ",\n";
+    file << "  \"replayEnabled\": " << (replayEnabled_ ? "true" : "false") << ",\n";
+    file << "  \"episodeCount\": " << episodes_.size() << ",\n";
+    file << "  \"episodes\": [\n";
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        const auto& episode = episodes_[i];
+        file << "    {\n";
+        file << "      \"timestamp\": " << episode.timestamp << ",\n";
+        file << "      \"reward\": " << episode.reward << ",\n";
+        file << "      \"novelty\": " << episode.novelty << ",\n";
+        file << "      \"energy\": " << episode.energy << ",\n";
+        file << "      \"age\": " << episode.age << ",\n";
+        file << "      \"action\": " << static_cast<int>(episode.action) << ",\n";
+        file << "      \"sensoryState\": [";
+        
+        for (size_t j = 0; j < std::min(size_t(10), episode.sensoryState.size()); ++j) {
+            file << episode.sensoryState[j];
+            if (j < std::min(size_t(10), episode.sensoryState.size()) - 1) file << ", ";
+        }
+        file << "],\n";
+        
+        file << "      \"activeNeurons\": [";
+        for (size_t j = 0; j < episode.activeNeurons.size(); ++j) {
+            file << episode.activeNeurons[j].getId();
+            if (j < episode.activeNeurons.size() - 1) file << ", ";
+        }
+        file << "],\n";
+        
+        file << "      \"neuronActivations\": [";
+        for (size_t j = 0; j < std::min(size_t(10), episode.neuronActivations.size()); ++j) {
+            file << episode.neuronActivations[j];
+            if (j < std::min(size_t(10), episode.neuronActivations.size()) - 1) file << ", ";
+        }
+        file << "]\n";
+        
+        file << "    }";
+        if (i < episodes_.size() - 1) file << ",";
+        file << "\n";
+    }
+    
+    file << "  ],\n";
+    file << "  \"averageReward\": " << getAverageReward() << "\n";
+    file << "}\n";
+    file.close();
+    return true;
+}
+
+bool NeuralEpisodicMemory::exportMemoryTracesCSV(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "EpisodeIndex,Timestamp,Reward,Novelty,Energy,Age,Action,SensoryState1,SensoryState2,SensoryState3,ActiveNeuronsCount,NeuronActivationsCount\n";
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        const auto& episode = episodes_[i];
+        file << i << "," << episode.timestamp << "," << episode.reward << "," 
+             << episode.novelty << "," << episode.energy << "," << episode.age << "," 
+             << static_cast<int>(episode.action) << ",";
+        
+        // Add first few sensory values
+        for (size_t j = 0; j < std::min(size_t(3), episode.sensoryState.size()); ++j) {
+            file << episode.sensoryState[j];
+            if (j < std::min(size_t(3), episode.sensoryState.size()) - 1) file << ",";
+        }
+        file << "," << episode.activeNeurons.size() << "," << episode.neuronActivations.size() << "\n";
+    }
+    
+    file.close();
+    return true;
+}
+
+bool NeuralEpisodicMemory::importMemoryTraces(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for memory import: " + filename);
+        return false;
+    }
+    
+    std::string line;
+    bool inDataSection = false;
+    size_t episodeIndex = 0;
+    
+    // Skip header line
+    if (std::getline(file, line)) {
+        if (line.find("EpisodeIndex,Timestamp,Reward,Novelty,Energy,Age,Action") != std::string::npos) {
+            inDataSection = true;
+        }
+    }
+    
+    while (inDataSection && std::getline(file, line)) {
+        if (line.empty() || line.find("===") != std::string::npos) {
+            continue;
+        }
+        
+        std::stringstream ss(line);
+        std::string token;
+        std::vector<std::string> tokens;
+        
+        while (std::getline(ss, token, ',')) {
+            tokens.push_back(token);
+        }
+        
+        if (tokens.size() >= 7) {
+            EpisodicMemoryItem episode;
+            episode.timestamp = static_cast<SimulationStep>(std::stoul(tokens[1]));
+            episode.reward = std::stof(tokens[2]);
+            episode.novelty = std::stof(tokens[3]);
+            episode.energy = std::stof(tokens[4]);
+            episode.age = static_cast<SimulationStep>(std::stoul(tokens[5]));
+            episode.action = static_cast<ActionType>(std::stoi(tokens[6]));
+            
+            // Clear neural data for imported episodes
+            episode.activeNeurons.clear();
+            episode.neuronActivations.clear();
+            
+            // Add episode
+            episodes_.push_back(episode);
+            episodeIndex++;
+            
+            // Enforce max capacity
+            while (episodes_.size() > maxEpisodes_) {
+                episodes_.erase(episodes_.begin());
+            }
+        }
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Memory traces imported from: " + filename + ". Imported " + 
+                std::to_string(episodes_.size()) + " episodes.");
+    return true;
+}

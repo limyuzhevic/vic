@@ -184,8 +184,54 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Neural recording capabilities
+    struct NeuralRecording {
+        SimulationStep timestamp;
+        Timestamp time;
+        std::vector<float> neuronActivations;
+        std::vector<NeuronId> activeNeurons;
+        float averageFiringRate;
+        float predictionError;
+        
+        NeuralRecording(SimulationStep ts, Timestamp t) 
+            : timestamp(ts), time(t), averageFiringRate(0), predictionError(0) {}
+    };
+    
+    // Record neural activity for analysis
+    bool recordNeuralActivity();
+    
+    // Get neural recordings
+    const std::vector<NeuralRecording>& getNeuralRecordings() const { return neuralRecordings_; }
+    
+    // Export neural recordings to file
+    bool exportNeuralRecordings(const std::string& filename) const;
+    
+    // Clear neural recordings
+    void clearNeuralRecordings();
+    
+    // Get recording statistics
+    struct RecordingStatistics {
+        size_t totalRecordings;
+        size_t totalRecordingsRecorded;
+        float averageRecordingDuration;
+        float dataRate;
+        
+        RecordingStatistics() : totalRecordings(0), totalRecordingsRecorded(0), 
+                               averageRecordingDuration(0), dataRate(0) {}
+    };
+    
+    RecordingStatistics getRecordingStatistics() const;
+    
+    // Enable/disable neural recording
+    void enableNeuralRecording(bool enable) { neuralRecordingEnabled_ = enable; }
+    bool isNeuralRecordingEnabled() const { return neuralRecordingEnabled_; }
+    
+    // Set recording interval
+    void setRecordingInterval(size_t interval) { recordingInterval_ = interval; }
+    size_t getRecordingInterval() const { return recordingInterval_; }
+    
+    // Get last neural activity sample
+    std::vector<float> getLastNeuralActivity() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();

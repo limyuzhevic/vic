@@ -266,23 +266,29 @@ float NeuralPrediction::computeSimilarity(const std::vector<float>& a,
     return dotProduct / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-void NeuralPrediction::modulatePredictionSynapses(float error, float reward) {
-    if (!brain_) return;
+void NeuralPrediction::storeToPredictionNeuron(NeuronId neuron, float activation) {
+    // Find or add this neuron to prediction neurons
+    auto it = std::find(predictionNeurons_.begin(), predictionNeurons_.end(), neuron);
     
-    // Apply reward-modulated plasticity to prediction-related synapses
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            // If this synapse was recently active in prediction pathway
-            if (std::abs(eligibility) > 0.001f) {
-                float delta = eligibility * (reward - 0.5f) * 2.0f;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility
-                syn->decayEligibilityTrace(0.1f);
-            }
+    if (it != predictionNeurons_.end()) {
+        size_t idx = std::distance(predictionNeurons_.begin(), it);
+        // Update prediction neuron activation
+        if (brain_ && !recentSensoryStates_.empty()) {
+            // Inject current to maintain prediction
+            brain_->injectCurrent(neuron, activation * 3.0f);
         }
+    } else if (predictionNeurons_.size() < 100) {  // Limit prediction neurons
+        predictionNeurons_.push_back(neuron);
+        // Initialize prediction neuron with activation
+        if (brain_) {
+            brain_->injectCurrent(neuron, activation * 3.0f);
+        }
+    }
+    
+    // Update prediction error based on activation mismatch
+    if (!recentSensoryStates_.empty() && predictionError_ > 0.0f) {
+        // Prediction neuron is active but prediction is uncertain
+        predictionError_ = std::min(predictionError_ + 0.1f, 1.0f);
     }
 }
 

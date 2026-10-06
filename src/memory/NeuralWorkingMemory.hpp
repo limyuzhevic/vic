@@ -71,8 +71,34 @@ public:
     // Is this neuron part of the winning population?
     bool isWinning(NeuronId neuron) const;
 
-    // Get overall memory activity level
-    float getMemoryActivity() const;
+    // Export memory traces for analysis
+    bool exportMemoryTraces(const std::string& filename) const;
+    bool exportMemoryTracesJSON(const std::string& filename) const;
+    bool exportMemoryTracesCSV(const std::string& filename) const;
+    
+    // Import memory traces
+    bool importMemoryTraces(const std::string& filename);
+    
+    // Get memory statistics
+    struct MemoryStatistics {
+        size_t totalNeurons;
+        size_t activeTraces;
+        float averageActivation;
+        float totalActivity;
+        float decayRate;
+        size_t capacity;
+        float activityLevel;
+        
+        MemoryStatistics() 
+            : totalNeurons(0), activeTraces(0), averageActivation(0), 
+              totalActivity(0), decayRate(0), capacity(0), activityLevel(0) {}
+    };
+    
+    MemoryStatistics getStatistics() const;
+    
+    // Test memory functionality
+    bool testMemoryExport() const;
+    std::string getDebugInfo() const;
 
 private:
     // Create recurrent connection for maintenance

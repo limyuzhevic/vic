@@ -423,4 +423,160 @@ void AttentionalSelection::reset() {
     pImpl->inhibitionLevel.clear();
 }
 
-} // namespace nlm
+bool NeuralWorkingMemory::exportMemoryTraces(const std::string& filename) const {
+    // Simple implementation - create a text file with memory data
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for memory export: " + filename);
+        return false;
+    }
+    
+    file << "Neural Working Memory Trace\n";
+    file << "Timestamp: " << std::time(nullptr) << "\n";
+    file << "Total neurons: " << memoryNeurons_.size() << "\n";
+    file << "Active traces: " << getActiveTraces() << "\n";
+    file << "\nNeuron Activations:\n";
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        file << "Neuron " << memoryNeurons_[i].getId() << ": " << memoryActivations_[i];
+        if (i < memoryTimestamps_.size()) {
+            file << " (age: " << memoryTimestamps_[i] << ")";
+        }
+        file << "\n";
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Memory traces exported to: " + filename);
+    return true;
+}
+
+bool NeuralWorkingMemory::exportMemoryTracesJSON(const std::string& filename) const {
+    // JSON export implementation
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    file << "  \"type\": \"NeuralWorkingMemory\",\n";
+    file << "  \"timestamp\": " << std::time(nullptr) << ",\n";
+    file << "  \"capacity\": " << capacity_ << ",\n";
+    file << "  \"decayRate\": " << decayRate_ << ",\n";
+    file << "  \"activeTraces\": " << getActiveTraces() << ",\n";
+    file << "  \"memoryNeurons\": [";
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (i > 0) file << ", ";
+        file << "{\"id\": " << memoryNeurons_[i].getId() 
+             << ", \"activation\": " << memoryActivations_[i];
+        if (i < memoryTimestamps_.size()) {
+            file << ", \"age\": " << memoryTimestamps_[i];
+        }
+    }
+    file << "],\n";
+    
+    file << "  \"statistics\": {\n";
+    file << "    \"activityLevel\": " << getMemoryActivity() << ",\n";
+    file << "    \"winners\": [";
+    
+    for (size_t i = 0; i < winners_.size(); ++i) {
+        if (i > 0) file << ", ";
+        file << winners_[i].getId();
+    }
+    file << "]\n";
+    file << "}\n";
+    file.close();
+    return true;
+}
+
+bool NeuralWorkingMemory::exportMemoryTracesCSV(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "NeuronID,Activation,Age,WinStatus\n";
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+        file << memoryNeurons_[i].getId() << "," << memoryActivations_[i];
+        if (i < memoryTimestamps_.size()) {
+            file << "," << memoryTimestamps_[i];
+        } else {
+            file << ",0";
+        }
+        file << "," << (isWinner ? "1" : "0") << "\n";
+    }
+    
+    file.close();
+    return true;
+}
+
+bool NeuralWorkingMemory::importMemoryTraces(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for memory import: " + filename);
+        return false;
+    }
+    
+    std::string line;
+    bool inDataSection = false;
+    size_t neuronIndex = 0;
+    
+    while (std::getline(file, line)) {
+        if (line.find("NeuronID,Activation,Age,WinStatus") != std::string::npos) {
+            inDataSection = true;
+            continue;
+        }
+        
+        if (!inDataSection || line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        // Parse CSV line
+        std::stringstream ss(line);
+        std::string token;
+        std::vector<std::string> tokens;
+        
+        while (std::getline(ss, token, ',')) {
+            tokens.push_back(token);
+        }
+        
+        if (tokens.size() >= 2) {
+            NeuronId neuronId(std::stoull(tokens[0]));
+            float activation = std::stof(tokens[1]);
+            
+            // Check if neuron already exists
+            auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuronId);
+            if (it != memoryNeurons_.end()) {
+                size_t idx = std::distance(memoryNeurons_.begin(), it);
+                memoryActivations_[idx] = activation;
+                
+                if (tokens.size() >= 3) {
+                    SimulationStep age = static_cast<SimulationStep>(std::stoi(tokens[2]));
+                    if (idx < memoryTimestamps_.size()) {
+                        memoryTimestamps_[idx] = age;
+                    }
+                }
+            } else {
+                // Add new neuron
+                if (memoryNeurons_.size() < capacity_) {
+                    memoryNeurons_.push_back(neuronId);
+                    memoryActivations_.push_back(activation);
+                    memoryTimestamps_.push_back(tokens.size() >= 3 ? 
+                        static_cast<SimulationStep>(std::stoi(tokens[2])) : 0);
+                    
+                    // Inject current to activate neuron
+                    if (brain_) {
+                        brain_->injectCurrent(neuronId, activation * 5.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Memory traces imported from: " + filename + ". Imported " + 
+                std::to_string(memoryNeurons_.size()) + " neurons.");
+    return true;
+}
