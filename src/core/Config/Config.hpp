@@ -43,6 +43,27 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation errors
+enum class ConfigValidationError {
+    None,
+    InvalidRange,
+    InvalidType,
+    MissingRequiredKey,
+    DuplicateKey,
+    InvalidValue
+};
+
+// Configuration validation result
+struct ConfigValidationResult {
+    ConfigValidationError error;
+    std::string message;
+    std::string key;
+    
+    ConfigValidationResult() : error(ConfigValidationError::None), message(), key() {}
+    ConfigValidationResult(ConfigValidationError e, const std::string& msg, const std::string& k = "")
+        : error(e), message(msg), key(k) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -90,8 +111,10 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation
+    ConfigValidationResult validate() const;
+    bool validateKey(const std::string& key) const;
+    std::vector<ConfigValidationResult> getValidationErrors() const;
     
 private:
     struct Impl;
@@ -100,6 +123,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isValidKey(const std::string& key);
+    static ConfigValidationResult validateEntry(const ConfigEntry& entry);
+    static std::vector<std::string> getRequiredKeys();
+    static bool isValidRange(const std::string& key, const ConfigValue& value);
 };
 
 } // namespace nlm

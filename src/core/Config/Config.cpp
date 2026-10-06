@@ -86,7 +86,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Write the actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -212,4 +245,181 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+ConfigValidationResult Config::validate() const {
+    std::vector<ConfigValidationResult> errors;
+    
+    // Check for duplicate keys
+    std::map<std::string, size_t> keyCounts;
+    for (const auto& entry : pImpl->entries) {
+        keyCounts[entry.key]++;
+    }
+    
+    for (const auto& pair : keyCounts) {
+        if (pair.second > 1) {
+            errors.emplace_back(ConfigValidationError::DuplicateKey, 
+                               "Duplicate configuration key: " + pair.first, pair.first);
+        }
+    }
+    
+    // Validate each entry
+    for (const auto& entry : pImpl->entries) {
+        auto entryError = validateEntry(entry);
+        if (entryError.error != ConfigValidationError::None) {
+            errors.push_back(entryError);
+        }
+    }
+    
+    // Check for required keys
+    auto requiredKeys = getRequiredKeys();
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.emplace_back(ConfigValidationError::MissingRequiredKey,
+                               "Missing required configuration key: " + key, key);
+        }
+    }
+    
+    // Return first error if any, or success
+    if (errors.empty()) {
+        return ConfigValidationResult();
+    } else {
+        return errors[0];
+    }
+}
+
+bool Config::validateKey(const std::string& key) const {
+    auto result = validateEntry(ConfigEntry(key, ConfigValue(std::string("placeholder")), ConfigSource::Default));
+    return result.error == ConfigValidationError::None;
+}
+
+std::vector<ConfigValidationResult> Config::getValidationErrors() const {
+    std::vector<ConfigValidationResult> errors;
+    
+    // Check for duplicate keys
+    std::map<std::string, size_t> keyCounts;
+    for (const auto& entry : pImpl->entries) {
+        keyCounts[entry.key]++;
+    }
+    
+    for (const auto& pair : keyCounts) {
+        if (pair.second > 1) {
+            errors.emplace_back(ConfigValidationError::DuplicateKey, 
+                               "Duplicate configuration key: " + pair.first, pair.first);
+        }
+    }
+    
+    // Validate each entry
+    for (const auto& entry : pImpl->entries) {
+        auto entryError = validateEntry(entry);
+        if (entryError.error != ConfigValidationError::None) {
+            errors.push_back(entryError);
+        }
+    }
+    
+    // Check for required keys
+    auto requiredKeys = getRequiredKeys();
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.emplace_back(ConfigValidationError::MissingRequiredKey,
+                               "Missing required configuration key: " + key, key);
+        }
+    }
+    
+    return errors;
+}
+
+// Validation helper implementations
+bool Config::isValidKey(const std::string& key) {
+    if (key.empty() || key.find('=') != std::string::npos) {
+        return false;
+    }
+    // Basic key format: alphanumeric with underscores and dashes
+    return std::all_of(key.begin(), key.end(), [](char c) {
+        return std::isalnum(c) || c == '_' || c == '-';
+    });
+}
+
+ConfigValidationResult Config::validateEntry(const ConfigEntry& entry) {
+    // Check key format
+    if (!isValidKey(entry.key)) {
+        return ConfigValidationError::InvalidType,
+               "Invalid configuration key format: " + entry.key, entry.key;
+    }
+    
+    // Validate based on key and value type
+    if (!isValidRange(entry.key, entry.value)) {
+        return ConfigValidationError::InvalidRange,
+               "Invalid value range for key: " + entry.key, entry.key;
+    }
+    
+    return ConfigValidationResult();
+}
+
+std::vector<std::string> Config::getRequiredKeys() {
+    return {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability"
+    };
+}
+
+bool Config::isValidRange(const std::string& key, const ConfigValue& value) {
+    // Basic validation based on key type
+    if (key == "random_seed") {
+        if (std::holds_alternative<int64_t>(value)) {
+            auto val = std::get<int64_t>(value);
+            return val >= 0 && val <= 2147483647;
+        }
+        return false;
+    } else if (key == "simulation_timestep") {
+        if (std::holds_alternative<double>(value)) {
+            auto val = std::get<double>(value);
+            return val > 0.0 && val <= 1.0;
+        }
+        return false;
+    } else if (key == "neuron_count") {
+        if (std::holds_alternative<int64_t>(value)) {
+            auto val = std::get<int64_t>(value);
+            return val > 0 && val <= 100000;
+        }
+        return false;
+    } else if (key == "region_count") {
+        if (std::holds_alternative<int64_t>(value)) {
+            auto val = std::get<int64_t>(value);
+            return val > 0 && val <= 100;
+        }
+        return false;
+    } else if (key == "connection_probability") {
+        if (std::holds_alternative<double>(value)) {
+            auto val = std::get<double>(value);
+            return val >= 0.0 && val <= 1.0;
+        }
+        return false;
+    } else if (key == "plasticity_learning_rate") {
+        if (std::holds_alternative<double>(value)) {
+            auto val = std::get<double>(value);
+            return val >= 0.0 && val <= 10.0;
+        }
+        return false;
+    }
+    
+    // For other keys, basic type validation
+    return true;
+}
+
+// Explicit template instantiations
+
