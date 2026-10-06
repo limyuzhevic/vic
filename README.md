@@ -77,12 +77,25 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+### Alternative Phase 6 Demo
+```bash
+./nlm_phase6_demo
+```
+
+This runs the dedicated Phase 6 integration demo with additional configuration options.
+
+### Phase 3/4 Demos
+```bash
+./nlm_phase3_demo
+./nlm_phase4_demo
+```
+
+These run earlier phase demonstrations.
 
 ```
 NLM/
@@ -161,6 +174,25 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+### Current Build Targets
+- `nlm` - Main Phase 6 demo (default command)
+- `nlm_phase6_demo` - Dedicated Phase 6 integration demo
+- `nlm_phase3_demo` - Phase 3 experiment demo
+- `nlm_phase4_demo` - Phase 4 experiment demo
+
+### Command Line Options for Phase 6 Demo
+The Phase 6 demo supports various command line arguments:
+
+```bash
+--steps N           Set max simulation steps (default: 10000)
+--neurons N         Set neuron count (default: 1000)
+--no-checkpoint      Disable checkpointing
+--no-replay          Disable replay system
+--no-development     Disable development system
+--quick             Quick test mode (small scale)
+--help              Show this help
+```
 
 ## Scientific Limitations
 
