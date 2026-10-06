@@ -64,15 +64,12 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::exchange(other.pImpl, nullptr)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
     }
     return *this;
 }
@@ -93,102 +90,48 @@ SynapticWeight Synapse::getWeight() const {
     return pImpl->weight;
 }
 
-void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+SynapseId Synapse::getId() const {
+    return pImpl ? pImpl->id : INVALID_SYNAPSE_ID;
 }
 
-void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+NeuronId Synapse::getSourceNeuron() const {
+    return pImpl ? pImpl->sourceNeuron : INVALID_NEURON_ID;
+}
+
+NeuronId Synapse::getDestinationNeuron() const {
+    return pImpl ? pImpl->destinationNeuron : INVALID_NEURON_ID;
+}
+
+SynapticWeight Synapse::getWeight() const {
+    return pImpl ? pImpl->weight : 0.0f;
 }
 
 Delay Synapse::getDelay() const {
-    return pImpl->delay;
-}
-
-void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
+    return pImpl ? pImpl->delay : 1;
 }
 
 SynapseType Synapse::getType() const {
-    return pImpl->type;
-}
-
-void Synapse::setType(SynapseType type) {
-    pImpl->type = type;
-}
-
-bool Synapse::isExcitatory() const {
-    return pImpl->type == SynapseType::Excitatory;
-}
-
-bool Synapse::isInhibitory() const {
-    return pImpl->type == SynapseType::Inhibitory;
-}
-
-void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
-    }
-}
-
-void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
-    }
+    return pImpl ? pImpl->type : SynapseType::Excitatory;
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
+    static const std::vector<Timestamp> empty;
+    return pImpl ? pImpl->preSpikeHistory : empty;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
-}
-
-void Synapse::clearHistory() {
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
+    static const std::vector<Timestamp> empty;
+    return pImpl ? pImpl->postSpikeHistory : empty;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+    static PlasticityFlags empty;
+    return pImpl ? pImpl->plasticityFlags : empty;
 }
 
 const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
-}
-
-float Synapse::getEligibilityTrace() const {
-    return pImpl->eligibilityTrace;
-}
-
-void Synapse::setEligibilityTrace(float trace) {
-    pImpl->eligibilityTrace = trace;
-}
-
-void Synapse::decayEligibilityTrace(float decayRate) {
-    pImpl->eligibilityTrace *= (1.0f - decayRate);
-    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
-        pImpl->eligibilityTrace = 0.0f;
-    }
-}
-
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
-}
-
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+    static const PlasticityFlags empty;
+    return pImpl ? pImpl->plasticityFlags : empty;
 }
 
 void Synapse::step(Timestamp currentTime) {

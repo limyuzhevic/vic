@@ -86,7 +86,24 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Handle different value types properly
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, int> || 
+                                 std::is_same_v<T, double> || 
+                                 std::is_same_v<T, bool>) {
+                // Non-string types
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        
+        // Add source information as comment
+        file << "# Source: " << static_cast<int>(entry.source) << "\n\n";
     }
     
     return true;

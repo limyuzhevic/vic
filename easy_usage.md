@@ -286,12 +286,130 @@ print("Agent simulation complete!")
 - Some neurons need input to fire - make sure sensory input is connected
 
 ---
+## Key Differences Between Current and Planned Features
 
-## Next Steps
+### Currently Working (Easy Usage)
+- Basic brain creation and initialization
+- Simple simulation loops
+- Agent-world interaction
+- Basic sensory processing and motor output
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### Planned for Future Versions (Advanced Features)
+- **Advanced configuration options** (JSON/YAML config files)
+- **Real-time visualization** (GLFW, SDL integration)
+- **Complex learning experiments** (structured experiment runner)
+- **Performance profiling** and benchmarking
+- **Distributed computing support**
+- **Checkpoint management and recovery**
+- **Advanced neuromodulation** (detailed dopamine, curiosity, etc.)
+- **Memory system optimizations** (working/episodic memory management)
+- **Development stage progression** (detailed maturation tracking)
 
-That's it! You're now ready to use NLM.
+### API Enhancement Plan
+
+**Phase 1 (Current)**: Core functionality
+**Phase 2 (Next)**: Advanced learning and experimentation
+**Phase 3 (Future)**: Distributed computing and visualization
+
+### Upgrade Path
+
+**For Beginners**: Use the current easy examples in this guide
+
+**For Researchers**: Refer to the `HOW_TO_USE.md` for advanced configuration and usage
+
+**For Developers**: Check the C++ API documentation for extending the framework
+
+### Current Status Summary
+
+✅ **Working**:
+- Basic brain creation and simulation
+- Agent-world interaction
+- Simple learning (reward modulation)
+- Configuration file loading
+- Basic visualization
+
+⚠️ **Limited**:
+- Advanced plasticity rules (some TODOs)
+- Complete memory systems
+- Full neuromodulation
+- Complex experiment management
+
+🔄 **Planned**:
+- Advanced Python API bindings
+- Real-time visualization
+- Performance optimizations
+- Distributed computing
+
+### Getting Help
+
+1. **Read `HOW_TO_USE.md`** for advanced configuration and setup
+2. **Check `docs/ARCHITECTURE.md`** for system overview and component descriptions
+3. **Refer to `docs/SCIENCE.md`** for scientific background and implementation details
+4. **Review `docs/EXPERIMENTS.md`** for experiment examples and best practices
+
+### Performance Considerations
+
+- **Memory Usage**: Large brain configurations may require significant memory
+- **Simulation Speed**: Complex brains run slower; optimize neuron count and connections
+- **Development Stages**: Enable development features for realistic brain maturation
+- **Checkpointing**: Use for long-running experiments to prevent data loss
+
+### Best Practices
+
+1. **Start Small**: Begin with simple configurations (100-500 neurons)
+2. **Monitor Memory**: Use system monitoring tools for large simulations
+3. **Use Checkpoints**: Save brain state regularly for long experiments
+4. **Profile Performance**: Identify bottlenecks before scaling up
+5. **Document Experiments**: Use the experiment framework for reproducible research
+
+### Future Roadmap
+
+**Python API Enhancements**:
+- Complete Python bindings for all C++ classes
+- Advanced configuration management
+- Real-time data access and monitoring
+- Integration with scientific Python ecosystem (numpy, matplotlib)
+
+**C++ Improvements**:
+- Complete all TODO PHASE 2 implementations
+- Add performance optimizations
+- Implement advanced plasticity rules
+- Complete memory system integration
+
+**Documentation Updates**:
+- Comprehensive API reference
+- Tutorial series for different use cases
+- Advanced examples and best practices
+- Troubleshooting guide
+
+### Quick Reference: What's Missing?
+
+The following advanced features are planned but not yet implemented:
+
+1. **Advanced Configuration**: JSON/YAML support, validation, inheritance
+2. **Real-time Visualization**: Network graphs, spike rasters, weight matrices
+3. **Complex Learning**: Multi-stage learning, curriculum learning, meta-learning
+4. **Memory Integration**: Full working/episodic memory integration
+5. **Development Tracking**: Detailed stage progression and maturation metrics
+6. **Experiment Management**: Structured experiment definitions and results
+7. **Performance Tools**: Profiling, benchmarking, memory analysis
+8. **Distributed Computing**: Parallel processing, distributed simulations
+
+### Upgrade Recommendations
+
+**If you're starting now**:
+- Use the current easy examples
+- Focus on basic learning and interaction
+- Plan for migration to advanced features later
+
+**If you're an existing user**:
+- Refer to `HOW_TO_USE.md` for advanced features
+- Check `docs/PHASE6_FINAL_AUDIT.md` for current status
+- Consider upgrading to Phase 6 features when available
+
+**If you're a developer**:
+- Help implement TODO PHASE 2 items
+- Add Python bindings for missing classes
+- Contribute to documentation and examples
+
+This upgrade guide will be updated as new features become available.
