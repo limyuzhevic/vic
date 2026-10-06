@@ -78,20 +78,19 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+    // ========== INITIALIZED SYSTEMS ==========
+        // Initialize developmental state
+        developmentalStage = DevelopmentalStage::Initial;
+        nextRegionId = 1;
+        timestep = 0.001;
+        currentStep = 0;
+        currentTime = 0.0;
+        totalSpikesThisStep = 0;
+        totalSpikesTotal = 0;
+        isResting = false;
+        stepsSinceLastEpisode = 0;
+        replayInterval = 100;      // Replay every 100 steps
+        consolidationInterval = 1000;  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed

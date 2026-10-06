@@ -52,6 +52,9 @@ void NeuralRegion::setName(const std::string& name) {
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
     PopulationId popId(pImpl->populations.size() + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);
+    if (!population) {
+        return PopulationId(); // Return invalid ID on allocation failure
+    }
     population->setNeuronType(type);
     pImpl->populations.push_back(std::move(population));
     return popId;
