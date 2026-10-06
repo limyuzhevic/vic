@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <string>
 
@@ -25,9 +26,15 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Oxytocin;
+class Vasopressin;
 class Novelty;
+class Curiosity;
 class PredictionError;
+class NeuromodulatorManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

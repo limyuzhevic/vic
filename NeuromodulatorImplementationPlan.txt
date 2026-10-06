@@ -1,0 +1,74 @@
+// Complete Implementation Plan for Missing Neuromodulators
+
+// Implementation Priority:
+// 1. Serotonin (5-HT) - Mood, impulsivity, social behavior
+// 2. Norepinephrine (NE) - Arousal and vigilance  
+// 3. Acetylcholine (ACh) - Attention and memory consolidation
+// 4. Oxytocin - Social bonding and trust
+// 5. Vasopressin - Social behavior and pair bonding
+
+// Key Integration Points:
+// - All neuromodulators should integrate with plasticity rules
+// - Should affect neural excitability and learning rates
+// - Should interact with dopamine for reward processing
+// - Should affect working memory and attention systems
+
+// Files to modify:
+// - src/neuromodulation/Serotonin.hpp/.cpp
+// - src/neuromodulation/Norepinephrine.hpp/.cpp  
+// - src/neuromodulation/Acetylcholine.hpp/.cpp
+// - src/neuromodulation/Oxytocin.hpp/.cpp (NEW)
+// - src/neuromodulation/Vasopressin.hpp/.cpp (NEW)
+// - src/neuromodulation/Neuromodulator.cpp (Dopamine enhancement)
+// - src/brain/Brain.hpp (add new neuromodulator getters)
+// - src/brain/Brain.cpp (initialize and use new neuromodulators)
+
+// Brain.cpp Integration:
+// 1. Add new neuromodulator initializations in Impl constructor
+// 2. Update Brain::step() to use all neuromodulators
+// 3. Enhance neuromodulation effects on neural excitability
+// 4. Add neuromodulator-modulated plasticity rules
+// 5. Integrate neuromodulators with working memory and attention
+
+// Enhanced Neuromodulator Integration:
+// - Multiple neuromodulators can co-regulate neural activity
+// - Neuromodulator interactions (e.g., DA + NE for locus coeruleus)
+// - Context-dependent modulation (e.g., ACh for attention)
+// - State-dependent modulation (e.g., 5-HT for impulsivity control)
+
+// Example Implementation for Serotonin:
+// - Modulates dopamine activity
+// - Reduces impulsive actions
+// - Enhances working memory capacity
+// - Influences stress response
+
+// Example Implementation for Norepinephrine:
+// - Increases arousal and alertness
+// - Enhances signal-to-noise ratio
+// - Improves focus and attention
+// - Modulates plasticity thresholds
+
+// Example Implementation for Acetylcholine:
+// - Enhances working memory
+// - Promotes memory consolidation
+// - Modulates sensory processing
+// - Improves attention to task-relevant stimuli
+
+// Example Implementation for Oxytocin:
+// - Promotes social bonding
+// - Reduces fear responses
+// - Enhances trust in social contexts
+// - Modulates reward processing
+
+// Example Implementation for Vasopressin:
+// - Enhances social recognition
+// - Modulates aggressive behavior
+// - Influences pair bonding
+// - Regulates stress response
+
+// Testing and Validation:
+// - Measure neuromodulator interactions
+// - Verify behavioral effects (exploration, social behavior)
+// - Test learning performance with different neuromodulator profiles
+// - Validate stress and arousal regulation
+// - Assess working memory and attention effects

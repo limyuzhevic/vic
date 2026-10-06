@@ -1,0 +1,135 @@
+// Fixed Brain.cpp integration - Prediction System and Concept Formation Integration
+
+// The following are the key fixes needed for proper Phase 6 integration:
+
+// Fix 1: Enhanced Prediction System Integration (Step 8)
+// Replace lines 512-516 in original Brain.cpp:
+
+void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
+    /* ... existing code ... */
+    
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Get current neural activity from working memory for prediction
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Create sensory-like observation from active neural traces
+            std::vector<float> neuralObservation;
+            for (NeuronId neuronId : memoryNeurons) {
+                float activation = pImpl->workingMemory->getTraceStrength(neuronId);
+                neuralObservation.push_back(activation);
+            }
+            
+            // Update prediction system with current neural state
+            SensoryInput neuralInput(neuralObservation);
+            pImpl->predictionSystem->updatePredictions(neuralInput);
+            pImpl->predictionSystem->predictNextState(neuralInput);
+            
+            // Track prediction error for neuromodulation
+            pImpl->predictionSystem->computePredictionError();
+            
+            // Feed prediction error to neuromodulation systems
+            if (pImpl->predictionError) {
+                float errorSignal = pImpl->predictionSystem->getPredictionError();
+                pImpl->predictionError->update(errorSignal, currentTime);
+                pImpl->dopamine->applyPredictionError(errorSignal);
+            }
+        }
+    }
+
+// Fix 2: Enhanced Concept Formation Integration (Step 10)
+// Replace lines 529-533 in original Brain.cpp:
+
+// ========== STEP 10: Update concept formation ==========
+if (pImpl->conceptFormation && pImpl->workingMemory && pImpl->episodicMemory) {
+    // Get current neural activity patterns from working memory
+    auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+    if (!memoryNeurons.empty()) {
+        // Get recent episodic memory for context
+        auto episodes = pImpl->episodicMemory->getRecentEpisodes(5);
+        
+        // Process neural patterns to form concepts
+        pImpl->conceptFormation->processNeuralPatterns(
+            memoryNeurons, 
+            episodes, 
+            pImpl->currentStep
+        );
+        
+        // Update planner with formed concepts
+        if (pImpl->planner) {
+            pImpl->planner->updateWithConcepts(pImpl->conceptFormation->getRecentConcepts());
+        }
+    }
+}
+
+// Fix 3: Enhanced Working Memory Integration with Prediction
+// Replace lines 612-615 in original Brain.cpp receiveSensoryInput:
+
+// Also store in working memory
+if (pImpl->workingMemory && normalizedValue > 0.5f) {
+    pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+    
+    // Also feed sensory input to prediction system
+    if (pImpl->predictionSystem) {
+        std::vector<float> sensoryData;
+        if (!input.getData().empty()) {
+            sensoryData = input.getData();
+            SensoryInput sensoryInput(sensoryData);
+            pImpl->predictionSystem->train(sensoryInput);
+        }
+    }
+}
+
+// Fix 4: Enhanced Prediction System Initialization
+// Replace comment lines 245-246 in original Brain.cpp initialize:
+
+// Initialize prediction system
+if (pImpl->predictionSystem) {
+    // Initialize prediction system with brain reference for synaptic integration
+    pImpl->predictionSystem->initialize(this);
+    // Set prediction confidence based on initial neural activity
+    pImpl->predictionSystem->setConfidenceThreshold(0.5f);
+    // Enable prediction error tracking
+    pImpl->predictionError->setEnabled(true);
+}
+
+// Fix 5: Additional Prediction Error Integration
+// In Brain::Impl constructor, add:
+predictionError = std::make_unique<PredictionError>();
+predictionError->setBrain(this);
+
+// In step() around neuromodulation area, add:
+if (pImpl->predictionError) {
+    float errorSignal = pImpl->predictionError->getModulationSignal();
+    pImpl->dopamine->applyPredictionError(errorSignal);
+}
+
+// Also add concept formation with planner integration:
+if (pImpl->conceptFormation && pImpl->planner) {
+    // Periodically update planner with current concepts
+    if (currentStep % 1000 == 0) {
+        pImpl->planner->updateWithConcepts(pImpl->conceptFormation->getStableConcepts());
+    }
+}
+
+// Add enhanced replay integration:
+if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+    // Get episodes for replay with concept context
+    auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(
+        std::min(3u, pImpl->episodicMemory->getEpisodeCount() / 10)
+    );
+    
+    for (const auto* episode : episodesToReplay) {
+        // Enhance replay with current concept context
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->updateContextFromReplay(episode);
+        }
+        
+        // Replay enhanced with prediction system feedback
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->recordReplayExperience(episode);
+        }
+        
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+}

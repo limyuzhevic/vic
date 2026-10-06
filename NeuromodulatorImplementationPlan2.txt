@@ -1,0 +1,65 @@
+// Complete Neuromodulator Implementation Plan
+
+// Current Status:
+// - Dopamine: Partially implemented (TODO PHASE 2 placeholders)
+// - Acetylcholine: Stub implementation (placeholder)
+// - Norepinephrine: Stub implementation (placeholder)  
+// - Serotonin: Stub implementation (placeholder)
+// - PredictionError: Implemented but needs brain integration
+// - Novelty: Implemented
+// - Curiosity: Implemented
+// - Oxytocin: NOT IMPLEMENTED
+// - Vasopressin: NOT IMPLEMENTED
+
+// Priority Implementation Order:
+// 1. Complete Dopamine implementation (replace TODOs)
+// 2. Complete PredictionError integration with Brain::step()
+// 3. Implement Oxytocin (social bonding, trust, reduced fear)
+// 4. Implement Vasopressin (social recognition, pair bonding)
+// 5. Enhance Acetylcholine (attention, memory consolidation)
+// 6. Enhance Norepinephrine (arousal, vigilance, focus)
+// 7. Enhance Serotonin (mood, impulsivity, social behavior)
+// 8. Integrate all neuromodulators into Brain::step()
+// 9. Add neuromodulator interaction effects
+
+// Key Integration Points for Each Neuromodulator:
+// - All should integrate with plasticity rules
+// - Should affect neural excitability via current injection
+// - Should interact with working memory systems
+// - Should modulate attention and focus
+// - Should affect learning rates and consolidation
+// - Should provide signals for action selection
+
+// Neuromodulator Effects to Implement:
+// Dopamine: Reward prediction error, reinforcement learning
+// Serotonin: Mood regulation, impulse control, social behavior
+// Norepinephrine: Arousal, vigilance, signal-to-noise ratio
+// Acetylcholine: Working memory, attention, sensory processing
+// Oxytocin: Social bonding, trust, reduced anxiety
+// Vasopressin: Social recognition, pair bonding, territorial behavior
+// PredictionError: Learning error signal for curiosity
+// Novelty: Change detection for exploration
+// Curiosity: Exploration drive based on prediction error
+
+// Integration Architecture:
+// - Each neuromodulator has its own brain reference for system access
+// - Neuromodulators can affect each other (e.g., 5-HT modulates DA)
+// - All neuromodulators participate in Brain::step() timing
+// - Neuromodulators can modulate working memory competition
+// - Neuromodulators affect plasticity through multiple mechanisms
+// - Neuromodulators influence action selection probabilities
+
+// Testing Strategy:
+// - Validate neuromodulator levels under different conditions
+// - Test behavioral effects (exploration vs exploitation)
+// - Measure learning performance with neuromodulator manipulations
+// - Verify social behavior changes with oxytocin/vasopressin
+// - Assess stress and arousal regulation
+// - Test working memory capacity with ACh modulation
+
+// Performance Considerations:
+// - Neuromodulator updates should be efficient (O(1) per step)
+// - Avoid excessive computation in neural loops
+// - Use minimal memory for neuromodulator state
+// - Consider neuromodulator diffusion effects
+// - Implement neuromodulator decay correctly
