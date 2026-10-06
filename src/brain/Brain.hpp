@@ -172,17 +172,14 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Norepinephrine - arousal and vigilance  
+    Norepinephrine* getNorepinephrine();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Serotonin - mood and behavioral regulation
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
