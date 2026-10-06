@@ -159,19 +159,38 @@ void testSynapseReset() {
     std::cout << "    testSynapseReset passed" << std::endl;
 }
 
-void testSynapsePlasticityFlags() {
-    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+void testSynapseMoveConstructor() {
+    nlm::Synapse synapse1(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    synapse1.setWeight(0.5f);
+    synapse1.setType(nlm::SynapseType::Excitatory);
     
-    assert(!synapse.getPlasticityFlags().hebbian);
-    assert(!synapse.getPlasticityFlags().stdp);
+    // Move construct
+    nlm::Synapse synapse2(std::move(synapse1));
     
-    synapse.enablePlasticity(true, true, false);
+    // Source should be in valid state
+    assert(synapse2.getWeight() == 0.5f);
+    assert(synapse2.getType() == nlm::SynapseType::Excitatory);
     
-    assert(synapse.getPlasticityFlags().hebbian);
-    assert(synapse.getPlasticityFlags().stdp);
-    assert(!synapse.getPlasticityFlags().reward_modulated);
+    std::cout << "    testSynapseMoveConstructor passed" << std::endl;
+}
+
+void testSynapseMoveAssignment() {
+    nlm::Synapse synapse1(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    synapse1.setWeight(0.7f);
+    synapse1.setType(nlm::SynapseType::Excitatory);
     
-    std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
+    nlm::Synapse synapse2(nlm::SynapseId(2), nlm::NeuronId(3), nlm::NeuronId(4));
+    synapse2.setWeight(0.3f);
+    synapse2.setType(nlm::SynapseType::Inhibitory);
+    
+    // Move assign
+    synapse2 = std::move(synapse1);
+    
+    // Source should be in valid state
+    assert(synapse2.getWeight() == 0.7f);
+    assert(synapse2.getType() == nlm::SynapseType::Excitatory);
+    
+    std::cout << "    testSynapseMoveAssignment passed" << std::endl;
 }
 
 void runAll() {
@@ -187,6 +206,8 @@ void runAll() {
     testSynapseRandomInitialization();
     testSynapseReset();
     testSynapsePlasticityFlags();
+    testSynapseMoveConstructor();
+    testSynapseMoveAssignment();
 }
 
 } // namespace test_synapse

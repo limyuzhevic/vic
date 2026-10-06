@@ -147,6 +147,40 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+void testNeuronMoveConstructor() {
+    nlm::Neuron neuron1(nlm::NeuronId(1));
+    neuron1.setType(nlm::NeuronType::Excitatory);
+    neuron1.setMembranePotential(-60.0f);
+    
+    // Move construct
+    nlm::Neuron neuron2(std::move(neuron1));
+    
+    // Source should be in valid state (id might be undefined after move)
+    assert(neuron2.getType() == nlm::NeuronType::Excitatory);
+    assert(neuron2.getMembranePotential() == -60.0f);
+    
+    std::cout << "    testNeuronMoveConstructor passed" << std::endl;
+}
+
+void testNeuronMoveAssignment() {
+    nlm::Neuron neuron1(nlm::NeuronId(1));
+    neuron1.setType(nlm::NeuronType::Excitatory);
+    neuron1.setMembranePotential(-65.0f);
+    
+    nlm::Neuron neuron2(nlm::NeuronId(2));
+    neuron2.setType(nlm::NeuronType::Inhibitory);
+    neuron2.setMembranePotential(-70.0f);
+    
+    // Move assign
+    neuron2 = std::move(neuron1);
+    
+    // Source should be in valid state
+    assert(neuron2.getType() == nlm::NeuronType::Excitatory);
+    assert(neuron2.getMembranePotential() == -65.0f);
+    
+    std::cout << "    testNeuronMoveAssignment passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();
@@ -158,6 +192,8 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testNeuronMoveConstructor();
+    testNeuronMoveAssignment();
 }
 
 } // namespace test_neuron
