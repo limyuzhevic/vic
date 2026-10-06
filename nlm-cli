@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+
+"""
+NLM (熙然) - Neural Learning Machine Command Line Interface
+
+Advanced command-line tool for controlling and experimenting with the NLM brain simulation.
+Provides comprehensive control over neural networks, plasticity, memory, and learning.
+"""
+
+import argparse
+import json
+import os
+import sys
+from typing import Dict, List, Any, Optional
+import configparser
+import yaml
+
+# Add current directory to path for imports
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from src.core.Config.Config import Config
+
+class NLMCLI:
+    """Command line interface for NLM"""
+    
+    def __init__(self):
+        self.config = Config()
+        self.running = False
+        
+    def load_config(self, filepath: str) -> bool:
+        """Load configuration from file"""
+        try:
+            if filepath.endswith('.json'):
+                with open(filepath, 'r') as f:
+                    config_data = json.load(f)
+                    for key, value in config_data.items():
+                        self.config.set(key, str(value))
+            elif filepath.endswith('.yaml') or filepath.endswith('.yml'):
+                with open(filepath, 'r') as f:
+                    config_data = yaml.safe_load(f)
+                    self._flatten_dict_to_config(config_data, "")
+            elif filepath.endswith('.cfg') or filepath.endswith('.ini'):
+                # Legacy format support
+                parser = configparser.ConfigParser()
+                parser.read(filepath)
+                for section in parser.sections():
+                    for key, value in parser.items(section):
+                        full_key = f"{section}.{key}" if section else key
+                        self.config.set(full_key, value)
+            else:
+                print(f"Unsupported config file format: {filepath}")
+                return False
+            print(f"Loaded configuration from: {filepath}")
+            return True
+        except Exception as e:
+            print(f"Error loading configuration: {e}")
+            return False
+    
+    def _flatten_dict_to_config(self, d: Dict, prefix: str = ""):
+        """Flatten nested dictionary for configuration"""
+        for key, value in d.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                self._flatten_dict_to_config(value, full_key)
+            else:
+                self.config.set(full_key, str(value))
+    
+    def save_config(self, filepath: str) -> bool:
+        """Save configuration to file"""
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+            
+            # Convert to JSON format
+            config_dict = {}
+            for key in self.config.getKeys():
+                value = self.config.getOr[str](key, "")
+                config_dict[key] = value
+            
+            with open(filepath, 'w') as f:
+                json.dump(config_dict, f, indent=2)
+            
+            print(f"Saved configuration to: {filepath}")
+            return True
+        except Exception as e:
+            print(f"Error saving configuration: {e}")
+            return False
+    
+    def show_config(self, section: str = ""):
+        """Display current configuration"""
+        print("\n=== Current Configuration ===")
+        keys = self.config.getKeys()
+        
+        if section:
+            # Filter keys by section
+            keys = [k for k in keys if k.startswith(section + ".") or k == section]
+        
+        if not keys:
+            print("No configuration found")
+            return
+        
+        # Group by section
+        sections = {}
+        for key in keys:
+            if "." in key:
+                section_name, subkey = key.split(".", 1)
+                if section_name not in sections:
+                    sections[section_name] = []
+                sections[section_name].append(subkey)
+            else:
+                if "general" not in sections:
+                    sections["general"] = []
+                sections["general"].append(key)
+        
+        # Display sections
+        for section_name in sorted(sections.keys()):
+            print(f"\n[{section_name}]")
+            for subkey in sections[section_name]:
+                full_key = f"{section_name}.{subkey}" if subkey != section_name else section_name
+                value = self.config.getOr[str](full_key, "")
+                print(f"  {full_key:<30} = {value}")
+    
+    def run_experiment(self, experiment_name: str, steps: int, 
+                      params: Optional[Dict] = None):
+        """Run a neural learning experiment"""
+        print(f"\nStarting experiment: {experiment_name}")
+        print(f"Steps: {steps}")
+        
+        if params:
+            for key, value in params.items():
+                self.config.set(key, str(value))
+        
+        # TODO: Integrate with actual NLM simulation
+        # This would require calling into the C++ simulation
+        print("Experiment framework initialized")
+        print("Note: Integration with C++ NLM simulation required")
+        
+    def explore_neural_network(self, region_id: str = "default", 
+                             neurons_to_analyze: Optional[List[int]] = None):
+        """Analyze neural network properties"""
+        print(f"\nAnalyzing neural network (Region: {region_id})")
+        
+        # TODO: Integrate with actual NLM brain
+        print("Neural network analysis framework initialized")
+        print("Note: Integration with C++ NLM brain required")
+    
+    def set_neural_parameters(self, parameters: Dict):
+        """Set neural network parameters"""
+        print("\nSetting neural network parameters...")
+        
+        for key, value in parameters.items():
+            self.config.set(key, str(value))
+        
+        print("Neural parameters updated")
+    
+    def show_stats(self):
+        """Show system statistics"""
+        print("\n=== NLM System Statistics ===")
+        
+        # Basic stats
+        keys = self.config.getKeys()
+        print(f"Configuration entries: {len(keys)}")
+        
+        # Memory usage (estimated)
+        import psutil
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        print(f"Memory usage: {memory_mb:.1f} MB")
+        
+        # Simulation state
+        if self.config.has("simulation.running"):
+            running = self.config.getOr[bool]("simulation.running", False)
+            print(f"Simulation running: {running}")
+        
+        print("\nCommands available:")
+        print("  help                    Show this help message")
+        print("  config <file>          Load configuration from file")
+        print("  saveconfig <file>      Save configuration to file")
+        print("  showconfig [section]    Display configuration")
+        print("  runexp <name> <steps>  Run neural learning experiment")
+        print("  explore <region>       Analyze neural network")
+        print("  setparam <key> <value> Set neural parameter")
+        print("  stats                   Show system statistics")
+        print("  quit                   Exit NLM CLI")
+
+def main():
+    """Main CLI entry point"""
+    cli = NLMCLI()
+    
+    parser = argparse.ArgumentParser(
+        description="NLM (熙然) - Neural Learning Machine Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-cli config my_config.json
+  nlm-cli saveconfig my_settings.json
+  nlm-cli showconfig simulation
+  nlm-cli runexp learning_experiment 1000
+  nlm-cli explore region1
+  nlm-cli setparam neuron_count 500
+        """
+    )
+    
+    # Global options
+    parser.add_argument('--version', action='store_true', help='Show version information')
+    parser.add_argument('--config', help='Load configuration file at startup')
+    
+    # Subcommands
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Config command
+    config_parser = subparsers.add_parser('config', help='Load configuration file')
+    config_parser.add_argument('filepath', help='Path to configuration file')
+    
+    # Saveconfig command
+    saveconfig_parser = subparsers.add_parser('saveconfig', help='Save configuration to file')
+    saveconfig_parser.add_argument('filepath', help='Path to save configuration file')
+    
+    # Showconfig command
+    showconfig_parser = subparsers.add_parser('showconfig', help='Display configuration')
+    showconfig_parser.add_argument('section', nargs='?', default='', help='Configuration section to display')
+    
+    # Run experiment command
+    runexp_parser = subparsers.add_parser('runexp', help='Run neural learning experiment')
+    runexp_parser.add_argument('name', help='Experiment name')
+    runexp_parser.add_argument('steps', type=int, help='Number of simulation steps')
+    runexp_parser.add_argument('--params', nargs='+', help='Additional parameters (format: key=value)')
+    
+    # Explore command
+    explore_parser = subparsers.add_parser('explore', help='Analyze neural network')
+    explore_parser.add_argument('region', default='default', nargs='?', help='Region ID to analyze')
+    explore_parser.add_argument('--neurons', nargs='+', type=int, help='Specific neurons to analyze')
+    
+    # Set parameter command
+    setparam_parser = subparsers.add_parser('setparam', help='Set neural parameter')
+    setparam_parser.add_argument('key', help='Parameter key')
+    setparam_parser.add_argument('value', help='Parameter value')
+    
+    # Stats command
+    subparsers.add_parser('stats', help='Show system statistics')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Handle global options
+    if args.version:
+        print("NLM CLI v0.1.0")
+        print("Phase 6: Final Integration")
+        return
+    
+    # Load configuration if specified
+    if args.config:
+        cli.load_config(args.config)
+    
+    # Handle commands
+    if not args.command:
+        parser.print_help()
+        return
+    
+    # Execute commands
+    try:
+        if args.command == 'config':
+            cli.load_config(args.filepath)
+        elif args.command == 'saveconfig':
+            cli.save_config(args.filepath)
+        elif args.command == 'showconfig':
+            cli.show_config(args.section)
+        elif args.command == 'runexp':
+            params = {}
+            if args.params:
+                for param in args.params:
+                    if '=' in param:
+                        key, value = param.split('=', 1)
+                        params[key] = value
+            cli.run_experiment(args.name, args.steps, params)
+        elif args.command == 'explore':
+            cli.explore_neural_network(args.region, args.neurons)
+        elif args.command == 'setparam':
+            cli.set_neural_parameters({args.key: args.value})
+        elif args.command == 'stats':
+            cli.show_stats()
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+if __name__ == "__main__":
+    main()

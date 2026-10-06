@@ -1,0 +1,367 @@
+# NLM Configuration Template
+# Version: 2.0
+# Format: JSON/YAML
+
+# === Basic Simulation Settings ===
+simulation:
+  # Random seed for reproducible experiments
+  random_seed: 42
+  
+  # Simulation timestep in seconds
+  simulation_timestep: 0.001
+  
+  # Number of neurons in the brain
+  neuron_count: 1000
+  
+  # Number of brain regions
+  region_count: 2
+  
+  # Connection probability for random connectivity
+  connection_probability: 0.1
+  
+  # Maximum simulation steps
+  max_simulation_steps: 10000
+  
+  # Simulation time limit (seconds)
+  simulation_time_limit: 0.0
+
+# === Plasticity System ===
+plasticity:
+  # STDP (Spike-Timing-Dependent Plasticity) parameters
+  stdp:
+    ltp_weight: 0.02          # Long-term potentiation weight
+    ltd_weight: 0.015         # Long-term depression weight
+    time_constant: 20.0       # STDP time window (ms)
+    min_weight: -1.0          # Minimum synaptic weight
+    max_weight: 1.0           # Maximum synaptic weight
+    
+  # Hebbian learning parameters
+  hebbian:
+    learning_rate: 0.01
+    weight_decay: 0.001
+    
+  # Reward-modulated plasticity
+  reward_modulated:
+    eligibility_trace_decay: 0.01
+    reward_scaling: 1.0
+    
+  # Homeostatic plasticity
+  homeostatic:
+    enabled: true
+    target_rate: 0.05
+    adjustment_rate: 0.001
+    
+  # Structural plasticity
+  structural:
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+    max_synapses: 50000
+
+# === Neuromodulation System ===
+neuromodulation:
+  # Dopamine system (reward and reinforcement)
+  dopamine:
+    baseline: 0.1
+    modulation_strength: 0.5
+    time_constant: 100.0
+    noise_level: 0.01
+    
+  # Acetylcholine system (attention and learning)
+  acetylcholine:
+    baseline: 0.05
+    attention_strength: 1.0
+    learning_modulation: 0.8
+    
+  # Serotonin system (mood and behavioral flexibility)
+  serotonin:
+    baseline: 0.03
+    flexibility_modulation: 0.7
+    reward_mood_link: 0.5
+    
+  # Noradrenaline system (arousal and vigilance)
+  noradrenaline:
+    baseline: 0.02
+    arousal_level: 0.8
+    vigilance_modulation: 0.6
+    
+  # Novelty detection
+  novelty:
+    detection_sensitivity: 0.9
+    adaptation_rate: 0.05
+    
+  # Curiosity system
+  curiosity:
+    exploration_bonus: 0.5
+    intrinsic_motivation: 0.7
+    novelty_response: 0.9
+
+# === Memory Systems ===
+memory:
+  # Working memory (short-term, active information)
+  working_memory:
+    capacity: 200              # Number of items
+    decay_rate: 0.01           # Decay per timestep
+    maintenance_strength: 0.8  # Recurrent connection strength
+    consolidation_rate: 0.001   # Rate of transferring to long-term
+    
+  # Episodic memory (experiences and events)
+  episodic_memory:
+    capacity: 5000             # Number of episodes
+    consolidation_strength: 0.7 # Strength of consolidation process
+    replay_frequency: 10       # Replay every N steps
+    replay_strength: 0.8        # Replay efficacy
+    interference_strength: 0.3 # Memory interference
+    
+  # Semantic memory (facts and knowledge)
+  semantic_memory:
+    capacity: 2000
+    learning_rate: 0.02
+    pattern_strength: 0.6
+    
+  # Procedural memory (skills and habits)
+  procedural_memory:
+    capacity: 1000
+    reinforcement_learning_rate: 0.05
+    habit_formation_rate: 0.001
+    
+  # Associative memory (pattern associations)
+  associative_memory:
+    pattern_capacity: 1000
+    association_strength: 0.8
+    pattern_completion_rate: 0.9
+
+# === Development System ===
+development:
+  # Developmental stages
+  developmental_stage:
+    current: "CriticalPeriod"
+    critical_period_start: 100
+    critical_period_end: 1000
+    maturation_phase: 2000
+    
+  # Synaptogenesis (formation of new connections)
+  synaptogenesis:
+    base_rate: 0.0001
+    experience_dependent_multiplier: 2.0
+    activity_dependent_boost: 0.5
+    
+  # Pruning (elimination of unused connections)
+  pruning:
+    base_rate: 0.00001
+    activity_threshold: 0.1
+    use_dependent_pruning: true
+    
+  # Maturation (neurodevelopmental changes)
+  maturation:
+    myelination_rate: 0.001
+    synaptic_maturation_speed: 0.8
+    metabolic_efficiency: 0.9
+    
+  # Experience-expectant plasticity
+  experience_expectant:
+    sensitive_period_duration: 1000
+    deprivation_impact: 0.8
+    enriched_environment_boost: 1.5
+
+# === Sensory Processing ===
+sensory:
+  # Visual processing
+  vision:
+    resolution: "high"
+    feature_detectors: 128
+    pattern_recognition: true
+    predictive_coding: true
+    
+  # Auditory processing
+  audition:
+    frequency_bands: 32
+    temporal_resolution: 0.001
+    sound_localization: true
+    
+  # Internal signals (proprioception, interoception)
+  internal:
+    body_mapping: true
+    homeostasis_sensing: true
+    emotion_signaling: true
+    
+  # Multisensory integration
+  multisensory:
+    integration_strength: 0.9
+    cross_modal_binding: true
+    temporal_binding_window: 0.1
+
+# === Motor System ===
+motor:
+  # Action selection
+  action_selection:
+    planning_horizon: 10         # Number of steps ahead
+    exploration_rate: 0.1
+    exploitation_rate: 0.9
+    uncertainty_weighting: true
+    
+  # Motor control
+  motor_control:
+    movement_precision: 0.8
+    adaptation_rate: 0.05
+    fatigue_model: true
+    
+  # Skill acquisition
+  skill_acquisition:
+    motor_learning_rate: 0.03
+    procedural_memory_integration: true
+    error_based_learning: true
+
+# === Prediction System ===
+prediction:
+  # Forward models
+  forward_model:
+    prediction_horizon: 5
+    prediction_error_computation: true
+    inverse_model: true
+    
+  # Predictive coding
+  predictive_coding:
+    prediction_error_strength: 0.9
+    precision_weighting: true
+    hierarchical_levels: 3
+  
+  # Expectation formation
+  expectation_formation:
+    memory_based: true
+    pattern_based: true
+    expectancy_learning_rate: 0.02
+
+# === Cognition Systems ===
+cognition:
+  # Neural planning
+  neural_planning:
+    planning_depth: 3
+    evaluation_function: "neural"
+    action_value_estimation: true
+    
+  # Concept formation
+  concept_formation:
+    pattern_extractors: 64
+    concept_network_size: 200
+    concept_learning_rate: 0.02
+    
+  # Attentional selection
+  attentional_selection:
+    competition_strength: 0.9
+    winner_take_all: true
+    top_down_bias: 0.7
+    bottom_up_salience: 0.6
+
+# === Environment ===
+environment:
+  # World model
+  world:
+    name: "GridWorld"
+    width: 10
+    height: 10
+    time_steps: 100
+    physics_enabled: false
+    
+  # Rewards and punishments
+  rewards:
+    immediate_reward_weight: 0.8
+    delayed_reward_weight: 0.3
+    punishment_strength: 0.5
+    reward_prediction_error: true
+    
+  # Goals and tasks
+  goals:
+    intrinsic_goals: ["survival", "growth", " exploration"]
+    extrinsic_goals: ["task_completion", "efficiency"]
+    goal_valuation: true
+
+# === Visualization ===
+visualization:
+  enabled: true
+  update_rate: 30.0           # Hz
+  
+  # Display options
+  display:
+    show_neurons: true
+    show_synapses: true
+    show_spikes: true
+    show_weights: true
+    show_activity: true
+    
+  # Export options
+  export:
+    format: "json"
+    fps: 30
+    duration: 3600
+    frame_rate: 0.1
+
+# === Logging ===
+logging:
+  level: "INFO"              # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_to_file: true
+  log_filename: "nlm.log"
+  
+  # Log file rotation
+  rotation:
+    max_size_mb: 100
+    backup_count: 5
+    compress: true
+  
+  # Structured logging
+  structured:
+    enabled: true
+    format: "json"
+    include_timestamps: true
+    include_context: true
+
+# === Performance ===
+performance:
+  # Memory management
+  memory:
+    pool_size: 1000000
+    alignment: 64
+    use_mmap: true
+    
+  # Computation
+  computation:
+    parallelization: true
+    thread_count: 4
+    simd_optimization: true
+    
+  # Caching
+  caching:
+    spike_cache_size: 10000
+    weight_cache_size: 50000
+    enable_write_back: true
+
+# === Advanced Features ===
+advanced:
+  # Neural network optimizations
+  optimizations:
+    enable_early_stopping: true
+    convergence_threshold: 0.001
+    learning_rate_annealing: true
+    
+  # Experimental controls
+  experimental:
+    random_seed_override: false
+    enable_logging: true
+    save_checkpoints: true
+    checkpoint_interval: 1000
+    
+  # Analysis tools
+  analysis:
+    enable_profiling: true
+    profile_interval: 100
+    performance_metrics: true
+    debug_mode: false
+
+# === Notes ===
+# This configuration supports both JSON and YAML formats.
+# Sections marked with # === are major system categories.
+# Each parameter should be documented with its purpose and typical range.
+# Configuration can be loaded via command line:
+#   nlm-cli config config.json
+#   nlm-cli config config.yaml
+# Configuration can be saved with:
+#   nlm-cli saveconfig backup.json
