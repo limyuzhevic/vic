@@ -48,7 +48,8 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to infer type from value
+                setFromString(key, value, ConfigSource::File);
         }
     }
     
@@ -186,21 +187,210 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
 
+// Advanced configuration methods
+
+// Get configuration value as string
+std::string Config::getAsString(const std::string& key, const std::string& defaultValue) const {
+    auto val = get<std::string>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// Check if configuration has changed
+bool Config::hasChangedSince(const Config& other) const {
+    if (pImpl->entries.size() != other.pImpl->entries.size()) {
+        return true;
+    }
+    
+    for (const auto& thisEntry : pImpl->entries) {
+        auto it = std::find_if(other.pImpl->entries.begin(), other.pImpl->entries.end(),
+            [&thisEntry](const ConfigEntry& otherEntry) {
+                return otherEntry.key == thisEntry.key;
+            });
+        
+        if (it == other.pImpl->entries.end()) {
+            return true;
+        }
+        
+        if (it->value != thisEntry.value || it->source != thisEntry.source) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Get configuration diff
+std::vector<std::string> Config::getDiff(const Config& other) const {
+    std::vector<std::string> diffs;
+    
+    // Check for removed keys
+    for (const auto& otherEntry : other.pImpl->entries) {
+        bool found = false;
+        for (const auto& thisEntry : pImpl->entries) {
+            if (thisEntry.key == otherEntry.key) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            diffs.push_back("REMOVED: " + otherEntry.key);
+        }
+    }
+    
+    // Check for changed keys
+    for (const auto& thisEntry : pImpl->entries) {
+        auto it = std::find_if(other.pImpl->entries.begin(), other.pImpl->entries.end(),
+            [&thisEntry](const ConfigEntry& otherEntry) {
+                return otherEntry.key == thisEntry.key;
+            });
+        
+        if (it != other.pImpl->entries.end() && 
+            (it->value != thisEntry.value || it->source != thisEntry.source)) {
+            diffs.push_back("CHANGED: " + thisEntry.key);
+        }
+    }
+    
+    return diffs;
+}
+
+// Merge configuration from another config
+void Config::merge(const Config& other, bool overrideSource) {
+    for (const auto& otherEntry : other.pImpl->entries) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&otherEntry](const ConfigEntry& thisEntry) {
+                return thisEntry.key == otherEntry.key;
+            });
+        
+        if (it != pImpl->entries.end()) {
+            if (overrideSource) {
+                it->value = otherEntry.value;
+                it->source = otherEntry.source;
+            }
+        } else {
+            pImpl->entries.push_back(otherEntry);
+        }
+    }
+}
+
+// Get all values of a specific type
+template<typename T>
+std::vector<std::pair<std::string, T>> Config::getAllOfType() const {
+    std::vector<std::pair<std::string, T>> result;
+    
+    for (const auto& entry : pImpl->entries) {
+        try {
+            auto value = std::get<T>(entry.value);
+            result.emplace_back(entry.key, value);
+        } catch (const std::bad_variant_access&) {
+            // Skip entries that don't match the type
+        }
+    }
+    
+    return result;
+}
+
+// Try to infer type from string value
+void Config::setFromString(const std::string& key, const std::string& valueStr, ConfigSource source) {
+    // Trim whitespace
+    std::string trimmed = trim(valueStr);
+    
+    // Check for boolean
+    if (trimmed == "true" || trimmed == "false") {
+        bool boolValue = (trimmed == "true");
+        set(key, boolValue, source);
+        return;
+    }
+    
+    // Check for integer
+    if (std::all_of(trimmed.begin(), trimmed.end(), ::isdigit) ||
+        (trimmed.size() > 0 && trimmed[0] == '-' && 
+         std::all_of(trimmed.begin() + 1, trimmed.end(), ::isdigit))) {
+        try {
+            int intValue = std::stoi(trimmed);
+            set(key, intValue, source);
+            return;
+        } catch (...) {
+            // Fall through to double
+        }
+    }
+    
+    // Check for double
+    try {
+        size_t pos;
+        double doubleValue = std::stod(trimmed, &pos);
+        if (pos == trimmed.size()) {
+            set(key, doubleValue, source);
+            return;
+        }
+    } catch (...) {
+        // Fall through to string
+    }
+    
+    // Default to string
+    set(key, trimmed, source);
+}
+
+// Save to file (improved)
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << "# Source: " << static_cast<int>(entry.source) << "\n";
+        
+        // Format based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << arg << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
+    }
+    
+    return true;
+}
+
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// New method explicit template instantiations
+template std::string Config::getAsString(const std::string&, const std::string&) const;
+template std::vector<std::pair<std::string, int>> Config::getAllOfType<int>() const;
+template std::vector<std::pair<std::string, double>> Config::getAllOfType<double>() const;
+template std::vector<std::pair<std::string, bool>> Config::getAllOfType<bool>() const;
+template std::vector<std::pair<std::string, std::string>> Config::getAllOfType<std::string>() const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;

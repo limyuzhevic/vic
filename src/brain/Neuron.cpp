@@ -58,8 +58,20 @@ void Neuron::setMembranePotential(MembranePotential potential) {
     pImpl->state.membranePotential = potential;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
 void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
+void Neuron::clearTotalCurrent() {
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
@@ -144,7 +156,7 @@ void Neuron::injectCurrent(MembranePotential current) {
 }
 
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {

@@ -64,19 +64,24 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Set values from string (with type inference)
+    void setFromString(const std::string& key, const std::string& valueStr, ConfigSource source = ConfigSource::Runtime);
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Get configuration value as string
+    std::string getAsString(const std::string& key, const std::string& defaultValue = "") const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Check if configuration has changed
+    bool hasChangedSince(const Config& other) const;
+    
+    // Get configuration diff
+    std::vector<std::string> getDiff(const Config& other) const;
+    
+    // Merge configuration from another config
+    void merge(const Config& other, bool overrideSource = true);
+    
+    // Get all values of a specific type
+    template<typename T>
+    std::vector<std::pair<std::string, T>> getAllOfType() const;
     
     // Check existence
     bool has(const std::string& key) const;

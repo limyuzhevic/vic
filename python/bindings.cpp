@@ -105,34 +105,95 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
+py::enum_<VisualizationMode>(m, "VisualizationMode", R"pbdoc(Visualization mode enumeration)pbdoc")
+        .value("Network", VisualizationMode::Network)
+        .value("Activity", VisualizationMode::Activity)
+        .value("Spikes", VisualizationMode::Spikes)
+        .value("Weights", VisualizationMode::Weights)
+        .value("Connectivity", VisualizationMode::Connectivity)
+        .value("Development", VisualizationMode::Development)
+        .value("Neuromodulation", VisualizationMode::Neuromodulation)
+        .value("Memory", VisualizationMode::Memory)
         .export_values();
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    // Add Python bindings for VisualizationInterface
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Enhanced visualization interface for debugging and analysis)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &VisualizationInterface::initialize, py::arg("mode") = VisualizationMode::Network,
+             "Initialize visualization with specified mode")
+        .def("update", &VisualizationInterface::update, py::arg("brain"), py::arg("timestep") = 0.001,
+             "Update visualization data")
+        .def("render", &VisualizationInterface::render, "Render current state")
+        .def("close", &VisualizationInterface::close, "Close visualization")
+        .def("isActive", &VisualizationInterface::isActive, "Check if visualization is active")
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate, py::arg("hz"),
+             "Set update rate in Hz")
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate, "Get update rate in Hz")
+        .def("setMode", &VisualizationInterface::setMode, py::arg("mode"),
+             "Set visualization mode")
+        .def("getMode", &VisualizationInterface::getMode, "Get current visualization mode")
+        .def("exportData", &VisualizationInterface::exportData, py::arg("filename"), py::arg("mode") = VisualizationMode::Network,
+             "Export visualization data to file")
+        .def("getDebugInfo", &VisualizationInterface::getDebugInfo,
+             "Get debug information as string")
+        .def("logDebugInfo", &VisualizationInterface::logDebugInfo, py::arg("message"),
+             "Log debug information")
+        .def("startPerformanceTimer", &VisualizationInterface::startPerformanceTimer,
+             "Start performance timer")
+        .def("getLastFrameTime", &VisualizationInterface::getLastFrameTime,
+             "Get last frame time in seconds")
+        .def("getAverageFrameTime", &VisualizationInterface::getAverageFrameTime,
+             "Get average frame time in seconds")
+        .def("getFiringRateDistribution", &VisualizationInterface::getFiringRateDistribution,
+             "Get firing rate distribution")
+        .def("getNeuronFiringOrder", &VisualizationInterface::getNeuronFiringOrder,
+             "Get neurons ordered by firing activity")
+        .def("getNetworkDensity", &VisualizationInterface::getNetworkDensity,
+             "Get network density")
+        .def("getClusterCount", &VisualizationInterface::getClusterCount,
+             "Get number of clusters in network")
+        .def("getWorkingMemorySize", &VisualizationInterface::getWorkingMemorySize,
+             "Get working memory size")
+        .def("getEpisodicMemoryCount", &VisualizationInterface::getEpisodicMemoryCount,
+             "Get episodic memory count")
+        .def("getDopamineLevel", &VisualizationInterface::getDopamineLevel,
+             "Get dopamine neuromodulation level")
+        .def("getCuriosityLevel", &VisualizationInterface::getCuriosityLevel,
+             "Get curiosity neuromodulation level")
+        .def("getNoveltyLevel", &VisualizationInterface::getNoveltyLevel,
+             "Get novelty neuromodulation level")
+        .def("getDevelopmentalStageInfo", &VisualizationInterface::getDevelopmentalStageInfo,
+             "Get developmental stage information")
+        .def("saveState", &VisualizationInterface::saveState, py::arg("filename"),
+             "Save visualization state to file")
+        .def("loadState", &VisualizationInterface::loadState, py::arg("filename"),
+             "Load visualization state from file")
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork, py::arg("brain"),
+             "Visualize network structure")
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity, py::arg("brain"),
+             "Visualize neural activity")
+        .def("visualizeSpikes", &VisualizationInterface::visualizeSpikes, py::arg("spikes"),
+             "Visualize spike raster plot")
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights, py::arg("brain"),
+             "Visualize weight matrix")
+        .def("visualizeConnectivity", &VisualizationInterface::visualizeConnectivity, py::arg("brain"),
+             "Visualize connectivity patterns")
+        .def("visualizeDevelopment", &VisualizationInterface::visualizeDevelopment, py::arg("brain"),
+             "Visualize development over time")
+        .def("visualizeNeuromodulation", &VisualizationInterface::visualizeNeuromodulation, py::arg("brain"),
+             "Visualize neuromodulation effects")
+        .def("visualizeMemory", &VisualizationInterface::visualizeMemory, py::arg("brain"),
+             "Visualize memory systems")
+        .def("setUpdateCallback", &VisualizationInterface::setUpdateCallback, py::arg("callback"),
+             "Set update callback function")
+        .def("setClickCallback", &VisualizationInterface::setClickCallback, py::arg("callback"),
+             "Set click callback function")
+        .def("setHoverCallback", &VisualizationInterface::setHoverCallback, py::arg("callback"),
+             "Set hover callback function");
+
+    m.def("createVisualization", []() -> std::shared_ptr<VisualizationInterface> {
+        return std::make_shared<VisualizationInterface>();
+    }, "Create a new visualization interface");
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
