@@ -130,12 +130,12 @@ public:
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    // Convenience methods for enhanced functionality
+    std::map<std::string, double> getNeuronStats() const;
+    void runExperiment(SimulationStep steps, Timestamp timestep);
+    bool resetAndInitialize(std::shared_ptr<Config> newConfig);
+    bool saveWithTimestamp(const std::string& basePath);
+    std::map<std::string, std::string> getSystemInfo() const;
     
     // ========== MEMORY SYSTEMS ==========
     
