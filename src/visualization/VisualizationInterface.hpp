@@ -1,52 +1,63 @@
 #pragma once
 
+#include "../brain/Brain.hpp"
+#include "../core/Config/Config.hpp"
 #include <string>
 #include <vector>
 #include <memory>
+#include <chrono>
+#include <thread>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
 class VisualizationInterface {
 public:
     VisualizationInterface();
     ~VisualizationInterface();
     
-    // Initialize visualization
-    bool initialize();
+    // Initialize with configuration
+    bool initialize(std::shared_ptr<Config> config);
     
-    // Update visualization data
-    void update();
+    // Rendering methods
+    void renderNeuralNetwork(const Brain& brain, const std::string& outputFile = "neural_network.html");
+    void renderActivityMap(const Brain& brain, const std::string& outputFile = "activity_map.html");
+    void renderMemoryTrajectories(const Brain& brain, const std::string& outputFile = "memory_trajectories.html");
+    void renderTrainingProgress(const std::string& outputFile = "training_progress.html");
     
-    // Render current state
-    void render();
+    // Real-time visualization
+    void startRealTimeVisualization(const Brain& brain, int updateIntervalMs = 100);
+    void stopRealTimeVisualization();
+    bool isRealTimeVisualizationRunning() const;
     
-    // Close visualization
-    void close();
+    // Export formats
+    void exportToJSON(const Brain& brain, const std::string& filepath);
+    void exportToCSV(const Brain& brain, const std::string& filepath);
+    void exportToNeuroML(const Brain& brain, const std::string& filepath);
     
-    // Check if visualization is active
-    bool isActive() const;
+    // Configuration
+    void setOutputDirectory(const std::string& directory);
+    void setUpdateInterval(int intervalMs);
+    void enableAutoSave(bool enable, int saveIntervalSteps = 1000);
+    void setQualityLevel(QualityLevel level);
     
-    // Set update rate
-    void setUpdateRate(double hz);
-    double getUpdateRate() const;
+    // Metrics and statistics
+    std::string getPerformanceMetrics() const;
+    std::string getVisualizationStats() const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
-    
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
-    
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
-    
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    // Interactive features
+    void enableInteractivity(bool enable);
+    void setInteractiveCallback(std::function<void(const std::string& event)> callback);
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+};
+
+enum class QualityLevel {
+    Low,      // Fast rendering, basic visualization
+    Medium,   // Balanced performance and quality
+    High,     // High quality, slower rendering
+    Ultra    // Highest quality, slowest rendering
 };
 
 } // namespace nlm

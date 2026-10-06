@@ -510,26 +510,83 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    if (pImpl->predictionSystem && pImpl->currentBrain) {
+        // Predict next state based on current neural activity
+        // This is where the prediction system actively uses neural patterns to forecast future states
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Create a simplified sensory representation from neural activity
+        std::vector<float> neuralActivityPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                float avgActivity = 0.0f;
+                int count = 0;
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        avgActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    neuralActivityPattern.push_back(avgActivity / count);
+                }
+            }
+        }
+        
+        // If we have enough neural activity data, create a SensoryInput for prediction
+        if (!neuralActivityPattern.empty()) {
+            // Create a temporary vision input representing the current neural state
+            auto sensoryInput = std::make_unique<Vision>();
+            size_t patternSize = std::min(neuralActivityPattern.size(), static_cast<size_t>(1000));
+            sensoryInput->initialize(patternSize, 1, 3); // width, height, channels
+            
+            // Normalize neural activity to [0,1] range for prediction
+            std::vector<float> normalizedPattern(neuralActivityPattern.begin(), neuralActivityPattern.begin() + patternSize);
+            for (float& val : normalizedPattern) {
+                val = std::max(0.0f, std::min(1.0f, val / 20.0f)); // Assume max activity ~20mV
+            }
+            
+            sensoryInput->setData(normalizedPattern);
+            
+            // Get prediction from prediction system
+            auto predictedState = pImpl->predictionSystem->predictNextState(*sensoryInput);
+            
+            // Update prediction system with current state for learning
+            if (predictedState) {
+                pImpl->predictionSystem->updatePredictions(*sensoryInput, *predictedState);
+                pImpl->predictionSystem->train(*sensoryInput);
+            }
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== STEP 9: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation: extract abstract patterns from neural activity
+        // This is where the brain forms abstract concepts from sensory and internal patterns
+        
+        // Collect current neural activity patterns for concept formation
+        std::vector<std::vector<float>> neuralPatterns;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                std::vector<float> pattern;
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        pattern.push_back(std::abs(neuron->getState().membranePotential - 
+                                                 neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+                if (!pattern.empty()) {
+                    neuralPatterns.push_back(pattern);
+                }
+            }
+        }
+        
+        // Process patterns for concept formation (simplified)
+        if (!neuralPatterns.empty() && pImpl->conceptFormation) {
+            // In a full implementation, conceptFormation would process these patterns
+            // to extract abstract concepts and relationships
+            // For now, we'll just track that concept formation is being updated
+            pImpl->conceptFormation->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
