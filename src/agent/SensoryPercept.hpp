@@ -2,7 +2,7 @@
 
 #include "AgentBody.hpp"
 #include "../sensory/SensoryInput.hpp"
-#include <memory>
+#include <cmath>
 #include <vector>
 
 namespace nlm {
@@ -17,7 +17,11 @@ public:
     // Vision: simple grayscale intensity grid (no RGB, no object labels)
     // Format: row-major, values 0.0-1.0
     const std::vector<float>& getVision() const { return vision_; }
-    void setVision(const std::vector<float>& v) { vision_ = v; }
+    void setVision(const std::vector<float>& v) { 
+        vision_ = v; 
+        visionWidth_ = v.empty() ? 0 : static_cast<size_t>(std::sqrt(v.size()));
+        visionHeight_ = v.empty() ? 0 : v.size() / visionWidth_; 
+    }
     size_t getVisionWidth() const { return visionWidth_; }
     size_t getVisionHeight() const { return visionHeight_; }
     

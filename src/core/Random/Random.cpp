@@ -38,14 +38,14 @@ uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
 }
 
-uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
+uint32_t RandomGenerator::uniformInt(int min, int max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
     if (min == max) {
-        return min;
+        return static_cast<uint32_t>(min);
     }
-    std::uniform_int_distribution<uint32_t> dist(min, max);
+    std::uniform_int_distribution<uint32_t> dist(static_cast<uint32_t>(min), static_cast<uint32_t>(max));
     return dist(pImpl->gen);
 }
 

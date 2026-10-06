@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -37,6 +38,8 @@ public:
     // Uniform integer in [min, max]
     uint32_t uniformInt(uint32_t min, uint32_t max);
     uint64_t uniformInt(uint64_t min, uint64_t max);
+    // Add int overload for test compatibility
+    uint32_t uniformInt(int min, int max);
     
     // Uniform real in [min, max)
     double uniformReal(double min, double max);
