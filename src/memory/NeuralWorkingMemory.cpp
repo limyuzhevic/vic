@@ -89,6 +89,37 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
 }
 
+void NeuralWorkingMemory::storePrediction(SimulationStep step,
+                                        const std::vector<float>& predicted,
+                                        const std::vector<float>& actual,
+                                        float error) {
+    // Store prediction for prediction-based memory integration
+    predictionRecords_.emplace_back(step, predicted, actual, error);
+    
+    // Keep only recent records
+    if (predictionRecords_.size() > 1000) {
+        predictionRecords_.erase(predictionRecords_.begin());
+    }
+    
+    // Enhance memory based on prediction error
+    if (error > 0.5f) {
+        // High prediction error -> stronger memory encoding
+        for (size_t i = 0; i < std::min(predicted.size(), actual.size()); ++i) {
+            float diff = std::abs(predicted[i] - actual[i]);
+            if (diff > 0.1f) {
+                // Create or strengthen memory trace for this prediction error
+                float strength = diff * 2.0f;  // Amplify the error signal
+                
+                // Store the predicted state as memory with high priority
+                store(predicted, strength);
+                
+                // Also store the actual state for comparison
+                store(actual, strength * 0.5f);
+            }
+        }
+    }
+}
+
 std::vector<float> NeuralWorkingMemory::retrieve() const {
     std::vector<float> result;
     result.reserve(memoryActivations_.size());

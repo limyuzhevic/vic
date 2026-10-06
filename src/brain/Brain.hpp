@@ -25,6 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -42,6 +45,18 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Neuromodulation signal structure
+struct NeuromodulatorSignal {
+    NeuromodulatorType type;
+    float magnitude;
+    Timestamp timestamp;
+    float predictionError;
+    float rewardValue;
+    
+    NeuromodulatorSignal() : type(NeuromodulatorType::None), magnitude(0.0f), 
+                             timestamp(0.0), predictionError(0.0f), rewardValue(0.0f) {}
 };
 
 // Brain: The central coordinator of the neural system
@@ -98,7 +113,10 @@ public:
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const NeuromodulatorSignal& signal);
+    
+    // Apply neuromodulator directly
+    void applyNeuromodulator(Neuromodulator* neuromodulator);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -172,8 +190,14 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -190,8 +214,20 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get simulation clock
+    SimulationClock* getSimulationClock();
+    
     // Logging
     void logStatus() const;
+    
+    // Memory integration methods
+    void updateMemoryWithNeuromodulators(Timestamp currentTime);
+    void enhanceEpisodicMemoryWithDopamine(const NeuromodulatorSignal& signal);
+    void gateWorkingMemoryWithAcetylcholine(const NeuromodulatorSignal& signal);
+    void modulateAttentionWithNorepinephrine(const NeuromodulatorSignal& signal);
+    
+    // Neuromodulator-driven action selection
+    void updateActionSelectionWithNeuromodulators();
     
 private:
     struct Impl;

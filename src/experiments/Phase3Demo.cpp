@@ -1,5 +1,5 @@
 #include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
+#include "../agent/EnhancedAgentBrain.hpp"
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"

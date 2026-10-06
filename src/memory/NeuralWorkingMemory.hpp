@@ -33,6 +33,12 @@ public:
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);
 
+    // Store prediction for prediction-based memory integration
+    void storePrediction(SimulationStep step,
+                        const std::vector<float>& predicted,
+                        const std::vector<float>& actual,
+                        float error);
+
     // Retrieve current working memory content as activity levels
     std::vector<float> retrieve() const;
 
@@ -104,6 +110,9 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+    
+    // Prediction records for prediction-based memory integration
+    std::vector<std::tuple<SimulationStep, std::vector<float>, std::vector<float>, float>> predictionRecords_;
 };
 
 // AttentionalSelection: Neural attention through competition

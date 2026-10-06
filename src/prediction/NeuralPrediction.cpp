@@ -111,7 +111,7 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
 }
 
 float NeuralPrediction::updateWithObservation(const std::vector<float>& actualState,
-                                             SimulationStep currentStep) {
+                                              SimulationStep currentStep) {
     // Generate prediction first
     auto predicted = generatePrediction(currentStep);
     

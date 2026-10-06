@@ -131,6 +131,27 @@ enum class DevelopmentalStage : uint8_t {
     Aging
 };
 
+// Neuromodulator types
+enum class NeuromodulatorType : uint8_t {
+    None,
+    Dopamine,
+    Acetylcholine,
+    Norepinephrine,
+    Serotonin,
+    Curiosity,
+    Novelty,
+    PredictionError,
+    Reward
+};
+
+// Plasticity rule types
+enum class PlasticityType : uint8_t {
+    STDP,
+    Hebbian,
+    RewardModulated,
+    Structural
+};
+
 // Spike event for event-driven computation
 struct SpikeEvent {
     NeuronId source_neuron;

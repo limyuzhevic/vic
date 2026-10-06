@@ -1,10 +1,11 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Extended with Phase 6: Prediction Integration Tests
 
 #include <iostream>
 #include <cassert>
 
-// Forward declarations of test functions
+// Forward declarations of existing test functions
 namespace test_types {
     void runAll();
 }
@@ -37,12 +38,31 @@ namespace test_brain {
     void runAll();
 }
 
+// Forward declarations of prediction integration test functions
+namespace test_prediction_integration {
+    void runAllTests();
+}
+
+// Forward declarations of prediction integration test functions
+namespace test_prediction_integration {
+    void runAllTests();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== Phase 6: Prediction Integration Tests ===" << std::endl;
+    std::cout << "Testing Comprehensive Prediction System Integration:" << std::endl;
+    std::cout << "  - Prediction System in Brain::step()" << std::endl;
+    std::cout << "  - Neuromodulation response to prediction errors" << std::endl;
+    std::cout << "  - Action selection based on predictions" << std::endl;
+    std::cout << "  - Attention modulation based on prediction errors" << std::endl;
+    std::cout << "  - Prediction accuracy over time" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +133,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction Integration tests..." << std::endl;
+    try {
+        test_prediction_integration::runAllTests();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -13,9 +13,12 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), development_(new Development()) {}
 
-DevelopmentSystem::~DevelopmentSystem() = default;
+DevelopmentSystem::~DevelopmentSystem() {
+    delete pImpl;
+    delete development_;
+}
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;
@@ -24,6 +27,7 @@ DevelopmentalStage DevelopmentSystem::getStage() const {
 void DevelopmentSystem::setStage(DevelopmentalStage stage) {
     pImpl->stage = stage;
     pImpl->stageAge = 0.0;
+    development_->setStage(stage);
 }
 
 void DevelopmentSystem::advanceStage() {
@@ -46,6 +50,7 @@ void DevelopmentSystem::advanceStage() {
     }
     pImpl->stepsInCurrentStage = 0;
     pImpl->stageAge = 0.0;
+    development_->setStage(pImpl->stage);
     NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
 }
 
@@ -92,28 +97,63 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     }
 }
 
+void DevelopmentSystem::updateEnhanced(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
+    // Use the enhanced Development class for comprehensive developmental effects
+    development_->initialize(brain);
+    development_->update(brain, rng, dt);
+}
+
+void DevelopmentSystem::applyExcitabilityEffects(Brain* brain) {
+    development_->applyExcitabilityEffects(brain);
+}
+
+void DevelopmentSystem::applyAttentionEffects(Brain* brain) {
+    development_->applyAttentionEffects(brain);
+}
+
+void DevelopmentSystem::applyMemoryConsolidationEffects(Brain* brain) {
+    development_->applyMemoryConsolidationEffects(brain);
+}
+
+void DevelopmentSystem::applyNeuromodulationEffects(Brain* brain) {
+    development_->applyNeuromodulationEffects(brain);
+}
+
+void DevelopmentSystem::applyPlasticityRuleEffects(Brain* brain) {
+    development_->applyPlasticityRuleEffects(brain);
+}
+
 float DevelopmentSystem::getPlasticityModifier() const {
-    // Higher plasticity in early stages, lower in later stages
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial: return 1.0f;
-        case DevelopmentalStage::CriticalPeriod: return 0.8f;
-        case DevelopmentalStage::Maturation: return 0.5f;
-        case DevelopmentalStage::Adult: return 0.2f;
-        case DevelopmentalStage::Aging: return 0.1f;
-        default: return 0.5f;
-    }
+    // Delegate to development class for enhanced plasticity modifier
+    return development_->getPlasticityRuleModifier(PlasticityType::STDP);
 }
 
 bool DevelopmentSystem::isCriticalPeriod() const {
-    return pImpl->stage == DevelopmentalStage::CriticalPeriod;
+    return development_->isCriticalPeriod();
 }
 
 float DevelopmentSystem::getCriticalPeriodProgress() const {
-    if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
-        return 0.0f;
-    }
-    // Progress through critical period (0 to 1)
-    return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+    return development_->getCriticalPeriodProgress();
+}
+
+DevelopmentSystem::DevelopmentMetrics DevelopmentSystem::getMetrics() const {
+    DevelopmentMetrics metrics;
+    metrics.age = age_;
+    metrics.stage = pImpl->stage;
+    metrics.neuralExcitability = development_->getMetrics().neuralExcitability;
+    metrics.attentionCapacity = development_->getMetrics().attentionCapacity;
+    metrics.memoryConsolidation = development_->getMetrics().memoryConsolidation;
+    metrics.dopamineRelease = development_->getMetrics().dopamineRelease;
+    metrics.acetylcholineRelease = development_->getMetrics().acetylcholineRelease;
+    metrics.norepinephrineRelease = development_->getMetrics().norepinephrineRelease;
+    metrics.serotoninRelease = development_->getMetrics().serotoninRelease;
+    metrics.plasticityStrength = development_->getMetrics().plasticityStrength;
+    metrics.learningRate = development_->getMetrics().learningRate;
+    metrics.explorationBias = development_->getMetrics().explorationBias;
+    metrics.memoryRetention = development_->getMetrics().memoryRetention;
+    
+    return metrics;
 }
 
 } // namespace nlm
+
