@@ -144,18 +144,79 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            bool success = self.loadFromFile(filepath);
+            if (!success) {
+                throw std::runtime_error("Failed to load configuration from file: " + filepath);
+            }
+            return success;
+        }, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            bool success = self.loadFromArgs(argc, argv);
+            if (!success) {
+                throw std::runtime_error("Failed to load configuration from command line arguments");
+            }
+            return success;
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            bool success = self.saveToFile(filepath);
+            if (!success) {
+                throw std::runtime_error("Failed to save configuration to file: " + filepath);
+            }
+            return success;
+        }, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto value = self.get<py::object>(key);
+            if (!value.has_value()) {
+                throw std::runtime_error("Configuration key not found: " + key);
+            }
+            return *value;
+        }, py::arg("key"),
+             "Get configuration value by key")
+        .def("getOr", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+            try {
+                auto value = self.get<py::object>(key);
+                return value.value_or(defaultValue);
+            } catch (...) {
+                return defaultValue;
+            }
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value by key with default")
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            // Handle different types
+            if (value.is_none()) {
+                throw std::runtime_error("Cannot set None value in configuration");
+            }
+            if (value.is<bool>()) {
+                self.set(key, value.cast<bool>());
+            } else if (value.is<int>()) {
+                self.set(key, value.cast<int>());
+            } else if (value.is<double>()) {
+                self.set(key, value.cast<double>());
+            } else if (value.is<std::string>()) {
+                self.set(key, value.cast<std::string>());
+            } else if (value.is<std::vector<int>>()) {
+                self.set(key, value.cast<std::vector<int>>());
+            } else if (value.is<std::vector<double>>()) {
+                self.set(key, value.cast<std::vector<double>>());
+            } else if (value.is<std::vector<std::string>>()) {
+                self.set(key, value.cast<std::vector<std::string>>());
+            } else {
+                throw std::runtime_error("Unsupported configuration value type");
+            }
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getEntries", &Config::getEntries,
+             "Get all configuration entries")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
@@ -207,13 +268,47 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("validate", [](const Action& self) {
+            // Basic validation - ensure parameters are within reasonable bounds
+            auto params = self.getParameters();
+            for (float param : params) {
+                if (std::isnan(param) || std::isinf(param)) {
+                    throw std::invalid_argument("Action parameters contain NaN or infinity values");
+                }
+            }
+            return true;
+        }, "Validate action parameters");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
         .def(py::init<float, float, WorldObjectType, float, float>(),
              py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
              py::arg("radius") = 0.5f)
+        .def("setPosition", [](WorldObject& self, float x, float y) {
+            self.x = x;
+            self.y = y;
+        }, py::arg("x"), py::arg("y"),
+             "Set object position")
+        .def("setType", [](WorldObject& self, WorldObjectType type) {
+            self.type = type;
+        }, py::arg("type"),
+             "Set object type")
+        .def("setValue", [](WorldObject& self, float value) {
+            self.value = value;
+        }, py::arg("value"),
+             "Set object value (reward or damage)")
+        .def("setRadius", [](WorldObject& self, float radius) {
+            self.radius = radius;
+        }, py::arg("radius"),
+             "Set object radius")
+        .def("isValid", [](const WorldObject& self) {
+            if (self.x < 0 || self.y < 0) return false;
+            if (self.radius <= 0) return false;
+            if (self.type == WorldObjectType::Empty) return true; // Empty objects are valid
+            if (std::isnan(self.value) || std::isinf(self.value)) return false;
+            return true;
+        }, "Check if world object is valid")
         .def_readwrite("x", &WorldObject::x)
         .def_readwrite("y", &WorldObject::y)
         .def_readwrite("radius", &WorldObject::radius)
@@ -223,6 +318,53 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
+        .def("setPosition", [](AgentBody& self, float x, float y) {
+            self.x = x;
+            self.y = y;
+        }, py::arg("x"), py::arg("y"),
+             "Set agent position")
+        .def("setOrientation", [](AgentBody& self, float orientation) {
+            if (std::isnan(orientation) || std::isinf(orientation)) {
+                throw std::invalid_argument("Orientation cannot be NaN or infinity");
+            }
+            self.orientation = orientation;
+        }, py::arg("orientation"),
+             "Set agent orientation")
+        .def("setVelocity", [](AgentBody& self, float vx, float vy) {
+            if (std::isnan(vx) || std::isinf(vx) || std::isnan(vy) || std::isinf(vy)) {
+                throw std::invalid_argument("Velocity components cannot be NaN or infinity");
+            }
+            self.velocityX = vx;
+            self.velocityY = vy;
+            self.isMoving = (vx != 0.0f || vy != 0.0f);
+        }, py::arg("vx"), py::arg("vy"),
+             "Set agent velocity")
+        .def("setEnergy", [](AgentBody& self, float energy) {
+            if (energy < 0) throw std::invalid_argument("Energy cannot be negative");
+            self.energy = energy;
+        }, py::arg("energy"),
+             "Set agent energy")
+        .def("setHealth", [](AgentBody& self, float health) {
+            if (health < 0 || health > 1) throw std::invalid_argument("Health must be between 0 and 1");
+            self.health = health;
+        }, py::arg("health"),
+             "Set agent health")
+        .def("setAge", [](AgentBody& self, float age) {
+            if (age < 0) throw std::invalid_argument("Age cannot be negative");
+            self.age = age;
+        }, py::arg("age"),
+             "Set agent age")
+        .def("validate", [](const AgentBody& self) {
+            if (std::isnan(self.x) || std::isinf(self.x)) throw std::invalid_argument("Invalid X position");
+            if (std::isnan(self.y) || std::isinf(self.y)) throw std::invalid_argument("Invalid Y position");
+            if (std::isnan(self.orientation) || std::isinf(self.orientation)) throw std::invalid_argument("Invalid orientation");
+            if (std::isnan(self.velocityX) || std::isinf(self.velocityX)) throw std::invalid_argument("Invalid velocity X");
+            if (std::isnan(self.velocityY) || std::isinf(self.velocityY)) throw std::invalid_argument("Invalid velocity Y");
+            if (self.energy < 0) throw std::invalid_argument("Invalid energy");
+            if (self.health < 0 || self.health > 1) throw std::invalid_argument("Invalid health");
+            if (self.age < 0) throw std::invalid_argument("Invalid age");
+            return true;
+        }, "Validate agent body state")
         .def_readwrite("x", &AgentBody::x)
         .def_readwrite("y", &AgentBody::y)
         .def_readwrite("orientation", &AgentBody::orientation)
@@ -265,8 +407,14 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("configure", [](SimpleWorld& self, float width, float height, size_t visionWidth, size_t visionHeight) {
+            if (width <= 0) throw std::invalid_argument("World width must be positive");
+            if (height <= 0) throw std::invalid_argument("World height must be positive");
+            if (visionWidth == 0) throw std::invalid_argument("Vision width must be positive");
+            if (visionHeight == 0) throw std::invalid_argument("Vision height must be positive");
+            self.configure(width, height, visionWidth, visionHeight);
+        }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions and vision")
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
@@ -302,12 +450,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
+        .def("receiveSensoryInputs", [](Brain& self, const std::vector<class SensoryInput>& inputs) {
+            for (const auto& input : inputs) {
+                self.receiveSensoryInput(input);
+            }
+        }, py::arg("inputs"),
+             "Receive multiple sensory inputs at once")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
+        .def("injectCurrents", [](Brain& self, const std::vector<std::pair<NeuronId, MembranePotential>>& injections) {
+            for (const auto& inj : injections) {
+                self.injectCurrent(inj.first, inj.second);
+            }
+        }, py::arg("injections"),
+             "Inject current into multiple neurons at once")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
@@ -342,6 +502,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -350,6 +512,31 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getConfigValue", [](const Brain& self, const std::string& key) {
+            auto value = self.getConfig()->get<py::object>(key);
+            if (!value.has_value()) {
+                throw std::runtime_error("Configuration key not found: " + key);
+            }
+            return *value;
+        }, py::arg("key"),
+             "Get a specific configuration value")
+        .def("setConfigValue", [](Brain& self, const std::string& key, const py::object& value) {
+            self.getConfig()->set(key, value.cast<py::object>());
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration value")
+        .def("getStatistics", [](const Brain& self) {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["average_firing_rate"] = self.getAverageFiringRate();
+            stats["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["pending_spike_events"] = self.getPendingSpikeEventCount();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
@@ -415,6 +602,170 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Utility functions for batch operations
+    m.def("batchReceiveSensoryInput", [](std::shared_ptr<Brain> brain, const std::vector<class SensoryInput>& inputs) {
+        for (const auto& input : inputs) {
+            brain->receiveSensoryInput(input);
+        }
+    }, py::arg("brain"), py::arg("inputs"),
+         "Receive multiple sensory inputs into a brain at once");
+
+    m.def("batchInjectCurrents", [](std::shared_ptr<Brain> brain, 
+                                 const std::vector<std::pair<NeuronId, MembranePotential>>& injections) {
+        for (const auto& inj : injections) {
+            brain->injectCurrent(inj.first, inj.second);
+        }
+    }, py::arg("brain"), py::arg("injections"),
+         "Inject current into multiple neurons at once");
+
+    m.def("batchStepBrains", [](const std::vector<std::shared_ptr<Brain>>& brains, SimulationStep currentStep) {
+        for (auto& brain : brains) {
+            brain->step(currentStep);
+        }
+    }, py::arg("brains"), py::arg("currentStep"),
+         "Step multiple brains simultaneously");
+
+    // Statistics and analysis functions
+    m.def("computeGlobalStatistics", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        py::dict globalStats;
+        size_t totalNeurons = 0;
+        size_t totalSynapses = 0;
+        size_t totalActiveNeurons = 0;
+        size_t totalFiringNeurons = 0;
+        float totalFiringRate = 0.0f;
+        float totalEIRatio = 0.0f;
+        size_t brainCount = 0;
+        
+        for (const auto& brain : brains) {
+            if (brain) {
+                totalNeurons += brain->getTotalNeuronCount();
+                totalSynapses += brain->getTotalSynapseCount();
+                totalActiveNeurons += brain->getActiveNeuronCount();
+                totalFiringNeurons += brain->getFiringNeuronCount();
+                totalFiringRate += brain->getAverageFiringRate();
+                totalEIRatio += brain->getExcitationInhibitionRatio();
+                brainCount++;
+            }
+        }
+        
+        if (brainCount > 0) {
+            globalStats["average_neurons"] = static_cast<double>(totalNeurons) / brainCount;
+            globalStats["average_synapses"] = static_cast<double>(totalSynapses) / brainCount;
+            globalStats["average_active_neurons"] = static_cast<double>(totalActiveNeurons) / brainCount;
+            globalStats["average_firing_neurons"] = static_cast<double>(totalFiringNeurons) / brainCount;
+            globalStats["average_firing_rate"] = totalFiringRate / brainCount;
+            globalStats["average_e_i_ratio"] = totalEIRatio / brainCount;
+        }
+        
+        return globalStats;
+    }, py::arg("brains"),
+         "Compute global statistics across multiple brains");
+
+    // Validation utilities
+    m.def("validateAllObjects", [](const std::vector<WorldObject>& objects) {
+        std::vector<bool> validityResults;
+        validityResults.reserve(objects.size());
+        
+        for (const auto& obj : objects) {
+            validityResults.push_back(obj.isValid());
+        }
+        
+        return validityResults;
+    }, py::arg("objects"),
+         "Validate multiple world objects and return validity results");
+
+    m.def("normalizeActionParameters", [](const std::vector<float>& params, float minValue = 0.0f, float maxValue = 1.0f) {
+        std::vector<float> normalizedParams;
+        normalizedParams.reserve(params.size());
+        
+        float paramMin = *std::min_element(params.begin(), params.end());
+        float paramMax = *std::max_element(params.begin(), params.end());
+        
+        if (paramMax > paramMin) {
+            for (float param : params) {
+                normalizedParams.push_back(minValue + (maxValue - minValue) * 
+                                         ((param - paramMin) / (paramMax - paramMin)));
+            }
+        } else {
+            normalizedParams = params; // All values are the same
+        }
+        
+        return normalizedParams;
+    }, py::arg("params"), py::arg("minValue") = 0.0f, py::arg("maxValue") = 1.0f,
+         "Normalize action parameters to a specified range");
+
+    // Configuration utilities
+    m.def("mergeConfigs", [](const std::vector<std::shared_ptr<Config>>& configs) {
+        auto mergedConfig = std::make_shared<Config>();
+        
+        for (const auto& config : configs) {
+            if (config) {
+                auto keys = config->getKeys();
+                for (const auto& key : keys) {
+                    auto value = config->get<py::object>(key);
+                    if (value.has_value()) {
+                        mergedConfig->set(key, *value);
+                    }
+                }
+            }
+        }
+        
+        return mergedConfig;
+    }, py::arg("configs"),
+         "Merge multiple configuration objects into one");
+
+    // Debug and monitoring utilities
+    m.def("getBrainHealth", [](const std::shared_ptr<Brain>& brain) {
+        py::dict healthInfo;
+        
+        if (!brain) {
+            healthInfo["status"] = "invalid";
+            healthInfo["error"] = "Brain pointer is null";
+            return healthInfo;
+        }
+        
+        healthInfo["status"] = "healthy";
+        healthInfo["total_neurons"] = brain->getTotalNeuronCount();
+        healthInfo["total_synapses"] = brain->getTotalSynapseCount();
+        healthInfo["active_neurons"] = brain->getActiveNeuronCount();
+        healthInfo["firing_neurons"] = brain->getFiringNeuronCount();
+        healthInfo["avg_firing_rate"] = brain->getAverageFiringRate();
+        healthInfo["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        healthInfo["total_spikes"] = brain->getTotalSpikeCount();
+        healthInfo["pending_spike_events"] = brain->getPendingSpikeEventCount();
+        
+        // Check for potential issues
+        if (brain->getTotalNeuronCount() == 0) {
+            healthInfo["warning"] = "No neurons in brain";
+        }
+        if (brain->getTotalSynapseCount() == 0) {
+            healthInfo["warning"] = "No synapses in brain";
+        }
+        if (brain->getAverageFiringRate() > 100.0f) {
+            healthInfo["warning"] = "Very high firing rate detected";
+        }
+        
+        return healthInfo;
+    }, py::arg("brain"),
+         "Get comprehensive health information about a brain");
+
+    m.def("benchmarkOperation", [](const std::string& operationName, std::function<void()> operation) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        operation();
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+        
+        py::dict result;
+        result["operation"] = operationName;
+        result["duration_microseconds"] = static_cast<long long>(duration.count());
+        result["duration_milliseconds"] = static_cast<double>(duration.count()) / 1000.0;
+        result["success"] = true;
+        
+        return result;
+    }, py::arg("operationName"), py::arg("operation"),
+         "Benchmark an operation and return timing results");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

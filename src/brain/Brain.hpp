@@ -1,3 +1,5 @@
+// Brain.hpp - Enhanced Brain class with improved architecture
+
 #pragma once
 
 #include "../core/Types/Types.hpp"
@@ -8,6 +10,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace nlm {
 
@@ -42,6 +46,51 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Brain Configuration Parameters - Use config values instead of hard-coded constants
+struct BrainConfig {
+    // Neural configuration
+    size_t neuronCount{1000};
+    size_t regionCount{1};
+    float connectionProbability{0.1f};
+    
+    // Plasticity parameters
+    float stdpLTPWeight{0.01f};
+    float stdpLTDWeight{0.012f};
+    float stdpTau{20.0f};
+    
+    // Structural plasticity
+    float synaptogenesisRate{0.0001f};
+    float pruningRate{0.00001f};
+    
+    // Integration intervals
+    size_t replayInterval{100};
+    size_t consolidationInterval{1000};
+    
+    // Checkpoint settings
+    std::string checkpointDir{"./checkpoints"};
+    size_t maxCheckpoints{10000};
+    uint32_t compressionLevel{5};
+    bool enableCompression{true};
+    
+    // Development parameters
+    double developmentInterval{1000.0};
+    
+    // Memory parameters
+    size_t workingMemoryCapacity{100};
+    size_t maxEpisodes{1000};
+    
+    // Cognition parameters
+    size_t plannerDepth{5};
+    float attentionInhibitionStrength{0.5f};
+    float attentionExcitationStrength{1.5f};
+    
+    // Defaults for backward compatibility
+    static BrainConfig getDefaultConfig() {
+        BrainConfig config;
+        return config;
+    }
 };
 
 // Brain: The central coordinator of the neural system
@@ -193,9 +242,50 @@ public:
     // Logging
     void logStatus() const;
     
+    // Validation
+    bool validate() const;
+    
+    // Configuration helpers
+    void updateConfigFromBrainConfig(const BrainConfig& brainConfig);
+    BrainConfig getBrainConfig() const;
+    
+    // Performance optimization helpers
+    void optimizeMemoryAccess();
+    void preAllocateMemory();
+    
+    // Advanced simulation methods
+    void stepWithMemoryReplay(SimulationStep currentStep, Timestamp currentTime);
+    void stepWithDevelopment(SimulationStep currentStep, Timestamp currentTime);
+    void stepWithPlasticity(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Debugging and analysis
+    void analyzeNetworkTopology() const;
+    void diagnosePerformanceIssues() const;
+    void generateDiagnosticReport() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Private helper methods
+    void initializeMemorySystems();
+    void initializePredictionSystem();
+    void initializeCognitionSystems();
+    void initializeDevelopmentSystem();
+    void initializeNeuromodulationSystems();
+    void initializePlasticitySystems();
+    void registerEventHandlers();
+    void setupNetworkTopology();
+    void validateConfiguration() const;
+    void optimizeNetworkConnectivity();
+    
+    // Event handlers
+    void handleSpikeEvents(const SpikeEvent& event);
+    void handleDelayedSpikeEvents(const DelayedSpikeEvent& event);
+    void handleNeuromodulation(const Neuromodulator& signal);
+    void handlePlasticityEvents();
+    void handleDevelopmentEvents();
+    void handleMemoryReplay();
 };
 
 } // namespace nlm
