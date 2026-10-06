@@ -92,11 +92,11 @@ void SimpleWorld::update(double timestep) {
     while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
     while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
     
-    // Boundary collision
+    // Boundary collision - consistent bounds
     if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
+    if (agent_.x >= width_) { agent_.x = width_ - 0.001f; agent_.velocityX = 0.0f; }
     if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    if (agent_.y >= height_) { agent_.y = height_ - 0.001f; agent_.velocityY = 0.0f; }
     
     // Energy decay
     agent_.energy -= energyDecayRate_;

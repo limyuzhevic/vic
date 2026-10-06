@@ -4,13 +4,13 @@
 
 namespace nlm {
 
-// Vision processing (placeholder)
+// Vision analysis processor
 // PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
 
-class VisionProcessor {
+class VisionAnalysis {
 public:
-    VisionProcessor();
-    ~VisionProcessor();
+    VisionAnalysis();
+    ~VisionAnalysis();
     
     // Process vision input
     void process(const Vision& input);

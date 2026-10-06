@@ -31,6 +31,11 @@ void HebbianRule::update(Synapse* synapse,
         return;
     }
     
+    // Safety checks for null pointers and empty vectors
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
     // Count coincident spikes (simplified)
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
@@ -48,6 +53,8 @@ void HebbianRule::update(Synapse* synapse,
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    // Safety check for null synapse
+    if (!synapse) return;
     synapse->addToWeight(delta);
 }
 
