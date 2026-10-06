@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -30,6 +31,12 @@ public:
     
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const;
+    
+    // Reset prediction system
+    void reset();
     
 private:
     struct Impl;

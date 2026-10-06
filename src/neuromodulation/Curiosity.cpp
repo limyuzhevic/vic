@@ -1,5 +1,8 @@
 #include "Curiosity.hpp"
+#include "brain/Brain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -9,13 +12,17 @@ struct Curiosity::Impl {
     float noveltyWeight;
     float predictionErrorWeight;
     float decayRate;
+    float explorationThreshold;
+    float learningRate;
     
     Impl() 
         : brain(nullptr)
         , level(0.0f)
         , noveltyWeight(0.5f)
         , predictionErrorWeight(0.5f)
-        , decayRate(0.05f) {}
+        , decayRate(0.05f)
+        , explorationThreshold(0.3f)
+        , learningRate(0.1f) {}
 };
 
 Curiosity::Curiosity() : pImpl(new Impl) {}
@@ -32,15 +39,20 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
-    // Curiosity increases with novelty and prediction error
+    // Curiosa increases with novelty and prediction error (RL exploration drive)
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
     
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    // Smooth update with learning rate
+    pImpl->level += (target - pImpl->level) * pImpl->learningRate;
     
     // Decay
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Apply to brain via dopamine integration
+    if (pImpl->brain && pImpl->brain->getDopamine()) {
+        pImpl->brain->getDopamine()->integrateCuriosity(pImpl->level);
+    }
 }
 
 float Curiosity::getExplorationDrive() const {

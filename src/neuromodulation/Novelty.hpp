@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -21,11 +22,11 @@ public:
     
     // Detect novelty from observation
     void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
+                        const class Observation& previousObservation);
     
     // Detect novelty from sensory input pattern
     void detectNovelty(const std::vector<float>& currentPattern,
-                       const std::vector<float>& previousPattern);
+                        const std::vector<float>& previousPattern);
     
     // Decay novelty over time
     void update(TimestepDuration dt);

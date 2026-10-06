@@ -40,43 +40,37 @@ private:
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Base implementation on NeuralEpisodicMemory for neural integration
 
-struct EpisodicMemoryItem {
-    SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
-    
-    EpisodicMemoryItem() : timestamp(0) {}
-};
-
-class EpisodicMemory {
+class EpisodicMemory : public NeuralEpisodicMemory {
 public:
     EpisodicMemory();
-    ~EpisodicMemory();
+    ~EpisodicMemory() override;
     
-    // Store episode
-    void storeEpisode(const EpisodicMemoryItem& episode);
+    // Store episode using neural pattern storage
+    void storeEpisode(const EpisodicMemoryItem& episode) override;
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Retrieve episode by index
+    EpisodicMemoryItem retrieveEpisode(size_t index) const override;
     
     // Get episode count
-    size_t getEpisodeCount() const;
+    size_t getEpisodeCount() const override;
     
     // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const override;
     
-    // Clear all
-    void clear();
+    // Clear all episodes
+    void clear() override;
     
     // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    void consolidate(float relevanceThreshold) override;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Convert between simple and neural episodic memory items
+    void convertToNeuralItem(const EpisodicMemoryItem& simpleItem, 
+                           EpisodicMemoryItem& neuralItem) const;
+    void convertFromNeuralItem(const EpisodicMemoryItem& neuralItem,
+                             EpisodicMemoryItem& simpleItem) const;
 };
 
 // Semantic memory: gradually acquired knowledge
@@ -144,27 +138,27 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Base implementation on NeuralAssociativeMemory for neural integration
 
-class AssociativeMemory {
+class AssociativeMemory : public NeuralAssociativeMemory {
 public:
     AssociativeMemory();
-    ~AssociativeMemory();
+    ~AssociativeMemory() override;
     
-    // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
+    // Create association using neural pattern matching
+    void associate(NeuronId a, NeuronId b, float strength) override;
     
     // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+    std::vector<NeuronId> getAssociations(NeuronId neuron) const override;
     
     // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
+    float getAssociationStrength(NeuronId a, NeuronId b) const override;
     
     // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
+    void updateAssociation(NeuronId a, NeuronId b, float delta) override;
     
-    // Clear all
-    void clear();
+    // Clear all associations
+    void clear() override;
     
 private:
     struct Impl;
