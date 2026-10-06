@@ -1,8 +1,8 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Easy Usage Guide for Beginners (Enhanced Edition)
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然 - "serene flow") is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -10,7 +10,9 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+**NEW**: NLM now includes an **enhanced Python API** with high-level convenience functions that make it much easier to use!
+
+That's it! NLM simulates all of this, but now with **powerful new tools for advanced users**!
 
 ---
 
