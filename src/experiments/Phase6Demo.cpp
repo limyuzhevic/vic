@@ -18,12 +18,22 @@ int main(int argc, char* argv[]) {
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
+    // Log start of experiment
+    std::cout << "Starting Phase 6 integration test..." << std::endl;
+    
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
     std::cout << "--- Integration Verification ---" << std::endl;
-    bool integrationOK = experiment.verifyIntegration();
+    bool integrationOK = false;
+    
+    try {
+        integrationOK = experiment.verifyIntegration();
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR during integration verification: " << e.what() << std::endl;
+        integrationOK = false;
+    }
     
     std::cout << std::endl;
     

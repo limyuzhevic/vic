@@ -446,49 +446,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Pre-validate neurons and synapses for efficiency
+    bool hasPlasticSynapses = false;
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
+            if (syn->getPlasticityFlags().stdp || syn->getPlasticityFlags().hebbian) {
+                hasPlasticSynapses = true;
+                break;
             }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+        }
+        if (hasPlasticSynapses) break;
+    }
+    
+    if (hasPlasticSynapses) {
+        // Apply STDP and Hebbian plasticity only if needed
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                // Apply STDP with neuromodulation
+                if (syn->getPlasticityFlags().stdp) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        // Modify weight change based on dopamine
+                        pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                        float weight = syn->getWeight();
+                        weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                        syn->setWeight(weight);
+                    }
                 }
+                
+                // Apply Hebbian learning
+                if (syn->getPlasticityFlags().hebbian) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    }
+                }
+                
+                // Update synapse state
+                syn->step(currentTime);
             }
-            
-            // Update synapse state
-            syn->step(currentTime);
         }
     }
     
     // ========== STEP 7: Update episodic memory ==========
+    // Store episode only when memory system is available and ready
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+            // Optimize episode creation - reserve space for common neuron counts
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Pre-allocate vectors to avoid reallocations
+            size_t estimatedActiveNeurons = 0;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            estimatedActiveNeurons++;
+                        }
+                    }
+                }
+            }
+            
+            // Reserve space for better memory efficiency
+            episode.activeNeurons.reserve(estimatedActiveNeurons);
+            episode.neuronActivations.reserve(estimatedActiveNeurons);
+            
+            // Store active neurons and their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -1089,29 +1122,67 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
-    // Memory system status
+    // Memory system status with enhanced debugging
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+        NLM_LOG_DEBUG("Working memory capacity: " + std::to_string(pImpl->workingMemory->getCapacity()));
     }
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        NLM_LOG_DEBUG("Episodic memory max episodes: " + std::to_string(pImpl->episodicMemory->getMaxEpisodes()));
+    }
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("Associative memory patterns: " + std::to_string(pImpl->associativeMemory->getPatternCount()));
     }
     
-    // Neuromodulation status
+    // Neuromodulation status with enhanced debugging
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+        NLM_LOG_DEBUG("Dopamine plasticity factor: " + std::to_string(pImpl->dopamine->getPlasticityFactor()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
     }
     
-    // Development status
+    // Development status with enhanced debugging
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    NLM_LOG_DEBUG("Developmental age (steps): " + std::to_string(pImpl->currentStep));
     
+    // Performance monitoring
+    NLM_LOG_DEBUG("Simulation timestep: " + std::to_string(pImpl->timestep));
+    NLM_LOG_DEBUG("Simulation time: " + std::to_string(pImpl->currentTime));
+    NLM_LOG_DEBUG("Steps since last episode: " + std::to_string(pImpl->stepsSinceLastEpisode));
+    
+    // Detailed region information with debugging
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        
+        // Debug region-specific metrics
+        NLM_LOG_DEBUG("    Population counts: " + std::to_string(region->getPopulationCount()));
+        NLM_LOG_DEBUG("    Active neurons: " + std::to_string(region->getActiveNeuronCount()));
+        NLM_LOG_DEBUG("    Region average firing rate: " + std::to_string(region->getAverageFiringRate()));
+        
+        // Check for potential issues
+        if (region->getTotalNeuronCount() > 0 && region->getAverageSynapticWeight() == 0.0f) {
+            NLM_LOG_WARNING("Region " + std::to_string(region->getId().index()) + 
+                          " has zero average synaptic weight - potential connectivity issue");
+        }
     }
+    
+    // Checkpoint system status
+    if (pImpl->checkpointManager) {
+        NLM_LOG_DEBUG("Checkpoint system: Active");
+        // Note: Add checkpoint manager debug info if available
+    }
+    
+    NLM_LOG_INFO("=== Brain Status End ===");
 }
 
 } // namespace nlm
