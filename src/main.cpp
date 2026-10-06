@@ -367,20 +367,31 @@ int main(int argc, char** argv) {
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    constexpr int64_t DEFAULT_RANDOM_SEED = 42;
+    constexpr double DEFAULT_SIMULATION_TIMESTEP = 0.001;
+    constexpr int64_t DEFAULT_NEURON_COUNT = 500;
+    constexpr int64_t DEFAULT_REGION_COUNT = 1;
+    constexpr float DEFAULT_CONNECTION_PROBABILITY = 0.15f;
+    constexpr float DEFAULT_STDP_LTP_WEIGHT = 0.02f;
+    constexpr float DEFAULT_STDP_LTD_WEIGHT = 0.015f;
+    constexpr float DEFAULT_STDP_TAU = 20.0f;
+    constexpr float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;
+    constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+    
+    config->set("random_seed", static_cast<int64_t>(DEFAULT_RANDOM_SEED), ConfigSource::Default);
+    config->set("simulation_timestep", DEFAULT_SIMULATION_TIMESTEP, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(DEFAULT_NEURON_COUNT), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(DEFAULT_REGION_COUNT), ConfigSource::Default);
+    config->set("connection_probability", DEFAULT_CONNECTION_PROBABILITY, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", DEFAULT_STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", DEFAULT_STDP_LTD_WEIGHT, ConfigSource::Default);
+    config->set("stdp_tau", DEFAULT_STDP_TAU, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", DEFAULT_SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    config->set("pruning_rate", DEFAULT_PRUNING_RATE, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");

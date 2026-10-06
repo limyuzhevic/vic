@@ -17,17 +17,64 @@ static float urand(uint64_t& state, float min, float max) {
     return min + normalized * (max - min);
 }
 
+// Simple linear congruential generator
+static uint64_t lcg(uint64_t& state) {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return state;
+}
+
+static float urand(uint64_t& state, float min, float max) {
+    uint64_t r = lcg(state);
+    float normalized = (r & 0xFFFFFFFFFFFFULL) / static_cast<float>(0xFFFFFFFFFFFFULL);
+    return min + normalized * (max - min);
+}
+
+// World simulation constants
+namespace {
+    constexpr float DEFAULT_WORLD_WIDTH = 20.0f;
+    constexpr float DEFAULT_WORLD_HEIGHT = 20.0f;
+    constexpr size_t DEFAULT_VISION_WIDTH = 16;
+    constexpr size_t DEFAULT_VISION_HEIGHT = 16;
+    constexpr float DEFAULT_MAX_ENERGY = 100.0f;
+    constexpr float DEFAULT_ENERGY_DECAY_RATE = 0.01f;
+    constexpr float DEFAULT_RESOURCE_ENERGY_GAIN = 30.0f;
+    constexpr float DEFAULT_SIMULATION_TIME = 0.0;
+    constexpr uint64_t DEFAULT_RNG_SEED = 42;
+    
+    constexpr float MIN_AGENT_POSITION = 2.0f;
+    constexpr float OBJECT_PLACEMENT_MIN = 1.0f;
+    constexpr int DEFAULT_RESOURCE_COUNT = 5;
+    constexpr int DEFAULT_HAZARD_COUNT = 3;
+    constexpr float RESOURCE_VALUE = 10.0f;
+    constexpr float HAZARD_VALUE = -15.0f;
+    constexpr float RESOURCE_RADIUS = 0.4f;
+    constexpr float HAZARD_RADIUS = 0.3f;
+    
+    constexpr float ACTION_TIME_THRESHOLD = 0.1f;
+    constexpr float MOVEMENT_COST = 0.01f;
+    constexpr float WALL_HIT_COST = 0.05f;
+    constexpr float MOVEMENT_COST_BACKWARD = 0.02f;
+    constexpr float TURN_COST = 0.005f;
+    constexpr float VELOCITY_DECAY_RATE = 0.9f;
+    constexpr float MOVEMENT_STEP_SIZE = 0.1f;
+    constexpr float INTERACTION_RANGE = 1.0f;
+    constexpr float DEFAULT_MOVE_SPEED = 3.0f;
+    constexpr float DEFAULT_TURN_SPEED = 2.0f;
+    constexpr float MOVEMENT_SPEED_BACKWARD_FACTOR = 0.5f;
+    constexpr float WALL_BUFFER = 0.01f;
+} // anonymous namespace
+
 SimpleWorld::SimpleWorld()
-    : width_(20.0f)
-    , height_(20.0f)
-    , visionWidth_(16)
-    , visionHeight_(16)
-    , maxEnergy_(100.0f)
-    , energyDecayRate_(0.01f)
-    , resourceEnergyGain_(30.0f)
-    , simTime_(0.0)
-    , rngSeed_(42)
-    , rngState_(42)
+    : width_(DEFAULT_WORLD_WIDTH)
+    , height_(DEFAULT_WORLD_HEIGHT)
+    , visionWidth_(DEFAULT_VISION_WIDTH)
+    , visionHeight_(DEFAULT_VISION_HEIGHT)
+    , maxEnergy_(DEFAULT_MAX_ENERGY)
+    , energyDecayRate_(DEFAULT_ENERGY_DECAY_RATE)
+    , resourceEnergyGain_(DEFAULT_RESOURCE_ENERGY_GAIN)
+    , simTime_(DEFAULT_SIMULATION_TIME)
+    , rngSeed_(DEFAULT_RNG_SEED)
+    , rngState_(DEFAULT_RNG_SEED)
 {
     agent_.reset();
 }
@@ -47,27 +94,27 @@ void SimpleWorld::setRandomSeed(uint64_t seed) {
 }
 
 void SimpleWorld::reset() {
-    simTime_ = 0.0;
+    simTime_ = DEFAULT_SIMULATION_TIME;
     agent_.reset();
-    agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
-    agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
+    agent_.x = urand(rngState_, MIN_AGENT_POSITION, width_ - MIN_AGENT_POSITION);
+    agent_.y = urand(rngState_, MIN_AGENT_POSITION, height_ - MIN_AGENT_POSITION);
     agent_.energy = maxEnergy_;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
     
     // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+    for (int i = 0; i < DEFAULT_RESOURCE_COUNT; ++i) {
+        float ox = urand(rngState_, OBJECT_PLACEMENT_MIN, width_ - OBJECT_PLACEMENT_MIN);
+        float oy = urand(rngState_, OBJECT_PLACEMENT_MIN, height_ - OBJECT_PLACEMENT_MIN);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, RESOURCE_VALUE, RESOURCE_RADIUS);
     }
     
     // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+    for (int i = 0; i < DEFAULT_HAZARD_COUNT; ++i) {
+        float ox = urand(rngState_, OBJECT_PLACEMENT_MIN, width_ - OBJECT_PLACEMENT_MIN);
+        float oy = urand(rngState_, OBJECT_PLACEMENT_MIN, height_ - OBJECT_PLACEMENT_MIN);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, HAZARD_VALUE, HAZARD_RADIUS);
     }
     
     generateVision();
@@ -94,9 +141,9 @@ void SimpleWorld::update(double timestep) {
     
     // Boundary collision
     if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
+    if (agent_.x >= width_) { agent_.x = width_ - WALL_BUFFER; agent_.velocityX = 0.0f; }
     if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    if (agent_.y >= height_) { agent_.y = height_ - WALL_BUFFER; agent_.velocityY = 0.0f; }
     
     // Energy decay
     agent_.energy -= energyDecayRate_;
@@ -118,11 +165,11 @@ uint64_t SimpleWorld::nextRandom() {
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
     ActionResult result;
-    const float moveSpeed = 3.0f;
-    const float turnSpeed = 2.0f;
+    const float moveSpeed = DEFAULT_MOVE_SPEED;
+    const float turnSpeed = DEFAULT_TURN_SPEED;
     
     // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
+    if (currentTime - agent_.lastActionTime < ACTION_TIME_THRESHOLD) {
         return ActionResult(0.0f, false, "too soon");
     }
     
@@ -133,37 +180,37 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             float dx = std::cos(agent_.orientation) * moveSpeed;
             float dy = std::sin(agent_.orientation) * moveSpeed;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
+            float newX = agent_.x + dx * MOVEMENT_STEP_SIZE;
+            float newY = agent_.y + dy * MOVEMENT_STEP_SIZE;
             
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                result.reward = MOVEMENT_COST; // Small cost for movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = WALL_HIT_COST; // Cost for hitting wall
                 result.success = false;
             }
             break;
         }
         
         case MotorCommand::MoveBackward: {
-            float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
-            float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
+            float dx = -std::cos(agent_.orientation) * moveSpeed * MOVEMENT_SPEED_BACKWARD_FACTOR;
+            float dy = -std::sin(agent_.orientation) * moveSpeed * MOVEMENT_SPEED_BACKWARD_FACTOR;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
+            float newX = agent_.x + dx * MOVEMENT_STEP_SIZE;
+            float newY = agent_.y + dy * MOVEMENT_STEP_SIZE;
             
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = MOVEMENT_COST_BACKWARD;
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = WALL_HIT_COST;
                 result.success = false;
             }
             break;
@@ -172,14 +219,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = TURN_COST;
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = TURN_COST;
             result.success = true;
             break;
             
@@ -201,9 +248,9 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::Wait:
         default:
             // Decay velocities
-            agent_.velocityX *= 0.9f;
-            agent_.velocityY *= 0.9f;
-            agent_.angularVelocity *= 0.9f;
+            agent_.velocityX *= VELOCITY_DECAY_RATE;
+            agent_.velocityY *= VELOCITY_DECAY_RATE;
+            agent_.angularVelocity *= VELOCITY_DECAY_RATE;
             agent_.isMoving = false;
             agent_.isTurning = false;
             result.reward = 0.0f;
@@ -220,7 +267,7 @@ ActionResult SimpleWorld::interact() {
     result.success = false;
     
     // Check for objects in interaction range
-    const float interactRange = 1.0f;
+    const float interactRange = INTERACTION_RANGE;
     
     for (auto& obj : objects_) {
         if (!obj.active) continue;
@@ -238,11 +285,19 @@ ActionResult SimpleWorld::interact() {
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
+                agent_.energy = std::max(0.0f, agent_.energy + obj.value);
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
-                result.message = "hit_hazard";
+                result.message = "encountered_hazard";
             }
+            
+            // Stop after first interaction
+            break;
+        }
+    }
+    
+    return result;
+}
             
             // Only interact with one object at a time
             break;
