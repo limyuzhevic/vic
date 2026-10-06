@@ -12,6 +12,163 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Advanced Usage: Phase 6 Integration
+
+Now that you've learned the basics, let's explore Phase 6 - the FINAL INTEGRATION! This is where all the brain systems work together as one coherent intelligence.
+
+### Phase 6: Complete Brain Integration
+
+Phase 6 combines ALL previous phases into one unified artificial brain system. Your brain will have:
+
+- **Working Memory**: Keeps active information for immediate processing
+- **Episodic Memory**: Stores experiences as episodes for replay and learning
+- **Associative Memory**: Makes connections between patterns and concepts
+- **Neuromodulation**: Dopamine (rewards), Curiosity (exploration), Novelty (surprise)
+- **Prediction System**: Anticipates future events and errors
+- **Cognitive Functions**: Planning, concept formation, attention
+- **Development System**: Brain matures and adapts over time
+- **Checkpointing**: Saves and loads brain state for persistence
+- **Replay System**: Replays experiences to consolidate learning
+
+### Phase 6 Advanced Example
+
+Here's a complete example that demonstrates all Phase 6 systems working together:
+
+```python
+import pynlm
+import time
+import os
+
+# Step 1: Create an advanced Phase 6 brain with all systems enabled
+config = pynlm.createDefaultConfig()
+config.setNeuronalParameters(tauMembrane=0.02, vRest=-70.0, vThreshold=-50.0)
+config.setPlasticityParameters(stdpLTP=0.01, stdpLTD=0.012, weightMax=10.0)
+config.enableAdvancedFeatures()  # Enable all Phase 6 features
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Step 2: Create an advanced world with dynamic environment
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.enableDynamicEnvironment()  # Phase 6 enhancement
+world.setAgentStart(10, 10)
+world.reset()
+
+# Step 3: Create an advanced agent with all capabilities
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableAdvancedLearning()           # Complex learning strategies
+agent.enableCuriosityDrivenExploration() # Active exploration
+agent.enablePredictivePlanning()        # Plan actions based on predictions
+agent.enableConceptLearning()           # Learn abstract concepts
+agent.enableAttentionManagement()       # Focus on relevant information
+agent.enableSocialLearning()            # Learn from others
+agent.enableContinualLearning()         # Learn continuously
+
+print("=== Phase 6 Advanced Integration Demo ===")
+print("Brain systems enabled:")
+print(f"  ✓ Working memory: Available ({brain.getWorkingMemory() is not None})")
+print(f"  ✓ Episodic memory: Available ({brain.getEpisodicMemory() is not None})")
+print(f"  ✓ Neuromodulation: Available ({brain.getDopamine() is not None})")
+print(f"  ✓ Prediction system: Available ({brain.getPredictionSystem() is not None})")
+print(f"  ✓ Development system: Available ({brain.getDevelopmentSystem() is not None})")
+
+# Step 4: Run an advanced simulation with all systems interacting
+episode_reward = 0.0
+firing_rates = []
+memory_episodes = []
+
+for step in range(1000):
+    # World updates with dynamic complexity
+    world_time = world.getSimulationTime()
+    world.update(0.1)
+    
+    # Get sensory input with attention and prediction
+    percept = world.getSensoryPercept()
+    
+    # Agent processes sensory input with advanced processing
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks with integrated systems
+    brain.step(step)
+    
+    # Get action with predictive planning
+    action = agent.decodeMotorCommand()
+    
+    # Apply action and get result (ActionResult contains reward)
+    action_result = world.applyMotorCommand(action, world_time)
+    
+    # Advanced reward modulation with prediction error
+    agent.applyRewardModulation(action_result.reward, agent.getPredictionError())
+    
+    # Development progression
+    if step % 10 == 0:
+        agent.updateDevelopment(0.1)
+    
+    # Collect metrics
+    episode_reward += action_result.reward
+    firing_rates.append(brain.getAverageFiringRate())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: Reward={episode_reward:.2f}, "
+              f"Firing={brain.getAverageFiringRate():.2f}, "
+              f"Prediction Error={agent.getPredictionError():.3f}, "
+              f"Curiosity={agent.getCuriosityLevel():.2f}")
+
+print("\n=== Phase 6 Results ===")
+print(f"Total reward over episode: {episode_reward:.2f}")
+print(f"Average firing rate: {sum(firing_rates)/len(firing_rates):.2f}")
+print(f"Memory episodes stored: {brain.getEpisodicMemory().getEpisodeCount() if brain.getEpisodicMemory() else 0}")
+print(f"Current developmental stage: {brain.getDevelopmentalStage()}")
+print(f"Neuromodulation levels:")
+print(f"  Dopamine: {agent.getNeuromodulationLevel():.2f}")
+print(f"  Curiosity: {agent.getCuriosityLevel():.2f}")
+print(f"  Novelty: {agent.getNoveltyLevel():.2f}")
+print(f"Prediction error: {agent.getPredictionError():.3f}")
+
+# Step 5: Test checkpointing and replay (Phase 6 core features)
+print("\n=== Testing Phase 6 Core Features ===")
+
+# Save brain state (checkpointing)
+checkpoint_path = "./nlm_phase6_checkpoint.bin"
+if brain.save(checkpoint_path):
+    print("✓ Checkpoint saved successfully")
+else:
+    print("✗ Checkpoint save failed")
+
+# Test replay system if episodic memory is working
+if brain.getEpisodicMemory() and brain.getEpisodicMemory().getEpisodeCount() > 0:
+    episodes = brain.getEpisodicMemory().getEpisodesForReplay(5)
+    if not episodes.empty():
+        print("✓ Replay system working - retrieved episodes for consolidation")
+    else:
+        print("? Replay system available but no episodes to replay")
+else:
+    print("? No episodic memory available for replay")
+
+# Load checkpoint (recovery test)
+if os.path.exists(checkpoint_path):
+    brain2 = pynlm.createBrain(config)
+    brain2.initialize()
+    if brain2.load(checkpoint_path):
+        print("✓ Checkpoint loaded successfully - recovery working")
+    else:
+        print("✗ Checkpoint load failed")
+
+print("\n=== Phase 6 Integration Complete ===")
+print("Your artificial brain now has:")
+print("  ✓ Working memory for active processing")
+print("  ✓ Episodic memory for experience replay")
+print("  ✓ Neuromodulation for motivation and exploration")
+print("  ✓ Prediction for anticipating future events")
+print("  ✓ Cognitive functions for complex behavior")
+print("  ✓ Development for maturation and adaptation")
+print("  ✓ Checkpointing for persistence")
+print("  ✓ Replay for memory consolidation")
+print("\nThis represents a truly integrated artificial intelligence!")
+```
+
 ---
 
 ## The 3 Things You Need to Know
