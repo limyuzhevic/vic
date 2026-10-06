@@ -197,6 +197,40 @@ float NeuralWorkingMemory::getMemoryActivity() const {
     return total / memoryActivations_.size();
 }
 
+void NeuralWorkingMemory::updateWithPredictionError(float predictionError) {
+    if (!brain_) return;
+    
+    // Prediction error modulates working memory stability
+    // Higher prediction error -> stronger memory maintenance
+    float modulation = std::clamp(predictionError * 2.0f, 0.0f, 2.0f);
+    
+    // Weaken weaker traces when prediction error is high (better exploration)
+    if (predictionError > 0.5f) {
+        for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+            if (memoryActivations_[i] < 0.3f) {
+                // Decay weak traces more when we have prediction error
+                memoryActivations_[i] *= (0.9f * (2.0f - modulation));
+            }
+        }
+    }
+    
+    // Enhance stronger traces when prediction error is low (exploitation)
+    if (predictionError < 0.3f) {
+        for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+            if (memoryActivations_[i] > 0.7f) {
+                // Boost strong traces for better retention
+                memoryActivations_[i] *= (1.1f * modulation);
+                if (memoryActivations_[i] > 1.0f) {
+                    memoryActivations_[i] = 1.0f;
+                }
+            }
+        }
+    }
+    
+    // Apply prediction error to working memory competition
+    runCompetition();
+}
+
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
     // Check if connection already exists
     for (const auto& conn : pImpl->maintenanceSynapses) {
@@ -421,6 +455,32 @@ void AttentionalSelection::reset() {
     topDownBias_.clear();
     bottomUpSalience_.clear();
     pImpl->inhibitionLevel.clear();
+}
+
+void AttentionalSelection::reset() {
+    winners_.clear();
+    attendedRegions_.clear();
+    neuronSalience_.clear();
+    topDownBias_.clear();
+    bottomUpSalience_.clear();
+    pImpl->inhibitionLevel.clear();
+}
+
+void AttentionalSelection::setConceptFocus(size_t conceptId) {
+    conceptFocusId_ = conceptId;
+    
+    // Apply top-down bias to neurons associated with this concept
+    // In a full implementation, this would use concept-to-neuron mappings
+    // For now, we just store the concept focus ID for future use
+    
+    // Also reset other biases to allow concept-driven attention
+    for (auto& bias : topDownBias_) {
+        bias.second *= 0.5f;
+    }
+    
+    for (auto& salience : bottomUpSalience_) {
+        salience.second *= 0.5f;
+    }
 }
 
 } // namespace nlm

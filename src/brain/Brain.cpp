@@ -511,8 +511,102 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Collect current neural activity as sensory-like state for prediction
+        std::vector<float> currentSensoryState;
+        
+        // Extract neural activity patterns for prediction system
+        // Focus on active sensory and internal neurons for prediction input
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory || type == NeuronType::Internal) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                            activation = std::clamp(activation, 0.0f, 1.0f);
+                            currentSensoryState.push_back(activation);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If we have neural state data, use it for prediction
+        if (!currentSensoryState.empty()) {
+            // Feed current neural state to prediction system for learning
+            // This is the core predictive coding mechanism
+            if (pImpl->predictionSystem) {
+                // Convert neural activity to sensory-like input for prediction system
+                // Create a simple representation of current brain state
+                std::vector<float> neuralFeatures;
+                if (!currentSensoryState.empty()) {
+                    // Compute statistical features for prediction
+                    float mean = 0.0f, variance = 0.0f;
+                    for (float val : currentSensoryState) {
+                        mean += val;
+                    }
+                    mean /= currentSensoryState.size();
+                    
+                    for (float val : currentSensoryState) {
+                        float diff = val - mean;
+                        variance += diff * diff;
+                    }
+                    variance /= currentSensoryState.size();
+                    
+                    neuralFeatures.push_back(mean);
+                    neuralFeatures.push_back(variance);
+                    neuralFeatures.push_back(*std::max_element(currentSensoryState.begin(), currentSensoryState.end()));
+                    neuralFeatures.push_back(*std::min_element(currentSensoryState.begin(), currentSensoryState.end()));
+                }
+                
+                // Train prediction system with current neural pattern
+                // This would update predictive models in a real implementation
+                pImpl->predictionSystem->train(SensoryInput(neuralFeatures));
+                
+                // Generate prediction for next state
+                std::unique_ptr<SensoryInput> predictedState = 
+                    pImpl->predictionSystem->predictNextState(SensoryInput(neuralFeatures));
+                
+                // Update prediction system with actual observation
+                pImpl->predictionSystem->updatePredictions(predictedState ? *predictedState : SensoryInput(neuralFeatures), SensoryInput(neuralFeatures));
+                
+                // Get prediction error for learning and attention
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (predictionError > 0.0f) {
+                    pImpl->predictionError->recordError(predictionError, currentStep);
+                }
+            }
+            
+            // Use prediction error for neuromodulation
+            if (pImpl->dopamine) {
+                // Dopamine modulates based on prediction error
+                pImpl->dopamine->setLevel(pImpl->predictionError ? 
+                    pImpl->predictionError->getPredictionError() : 0.0f);
+            }
+            
+            // Apply prediction error to working memory for learning
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->updateWithPredictionError(
+                    pImpl->predictionError ? 
+                    pImpl->predictionError->getPredictionError() : 0.0f);
+            }
+            
+            // Save predicted states for planning (in episodic memory)
+            if (pImpl->episodicMemory && currentStep % 10 == 0) {
+                // Store a summary of current state with prediction error
+                EpisodicMemoryItem predictionItem;
+                predictionItem.timestamp = currentStep;
+                predictionItem.predictionError = pImpl->predictionSystem ? 
+                    pImpl->predictionSystem->getPredictionError() : 0.0f;
+                predictionItem.sensoryState.resize(currentSensoryState.size());
+                std::copy(currentSensoryState.begin(), currentSensoryState.end(), 
+                         predictionItem.sensoryState.begin());
+                predictionItem.reward = pImpl->dopamine ? 
+                    pImpl->dopamine->getLevel() : 0.0f;
+                pImpl->episodicMemory->storePredictionItem(predictionItem);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +622,112 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process neural activity patterns to discover concepts
+        // Extract patterns from working memory and episodic memory
+        
+        std::vector<float> neuralPattern;
+        
+        // Collect patterns from working memory for concept formation
+        if (pImpl->workingMemory) {
+            // Get working memory traces as potential concept instances
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Create pattern representation from active neurons
+                for (const auto& region : pImpl->regions) {
+                    for (const auto& pop : region->getPopulations()) {
+                        NeuronType type = pop->getNeuronType();
+                        if (type == NeuronType::Sensory || type == NeuronType::Internal) {
+                            for (const auto* neuron : pop->getNeurons()) {
+                                if (std::find(memoryNeurons.begin(), memoryNeurons.end(), 
+                                            neuron->getId()) != memoryNeurons.end()) {
+                                    float activation = std::abs(
+                                        neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                                    activation = std::clamp(activation, 0.0f, 1.0f);
+                                    neuralPattern.push_back(activation);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Also incorporate episodic memory patterns
+        if (pImpl->episodicMemory && neuralPattern.empty()) {
+            // Get recent episodes as additional concept instances
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            if (!recentEpisodes.empty()) {
+                const auto* latestEpisode = recentEpisodes.back();
+                neuralPattern = latestEpisode->pattern;
+            }
+        }
+        
+        // Process pattern through concept formation system
+        if (!neuralPattern.empty()) {
+            // Extract features from neural pattern for concept formation
+            std::vector<float> features;
+            if (!neuralPattern.empty()) {
+                // Compute basic statistical features
+                float mean = 0.0f, variance = 0.0f;
+                for (float val : neuralPattern) {
+                    mean += val;
+                }
+                mean /= neuralPattern.size();
+                
+                for (float val : neuralPattern) {
+                    float diff = val - mean;
+                    variance += diff * diff;
+                }
+                variance /= neuralPattern.size();
+                
+                // Create feature vector for concept formation
+                features.push_back(mean);  // Central tendency
+                features.push_back(variance);  // Variability
+                features.push_back(*std::max_element(neuralPattern.begin(), neuralPattern.end()));  // Max activation
+                features.push_back(*std::min_element(neuralPattern.begin(), neuralPattern.end()));  // Min activation
+                
+                // Add higher-order features for better concept discrimination
+                float range = features[2] - features[3];  // Max - min
+                features.push_back(range);
+                
+                // Compute temporal stability (change over time)
+                if (pImpl->episodicMemory && !pImpl->episodicMemory->getRecentEpisodes(2).empty()) {
+                    auto episodes = pImpl->episodicMemory->getRecentEpisodes(2);
+                    if (episodes.size() >= 2) {
+                        const auto* prev = episodes[1];
+                        const auto* curr = episodes[0];
+                        if (!prev->pattern.empty() && !curr->pattern.empty()) {
+                            float patternChange = 0.0f;
+                            for (size_t i = 0; i < std::min(prev->pattern.size(), curr->pattern.size()); ++i) {
+                                patternChange += std::abs(prev->pattern[i] - curr->pattern[i]);
+                            }
+                            patternChange /= std::min(prev->pattern.size(), curr->pattern.size());
+                            features.push_back(1.0f - patternChange);  // Stability measure
+                        }
+                    }
+                }
+            }
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                neuralPattern, features, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep);
+            
+            // Use concepts for attention and decision making
+            if (pImpl->attention && conceptId > 0) {
+                // Concept-based attention: highlight concept-related neural activity
+                const auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    pImpl->attention->setConceptFocus(conceptId);
+                }
+            }
+            
+            // Integrate with episodic memory for learning
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->associateWithConcept(currentStep, conceptId);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

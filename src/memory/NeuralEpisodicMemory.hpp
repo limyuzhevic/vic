@@ -30,6 +30,9 @@ struct EpisodicMemoryItem {
     float energy;
     float novelty;
     
+    // Prediction error (difference between predicted and actual)
+    float predictionError;
+    
     // Consequence of action
     std::vector<float> resultingSensoryState;
     float resultingReward;
@@ -41,11 +44,14 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Concept ID associated with this episode
+    size_t conceptId;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , predictionError(0), resultingReward(0), age(0), conceptId(0) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
@@ -118,11 +124,14 @@ public:
     void enableReplay(bool enable) { replayEnabled_ = enable; }
     bool isReplayEnabled() const { return replayEnabled_; }
 
-    // Get episodes for replay (selection based on relevance and recency)
-    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
+    // Store a prediction item (for future planning)
+    void storePredictionItem(const EpisodicMemoryItem& predictionItem);
 
-    // Replay multiple episodes (for sleep-like consolidation)
-    void replaySequence(const std::vector<size_t>& episodeIds);
+    // Associate episode with concept
+    void associateWithConcept(SimulationStep episodeId, size_t conceptId);
+
+    // Get episodes associated with a concept
+    std::vector<const EpisodicMemoryItem*> getEpisodesForConcept(size_t conceptId) const;
 
 private:
     // Compute similarity between query and stored episode

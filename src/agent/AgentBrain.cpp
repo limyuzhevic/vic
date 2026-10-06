@@ -2,6 +2,8 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -19,6 +21,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , conceptBasedSelectionEnabled_(true)
+    , plannerIntegrated_(false)
+    , lastAction_(ActionType::Wait)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -30,8 +35,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +51,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -58,6 +63,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 }
             }
         }
+        
+        // Try to initialize neural planner integration
+        if (brain_->getPlanner()) {
+            plannerIntegrated_ = true;
+            brain_->getPlanner()->setActionQuality(ActionType::MoveForward, 0.5f);
+            brain_->getPlanner()->setActionQuality(ActionType::MoveBackward, 0.5f);
+            brain_->getPlanner()->setActionQuality(ActionType::TurnLeft, 0.5f);
+            brain_->getPlanner()->setActionQuality(ActionType::TurnRight, 0.5f);
+            brain_->getPlanner()->setActionQuality(ActionType::Interact, 0.5f);
+            brain_->getPlanner()->setActionQuality(ActionType::Wait, 0.5f);
+        }
     }
 }
 
@@ -67,11 +83,21 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    conceptBasedSelectionEnabled_ = true;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    // Initialize concept-based action selection with neural planner
+    if (brain_ && brain_->getConceptFormation()) {
+        NLM_LOG_INFO("Concept formation system initialized for cognitive integration");
+    }
+    
+    if (plannerIntegrated_) {
+        NLM_LOG_INFO("Neural planner integrated for action planning");
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -140,12 +166,138 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+        
+        // Update novelty detection in brain
+        if (brain_->getNovelty()) {
+            brain_->getNovelty()->setNoveltyLevel(noveltyLevel_);
+        }
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity and novelty integration
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Update brain's curiosity system
+        if (brain_->getCuriosity()) {
+            brain_->getCuriosity()->setCuriosityLevel(curiosityLevel_);
+        }
+        
+        // Enhance novelty detection with concept formation
+        if (brain_ && brain_->getConceptFormation()) {
+            // Use concept formation to identify truly novel experiences
+            std::vector<float> sensoryPattern;
+            
+            // Combine all sensory modalities
+            for (float val : vision) sensoryPattern.push_back(val);
+            for (float val : touch) sensoryPattern.push_back(val);
+            for (float val : intern) sensoryPattern.push_back(val);
+            for (float val : proprio) sensoryPattern.push_back(val);
+            
+            // Check if this pattern is novel relative to learned concepts
+            if (!sensoryPattern.empty()) {
+                size_t matchingConcept = brain_->getConceptFormation()->getMatchingConcept(
+                    sensoryPattern, 0.8f);  // High threshold for "familiar"
+                
+                // If no matching concept, it's truly novel
+                if (matchingConcept == 0 || !brain_->getConceptFormation()->getConcept(matchingConcept)) {
+                    // Enhance novelty signal for truly novel experiences
+                    noveltyLevel_ *= 1.5f;  // Boost novelty for completely new patterns
+                    curiosityLevel_ = std::min(1.0f, curiosityLevel_ * 1.3f);  // Boost curiosity
+                }
+            }
+        }
+        
+        // Integrate with episodic memory for temporal novelty
+        if (brain_ && brain_->getEpisodicMemory()) {
+            auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(3);
+            if (recentEpisodes.size() >= 2) {
+                const auto* prev = recentEpisodes[1];
+                const auto* curr = recentEpisodes[0];
+                
+                // Compute pattern change between recent episodes
+                float patternChange = 0.0f;
+                if (!prev->pattern.empty() && !curr->pattern.empty()) {
+                    for (size_t i = 0; i < std::min(prev->pattern.size(), curr->pattern.size()); ++i) {
+                        patternChange += std::abs(prev->pattern[i] - curr->pattern[i]);
+                    }
+                    patternChange /= std::min(prev->pattern.size(), curr->pattern.size());
+                }
+                
+                // High pattern change indicates temporal novelty
+                if (patternChange > 0.3f) {
+                    curiosityLevel_ *= 1.2f;  // Boost curiosity for temporal novelty
+                }
+            }
+        }
+    }
+    
+    // Apply neuromodulation to brain's cognitive systems
+    if (dopamineLevel_ != 0.0f) {
+        if (brain_->getDopamine()) {
+            brain_->getDopamine()->setLevel(dopamineLevel_);
+        }
+        
+        // Modulate concept formation with prediction error
+        if (brain_ && brain_->getConceptFormation() && brain_->getPredictionErrorSignal()) {
+            float predictionError = brain_->getPredictionErrorSignal()->getPredictionError();
+            if (std::abs(predictionError) > 0.1f) {  // Significant prediction error
+                // Concept formation is more active with prediction errors
+                const auto& concepts = brain_->getConceptFormation()->getConcepts();
+                for (size_t i = 0; i < concepts.size(); ++i) {
+                    // Update concept stability based on prediction error
+                    brain_->getConceptFormation()->updateConcept(
+                        i, concepts[i].prototype, concepts[i].features, 
+                        std::abs(predictionError));
+                }
+            }
+        }
+        
+        // Modulate neural planner with prediction error
+        if (plannerIntegrated_ && brain_->getPlanner()) {
+            brain_->getPlanner()->updatePlanQuality(
+                std::vector<ActionType>{lastAction_}, 
+                std::vector<ActionType>{lastAction_}, 
+                std::abs(predictionError));
+        }
+    }
+}
+    
+    // Update concept formation with current sensory input
+    if (brain_ && brain_->getConceptFormation()) {
+        // Convert sensory percept to neural pattern for concept formation
+        std::vector<float> sensoryPattern;
+        
+        // Combine all sensory modalities
+        for (float val : vision) sensoryPattern.push_back(val);
+        for (float val : touch) sensoryPattern.push_back(val);
+        for (float val : intern) sensoryPattern.push_back(val);
+        for (float val : proprio) sensoryPattern.push_back(val);
+        
+        // Extract features for concept formation
+        std::vector<float> features;
+        if (!sensoryPattern.empty()) {
+            float mean = 0.0f, variance = 0.0f;
+            for (float val : sensoryPattern) {
+                mean += val;
+            }
+            mean /= sensoryPattern.size();
+            
+            for (float val : sensoryPattern) {
+                float diff = val - mean;
+                variance += diff * diff;
+            }
+            variance /= sensoryPattern.size();
+            
+            features.push_back(mean);
+            features.push_back(variance);
+            features.push_back(*std::max_element(sensoryPattern.begin(), sensoryPattern.end()));
+            features.push_back(*std::min_element(sensoryPattern.begin(), sensoryPattern.end()));
+        }
+        
+        // Present to concept formation system
+        brain_->getConceptFormation()->presentExperience(sensoryPattern, features, 
+                                                        curiosityLevel_, brain_->getCurrentStep());
     }
 }
 
@@ -157,6 +309,15 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Apply concept-based action selection if enabled
+    if (conceptBasedSelectionEnabled_ && brain_->getConceptFormation()) {\n        decoded = applyConceptBasedSelection(decoded);
+    }
+    
+    // Apply neural planner if integrated
+    if (plannerIntegrated_) {
+        decoded = applyNeuralPlanner(decoded);
     }
     
     return decoded;
@@ -235,6 +396,98 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
+MotorCommand AgentBrain::applyConceptBasedSelection(MotorCommand defaultCmd) {
+    if (!brain_ || !brain_->getConceptFormation()) {
+        return defaultCmd;
+    }
+    
+    // Get current neural activity as pattern for concept matching
+    std::vector<float> currentPattern;
+    
+    // Sample from active neurons (simplified approach)
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            if (type == NeuronType::Motor) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    float activity = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential) / 20.0f;
+                    currentPattern.push_back(activity);
+                }
+            }
+        }
+    }
+    
+    if (currentPattern.empty()) {
+        return defaultCmd;
+    }
+    
+    // Find concept that matches current neural pattern
+    size_t matchingConcept = brain_->getConceptFormation()->getMatchingConcept(
+        currentPattern, 0.6f);  // Lower threshold for motor selection
+    
+    if (matchingConcept > 0) {
+        // Concept-based action selection
+        // For now, map concepts to motor commands
+        // In a real implementation, this would use the concept's stored associations
+        switch (matchingConcept % 6) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::Interact;
+            default: return MotorCommand::Wait;
+        }
+    }
+    
+    return defaultCmd;
+}
+
+MotorCommand AgentBrain::applyNeuralPlanner(MotorCommand defaultCmd) {
+    if (!brain_ || !brain_->getPlanner() || !plannerIntegrated_) {
+        return defaultCmd;
+    }
+    
+    // Get current brain state as neural pattern
+    std::vector<float> currentState;
+    
+    // Collect current neural activity patterns
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            if (type == NeuronType::Sensory || type == NeuronType::Internal) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    float activity = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential) / 20.0f;
+                    currentState.push_back(activity);
+                }
+            }
+        }
+    }
+    
+    // Use neural planner to select action based on current state and goals
+    if (!currentState.empty()) {
+        // Set a simple goal based on current state
+        brain_->getPlanner()->setCurrentGoal(currentState);
+        
+        // Plan action
+        ActionType plannedAction = brain_->getPlanner()->planAction(
+            currentState, curiosityLevel_ * 0.5f + 0.3f);  // Use curiosity as goal preference
+        
+        // Convert ActionType to MotorCommand
+        switch (plannedAction) {
+            case ActionType::MoveForward: return MotorCommand::MoveForward;
+            case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+            case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+            case ActionType::TurnRight: return MotorCommand::TurnRight;
+            case ActionType::Interact: return MotorCommand::Interact;
+            default: return defaultCmd;
+        }
+    }
+    
+    return defaultCmd;
+}
+
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
@@ -266,16 +519,33 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // Update brain's prediction error system
+    if (brain_->getPredictionErrorSignal()) {
+        brain_->getPredictionErrorSignal()->recordError(std::abs(predictionError_), brain_->getCurrentStep());
+    }
     
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    // Update brain's dopamine system
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->setLevel(dopamineLevel_);
+    }
+    
+    // Update planning quality based on reward prediction
+    if (plannerIntegrated_) {
+        // Get current planned actions (simplified - would need better tracking)
+        std::vector<ActionType> plannedActions = {lastAction_};
+        std::vector<ActionType> actualActions = {lastAction_};
+        brain_->getPlanner()->updatePlanQuality(plannedActions, actualActions, predictionError_);
+    }
+    
+    // Update concept formation with reward prediction error
+    if (brain_ && brain_->getConceptFormation()) {
+        // Use prediction error to update concept stability
+        const auto& concepts = brain_->getConceptFormation()->getConcepts();
+        if (!concepts.empty()) {
+            size_t conceptId = concepts.size() - 1;  // Use latest concept
+            brain_->getConceptFormation()->updateConcept(conceptId, std::vector<float>(), 
+                                                         std::vector<float>(), predictionError_);
+        }
     }
 }
 
@@ -311,6 +581,11 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+    
+    // Update brain's development system
+    if (brain_->getDevelopmentSystem()) {
+        brain_->getDevelopmentSystem()->update(this, *brain_->getRandomGenerator(), timestep);
+    }
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -342,9 +617,32 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    conceptBasedSelectionEnabled_ = true;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset brain systems
+    if (brain_) {
+        brain_->reset();
+    }
+}
+
+// Get brain pointer
+Brain* AgentBrain::getBrain() { return brain_.get(); }
+
+// Configure concept-based action selection
+void AgentBrain::enableConceptBasedSelection(bool enable) {
+    conceptBasedSelectionEnabled_ = enable;
+}
+
+bool AgentBrain::isConceptBasedSelectionEnabled() const {
+    return conceptBasedSelectionEnabled_;
+}
+
+// Get concept-based action selection status
+bool AgentBrain::isPlannerIntegrated() const {
+    return plannerIntegrated_;
 }
 
 } // namespace nlm

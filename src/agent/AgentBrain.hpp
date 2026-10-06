@@ -10,7 +10,7 @@
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with cognitive system integration
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -63,11 +63,16 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableConceptBasedSelection(bool enable) { conceptBasedSelectionEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isConceptBasedSelectionEnabled() const { return conceptBasedSelectionEnabled_; }
+    
+    // Cognitive system integration status
+    bool isPlannerIntegrated() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -75,6 +80,10 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Cognitive system integration
+    MotorCommand applyConceptBasedSelection(MotorCommand defaultCmd);
+    MotorCommand applyNeuralPlanner(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
     
@@ -108,6 +117,11 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool conceptBasedSelectionEnabled_;
+    
+    // Cognitive system integration state
+    bool plannerIntegrated_;
+    ActionType lastAction_;  // For tracking planned vs actual actions
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

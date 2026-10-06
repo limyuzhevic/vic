@@ -62,6 +62,9 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
+    // Update working memory with prediction error
+    void updateWithPredictionError(float predictionError);
+
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
 
@@ -166,6 +169,12 @@ public:
     // Reset attention
     void reset();
 
+    // Set concept focus for concept-based attention
+    void setConceptFocus(size_t conceptId);
+    
+    // Get current concept focus
+    size_t getConceptFocus() const { return conceptFocusId_; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -182,6 +191,9 @@ private:
     // Biases/salience stored by NeuronId for correct lookup in processCompetition
     std::unordered_map<uint64_t, float> topDownBias_;
     std::unordered_map<uint64_t, float> bottomUpSalience_;
+    
+    // Concept focus for concept-based attention
+    size_t conceptFocusId_;
 };
 
 } // namespace nlm
