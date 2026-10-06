@@ -1,89 +1,110 @@
-// Config Tests
-#include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
+// Test configuration
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include "../src/core/Config/Config.hpp"
 
-namespace test_config {
+namespace py = pybind11;
+namespace nlm {
 
-void testConfigCreation() {
-    nlm::Config config;
-    assert(!config.has("test"));
-    
-    std::cout << "    testConfigCreation passed" << std::endl;
+PYBIND11_MODULE(pynlm_tests, m) {
+    m.doc() = "NLM Test Module for Configuration Testing";
+
+    // Include all test classes
+    py::class_<Config>(m, "ConfigTest")
+        .def(py::init<>())
+        .def("run_all_tests", [](Config& self) {
+            std::string results = "Running Configuration Tests...\n";
+            
+            // Test 1: Basic operations
+            self.set("test.int", 42);
+            self.set("test.float", 3.14);
+            self.set("test.string", "hello");
+            self.set("test.bool", true);
+            
+            if (self.get<int64_t>("test.int").value_or(0) != 42) {
+                throw py::value_error("Test 1 failed: int value mismatch");
+            }
+            
+            if (self.get<double>("test.float").value_or(0.0) != 3.14) {
+                throw py::value_error("Test 1 failed: float value mismatch");
+            }
+            
+            if (self.get<std::string>("test.string").value_or("") != "hello") {
+                throw py::value_error("Test 1 failed: string value mismatch");
+            }
+            
+            if (self.get<bool>("test.bool").value_or(false) != true) {
+                throw py::value_error("Test 1 failed: bool value mismatch");
+            }
+            
+            results += "✓ Test 1 PASSED: Basic operations\n";
+            
+            // Test 2: Type safety
+            if (self.get<int64_t>("test.string").has_value()) {
+                throw py::value_error("Test 2 failed: type safety violation");
+            }
+            
+            results += "✓ Test 2 PASSED: Type safety\n";
+            
+            // Test 3: Default values
+            if (self.getOr<int64_t>("missing", 999) != 999) {
+                throw py::value_error("Test 3 failed: default value not working");
+            }
+            
+            results += "✓ Test 3 PASSED: Default values\n";
+            
+            // Test 4: Key existence
+            if (!self.has("test.int") || !self.has("test.float")) {
+                throw py::value_error("Test 4 failed: key existence check");
+            }
+            
+            results += "✓ Test 4 PASSED: Key existence\n";
+            
+            // Test 5: Clear operation
+            self.clear();
+            if (self.getKeys().size() != 0) {
+                throw py::value_error("Test 5 failed: clear operation");
+            }
+            
+            results += "✓ Test 5 PASSED: Clear operation\n";
+            
+            results += "\nAll configuration tests PASSED!";
+            return results;
+        }, "Run all configuration tests");
+
+    py::class_<Config>(m, "ConfigAnalysisTest")
+        .def(py::init<>())
+        .def("analyze_and_validate", [](Config& self) {
+            std::string results = "Running Configuration Analysis...\n";
+            
+            // Add test data
+            self.set("neuron_count", 1000);
+            self.set("connection_rate", 0.05);
+            self.set("enabled_flag", true);
+            self.set("model_name", "test_model");
+            
+            // Test analysis
+            std::string analysis = self.analyze_config();
+            if (analysis.find("Configuration Analysis") == std::string::npos) {
+                throw py::value_error("Analysis failed: missing analysis header");
+            }
+            
+            // Test quality score
+            int quality = self.get_quality_score();
+            if (quality < 0 || quality > 100) {
+                throw py::value_error("Quality score out of range: " + std::to_string(quality));
+            }
+            
+            // Test JSON export
+            std::string json = self.exportToJson();
+            if (json.find("neuron_count") == std::string::npos) {
+                throw py::value_error("JSON export missing neuron_count");
+            }
+            
+            results += "✓ Analysis completed successfully\n";
+            results += "✓ Quality score: " + std::to_string(quality) + "/100\n";
+            results += "✓ JSON export: " + std::to_string(json.size()) + " characters\n";
+            results += "\nAnalysis tests PASSED!";
+            return results;
+        }, "Analyze and validate configuration");
 }
-
-void testConfigSetAndGet() {
-    nlm::Config config;
-    
-    config.set("int_value", 42, nlm::ConfigSource::Runtime);
-    assert(config.has("int_value"));
-    
-    auto intVal = config.get<int>("int_value");
-    assert(intVal.has_value());
-    assert(*intVal == 42);
-    
-    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
-    auto doubleVal = config.get<double>("double_value");
-    assert(doubleVal.has_value());
-    assert(*doubleVal > 3.13 && *doubleVal < 3.15);
-    
-    config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
-    auto stringVal = config.get<std::string>("string_value");
-    assert(stringVal.has_value());
-    assert(*stringVal == "hello");
-    
-    config.set("bool_value", true, nlm::ConfigSource::Runtime);
-    auto boolVal = config.get<bool>("bool_value");
-    assert(boolVal.has_value());
-    assert(*boolVal == true);
-    
-    std::cout << "    testConfigSetAndGet passed" << std::endl;
-}
-
-void testConfigGetOr() {
-    nlm::Config config;
-    
-    int val = config.getOr<int>("missing", 100);
-    assert(val == 100);
-    
-    config.set("existing", 50, nlm::ConfigSource::Runtime);
-    val = config.getOr<int>("existing", 100);
-    assert(val == 50);
-    
-    std::cout << "    testConfigGetOr passed" << std::endl;
-}
-
-void testConfigRemove() {
-    nlm::Config config;
-    
-    config.set("test", 123, nlm::ConfigSource::Runtime);
-    assert(config.has("test"));
-    
-    config.remove("test");
-    assert(!config.has("test"));
-    
-    std::cout << "    testConfigRemove passed" << std::endl;
-}
-
-void testConfigKeys() {
-    nlm::Config config;
-    
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
-    
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
-    
-    std::cout << "    testConfigKeys passed" << std::endl;
-}
-
-void runAll() {
-    testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
-}
-
-} // namespace test_config

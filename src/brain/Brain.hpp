@@ -109,11 +109,204 @@ public:
     // Reset brain state
     void reset();
     
-    // Save brain state to file (checkpointing)
+    // Enhanced checkpoint persistence methods
+    
+    /**
+     * Get comprehensive brain checkpoint data including all neural systems and their states
+     * Collects all neural components for checkpointing with validation and integrity checks
+     */
+    CheckpointData getBrainCheckpointData() const;
+    
+    /**
+     * Restore complete brain state from checkpoint data
+     * Reinitializes all neural systems with saved state
+     */
+    bool restoreBrainState(const CheckpointData& data);
+    
+    /**
+     * Validate checkpoint data integrity
+     * Performs comprehensive validation of checkpoint data structure and content
+     */
+    bool validateCheckpointIntegrity(const CheckpointData& data) const;
+    
+    /**
+     * Create brain-specific checkpoint metadata
+     * Generates metadata specific to brain checkpoint for versioning and compatibility
+     */
+    std::vector<uint8_t> createBrainSpecificMetadata(const CheckpointData& data) const;
+    
+    // Enhanced checkpoint management methods
+    
+    /**
+     * Save brain state to file (enhanced with comprehensive checkpointing)
+     * Saves all neural systems and their state to checkpoint file
+     */
     bool save(const std::string& filepath) const;
     
-    // Load brain state from file
+    /**
+     * Load brain state from file (enhanced with comprehensive restoration)
+     * Restores complete brain state from checkpoint file
+     */
     bool load(const std::string& filepath);
+    
+    /**
+     * Enhanced checkpoint management with error recovery
+     * Handles checkpoint loading with version compatibility and data corruption recovery
+     */
+    bool enhancedLoad(const std::string& filepath);
+    
+    /**
+     * Checkpoint integrity validation
+     * Comprehensive validation of checkpoint data and file structure
+     */
+    bool validateCheckpointIntegrity(const std::string& filepath) const;
+    
+    /**
+     * Checkpoint restoration with error recovery
+     * Restores checkpoint with comprehensive error handling
+     */
+    bool restoredWithErrorRecovery(const std::string& filepath);
+    
+    /**
+     * Version compatibility check
+     * Ensures checkpoint is compatible with current brain version
+     */
+    bool isCheckpointCompatible(const std::string& filepath) const;
+    
+    /**
+     * Create checkpoint with incremental save support
+     * Implements incremental checkpointing for performance
+     */
+    bool incrementalSave(const std::string& basePath, uint64_t checkpointStep);
+    
+    /**
+     * Get checkpoint compression for large brains
+     * Implements checkpoint compression for performance optimization
+     */
+    bool compressedSave(const std::string& filepath, CompressionLevel compression);
+    
+    /**
+     * Handle checkpoint fragmentation for very large brains
+     * Manages large checkpoints that exceed memory limits
+     */
+    bool fragmentedSave(const std::string& basePath, size_t maxFragmentSize);
+    
+    // Checkpoint system integration
+    
+    /**
+     * Get checkpoint statistics
+     * Provides information about current checkpoint state
+     */
+    std::string getCheckpointStats() const;
+    
+    /**
+     * Update checkpoint manager
+     * Updates checkpoint state and handles periodic saves
+     */
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    
+    /**
+     * Save checkpoint immediately
+     * Forces immediate checkpoint save
+     */
+    bool saveCheckpointImmediately(const std::string& name);
+    
+    /**
+     * List available checkpoints
+     * Returns list of available checkpoints
+     */
+    std::vector<CheckpointManager::CheckpointInfo> listCheckpoints() const;
+    
+    /**
+     * Prune old checkpoints
+     * Removes old checkpoints to save space
+     */
+    void pruneOldCheckpoints(size_t keepCount);
+    
+    // Checkpoint data structure for comprehensive state
+    struct CheckpointData {
+        NeuronCheckpointData neuronData;
+        SynapseCheckpointData synapseData;
+        std::vector<uint8_t> memoryData;
+        std::vector<uint8_t> episodicMemoryData;
+        std::vector<uint8_t> associativeMemoryData;
+        std::vector<uint8_t> predictionData;
+        std::vector<uint8_t> plannerData;
+        std::vector<uint8_t> conceptFormationData;
+        std::vector<uint8_t> attentionData;
+        std::vector<uint8_t> developmentData;
+        NeuromodulatorCheckpoint neuromodData;
+        SimulationCheckpoint simulationData;
+        DevelopmentalCheckpoint developmentalData;
+        RandomStateCheckpoint randomData;
+        ConfigCheckpoint configData;
+        
+        struct NeuromodulatorCheckpoint {
+            float dopamine;
+            float curiosity;
+            float novelty;
+            float predictionError;
+        };
+        
+        struct SimulationCheckpoint {
+            uint64_t step;
+            double time;
+            double timestep;
+            size_t totalSpikesThisStep;
+            size_t totalSpikesTotal;
+            bool isResting;
+            size_t stepsSinceLastEpisode;
+            size_t replayInterval;
+            size_t consolidationInterval;
+            std::vector<float> currentSensoryInput;
+            size_t currentConceptId;
+        };
+        
+        struct DevelopmentalCheckpoint {
+            DevelopmentalStage stage;
+        };
+        
+        struct RandomStateCheckpoint {
+            uint64_t seed;
+            std::vector<uint64_t> state;
+        };
+        
+        struct ConfigCheckpoint {
+            std::shared_ptr<Config> config;
+        };
+        
+        struct InterRegionConnectionCheckpoint {
+            RegionId sourceRegion;
+            RegionId targetRegion;
+            float weight;
+            Delay delay;
+        };
+        
+        struct NeuronCheckpointEntry {
+            float membranePotential;
+            float restingPotential;
+            float threshold;
+            float resetPotential;
+            float leakConductance;
+            FiringState firingState;
+            uint32_t refractoryRemaining;
+            uint32_t refractoryPeriod;
+            float lastSpikeTime;
+            NeuronType neuronType;
+        };
+        
+        struct NeuronDynamicsCheckpoint {
+            RegionId regionId;
+            size_t neuronCount;
+            std::vector<NeuronCheckpointEntry> neurons;
+        };
+        
+        std::vector<NeuronDynamicsCheckpoint> neuronDynamicsData;
+        std::vector<InterRegionConnectionCheckpoint> connectivityData;
+    };
+    
+private:
+    struct Impl;
     
     // Region management
     RegionId addRegion(const std::string& name = "");

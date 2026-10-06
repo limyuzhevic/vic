@@ -1,3 +1,5 @@
+# NLM (Neural Learning Machine) - Build Configuration
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -97,6 +99,7 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +107,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +115,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,34 +123,63 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# CLI executable
+add_executable(nlm_cli
+    src/cli/nlm_cli.cpp
+)
+
+target_link_libraries(nlm_cli PUBLIC nlm_core)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_cli
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Python bindings (if pybind11 is available)
+if (PYTHON_EXECUTABLE AND TARGET nlm_core)
+    find_package(pybind11 REQUIRED)
+    pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core)
+    target_include_directories(pynlm PRIVATE .)
+endif()
+
+# Documentation generation
+find_program(SPHINX_FOUND sphinx-build)
+if(SPHINX_FOUND)
+    add_custom_target(docs
+        COMMAND ${SPHINX_FOUND} -b html docs _build/html
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Building documentation with Sphinx"
+    )
+endif()
