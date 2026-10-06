@@ -174,12 +174,22 @@ std::string Config::summary() const {
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, int>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, float>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    oss << (arg ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, char>) {
+                    oss << "'" << arg << "'";
+                } else {
+                    oss << "[complex type]";
+                }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }

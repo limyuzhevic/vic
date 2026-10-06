@@ -10,6 +10,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class AdvancedConfigManager;
 
 // Configuration value types
 using ConfigValue = std::variant<

@@ -29,13 +29,6 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
     # Plasticity
@@ -55,13 +48,10 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/MemoryAnalysisTools.cpp
+    src/memory/MemoryAnalysisToolsDemo.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -74,17 +64,25 @@ add_library(nlm_core STATIC
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
+    src/motor/Action.cpp
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    src/experiments/AdvancedToolsHeaders.hpp
+    src/experiments/AdvancedConfigManager.cpp
+    src/experiments/PerformanceProfiler.cpp
+    src/experiments/DataExportTool.cpp
+    src/experiments/MemoryAnalysisTools.cpp
+    src/experiments/VisualizationTools.cpp
+    src/experiments/DebuggingTools.cpp
+    src/experiments/AdvancedExperimentFramework.cpp
+    src/experiments/AdvancedNLMSystemIntegration.cpp
+    src/experiments/AdvancedNLMSystemMain.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -138,6 +136,45 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Advanced System Demo executables
+add_executable(nlm_advanced_system_demo
+    src/experiments/AdvancedNLMSystemMain.cpp
+)
+target_link_libraries(nlm_advanced_system_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+add_executable(nlm_advanced_config_demo
+    src/experiments/DemoAdvancedConfigManager.cpp
+)
+target_link_libraries(nlm_advanced_config_demo PUBLIC nlm_core)
+
+add_executable(nlm_advanced_perf_demo
+    src/experiments/DemoPerformanceProfiler.cpp
+)
+target_link_libraries(nlm_advanced_perf_demo PUBLIC nlm_core)
+
+add_executable(nlm_advanced_data_export_demo
+    src/experiments/DemoDataExportTool.cpp
+)
+target_link_libraries(nlm_advanced_data_export_demo PUBLIC nlm_core)
+
+add_executable(nlm_advanced_memory_demo
+    src/experiments/DemoMemoryAnalysis.cpp
+)
+target_link_libraries(nlm_advanced_memory_demo PUBLIC nlm_core)
+
+add_executable(nlm_advanced_viz_demo
+    src/experiments/DemoVisualization.cpp
+)
+target_link_libraries(nlm_advanced_viz_demo PUBLIC nlm_core)
+
+add_executable(nlm_advanced_debug_demo
+    src/experiments/DemoDebuggingTools.cpp
+)
+target_link_libraries(nlm_advanced_debug_demo PUBLIC nlm_core)
+
+# Plugin system (experimental)
+add_subdirectory(plugin_system)
 
 # Testing
 enable_testing()
