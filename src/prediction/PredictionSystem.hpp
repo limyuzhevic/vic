@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include <vector>
-#include <memory>
+#include "../brain/Brain.hpp"
+#include "SensoryInput.hpp"
 
 namespace nlm {
 
@@ -33,6 +33,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Initialize with brain reference for neural integration
+    void initialize(Brain* brain);
+    
+    // Update prediction system with neural activity
+    void update(float timestep);
     
 private:
     struct Impl;

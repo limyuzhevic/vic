@@ -3,8 +3,7 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
+#include "../sensory/Vision.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
@@ -49,6 +48,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +131,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -243,7 +248,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -258,6 +263,9 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +519,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create current sensory state from sensory neurons
+        // Note: we use vision as our current sensory representation
+        auto vision = std::make_unique<Vision>(16, 16, 1); // 16x16 grayscale
+        
+        // Extract current activity from sensory neurons
+        std::vector<float> sensoryData;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            sensoryData.push_back(activity);
+        }
+        
+        // Convert to appropriate sensory input type (Vision for now)
+        vision->setData(sensoryData);
+        
+        // Make prediction for next timestep
+        auto predictedState = pImpl->predictionSystem->predictNextState(*vision);
+        
+        // Update prediction system with actual observation
+        pImpl->predictionSystem->updatePredictions(*predictedState, *vision);
+        
+        // Update prediction system with neural effects
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Log prediction system state
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        if (predictionError > 0.0f) {
+            NLM_LOG_DEBUG("Prediction error: " + std::to_string(predictionError) + ", confidence: " + std::to_string(confidence));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1069,8 +1104,16 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
@@ -1100,6 +1143,24 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+        NLM_LOG_INFO("  (ACh affects attention and memory encoding)");
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+        NLM_LOG_INFO("  (NE affects arousal and vigilance: Arousal=" + std::to_string(pImpl->norepinephrine->getArousal()) + ", Vigilance=" + std::to_string(pImpl->norepinephrine->getVigilance()) + ")");
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+        NLM_LOG_INFO("  (5-HT affects mood: Mood=" + std::to_string(pImpl->serotonin->getMood()) + ")");
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
     }
     
     // Development status

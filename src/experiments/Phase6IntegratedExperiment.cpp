@@ -296,14 +296,35 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     brain->initialize();
     
     // Get neuromodulation systems
-    auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !curiosity || !novelty || !acetylcholine || !norepinephrine || !serotonin) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
     }
+    
+    // Test neuromodulator functionality
+    NLM_LOG_INFO("Testing Dopamine: level=" + std::to_string(dopamine->getLevel()));
+    NLM_LOG_INFO("Testing Curiosity: level=" + std::to_string(curiosity->getLevel()));
+    NLM_LOG_INFO("Testing Novelty: level=" + std::to_string(novelty->getLevel()));
+    NLM_LOG_INFO("Testing Acetylcholine: level=" + std::to_string(acetylcholine->getLevel()));
+    NLM_LOG_INFO("Testing Norepinephrine: level=" + std::to_string(norepinephrine->getLevel()));
+    NLM_LOG_INFO("Testing Serotonin: level=" + std::to_string(serotonin->getLevel()));
+    
+    // Test neuromodulator effects - apply ACh boost, NE arousal, 5-HT mood
+    acetylcholine->boostAttention(0.5f);
+    norepinephrine->enhanceArousal(0.3f);
+    serotonin->modulateMood(0.7f);
+    
+    // Test neuromodulator-derived states
+    NLM_LOG_INFO("ACh arousal support: " + std::to_string(acetylcholine->getMood()));
+    NLM_LOG_INFO("NE vigilance level: " + std::to_string(norepinephrine->getVigilance()));
+    NLM_LOG_INFO("NE arousal level: " + std::to_string(norepinephrine->getArousal()));
+    NLM_LOG_INFO("5-HT mood level: " + std::to_string(serotonin->getMood()));
     
     // Run some steps with sensory input
     for (int i = 0; i < 50; ++i) {
@@ -313,6 +334,7 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     }
     
     NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    NLM_LOG_INFO("[PASS] All neuromodulators (DA, ACh, NE, 5-HT, Curiosity, Novelty) integrated");
     return true;
 }
 
