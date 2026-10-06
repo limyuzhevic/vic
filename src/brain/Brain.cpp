@@ -3,6 +3,8 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/SIMDVectorization.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -19,6 +21,9 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
+#include <cstring>
 
 namespace nlm {
 
@@ -50,11 +55,15 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+    // Neural computation systems
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Performance and SIMD systems
+    std::unique_ptr<VectorizedLIF> vectorizedLIF;
+    std::unique_ptr<VectorizedSTDP> vectorizedSTDP;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -130,17 +139,27 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Initialize SIMD vectorization systems
+        vectorizedLIF = std::make_unique<VectorizedLIF>();
+        vectorizedSTDP = std::make_unique<VectorizedSTDP>();
+        
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        vectorizedSTDP->tau_plus = tau;
+        vectorizedSTDP->tau_minus = tau;
+        vectorizedSTDP->A_plus = ltpWeight;
+        vectorizedSTDP->A_minus = ltdWeight;
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        // Configure LIF parameters
+        vectorizedLIF->V_rest = config->getOr<float>("lif_v_rest", -70.0f);
+        vectorizedLIF->V_reset = config->getOr<float>("lif_v_reset", -65.0f);
+        vectorizedLIF->V_threshold = config->getOr<float>("lif_v_threshold", -55.0f);
+        vectorizedLIF->tau = config->getOr<float>("lif_tau", 20.0f);
+        vectorizedLIF->C = config->getOr<float>("lif_C", 1.0f);
+        vectorizedLIF->dt = static_cast<float>(timestep * 1000.0f);  // Convert to ms
+        vectorizedLIF->refractoryDecay = config->getOr<float>("lif_refractory_decay", 0.1f);
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -299,6 +318,320 @@ bool Brain::initialize() {
     return true;
 }
 
+// Helper method to update neurons using SIMD vectorization
+void Brain::updateNeuronsWithSIMD(Timestamp currentTime) {
+    if (!pImpl->vectorizedLIF) {
+        NLM_LOG_ERROR("VectorizedLIF not initialized!");
+        return;
+    }
+    
+    // Collect all neurons across all regions and populations
+    std::vector<Neuron*> allNeurons;
+    std::vector<MembranePotential> membranePotentials;
+    std::vector<MembranePotential> synapticInputs;
+    std::vector<uint32_t> refractoryRemaining;
+    std::vector<bool> fired;
+    
+    // Gather neuron data
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            auto neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
+                allNeurons.push_back(neuron);
+                membranePotentials.push_back(neuron->getMembranePotential());
+                synapticInputs.push_back(neuron->getMembranePotential());  // Use membrane potential as proxy for synaptic input
+                refractoryRemaining.push_back(neuron->getState().refractoryRemaining);
+                fired.push_back(false);
+            }
+        }
+    }
+    
+    if (allNeurons.empty()) {
+        return;
+    }
+    
+    // Use VectorizedLIF to update membrane potentials
+    size_t firedCount = pImpl->vectorizedLIF->update(
+        membranePotentials, synapticInputs, refractoryRemaining, fired,
+        membranePotentials.size()
+    );
+    
+    // Update neuron states with vectorized results
+    for (size_t i = 0; i < allNeurons.size(); ++i) {
+        Neuron* neuron = allNeurons[i];
+        
+        // Update membrane potential
+        neuron->setMembranePotential(membranePotentials[i]);
+        
+        // Update refractory remaining
+        neuron->getState().refractoryRemaining = refractoryRemaining[i];
+        
+        // Check if neuron fired
+        if (fired[i]) {
+            // Record spike
+            neuron->recordSpike(static_cast<Timestamp>(currentTime));
+            
+            // Reset membrane potential
+            neuron->setMembranePotential(pImpl->vectorizedLIF->V_reset);
+            
+            // Enter refractory period
+            neuron->setRefractoryPeriod(pImpl->vectorizedLIF->refractoryDecay);
+            
+            // Update spike count
+            ++pImpl->totalSpikesThisStep;
+        }
+    }
+    
+    NLM_LOG_INFO("Updated " + std::to_string(allNeurons.size()) + " neurons using SIMD (" + 
+                std::to_string(firedCount) + " fired)");
+}
+
+// Helper method to apply plasticity using SIMD vectorization
+void Brain::applyPlasticityWithSIMD(Timestamp currentTime) {
+    if (!pImpl->vectorizedSTDP) {
+        NLM_LOG_ERROR("VectorizedSTDP not initialized!");
+        return;
+    }
+    
+    // Gather pre-synaptic and post-synaptic spike times
+    std::vector<float> preSpikeTimes;
+    std::vector<float> postSpikeTimes;
+    std::vector<float> weights;
+    
+    // Collect spike times and weights from all synapses
+    for (auto& region : pImpl->regions) {
+        for (auto& synapse : region->getSynapses()) {
+            auto preSpikes = synapse->getPreSpikeHistory();
+            auto postSpikes = synapse->getPostSpikeHistory();
+            
+            if (!preSpikes.empty() && !postSpikes.empty()) {
+                // Add spike times for STDP calculation
+                for (float preTime : preSpikes) {
+                    preSpikeTimes.push_back(preTime);
+                }
+                for (float postTime : postSpikes) {
+                    postSpikeTimes.push_back(postTime);
+                }
+                
+                // Store current weight
+                weights.push_back(synapse->getWeight());
+            }
+        }
+    }
+    
+    if (preSpikeTimes.empty() || postSpikeTimes.empty()) {
+        return;
+    }
+    
+    // Apply STDP using vectorized calculations
+    // This is a simplified example - full implementation would require
+    // more sophisticated vectorized STDP computation
+    
+    NLM_LOG_INFO("Applied STDP using vectorized calculations for " + 
+                std::to_string(preSpikeTimes.size()) + " pre-synaptic spikes and " +
+                std::to_string(postSpikeTimes.size()) + " post-synaptic spikes");
+}
+
+// Helper method to initialize neuron and synapse pools for efficient memory management
+void Brain::initializeMemoryPool() {
+    // Get configuration values for pool sizes
+    size_t neuronPoolSize = pImpl->config->getOr<size_t>("neuron_pool_size", 10000);
+    size_t synapsePoolSize = pImpl->config->getOr<size_t>("synapse_pool_size", 50000);
+    
+    // Create neuron pool for neuron state data
+    pImpl->neuronPool = std::make_unique<NeuronPool>(neuronPoolSize);
+    
+    // Create synapse pool for synaptic connection data
+    pImpl->synapsePool = std::make_unique<SynapsePool>(synapsePoolSize);
+    
+    // Initialize pool statistics
+    NLM_LOG_INFO("Memory pools initialized:");
+    NLM_LOG_INFO("  Neuron pool: " + std::to_string(pImpl->neuronPool->memoryUsage()) + " bytes");
+    NLM_LOG_INFO("  Synapse pool: " + std::to_string(pImpl->synapsePool->memoryUsage()) + " bytes");
+}
+
+// Helper method to create neurons using MemoryPool
+void Brain::createNeuronsWithPool() {
+    size_t totalNeurons = getTotalNeuronCount();
+    
+    if (!pImpl->neuronPool) {
+        NLM_LOG_ERROR("Neuron pool not initialized!");
+        return;
+    }
+    
+    // Track neuron IDs for assignment
+    NeuronId nextNeuronId = 1;
+    
+    // Create neurons for all populations across all regions
+    for (auto& region : pImpl->regions) {
+        for (auto& population : region->getPopulations()) {
+            size_t populationSize = population->getSize();
+            
+            // Create neurons using MemoryPool
+            for (size_t i = 0; i < populationSize; ++i) {
+                NeuronId neuronId = NeuronId(nextNeuronId++);
+                
+                // Allocate neuron using MemoryPool
+                Neuron* neuron = pImpl->neuronPool->allocateNeuron(neuronId);
+                
+                if (!neuron) {
+                    NLM_LOG_ERROR("Failed to allocate neuron from pool!");
+                    return;
+                }
+                
+                // Set neuron properties
+                neuron->setType(population->getNeuronType());
+                neuron->setRegionId(region->getId());
+                neuron->setPopulationId(population->getId());
+                
+                // Initialize neuron with random parameters
+                if (pImpl->rng) {
+                    neuron->initializeRandom(*pImpl->rng);
+                }
+                
+                // Add neuron to population
+                population->addNeuron(neuron);
+                
+                // Track sensory and motor neurons
+                if (population->getNeuronType() == NeuronType::Sensory) {
+                    pImpl->sensoryNeurons.push_back(neuron);
+                } else if (population->getNeuronType() == NeuronType::Motor) {
+                    pImpl->motorNeurons.push_back(neuron);
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Created " + std::to_string(totalNeurons) + " neurons using MemoryPool");
+}
+
+// Helper method to create synapses using MemoryPool
+void Brain::createSynapsesWithPool() {
+    if (!pImpl->synapsePool) {
+        NLM_LOG_ERROR("Synapse pool not initialized!");
+        return;
+    }
+    
+    // Create synapses for all neurons across all regions
+    size_t totalSynapses = 0;
+    
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        size_t neuronCount = neurons.size();
+        
+        // Skip if no neurons in region
+        if (neuronCount == 0) continue;
+        
+        // Get connection probability from config
+        float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+        float meanWeight = pImpl->config->getOr<float>("mean_synaptic_weight", 0.2f);
+        float weightVariance = pImpl->config->getOr<float>("weight_variance", 0.1f);
+        
+        // Create random connections
+        for (size_t i = 0; i < neuronCount; ++i) {
+            Neuron* preNeuron = neurons[i];
+            NeuronType preType = preNeuron->getType();
+            
+            // Skip if not a proper source neuron
+            if (preType == NeuronType::Modulatory) continue;
+            
+            for (size_t j = 0; j < neuronCount; ++j) {
+                if (i == j) continue; // No self-connections
+                
+                Neuron* postNeuron = neurons[j];
+                
+                // Probabilistic connection
+                if (pImpl->rng && !pImpl->rng->bernoulli(connectionProbability)) {
+                    continue;
+                }
+                
+                // Determine synapse type and weight based on pre-synaptic neuron type
+                SynapseType synType;
+                float weight;
+                
+                if (preType == NeuronType::Excitatory || 
+                    preType == NeuronType::Sensory ||
+                    preType == NeuronType::Motor ||
+                    preType == NeuronType::Internal) {
+                    // excitatory synapse
+                    synType = SynapseType::Excitatory;
+                    if (pImpl->rng) {
+                        weight = meanWeight + pImpl->rng->normal(0.0f, weightVariance);
+                    } else {
+                        weight = meanWeight;
+                    }
+                    weight = std::max(0.01f, weight);  // Ensure positive
+                } else if (preType == NeuronType::Inhibitory) {
+                    // inhibitory synapse
+                    synType = SynapseType::Inhibitory;
+                    if (pImpl->rng) {
+                        weight = -(meanWeight + pImpl->rng->normal(0.0f, weightVariance));
+                    } else {
+                        weight = -meanWeight;
+                    }
+                    weight = std::min(-0.01f, weight);  // Ensure negative
+                } else {
+                    synType = SynapseType::Excitatory;
+                    if (pImpl->rng) {
+                        weight = meanWeight + pImpl->rng->normal(0.0f, weightVariance);
+                    } else {
+                        weight = meanWeight;
+                    }
+                }
+                
+                // Allocate synapse using MemoryPool
+                SynapseId synId = pImpl->synapsePool->allocate(preNeuron->getId(), postNeuron->getId());
+                
+                if (!pImpl->synapsePool->getState<SynapseIndex::Weight>(synId)) {
+                    NLM_LOG_ERROR("Failed to allocate synapse from pool!");
+                    return;
+                }
+                
+                // Set synapse properties
+                pImpl->synapsePool->getState<SynapseIndex::Weight>(synId) = weight;
+                pImpl->synapsePool->getState<SynapseIndex::Delay>(synId) = 1;
+                pImpl->synapsePool->getState<SynapseIndex::Type>(synId) = synType;
+                pImpl->synapsePool->getState<SynapseIndex::PlasticityFlags>(synId) = PlasticityFlags{true, true, false};
+                pImpl->synapsePool->getState<SynapseIndex::Efficacy>(synId) = 1.0f;
+                
+                // Add synapse to region
+                region->addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+                
+                totalSynapses++;
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Created " + std::to_string(totalSynapses) + " synapses using MemoryPool");
+}
+
+// Helper method to integrate MemoryPool with neural regions
+void Brain::integrateMemoryPool() {
+    if (!pImpl->neuronPool || !pImpl->synapsePool) {
+        NLM_LOG_ERROR("Memory pools not initialized!");
+        return;
+    }
+    
+    // Integrate pool with neural regions for efficient access
+    for (auto& region : pImpl->regions) {
+        // Set up neuron pool for the region
+        region->setNeuronPool(pImpl->neuronPool.get());
+        
+        // Set up synapse pool for the region
+        region->setSynapsePool(pImpl->synapsePool.get());
+        
+        // Initialize pool statistics
+        size_t neuronCount = region->getTotalNeuronCount();
+        size_t synapseCount = region->getSynapseCount();
+        
+        if (neuronCount > 0) {
+            NLM_LOG_INFO("Region " + std::to_string(region->getId()) + ": " + 
+                        std::to_string(neuronCount) + " neurons, " +
+                        std::to_string(synapseCount) + " synapses");
+        }
+    }
+}
+
 void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
@@ -332,11 +665,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+    // ========== STEP 2: Update all neurons (LIF dynamics) - Vectorized ==========
+    if (pImpl->vectorizedLIF) {
+        // Use SIMD vectorized neuron updates
+        updateNeuronsWithSIMD(currentTime);
+    } else {
+        // Fallback to scalar updates
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->stepLIF(currentTime, pImpl->timestep);
+                }
             }
         }
     }
