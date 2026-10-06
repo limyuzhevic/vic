@@ -5,7 +5,8 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Real implementation based on biological STDP mechanisms
+// Captures synaptic plasticity from pre-post spike timing correlations
 
 class STDP : public PlasticityRule {
 public:
@@ -36,27 +37,50 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// Integrates reward signals with spike-timing dependent plasticity
 class RewardModulatedSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Reward parameters
+    void setRewardModulation(float modulation);
+    float getRewardModulation() const;
+    void setRewardThreshold(float threshold);
+    float getRewardThreshold() const;
+    
+    void configure(float modulation, float threshold);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
+// Extended STDP model accounting for pre-post spike triplets
 class TripletSTDP : public PlasticityRule {
 public:
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "TripletSTDP"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Triplet parameters
+    void setLearningRates(float a_plus, float a_minus, float b_plus, float b_minus);
+    void setTimeConstants(float tau_plus, float tau_minus, float tau_x);
+    
+    void configure(float a_plus, float a_minus, float b_plus, float b_minus,
+                   float tau_plus, float tau_minus, float tau_x);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

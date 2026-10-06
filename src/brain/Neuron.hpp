@@ -41,7 +41,7 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with real neural computation
 class Neuron {
 public:
     // Create neuron with ID
@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements real integrate-and-fire dynamics with LIF model
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -147,5 +147,3 @@ private:
     struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm

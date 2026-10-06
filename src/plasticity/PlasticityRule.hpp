@@ -6,14 +6,13 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Implements real synaptic plasticity mechanisms for artificial developmental brain
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -37,7 +36,7 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// Implements symmetric Hebbian learning for cooperative synaptic strengthening
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -53,6 +52,20 @@ public:
     // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
+    void setMaxWeight(float weight);
+    float getMaxWeight() const;
+    void setMinWeight(float weight);
+    float getMinWeight() const;
+    void setTimeWindow(float window);
+    float getTimeWindow() const;
+    void setEligibilityTraceDecay(float decay);
+    float getEligibilityTraceDecay() const;
+    void setRewardModulation(float modulation);
+    float getRewardModulation() const;
+    
+    // Configuration
+    void configure(float learningRate, float maxWeight, float minWeight,
+                   float timeWindow, float traceDecay, float rewardModulation);
     
 private:
     struct Impl;
@@ -60,27 +73,72 @@ private:
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
+// Implements anti-correlation learning for competition and synaptic weakening
 class AntiHebbianRule : public PlasticityRule {
 public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setMaxWeight(float weight);
+    float getMaxWeight() const;
+    void setMinWeight(float weight);
+    float getMinWeight() const;
+    void setTimeWindow(float window);
+    float getTimeWindow() const;
+    
+    // Configuration
+    void configure(float learningRate, float maxWeight, float minWeight, float timeWindow);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
+// Implements homeostatic plasticity with dynamic threshold for stability and criticality
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setMaxWeight(float weight);
+    float getMaxWeight() const;
+    void setMinWeight(float weight);
+    float getMinWeight() const;
+    void setKappa(float kappa);        // BCM threshold variable
+    float getKappa() const;
+    void setMu(float mu);              // Sliding threshold rate
+    float getMu() const;
+    void setTimeWindow(float window);
+    float getTimeWindow() const;
+    
+    // Configuration
+    void configure(float learningRate, float maxWeight, float minWeight,
+                   float kappa, float mu, float timeWindow);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
