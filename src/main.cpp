@@ -25,27 +25,89 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <unordered_map>
+#include <chrono>
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+struct CommandLineArgs {
+    std::string configFile = "configs/default.cfg";
+    std::string testType = "all";
+    std::vector<std::pair<std::string, std::string>> configOverrides;
+    bool quietMode = false;
+    bool verboseMode = false;
+    bool benchmarkMode = false;
+    bool showHelp = false;
+    bool runExperiments = false;
+    bool runDemo = false;
+    bool runInteractive = false;
+};
+
+CommandLineArgs parseArguments(int argc, char** argv) {
+    CommandLineArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            args.showHelp = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            args.quietMode = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verboseMode = true;
+        } else if (arg == "--benchmark" || arg == "-b") {
+            args.benchmarkMode = true;
+        } else if (arg == "--experiments") {
+            args.runExperiments = true;
+        } else if (arg == "--demo") {
+            args.runDemo = true;
+        } else if (arg == "--interactive") {
+            args.runInteractive = true;
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg == "--test") {
+            if (i + 1 < argc) {
+                args.testType = argv[++i];
+            }
+        } else if (arg == "--set") {
+            if (i + 1 < argc) {
+                std::string setting = argv[++i];
+                size_t pos = setting.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = setting.substr(0, pos);
+                    std::string value = setting.substr(pos + 1);
+                    args.configOverrides.emplace_back(key, value);
+                }
+            }
+        } else {
+            // Handle positional argument as test type
+            if (args.testType == "all") {
+                args.testType = arg;
+            }
+        }
+    }
+    
+    return args;
+}
+
+void printUsage() {
+    std::cout << "NLM - Neural Learning Machine - Usage:" << std::endl;
+    std::cout << "  nlm [--help] [--config <file>] [--test <type>] [--quiet] [--verbose] [--benchmark]" << std::endl;
+    std::cout << "  nlm --experiments  Run all available experiments" << std::endl;
+    std::cout << "  nlm --demo          Run demonstration with visual output" << std::endl;
+    std::cout << "  nlm --interactive   Start interactive mode" << std::endl;
+    std::cout << "\nTest types:" << std::endl;
+    std::cout << "  basic      Run basic neural connectivity test" << std::endl;
+    std::cout << "  plasticity Run plasticity learning experiment" << std::endl;
+    std::cout << "  stdp       Run STDP verification" << std::endl;
+    std::cout << "  all         Run all tests (default)" << std::endl;
+    std::cout << "\nConfiguration options:" << std::endl;
+    std::cout << "  --config <file>   Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --set <key>=<val> Set configuration value" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
