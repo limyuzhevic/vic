@@ -350,8 +350,65 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+.def("logStatus", &Brain::logStatus,
+              "Log brain status");
+
+    // ========== MEMORY SYSTEMS ==========
+    
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+
+    // ========== PREDICTION SYSTEM ==========
+    
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system")
+
+    // ========== COGNITION SYSTEMS ==========
+    
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get concept formation system")
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get attention system")
+
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine system")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity system")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty system")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error signal")
+
+    // ========== RANDOM GENERATOR ==========
+    
+    .def("getRandomGenerator", &Brain::getRandomGenerator,
+         py::return_value_policy::reference_internal,
+         "Get random number generator");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
