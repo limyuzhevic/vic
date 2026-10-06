@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Enhanced with Python Binding Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +38,24 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_python_bindings {
+    void runAll();
+}
+
+namespace test_enhanced_convenience {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Testing Python Bindings:" << std::endl;
+    std::cout << "  - Enhanced Python API" << std::endl;
+    std::cout << "  - Convenience Functions" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -119,12 +132,32 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Python Binding tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Enhanced Convenience Tests..." << std::endl;
+    try {
+        test_enhanced_convenience::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "Enhanced Python API with comprehensive testing successfully implemented!" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;
         return 1;
     }
 }
+

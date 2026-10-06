@@ -5,14 +5,14 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) - Enhanced neural simulation framework with developmental stages and advanced convenience functions"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "developmental", "neuroscience", "AI"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,6 +25,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Framework :: Pytest",
 ]
 
 dependencies = []
@@ -33,12 +35,26 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "memory-profiler",
+    "cython>=3.0",
+]
+experimental = [
+    "matplotlib>=3.5.0",
+    "jupyter>=1.0.0",
+    "ipython>=7.0.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Forum" = "https://github.com/nlm-project/nlm/discussions"
+"Examples" = "https://github.com/nlm-project/nlm/tree/main/examples"
+
+[project.scripts]
+nlm-cli = "pynlm.cli:main"
+nlm-benchmark = "pynlm.benchmark:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +63,55 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_TESTS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = true
+NLM_ENABLE_EXPERIMENTAL_FEATURES = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = ["tests", "python"]
+python_files = ["test_*.py", "*test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short -x"
+
+[tool.coverage.run]
+source = ["pynlm", "src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == __main__",
+]
+
+[build-system]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+build-backend = "scikit_build_core.build"
+
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+show_traceback = true
+

@@ -23,9 +23,231 @@ PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
+        
+        A Python binding for the NLM C++ neural simulation framework (熙然, "serene flow").
+        
+        NLM is an experimental artificial developmental brain project that creates
+        neural systems beginning in a primitive developmental state and acquiring
+        increasingly complex abilities through interaction with an environment.
+        
+        Features:
+        - Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation
+        - Multiple plasticity mechanisms: STDP, Hebbian learning, structural plasticity
+        - Neuromodulation: dopamine, curiosity, novelty detection
+        - Memory systems: working memory, episodic memory, associative memory
+        - Cognitive systems: neural planning, concept formation, attention
+        - Developmental stages affecting plasticity and learning
+        
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Quick Start Example:
+        ```python
+        import pynlm
+        
+        # Create brain with default configuration
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for i in range(1000):
+            brain.step(i)
+            
+        print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        ```
+        
+        For more examples and tutorials, see:
+        - easy_usage.md (beginner-friendly guide)
+        - HOW_TO_USE.md (comprehensive documentation)
+        - docs/ (architecture and scientific documentation)
     )pbdoc";
+
+    // Python type aliases for better API design
+    m.attr("NeuronId") = py::type_info<NeuronId>().cpp_type();
+    m.attr("SynapseId") = py::type_info<SynapseId>().cpp_type();
+    m.attr("RegionId") = py::type_info<RegionId>().cpp_type();
+    m.attr("PopulationId") = py::type_info<PopulationId>().cpp_type();
+    
+    // Common Pythonic constants for convenience
+    m.attr("MAX_NEURONS") = 10000LL;
+    m.attr("MAX_SYNAPSES") = 100000LL;
+    m.attr("DEFAULT_SIMULATION_DT") = 0.001;
+    m.attr("NEURON_SCALE_FACTOR") = 1000.0f;
+    m.attr("DEFAULT_EXPLORATION_RATE") = 0.1f;
+    m.attr("MAX_PLACIDITY_MODIFIER") = 2.0f;
+    m.attr("MIN_PLACIDITY_MODIFIER") = 0.1f;
+
+    // Convenience functions for common patterns
+    m.def("run_demo_simulation", [](std::shared_ptr<Config> config, int num_steps) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        for (int i = 0; i < num_steps; ++i) {
+            brain->step(i);
+        }
+        
+        return brain;
+    }, py::arg("config") = nullptr,
+       py::arg("num_steps") = 1000,
+       "Run a demonstration simulation with default parameters");
+
+    m.def("run_agent_episode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent, int num_steps) {
+        world->reset();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation based on internal signals
+            auto internal = percept.getInternal();
+            float reward = internal.empty() ? 0.0f : internal[0];
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1);
+        }
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps") = 1000,
+       "Run a complete agent episode in the environment");
+
+    m.def("create_development_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set developmentally-appropriate defaults
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.05f, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a development-stage appropriate configuration");
+
+    m.def("create_steady_state_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set steady-state defaults (adult brain)
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", false, ConfigSource::Runtime);  // Less structural change
+        config->set("neuromod.curiosity.enable", false, ConfigSource::Runtime);    // Less exploration
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a steady-state (adult brain) configuration");
+
+    m.def("create_exploratory_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set exploratory defaults (high plasticity, high curiosity)
+        config->set("brain.neuron_count", static_cast<int64_t>(300), ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.08f, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create an exploratory (juvenile brain) configuration");
+
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, int steps) {
+        brain->reset();
+        brain->initialize();
+        
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
+        float spikes_per_ms = brain->getTotalSpikeCount() / static_cast<float>(duration.count());
+        float neurons_per_ms = brain->getTotalNeuronCount() / static_cast<float>(duration.count());
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getTotalSynapseCount(),
+            brain->getFiringNeuronCount(),
+            duration.count(),
+            spikes_per_ms,
+            neurons_per_ms
+        );
+    }, py::arg("brain"), py::arg("steps") = 1000,
+       "Benchmark brain performance and return statistics");
+
+    m.def("compare_developmental_stages", [](std::shared_ptr<Config> base_config, 
+                                            const std::vector<std::string>& stage_names,
+                                            int steps_per_stage) {
+        std::vector<std::tuple<std::string, float, float, float, float>> results;
+        
+        // Initialize different developmental stages
+        auto config = std::make_shared<Config>(*base_config);
+        
+        for (const auto& stage_name : stage_names) {
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            float total_spikes = 0;
+            float total_time = 0;
+            
+            for (int i = 0; i < steps_per_stage; ++i) {
+                auto stage_start = std::chrono::high_resolution_clock::now();
+                brain->step(i);
+                auto stage_end = std::chrono::high_resolution_clock::now();
+                
+                auto stage_duration = std::chrono::duration_cast<std::chrono::milliseconds>(stage_end - stage_start);
+                total_time += stage_duration.count();
+                total_spikes += brain->getTotalSpikeCount();
+            }
+            
+            float spikes_per_ms = total_spikes / total_time;
+            results.push_back(std::make_tuple(stage_name, total_spikes, total_time, spikes_per_ms, brain->getAverageFiringRate()));
+        }
+        
+        return results;
+    }, py::arg("base_config"), py::arg("stage_names"), py::arg("steps_per_stage") = 100,
+       "Compare different developmental stages and return performance metrics");
+
+    m.def("export_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        try {
+            brain->save(filename);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Error saving brain state: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filename"),
+       "Export brain state to file with error handling");
+
+    m.def("import_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        try {
+            brain->load(filename);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Error loading brain state: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filename"),
+       "Import brain state from file with error handling");
+
+    m.def("createDefaultConfig", []() {
+        return std::make_shared<Config>();
+    }, "Create a default configuration with sensible defaults for learning experiments");
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -402,7 +624,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration with sensible defaults for learning experiments");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
