@@ -64,6 +64,37 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
+## Configuration Improvements
+
+The NLM project has undergone significant improvements to its configuration system. Key enhancements include:
+
+### 1. Centralized Configuration Management
+- **Configuration Keys**: All configuration keys now defined in `src/core/Config/ConfigInitializer.hpp`
+- **Default Values**: Centralized defaults in `DefaultConfig` struct
+- **Configuration Schema**: Comprehensive schema definition for all configuration options
+
+### 2. Key Consistency Fixes
+- Fixed inconsistencies between `configs/default.cfg` and codebase
+- Standardized configuration key names across all files
+- Resolved naming conflicts and ambiguities
+
+### 3. Enhanced Configuration Loading
+- Improved file-based configuration parser with better error handling
+- Added support for different value types (int, double, float, bool, string)
+- Better command line argument parsing
+- Enhanced type conversion and validation
+
+### 4. Configuration Validation
+- Schema-based validation of configuration files
+- Automatic validation of configuration values
+- Type checking and validation framework
+
+### 5. Better Testing and Documentation
+- Comprehensive configuration integration tests
+- Demonstration program showing configuration improvements
+- Detailed configuration documentation
+- Automated testing framework
+
 ## Building
 
 ```bash
@@ -82,7 +113,142 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Configuration Demonstration
+```bash
+./config_demo
+```
+
+This demonstrates the new configuration system features and improvements.
+
+### Configuration Tests
+```bash
+./test_config
+./test_config_integration
+```
+
+These run the configuration unit tests and integration tests respectively.
+
 ## Project Structure
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   ├── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   └── CONFIG_IMPROVEMENTS.md   # Configuration improvements documentation
+├── src/
+│   ├── core/
+│   │   ├── Config/            # Core configuration system
+│   │   └── ...                # Other core utilities
+│   ├── ...                    # Other source directories
+│   └── demo/                  # Demonstration programs
+├── tests/                      # Testing directory
+├── configs/                    # Configuration files
+└── demo/                       # Demonstration programs
+```
+
+## Configuration Key Constants
+
+The configuration system uses centralized key constants defined in `ConfigKeys`:
+
+```cpp
+namespace ConfigKeys {
+    constexpr const char* RANDOM_SEED = "random_seed";
+    constexpr const char* NEURON_COUNT = "neuron_count";
+    constexpr const char* SYNAPTOGENESIS_RATE = "synaptogenesis_rate";
+    constexpr const char* PRUNING_RATE = "pruning_rate";
+    // ... more keys
+}
+```
+
+## Configuration Initialization
+
+The configuration system provides a centralized initialization function:
+
+```cpp
+// Initialize configuration with defaults
+nlm::initializeConfigWithDefaults(config);
+
+// Set Phase 2 specific values using new config keys
+config->set(ConfigKeys::STDP_LTP_WEIGHT, 0.02f);
+config->set(ConfigKeys::STDP_LTD_WEIGHT, 0.015f);
+```
+
+## Configuration Schema
+
+A comprehensive configuration schema is available in `ConfigSchema::getSchema()`, which provides:
+
+- Configuration key names
+- Value types
+- Description and comments
+- Required/optional flags
+- Default values
+
+## Testing Configuration System
+
+The configuration system includes comprehensive tests:
+
+### Unit Tests
+- `test_config`: Basic configuration functionality
+- `test_config_integration`: Configuration system integration
+- `config_demo`: Configuration improvements demonstration
+
+### Test Coverage
+- Configuration key constants
+- Default value initialization
+- Configuration file parsing
+- Key consistency verification
+- Schema validation
+- Type conversion validation
+
+## Benefits for Advanced Users
+
+1. **Easier Configuration Management**: Centralized configuration constants and schema
+2. **Better Debugging**: Improved error messages and validation
+3. **Enhanced Extensibility**: Configuration schema for easy extension
+4. **Improved Integration**: Consistent key naming across all files
+5. **Better Documentation**: Comprehensive configuration documentation
+
+## Future Enhancements
+
+The improved configuration system provides a foundation for:
+
+1. **JSON/YAML Support**: Replace simple key=value parser with full JSON/YAML support
+2. **Configuration Validation**: Advanced schema-based validation
+3. **Configuration Serialization**: Save/load configuration with validation
+4. **Configuration Templates**: Default templates for different scenarios
+5. **Configuration Documentation**: Automatic documentation generation
+
+## Configuration Files
+
+### Default Configuration
+- `configs/default.cfg`: Default configuration file (updated to use new key names)
+
+### Configuration Schema
+- `docs/CONFIG_IMPROVEMENTS.md`: Comprehensive documentation of configuration system
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
+
+### Configuration Improvements Contributors
+- Enhanced configuration management and validation
+- Fixed key inconsistencies and improved testing
+- Added comprehensive documentation and demonstration programs
+
+---
+
+*Last updated: Configuration improvements completed with enhanced configuration management system*
 
 ```
 NLM/

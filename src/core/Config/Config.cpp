@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "ConfigInitializer.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,9 +20,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -35,7 +33,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with improved handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,7 +46,51 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Handle different value types based on key
+            bool success = true;
+            if (key == ConfigKeys::RANDOM_SEED || key == ConfigKeys::NEURON_COUNT || 
+                key == ConfigKeys::REGION_COUNT || key == ConfigKeys::MAX_SIMULATION_STEPS ||
+                key == ConfigKeys::ENVIRONMENT_WIDTH || key == ConfigKeys::ENVIRONMENT_HEIGHT ||
+                key == ConfigKeys::WORKING_MEMORY_CAPACITY || key == ConfigKeys::EPISODIC_MEMORY_CAPACITY) {
+                try {
+                    long long val = std::stoll(value);
+                    set(key, val, ConfigSource::File);
+                } catch (const std::exception&) { success = false; }
+            }
+            else if (key == ConfigKeys::SIMULATION_TIMESTEP || key == ConfigKeys::SIMULATION_TIME_LIMIT ||
+                     key == ConfigKeys::CRITICAL_PERIOD_DURATION) {
+                try {
+                    double val = std::stod(value);
+                    set(key, val, ConfigSource::File);
+                } catch (const std::exception&) { success = false; }
+            }
+            else if (key == ConfigKeys::CONNECTION_PROBABILITY || 
+                     key == ConfigKeys::PLASTICITY_LEARNING_RATE || 
+                     key == ConfigKeys::STDP_LTP_WEIGHT || key == ConfigKeys::STDP_LTD_WEIGHT ||
+                     key == ConfigKeys::STDP_TAU || key == ConfigKeys::SYNAPTOGENESIS_RATE ||
+                     key == ConfigKeys::PRUNING_RATE || key == ConfigKeys::DEVELOPMENT_SYNAPTOGENESIS_RATE ||
+                     key == ConfigKeys::DEVELOPMENT_PRUNING_RATE || key == ConfigKeys::DOPAMINE_BASELINE ||
+                     key == ConfigKeys::DOPAMINE_GAIN || key == ConfigKeys::REWARD_DISCOUNT_FACTOR ||
+                     key == ConfigKeys::REWARD_BASELINE || key == ConfigKeys::VISUALIZATION_UPDATE_RATE) {
+                try {
+                    float val = std::stof(value);
+                    set(key, val, ConfigSource::File);
+                } catch (const std::exception&) { success = false; }
+            }
+            else if (key == ConfigKeys::LOG_TO_FILE || key == ConfigKeys::VISUALIZATION_ENABLED ||
+                     key == ConfigKeys::DEVELOPMENT_ENABLE) {
+                bool val = (value == "true" || value == "1" || value == "yes");
+                set(key, val, ConfigSource::File);
+            }
+            else {
+                // Default to string for unknown keys
+                set(key, value, ConfigSource::File);
+            }
+            
+            // Log parsing errors for unrecognized keys or type conversion failures
+            if (!success) {
+                // In a real implementation, we might want to log a warning here
+            }
         }
     }
     

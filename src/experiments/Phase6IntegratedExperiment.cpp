@@ -1,5 +1,6 @@
 #include "Phase6IntegratedExperiment.hpp"
 #include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigInitializer.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
@@ -25,13 +26,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set(ConfigKeys::NEURON_COUNT, config.neuronCount);
+    cfg->set(ConfigKeys::REGION_COUNT, config.regionCount);
+    cfg->set(ConfigKeys::CONNECTION_PROBABILITY, config.connectionProbability);
+    cfg->set(ConfigKeys::STDP_LTP_WEIGHT, 0.01f);
+    cfg->set(ConfigKeys::STDP_LTD_WEIGHT, 0.012f);
+    cfg->set(ConfigKeys::SYNAPTOGENESIS_RATE, 0.0001f);
+    cfg->set(ConfigKeys::PRUNING_RATE, 0.00001f);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -164,8 +165,8 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     
     // Create minimal brain
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    cfg->set("region_count", 1);
+    cfg->set(ConfigKeys::NEURON_COUNT, 100);
+    cfg->set(ConfigKeys::REGION_COUNT, 1);
     
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
@@ -250,7 +251,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set(ConfigKeys::NEURON_COUNT, 100);
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
@@ -320,7 +321,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set(ConfigKeys::NEURON_COUNT, 100);
     
     // Create and initialize brain
     auto brain1 = std::make_shared<Brain>(cfg);
@@ -367,7 +368,7 @@ bool Phase6IntegratedExperiment::testReplay() {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set(ConfigKeys::NEURON_COUNT, 100);
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();

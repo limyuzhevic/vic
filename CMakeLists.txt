@@ -139,6 +139,12 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Demo executable for configuration improvements
+add_executable(config_demo
+    demo/config_demo.cpp
+)
+target_link_libraries(config_demo PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

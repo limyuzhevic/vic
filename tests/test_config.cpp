@@ -1,5 +1,6 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "core/Config/ConfigInitializer.hpp"
 #include <cassert>
 #include <iostream>
 
