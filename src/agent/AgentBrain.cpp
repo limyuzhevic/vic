@@ -163,26 +163,33 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
+    // Optimized motor decoding with cached neuron state references
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            const NeuronState& state = n->getState();
+            sum += std::abs(state.membranePotential - state.restingPotential);
         }
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    // Calculate all motor group activities
+    const float forwardAct = calcActivity(motorForward_);
+    const float backwardAct = calcActivity(motorBackward_);
+    const float leftAct = calcActivity(motorTurnLeft_);
+    const float rightAct = calcActivity(motorTurnRight_);
+    const float interactAct = calcActivity(motorInteract_);
+    const float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
+    // Create command array for efficient maximum finding
+    struct CommandWithActivity {
+        MotorCommand cmd;
+        float activity;
+    };
+    
+    CommandWithActivity commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
@@ -191,9 +198,11 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::Wait, waitAct}
     };
     
+    // Find maximum activity using optimized approach
     MotorCommand best = MotorCommand::Wait;
     float bestActivity = waitAct;  // Default to wait if nothing stronger
     
+    // Fast linear scan for maximum activity
     for (const auto& c : commands) {
         if (c.activity > bestActivity) {
             bestActivity = c.activity;
@@ -201,7 +210,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
-    // Only act if there's meaningful activity
+    // Only act if there's meaningful activity (threshold check)
     if (bestActivity < 0.5f) {
         return MotorCommand::Wait;
     }

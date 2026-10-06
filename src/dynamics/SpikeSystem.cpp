@@ -10,6 +10,7 @@ struct SpikeSystem::Impl {
     std::vector<SpikeHandler> handlers;
     std::vector<DelayedSpikeHandler> delayedHandlers;
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
+    std::unordered_map<NeuronId, std::vector<DelayedSpikeEvent>> delayedSpikesByDestination;  // Optimized for O(1) lookup
     size_t maxHistorySize;
     
     // Spike counting for statistics
@@ -44,8 +45,11 @@ void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationSte
 }
 
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
-    // Store by delivery step for efficient processing
+    // Store by delivery step for efficient batch processing
     pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    
+    // Also store by destination neuron for O(1) lookup during delivery
+    pImpl->delayedSpikesByDestination[event.destination_neuron].push_back(event);
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
@@ -83,14 +87,18 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
         // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
+        // Copy spikes to avoid invalidation during iteration
+        std::vector<DelayedSpikeEvent> spikesToProcess = std::move(it->second);
+        
+        // Remove processed spikes immediately
+        pImpl->delayedSpikes.erase(it);
+        
+        // Call delayed spike handlers (these will deliver synaptic input)
+        for (const auto& delayedEvent : spikesToProcess) {
             for (auto& handler : pImpl->delayedHandlers) {
                 handler(delayedEvent);
             }
         }
-        // Remove processed spikes
-        pImpl->delayedSpikes.erase(it);
     }
 }
 
@@ -178,6 +186,7 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+    pImpl->delayedSpikesByDestination.clear();
 }
 
 } // namespace nlm

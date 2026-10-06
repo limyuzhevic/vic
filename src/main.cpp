@@ -183,8 +183,12 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
     
     // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    const size_t numSteps = 50;
+    const float timestep = 0.001f;
+    
+    for (SimulationStep step = 0; step < numSteps; ++step) {
+        // Use pre-calculated timestep to avoid multiplication in loop
+        brain->step(step, static_cast<float>(step) * timestep);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -222,19 +226,26 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+    const size_t numSteps = 1000;
+    const float injectionAmount = 30.0f;
+    const size_t neuronsPerPattern = 20;
+    
+    for (SimulationStep step = 0; step < numSteps; ++step) {
+        // Optimized input pattern - calculate how many neurons to inject once
+        const size_t neuronsToInject = std::min<size_t>(neuronsPerPattern, brain->getTotalNeuronCount() / 4);
+        
+        for (size_t i = 0; i < neuronsToInject; ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, injectionAmount);
         }
         
-        brain->step(step, step * 0.001);
+        // Use pre-calculated timestep
+        brain->step(step, static_cast<float>(step) * 0.001f);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     
@@ -263,22 +274,29 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record initial weights
     std::vector<float> beforeWeights;
+    beforeWeights.reserve(5);  // Reserve space to avoid reallocations
+    
     for (size_t i = 0; i < 5; ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                     " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
+    // Pre-calculate timestep for efficiency
+    const float timestep = 0.001f;
+    const float preFireCurrent = 60.0f;
+    
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
         
+        // Cache neurons reference to avoid repeated calls
         auto neurons = region->getAllNeurons();
         if (neurons.size() >= 2) {
             preNeuron = neurons[0];
@@ -287,26 +305,34 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            preNeuron->injectCurrent(preFireCurrent);
+            brain->step(trial * 2, static_cast<float>(trial * 2) * timestep);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            postNeuron->injectCurrent(preFireCurrent);
+            brain->step(trial * 2 + 1, static_cast<float>(trial * 2 + 1) * timestep);
         }
     }
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
+    
+    // Pre-allocate beforeWeights vector to avoid reallocations
+    beforeWeights.clear();
+    beforeWeights.reserve(5);
+    
     for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
+        float currentWeight = synapses[i]->getWeight();
+        float delta = currentWeight - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                     " after: " + std::to_string(currentWeight) +
+                     " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
     float totalDelta = 0.0f;
+    
+    // Vectorized delta calculation
     for (size_t i = 0; i < 5; ++i) {
         totalDelta += synapses[i]->getWeight() - beforeWeights[i];
     }

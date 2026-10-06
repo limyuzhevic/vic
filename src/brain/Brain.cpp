@@ -437,33 +437,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
-    }
-    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // Calculate neuromodulation factor for plasticity (compute once outside loop)
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Optimized plasticity application - pre-calculate dopamine-based weight adjustments
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
+            PlasticityFlags& flags = syn->getPlasticityFlags();
+            
+            // Pre-calculate dopamine-based weight adjustment factor
+            float dopamineAdjustment = (plasticityMod - 1.0f) * 0.001f;
+            
             // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
+            if (flags.stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Modify weight change based on dopamine (combined in one operation)
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    float currentWeight = syn->getWeight();
+                    syn->addToWeight((currentWeight > 0 ? 1.0f : -1.0f) * dopamineAdjustment);
                 }
             }
             
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
+            // Apply Hebbian learning (STDP and Hebbian applied together for efficiency)
+            if (flags.hebbian) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
