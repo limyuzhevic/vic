@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <stdexcept>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,91 +23,91 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format based on extension
+    std::string extension = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    if (extension == ".json") {
+        return loadFromJSON(filepath);
+    } else if (extension == ".yaml" || extension == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Fall back to simple key=value format
+        return loadFromSimpleFile(filepath);
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing command line arguments: " + std::string(e.what()));
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
+    // Determine format based on extension
+    std::string extension = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
-    return true;
+    try {
+        if (extension == ".json") {
+            saveToJSON(file);
+        } else if (extension == ".yaml" || extension == ".yml") {
+            saveToYAML(file);
+        } else {
+            saveToSimpleFormat(file);
+        }
+        
+        NLM_LOG_INFO("Configuration saved to: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving configuration to file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
     try {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            return std::nullopt;
+        }
+        
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error getting configuration value for key '" + key + "': " + std::string(e.what()));
         return std::nullopt;
     }
 }
@@ -115,6 +119,18 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set configuration with empty key");
+        return;
+    }
+    
+    // Validate key format (allow dots for nested keys)
+    for (char c : key) {
+        if (!(std::isalnum(c) || c == '_' || c == '.' || c == '-')) {
+            NLM_LOG_WARNING("Configuration key contains unusual characters: '" + key + "'");
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
