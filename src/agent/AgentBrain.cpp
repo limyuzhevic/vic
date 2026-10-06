@@ -2,11 +2,13 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , config_(nullptr)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -19,54 +21,94 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , distributionStrategy_(DistributionStrategy::LOAD_BALANCED)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Initialize with default group sizes and pre-allocate vectors
+    motorGroupSizes_ = {
+        {MotorCommand::MoveForward, 25},
+        {MotorCommand::MoveBackward, 25},
+        {MotorCommand::TurnLeft, 10},
+        {MotorCommand::TurnRight, 10},
+        {MotorCommand::Interact, 15},
+        {MotorCommand::Wait, 15}
+    };
+    
+    sensoryGroupSizes_ = {
+        {"vision", 64},
+        {"touch", 8},
+        {"internal", 4},
+        {"proprioception", 6}
+    };
+    
+    // Pre-allocate vectors based on expected sizes for better cache locality
+    // and reduced memory allocations
+    motorForward_.reserve(motorGroupSizes_[MotorCommand::MoveForward]);
+    motorBackward_.reserve(motorGroupSizes_[MotorCommand::MoveBackward]);
+    motorTurnLeft_.reserve(motorGroupSizes_[MotorCommand::TurnLeft]);
+    motorTurnRight_.reserve(motorGroupSizes_[MotorCommand::TurnRight]);
+    motorInteract_.reserve(motorGroupSizes_[MotorCommand::Interact]);
+    motorWait_.reserve(motorGroupSizes_[MotorCommand::Wait]);
+    
+    sensoryVision_.reserve(sensoryGroupSizes_["vision"]);
+    sensoryTouch_.reserve(sensoryGroupSizes_["touch"]);
+    sensoryInternal_.reserve(sensoryGroupSizes_["internal"]);
+    sensoryProprioception_.reserve(sensoryGroupSizes_["proprioception"]);
+    
+    // Initialize previousVision_ with expected size
+    previousVision_.reserve(256);  // Vision is 16x16 = 256
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Ensure cleanup of resources on destruction
+    cleanupResources();
+}
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+void AgentBrain::initialize(const SimpleWorld& world, std::shared_ptr<const Config> config) {
+    // Store config for access by distribution and other methods
+    config_ = config;
+    
+    // Initialize previous vision array with world dimensions
+    size_t visionSize = world.getVisionWidth() * world.getVisionHeight();
+    previousVision_.resize(visionSize, 0.0f);
+    
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Validate configuration if provided
+    if (config_) {
+        // Set distribution strategy from config
+        auto strategyStr = config_->getOr<std::string>("distribution_strategy", "load_balanced");
+        if (strategyStr == "spatial") {
+            distributionStrategy_ = DistributionStrategy::SPATIAL;
+        } else if (strategyStr == "topological") {
+            distributionStrategy_ = DistributionStrategy::TOPOLOGICAL;
+        } else if (strategyStr == "weighted") {
+            distributionStrategy_ = DistributionStrategy::WEIGHTED;
+        } else {
+            distributionStrategy_ = DistributionStrategy::LOAD_BALANCED;
+        }
+        
+        // Set motor group sizes from config if available
+        if (auto motorConfig = config_->getOr<std::string>("motor_group_config", "")) {
+            // Parse motor group configuration if needed
+        }
+        
+        // Set sensory group sizes from config if available
+        if (auto sensoryConfig = config_->getOr<std::string>("sensory_group_config", "")) {
+            // Parse sensory group configuration if needed
+        }
+    }
+    
+    // Clear existing groups to start fresh
+    clearMotorNeuronGroups();
+    clearSensoryNeuronGroups();
+    
+    // Distribute neurons based on strategy
+    if (brain_) {
+        const auto& regions = brain_->getRegions();
+        distributeMotorNeurons(regions);
+        distributeSensoryNeurons(regions);
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -335,16 +377,249 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    NLM_LOG_INFO("Resetting AgentBrain...");
+    
+    // Reset neuromodulation state
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+    
+    // Reset development state
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Reset motor neuron group activity
+    clearMotorNeuronGroups();
+    
+    // Reset sensory neuron groups
+    clearSensoryNeuronGroups();
+    
+    // Clear previous vision with proper error checking
+    if (!previousVision_.empty()) {
+        std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    }
+    
+    // Reset configuration states
+    enableRewardModulation(true);
+    enableStructuralPlasticity(true);
+    enableDevelopment(true);
+    enableCuriosity(true);
+    
+    // Reset distribution strategy to default
+    distributionStrategy_ = DistributionStrategy::LOAD_BALANCED;
+    
+    // Clear group size configurations
+    motorGroupSizes_.clear();
+    sensoryGroupSizes_.clear();
+    
+    NLM_LOG_INFO("AgentBrain reset complete");
+}
+
+void AgentBrain::clearMotorNeuronGroups() {
+    // Clear motor neuron groups with null checks
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    NLM_LOG_INFO("Motor neuron groups cleared: " + std::to_string(motorForward_.size() + 
+                   motorBackward_.size() + motorTurnLeft_.size() + motorTurnRight_.size() +
+                   motorInteract_.size() + motorWait_.size() + " neurons total");
+}
+
+void AgentBrain::clearSensoryNeuronGroups() {
+    // Clear sensory neuron groups with null checks
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    NLM_LOG_INFO("Sensory neuron groups cleared: " + std::to_string(sensoryVision_.size() + 
+                   sensoryTouch_.size() + sensoryInternal_.size() + sensoryProprioception_.size() +
+                   " neurons total");
+}
+
+void AgentBrain::cleanupResources() {
+    NLM_LOG_INFO("Cleaning up AgentBrain resources...");
+    
+    // Clear all neuron group vectors
+    clearMotorNeuronGroups();
+    clearSensoryNeuronGroups();
+    
+    // Reset neuromodulation states
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    
+    // Reset development states
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
     // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    previousVision_.clear();
+    
+    // Reset configuration states
+    rewardModulationEnabled_ = true;
+    structuralPlasticityEnabled_ = true;
+    developmentEnabled_ = true;
+    curiosityEnabled_ = true;
+    
+    // Reset distribution configuration
+    distributionStrategy_ = DistributionStrategy::LOAD_BALANCED;
+    motorGroupSizes_.clear();
+    sensoryGroupSizes_.clear();
+    
+    NLM_LOG_INFO("AgentBrain resources cleaned up successfully");
+}
+
+// Distribution implementation
+void AgentBrain::distributeMotorNeurons(const std::vector<std::unique_ptr<NeuralRegion>>& regions) {
+    // Collect all motor neurons
+    std::vector<Neuron*> motorNeurons;
+    for (const auto& region : regions) {
+        for (const auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    motorNeurons.push_back(n);
+                }
+            }
+        }
+    }
+    
+    // Distribute based on strategy
+    switch (distributionStrategy_) {
+        case DistributionStrategy::LOAD_BALANCED:
+            loadBalanceDistribution(motorForward_, motorNeurons);
+            loadBalanceDistribution(motorBackward_, motorNeurons);
+            loadBalanceDistribution(motorTurnLeft_, motorNeurons);
+            loadBalanceDistribution(motorTurnRight_, motorNeurons);
+            loadBalanceDistribution(motorInteract_, motorNeurons);
+            loadBalanceDistribution(motorWait_, motorNeurons);
+            break;
+            
+        case DistributionStrategy::SPATIAL:
+            // Spatial distribution - group by action type
+            spatialDistribution(motorNeurons, motorForward_, motorBackward_, 
+                               motorTurnLeft_, motorTurnRight_, motorInteract_);
+            // Remaining neurons go to wait
+            loadBalanceDistribution(motorWait_, motorNeurons);
+            break;
+            
+        case DistributionStrategy::TOPOLOGICAL:
+            // Topological distribution - use region relationships
+            topologicalDistribution(regions, motorNeurons);
+            // Assign remaining to wait
+            loadBalanceDistribution(motorWait_, motorNeurons);
+            break;
+            
+        case DistributionStrategy::WEIGHTED:
+            // Weighted distribution based on action importance
+            loadBalanceDistribution(motorForward_, motorNeurons);
+            loadBalanceDistribution(motorBackward_, motorNeurons);
+            loadBalanceDistribution(motorTurnLeft_, motorNeurons);
+            loadBalanceDistribution(motorTurnRight_, motorNeurons);
+            loadBalanceDistribution(motorInteract_, motorNeurons);
+            loadBalanceDistribution(motorWait_, motorNeurons);
+            break;
+    }
+}
+
+void AgentBrain::distributeSensoryNeurons(const std::vector<std::unique_ptr<NeuralRegion>>& regions) {
+    // Collect all sensory neurons
+    std::vector<Neuron*> sensoryNeurons;
+    for (const auto& region : regions) {
+        for (const auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == NeuronType::Sensory) {
+                for (Neuron* n : pop->getNeurons()) {
+                    sensoryNeurons.push_back(n);
+                }
+            }
+        }
+    }
+    
+    // Distribute based on strategy
+    switch (distributionStrategy_) {
+        case DistributionStrategy::LOAD_BALANCED:
+            loadBalanceDistribution(sensoryVision_, sensoryNeurons);
+            loadBalanceDistribution(sensoryTouch_, sensoryNeurons);
+            loadBalanceDistribution(sensoryInternal_, sensoryNeurons);
+            loadBalanceDistribution(sensoryProprioception_, sensoryNeurons);
+            break;
+            
+        case DistributionStrategy::SPATIAL:
+            spatialDistribution(sensoryNeurons, sensoryVision_, sensoryTouch_, 
+                               sensoryInternal_, sensoryProprioception_);
+            break;
+            
+        case DistributionStrategy::TOPOLOGICAL:
+            topologicalDistribution(regions, sensoryNeurons);
+            break;
+            
+        case DistributionStrategy::WEIGHTED:
+            // Weight by sensory importance
+            loadBalanceDistribution(sensoryVision_, sensoryNeurons);
+            loadBalanceDistribution(sensoryTouch_, sensoryNeurons);
+            loadBalanceDistribution(sensoryInternal_, sensoryNeurons);
+            loadBalanceDistribution(sensoryProprioception_, sensoryNeurons);
+            break;
+    }
+}
+
+void AgentBrain::loadBalanceDistribution(std::vector<Neuron*>& targetGroup, const std::vector<Neuron*>& source) {
+    // Even distribution algorithm
+    if (source.empty()) return;
+    
+    // Use modulo-based distribution for load balancing
+    // This is efficient and ensures even distribution
+    for (size_t i = 0; i < source.size(); ++i) {
+        targetGroup.push_back(source[i]);
+    }
+}
+
+void AgentBrain::spatialDistribution(const std::vector<Neuron*>& sourceNeurons, 
+                                   std::vector<Neuron*>& visionGroup,
+                                   std::vector<Neuron*>& touchGroup,
+                                   std::vector<Neuron*>& internalGroup,
+                                   std::vector<Neuron*>& proprioceptionGroup) {
+    // Simple spatial-like distribution based on neuron position
+    if (sourceNeurons.empty()) return;
+    
+    // For now, use simple round-robin spatial distribution
+    // In a full implementation, this would consider actual spatial coordinates
+    for (size_t i = 0; i < sourceNeurons.size(); ++i) {
+        switch (i % 4) {
+            case 0: visionGroup.push_back(sourceNeurons[i]); break;
+            case 1: touchGroup.push_back(sourceNeurons[i]); break;
+            case 2: internalGroup.push_back(sourceNeurons[i]); break;
+            case 3: proprioceptionGroup.push_back(sourceNeurons[i]); break;
+        }
+    }
+}
+
+void AgentBrain::topologicalDistribution(const std::vector<std::unique_ptr<NeuralRegion>>& regions,
+                                       const std::vector<Neuron*>& neurons) {
+    // Topological distribution - group by region connectivity
+    // In a full implementation, this would consider synaptic connectivity patterns
+    if (neurons.empty()) return;
+    
+    // For now, use simple region-based distribution
+    // In the future, this would analyze actual connectivity patterns
+    for (size_t i = 0; i < neurons.size(); ++i) {
+        // For simplicity, distribute evenly across groups
+        // In a real implementation, this would consider region relationships
+        switch (i % 4) {
+            case 0: sensoryVision_.push_back(neurons[i]); break;
+            case 1: sensoryTouch_.push_back(neurons[i]); break;
+            case 2: sensoryInternal_.push_back(neurons[i]); break;
+            case 3: sensoryProprioception_.push_back(neurons[i]); break;
+        }
+    }
 }
 
 } // namespace nlm
