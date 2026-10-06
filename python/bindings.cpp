@@ -347,11 +347,115 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
+
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Advanced brain control methods for expert users
+        .def("runSimulationSteps", [](Brain& self, size_t numSteps, bool verbose = false) {
+            for (size_t i = 0; i < numSteps; ++i) {
+                self.step(i, i * 0.001);
+                if (verbose && i % 100 == 0) {
+                    std::cout << "Step " << i << ": " 
+                             << self.getFiringNeuronCount() << " neurons firing, "
+                             << self.getTotalSpikeCount() << " total spikes" << std::endl;
+                }
+            }
+        }, py::arg("numSteps"), py::arg("verbose") = false,
+             "Run multiple simulation steps efficiently")
+        
+        .def("enableAllPlasticity", [](Brain& self) {
+            if (auto* stdp = self.getSTDP()) stdp->configure(0.02f, 0.018f, 25.0f);
+            if (auto* hebbian = self.getHebbian()) hebbian->setLearningRate(0.01f);
+            if (auto* structural = self.getStructuralPlasticity()) {
+                structural->setSynaptogenesisRate(0.0002f);
+                structural->setPruningRate(0.00002f);
+            }
+        }, "Enable all plasticity mechanisms with optimal settings")
+        
+        .def("getBrainSnapshot", [](const Brain& self) {
+            py::dict snapshot;
+            snapshot["total_neurons"] = self.getTotalNeuronCount();
+            snapshot["total_synapses"] = self.getTotalSynapseCount();
+            snapshot["firing_neurons"] = self.getFiringNeuronCount();
+            snapshot["average_firing_rate"] = self.getAverageFiringRate();
+            snapshot["total_spikes"] = self.getTotalSpikeCount();
+            snapshot["development_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return snapshot;
+        }, "Get brain state snapshot as dictionary")
+        
+        .def("compareBrains", [](const Brain& self1, const Brain& self2) {
+            py::dict comparison;
+            comparison["neurons_match"] = self1.getTotalNeuronCount() == self2.getTotalNeuronCount();
+            comparison["spikes_match"] = self1.getTotalSpikeCount() == self2.getTotalSpikeCount();
+            comparison["firing_rate_diff"] = std::abs(self1.getAverageFiringRate() - 
+                                                      self2.getAverageFiringRate());
+            return comparison;
+        }, "Compare two brains and return comparison metrics")
+        
+        .def("exportNetworkTopology", [](Brain& self, const std::string& filepath) {
+            // Export network structure for analysis
+            auto regions = self.getRegions();
+            std::ofstream file(filepath);
+            if (file.is_open()) {
+                file << "NLM Network Topology Export" << std::endl;
+                file << "================================" << std::endl;
+                file << "Total Neurons: " << self.getTotalNeuronCount() << std::endl;
+                file << "Total Synapses: " << self.getTotalSynapseCount() << std::endl;
+                file << "Regions: " << self.getRegionCount() << std::endl;
+                for (size_t i = 0; i < self.getRegionCount(); ++i) {
+                    auto rid = self.getRegionIds()[i];
+                    auto* region = self.getRegion(rid);
+                    if (region) {
+                        file << "  Region " << i << ": " << region->getName() << std::endl;
+                        file << "    Neurons: " << region->getNeuronCount() << std::endl;
+                        file << "    Synapses: " << region->getSynapseCount() << std::endl;
+                    }
+                }
+                file << "Export completed successfully" << std::endl;
+                return true;
+            }
+            return false;
+        }, py::arg("filepath"), "Export network topology to file")
+        
+        .def("setAdvancedLearningRate", [](Brain& self, float stdpLTP, float stdpLTD, 
+                                          float hebbianRate, float structuralRate) {
+            if (auto* stdp = self.getSTDP()) {
+                stdp->configure(stdpLTP, stdpLTD, 25.0f);
+            }
+            if (auto* hebbian = self.getHebbian()) {
+                hebbian->setLearningRate(hebbianRate);
+            }
+            if (auto* structural = self.getStructuralPlasticity()) {
+                structural->setSynaptogenesisRate(structuralRate);
+                structural->setPruningRate(structuralRate * 0.1f);
+            }
+        }, py::arg("stdp_ltp"), py::arg("stdp_ltd"), py::arg("hebbian_rate"), py::arg("structural_rate"),
+             "Set advanced plasticity learning rates")
+        
+        .def("getPerformanceMetrics", [](const Brain& self) {
+            py::dict metrics;
+            metrics["neuron_count"] = self.getTotalNeuronCount();
+            metrics["synapse_count"] = self.getTotalSynapseCount();
+            metrics["firing_rate"] = self.getAverageFiringRate();
+            metrics["spike_count"] = self.getTotalSpikeCount();
+            metrics["excitatory_inhibitory_ratio"] = self.getExcitationInhibitionRatio();
+            
+            // Calculate additional performance metrics
+            size_t total_possible = self.getTotalNeuronCount() * 10;  // Approximate connectivity
+            float connectivity_efficiency = static_cast<float>(self.getTotalSynapseCount()) / 
+                                           static_cast<float>(total_possible);
+            metrics["connectivity_efficiency"] = connectivity_efficiency;
+            
+            float theoretical_max_rate = 100.0f; // Hz
+            float utilization = self.getAverageFiringRate() / theoretical_max_rate;
+            metrics["network_utilization"] = utilization;
+            
+            return metrics;
+        }, "Get comprehensive performance metrics")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
