@@ -9,6 +9,106 @@
 
 namespace nlm {
 
+// =============================================================================
+// AgentBrain: NLM Brain-to-World Interface
+// =============================================================================
+// 
+// This class serves as the interface layer between the NLM brain and the external
+// world, handling sensory transduction (world → brain) and motor decoding 
+// (brain → world). It implements the complete agent control loop including
+// perception, decision making, and action execution.
+// 
+// Key Responsibilities:
+// - Sensory transduction: Convert world percepts to neural inputs
+// - Motor decoding: Convert neural activity to world commands
+// - Neuromodulation: Apply reward and error signals to plasticity
+// - Development management: Track and update developmental state
+// - Curiosity-driven exploration: Balance exploitation vs exploration
+// - Novelty detection: Identify new experiences for learning
+// - Action selection: Choose optimal behaviors based on context
+// 
+// The agent operates in closed-loop with the world:
+// 1. World generates percepts (sensory input)
+// 2. AgentBrain processes percepts and injects into brain
+// 3. Brain processes inputs and generates motor commands
+// 4. AgentBrain decodes commands and applies to world
+// 5. World provides feedback (reward, novel events)
+// 6. Neuromodulation updates learning based on feedback
+// 7. Development progresses based on experience
+// 
+// Usage Example:
+// ```
+// #include "AgentBrain.hpp"
+// 
+// // Create brain
+// auto config = std::make_shared<Config>();
+// auto brain = std::make_shared<Brain>(config);
+// 
+// // Create agent interface
+// AgentBrain agent(brain);
+// 
+// // Create and configure world
+// SimpleWorld world;
+// world.configure(20, 20, 8, 8);
+// 
+// // Initialize agent with world
+// agent.initialize(world);
+// 
+// // Configure agent behavior
+// agent.enableRewardModulation(true);
+// agent.enableCuriosity(true);
+// agent.enableDevelopment(true);
+// agent.enableStructuralPlasticity(true);
+// 
+// // Run control loop
+// for (int step = 0; step < 1000; ++step) {
+//     // World updates
+//     world.update(0.1);
+//     
+//     // Get sensory percept from world
+//     SensoryPercept percept = world.getSensoryPercept();
+//     
+//     // Process sensory input
+//     agent.processSensoryInput(percept);
+//     
+//     // Brain step (handled internally)
+//     
+//     // Get motor command
+//     MotorCommand cmd = agent.decodeMotorCommand();
+//     
+//     // Apply action to world
+//     world.applyMotorCommand(cmd, world.getSimulationTime());
+//     
+//     // Get reward and apply neuromodulation
+//     float reward = 0.0f;  // Would extract from percept
+//     agent.applyRewardModulation(reward, 0.0f);
+//     
+//     // Update development
+//     agent.updateDevelopment(0.1);
+//     
+//     // Print debug info
+//     if (step % 100 == 0) {
+//         std::cout << "Step " << step << ": "
+//                   << "Curiosity: " << agent.getCuriosityLevel()
+//                   << " Novelty: " << agent.getNoveltyLevel()
+//                   << " Dopamine: " << agent.getNeuromodulationLevel()
+//                   << std::endl;
+//     }
+// }
+// ```
+// =============================================================================
+
+#pragma once
+
+#include "AgentBody.hpp"
+#include "SensoryPercept.hpp"
+#include "../brain/Brain.hpp"
+#include "../world/SimpleWorld.hpp"
+#include <memory>
+#include <vector>
+
+namespace nlm {
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {

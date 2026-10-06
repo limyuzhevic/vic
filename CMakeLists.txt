@@ -92,20 +92,16 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
-)
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+# Find nlohmann_json
+find_package(nlohmann_json 3.2.0 REQUIRED)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+# CLI Framework
+add_library(nlm_cli STATIC
+    src/cli/CLIOptions.cpp
+    src/cli/MainCLI.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_include_directories(nlm_cli PUBLIC src/cli)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlohmann_json::nlohmann_json)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
@@ -125,7 +121,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
