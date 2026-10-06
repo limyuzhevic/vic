@@ -9,20 +9,12 @@ namespace nlm {
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
-class PredictionSystem {
-public:
-    PredictionSystem();
-    ~PredictionSystem();
-    
-    // Make prediction for next timestep
+// Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
-    
-    // Get prediction error
-    float getPredictionError() const;
     
     // Get prediction confidence
     float getConfidence() const;
@@ -33,6 +25,13 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Update prediction system with current observation
+    // This method updates the internal prediction model based on sensory input
+    void updateObservation(const std::vector<float>& observation);
+    
+    // Get predicted state as activity pattern
+    std::vector<float> predictNextStatePattern(const std::vector<float>& currentState);
     
 private:
     struct Impl;

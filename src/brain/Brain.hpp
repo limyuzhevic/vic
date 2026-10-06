@@ -115,6 +115,15 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+    // Helper functions for cognitive system integration
+    void applyActionSelectionBiasFromAttention(const std::vector<NeuronId>& attentionWinners);
+    void applyActionSelectionFromPrediction(const std::vector<float>& predictedState, float confidence);
+    void encourageExploration();
+    
+    // Helper functions for cognitive system integration
+    void applyActionSelectionBiasFromAttention(const std::vector<NeuronId>& attentionWinners);
+    void applyActionSelectionFromPrediction(const std::vector<float>& predictedState, float confidence);
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);

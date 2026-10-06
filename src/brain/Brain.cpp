@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +132,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize complete neuromodulation system
+        serotonin = std::make_unique<Serotonin>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -417,24 +425,68 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // Update acetylcholine (attention and memory encoding)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        // Acetylcholine enhances memory encoding and feature binding
+        float achLevel = pImpl->acetylcholine->getLevel();
+        if (achLevel > 0.3f) {
+            // Boost working memory encoding
+            if (pImpl->workingMemory) {
+                // Enhance encoding of current sensory input
+                pImpl->workingMemory->strengthenMemory(1.0f + achLevel * 0.3f);
+            }
+            
+            // Enhance attentional feature binding
+            if (pImpl->attention) {
+                // Increase attentional focus precision
+                pImpl->attention->setExcitationStrength(1.5f + achLevel * 0.5f);
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Norepinephrine modulates arousal and attention
+        float neLevel = pImpl->norepinephrine->getLevel();
+        if (neLevel > 0.3f) {
+            // Enhance neural arousal and alertness
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // NE increases baseline excitability
+                        neuron->injectCurrent(neLevel * 0.2f);
                     }
                 }
+            }
+            
+            // Boost attentional selection
+            if (pImpl->attention) {
+                pImpl->attention->boostAttention(neLevel * 0.3f);
+            }
+        }
+    }
+    
+    // Update serotonin (mood and consolidation)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Serotonin modulates mood, consolidation, and behavior
+        float seroLevel = pImpl->serotonin->getLevel();
+        if (seroLevel > 0.3f) {
+            // Enhance memory consolidation
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->strengthenMemory(1.0f + seroLevel * 0.2f);
+            }
+            
+            // Modulate behavioral approach/avoidance
+            if (seroLevel > 0.7f) {
+                // High serotonin promotes exploration
+                // This could bias action selection towards novel actions
+                encourageExploration();
             }
         }
     }
@@ -513,23 +565,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        
+        // Use current working memory state as input for prediction
+        if (pImpl->workingMemory) {
+            std::vector<float> currentState = pImpl->workingMemory->retrieve();
+            pImpl->predictionSystem->updateObservation(currentState);
+            
+            // Generate prediction and calculate prediction error
+            std::vector<float> predictedState = pImpl->predictionSystem->predictNextStep();
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            
+            // High confidence predictions reinforce current working memory
+            if (predictionConfidence > 0.7f) {
+                pImpl->workingMemory->strengthenMemory(1.0f + predictionConfidence * 0.2f);
+            }
+            
+            // Use prediction to influence action selection
+            applyActionSelectionFromPrediction(predictedState, predictionConfidence);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
+        // Enhanced working memory -> attention integration
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention feedback to reinforce working memory traces
+            const auto& winners = pImpl->attention->getWinners();
+            if (!winners.empty()) {
+                // Strong reinforcement of attended memory traces
+                for (NeuronId winner : winners) {
+                    if (pImpl->workingMemory->contains(winner)) {
+                        float currentActivation = pImpl->workingMemory->getNeuronActivation(winner);
+                        float reinforcementFactor = 1.5f + currentActivation;  // Stronger for active neurons
+                        pImpl->workingMemory->strengthenMemory(1.0f + reinforcementFactor * 0.1f);
+                    }
+                }
+                
+                // Use attention winners to bias action selection
+                applyActionSelectionBiasFromAttention(winners);
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Concept formation processes current neural activity patterns to form concepts
+        // Extract working memory state for concept formation
+        std::vector<float> workingMemoryState = pImpl->workingMemory->retrieve();
+        
+        // Also include episodic memory if available
+        std::vector<Concept> existingConcepts;
+        if (pImpl->conceptFormation) {
+            existingConcepts = pImpl->conceptFormation->getCurrentConcepts();
+        }
+        
+        // Process current state to form new concepts or update existing ones
+        std::vector<Concept> newConcepts = pImpl->conceptFormation->process(workingMemoryState, existingConcepts);
+        
+        // Store new concepts for planner to use
+        if (!newConcepts.empty()) {
+            // Update working memory with concept information
+            for (size_t i = 0; i < std::min(newConcepts.size(), size_t(10)); ++i) {
+                // Add concept activation to relevant working memory neurons
+                float conceptStrength = newConcepts[i].strength;
+                pImpl->workingMemory->strengthenMemory(1.0f + conceptStrength * 0.1f);
+            }
+        }
+        
+        // Prepare concepts for planning
+        pImpl->conceptFormation->updateConcepts(newConcepts);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -586,6 +695,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+// Helper functions for cognitive system integration
+void Brain::applyActionSelectionBiasFromAttention(const std::vector<NeuronId>& attentionWinners) {
+    // Use attention winners to bias action selection
+    if (pImpl->motorNeurons.empty() || attentionWinners.empty()) return;
+    
+    // Calculate bias strength based on attention winners
+    float totalAttentionStrength = 0.0f;
+    for (NeuronId winner : attentionWinners) {
+        // Find neuron in motor neurons with similar properties
+        for (auto* motorNeuron : pImpl->motorNeurons) {
+            if (motorNeuron->getId() == winner) {
+                float neuronActivity = motorNeuron->getState().membranePotential;
+                totalAttentionStrength += std::max(0.0f, neuronActivity);
+                break;
+            }
+        }
+    }
+    
+    if (totalAttentionStrength > 0.0f) {
+        // Apply bias to motor neuron groups
+        for (auto* motorNeuron : pImpl->motorNeurons) {
+            // Bias based on attention strength
+            motorNeuron->injectCurrent(totalAttentionStrength * 0.1f);
+        }
+    }
+}
+
+void Brain::encourageExploration() {
+    // Promote exploratory behavior when serotonin is high
+    if (pImpl->motorNeurons.empty()) return;
+    
+    // Add bias towards exploring novel actions
+    // This increases the chance of selecting less-used motor neurons
+    float explorationBonus = 0.3f;
+    
+    for (size_t i = 0; i < pImpl->motorNeurons.size(); ++i) {
+        auto* motorNeuron = pImpl->motorNeurons[i];
+        if (motorNeuron) {
+            // Calculate how recently this motor neuron was used
+            // (simplified - in real implementation would track usage history)
+            float usageFactor = 1.0f - (static_cast<float>(i) / static_cast<float>(pImpl->motorNeurons.size()));
+            
+            // Apply exploration bias (higher for less-used neurons)
+            float explorationBias = explorationBonus * usageFactor;
+            motorNeuron->injectCurrent(explorationBias);
+        }
+    }
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -598,12 +754,33 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Step 1: Store sensory input in working memory as compressed pattern
+    if (pImpl->workingMemory) {
+        // Extract and normalize sensory pattern for working memory storage
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(numSensory);
+        
+        for (size_t i = 0; i < numSensory; ++i) {
+            // Normalize input to range [0, 1] based on expected max value
+            float normalizedValue = std::min(values[i], 255.0f) / 255.0f;
+            sensoryPattern.push_back(normalizedValue);
+        }
+        
+        // Store in working memory with higher strength for fresh input
+        pImpl->workingMemory->store(sensoryPattern, 1.0f);
+        
+        // Also update prediction system with sensory observation
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->updateObservation(sensoryPattern);
+        }
+    }
+    
+    // Step 2: Inject current into sensory neurons (existing functionality)
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            normalizedValue = static_cast<float>(values[i]) * 10.0f / 255.0f;
         }
         
         // Inject current into this sensory neuron
