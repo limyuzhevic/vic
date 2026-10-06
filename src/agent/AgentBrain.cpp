@@ -64,6 +64,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Validate inputs
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot initialize AgentBrain: brain is null");
+        return;
+    }
+    
+    if (world.getVisionWidth() == 0 || world.getVisionHeight() == 0) {
+        NLM_LOG_ERROR("Cannot initialize AgentBrain: invalid world dimensions");
+        return;
+    }
+    
+    // Initialize state variables
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;

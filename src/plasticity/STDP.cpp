@@ -52,7 +52,14 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Input validation
+    if (!synapse) {
+        NLM_LOG_ERROR("STDP update failed: synapse is null");
+        return;
+    }
+    
+    if (preSpikes.empty() && postSpikes.empty()) {
+        // No spikes to process, nothing to do
         return;
     }
     

@@ -177,10 +177,50 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration before proceeding
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration is null");
+        return false;
+    }
+    
+    // Get and validate configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: 0. Minimum value is 1.");
+        return false;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region count: 0. Minimum value is 1.");
+        return false;
+    }
+    
+    if (neuronCount / regionCount == 0) {
+        NLM_LOG_ERROR("Too many regions for given neuron count. Each region must have at least 1 neuron.");
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability) + ". Must be between 0.0 and 1.0.");
+        return false;
+    }
+    
+    // Additional validation for other configuration parameters
+    auto seedOpt = pImpl->config->get<int64_t>("random_seed");
+    if (seedOpt.has_value() && seedOpt.value() < 0) {
+        NLM_LOG_ERROR("Invalid random seed: " + std::to_string(seedOpt.value()) + ". Must be non-negative.");
+        return false;
+    }
+    
+    auto timestepOpt = pImpl->config->get<double>("simulation_timestep");
+    if (timestepOpt.has_value() && (timestepOpt.value() <= 0.0 || timestepOpt.value() > 1.0)) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestepOpt.value()) + ". Must be between 0 and 1.0 seconds.");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -195,7 +235,12 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
+            // Add populations with validation
+            if (neuronsPerRegion < 3) {
+                NLM_LOG_ERROR("Not enough neurons to create all population types. Minimum neurons per region is 3.");
+                return false;
+            }
+            
             auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
@@ -232,31 +277,64 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Working memory not initialized");
+        return false;
+    }
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
     // Initialize episodic memory
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Episodic memory not initialized");
+        return false;
+    }
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
     // Initialize associative memory
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Associative memory not initialized");
+        return false;
+    }
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
+    if (!pImpl->planner) {
+        NLM_LOG_ERROR("Planner not initialized");
+        return false;
+    }
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_ERROR("Concept formation not initialized");
+        return false;
+    }
     pImpl->conceptFormation->initialize(this);
     
+    if (!pImpl->attention) {
+        NLM_LOG_ERROR("Attention system not initialized");
+        return false;
+    }
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
+    if (!pImpl->novelty) {
+        NLM_LOG_ERROR("Novelty detector not initialized");
+        return false;
+    }
     pImpl->novelty->initialize(this);
+    
+    if (!pImpl->curiosity) {
+        NLM_LOG_ERROR("Curiosity system not initialized");
+        return false;
+    }
     pImpl->curiosity->initialize(this);
     
     // Register spike handlers for event-driven processing
