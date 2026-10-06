@@ -1089,29 +1089,62 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
+    // IMPROVEMENT: Enhanced system integration status reporting
+    NLM_LOG_INFO("=== SYSTEM INTEGRATION STATUS ===");
+    
     // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    NLM_LOG_INFO("MEMORY SYSTEMS:");
+    NLM_LOG_INFO("  Working memory: " + std::to_string(hasWorkingMemory()) + 
+                 " (traces: " + std::to_string(getWorkingMemoryTraceCount()) + ")");
+    NLM_LOG_INFO("  Episodic memory: " + std::to_string(hasEpisodicMemory()) + 
+                 " (episodes: " + std::to_string(getEpisodicMemoryCount()) + ")");
+    NLM_LOG_INFO("  Associative memory: " + std::to_string(getAssociativeMemory() != nullptr));
+    
+    // Prediction system status
+    NLM_LOG_INFO("PREDICTION SYSTEM: " + std::to_string(hasPredictionSystem()) + 
+                 " (confidence: " + std::to_string(getPredictionConfidence()) + ")");
+    
+    // Cognition system status
+    NLM_LOG_INFO("COGNITION SYSTEMS:");
+    NLM_LOG_INFO("  Neural planner: " + std::to_string(getPlanner() != nullptr));
+    NLM_LOG_INFO("  Concept formation: " + std::to_string(getConceptFormation() != nullptr) + 
+                 " (active concepts: " + std::to_string(getConceptFormationActivity()) + ")");
+    NLM_LOG_INFO("  Attentional selection: " + std::to_string(getAttention() != nullptr));
+    
+    // Development system status
+    NLM_LOG_INFO("DEVELOPMENT SYSTEM: " + std::to_string(hasDevelopmentSystem()) + 
+                 " (stage: " + getDevelopmentalStageString() + ")");
+    
+    if (hasDevelopmentSystem()) {
+        NLM_LOG_INFO("    Plasticity factor: " + std::to_string(getDevelopmentalPlasticityFactor()));
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    // Neuromodulation system status
+    NLM_LOG_INFO("NEUROMODULATION SYSTEMS: " + std::to_string(hasNeuromodulation()) + 
+                 " (total activity: " + std::to_string(getTotalNeuromodulationActivity()) + ")");
+    
+    if (hasNeuromodulation()) {
+        NLM_LOG_INFO("    Dopamine level: " + std::to_string(getCurrentDopamineLevel()));
+        NLM_LOG_INFO("    Curiosity level: " + std::to_string(getCurrentCuriosityLevel()));
+        NLM_LOG_INFO("    Novelty level: " + std::to_string(getCurrentNoveltyLevel()));
+        NLM_LOG_INFO("    Prediction error level: " + std::to_string(getPredictionErrorLevel()));
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
+    // Enhanced region information
+    NLM_LOG_INFO("=== NEURAL REGIONS ===");
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                     " (" + region->getName() + "): " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                     std::to_string(region->getSynapseCount()) + " synapses, " +
+                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        
+        // Region-specific system integration status
+        NLM_LOG_INFO("    Working memory: " + std::to_string(region->hasWorkingMemory()) + 
+                     ", Episodic memory: " + std::to_string(region->hasEpisodicMemory()));
     }
+    
+    NLM_LOG_INFO("=== Phase 6 Integration Complete ===");
 }
 
 } // namespace nlm
