@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/ErrorHandling/ErrorHandling.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -27,6 +28,15 @@
 #include <numeric>
 
 using namespace nlm;
+
+void initializeSystem() {
+    // Initialize error handling system
+    nlm::initializeErrorHandling();
+    
+    NLM_LOG_INFO("=== NLM System Initialization ===");
+    NLM_LOG_INFO("Error handling system initialized");
+    NLM_LOG_INFO("Logger system initialized");
+}
 
 void printBanner() {
     std::cout << R"(
@@ -324,13 +334,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Initialize system (error handling, logging)
+    initializeSystem();
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");

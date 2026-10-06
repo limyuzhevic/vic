@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "../ErrorHandling/ErrorHandling.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
