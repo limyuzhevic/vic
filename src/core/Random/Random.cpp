@@ -106,7 +106,8 @@ bool RandomGenerator::randomBool() {
 }
 
 uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
+    std::uniform_int_distribution<uint32_t> dist(0, 1);
+    return dist(pImpl->gen);
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
@@ -119,7 +120,8 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
+        std::uniform_int_distribution<uint32_t> dist(0, 255);
+        bytes[i] = static_cast<uint8_t>(dist(pImpl->gen));
     }
 }
 

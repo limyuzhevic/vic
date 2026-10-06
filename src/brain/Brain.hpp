@@ -153,8 +153,8 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
-    
+// ========== COGNITIVE SYSTEM ACCESSORS ==========
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
@@ -164,9 +164,47 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Self-model for internal representation of self
+    SelfModel* getSelfModel();
     
-    DevelopmentSystem* getDevelopmentSystem();
+    // Social learning from observing others
+    SocialLearning* getSocialLearning();
+    
+// ========== COGNITIVE INTEGRATION METHODS ==========
+
+    // 1. Cognitive Systems Enhancement
+    void updateCognitiveSystems();  // Comprehensive cognitive processing
+    void useConceptsForPlanning();  // Use learned concepts to influence action selection
+    void useEpisodicMemoryForPlanning();  // Use past experiences to guide planning
+    void useWorkingMemoryForAttention();  // Use working memory content to select attention
+    void usePredictionForCognition();  // Use predictions to inform cognitive processing
+    void useNeuromodulatorsForCognition();  // Use neuromodulators to modulate cognitive functions
+    
+    // 2. Memory-Cognition Integration
+    void integrateMemoryWithCognition();  // Use memory systems to support cognition
+    void useWorkingMemoryForConceptFormation();  // Use working memory patterns as input for concept formation
+    void useEpisodicMemoryForPlanning();  // Use episodic memory for planning and action evaluation
+    void useAssociativeMemoryForConceptAssociation();  // Use associative memory for concept association
+    void connectAttentionToWorkingMemory();  // Connect attention to working memory competition
+    void useConceptsToInfluenceAttention();  // Use concepts to influence attention selection
+    
+    // 3. Prediction-Cognition Integration
+    void integratePredictionWithCognition();  // Use prediction system to inform planning decisions
+    void usePredictionErrorsToUpdateConceptFormation();  // Use prediction errors to update concept formation
+    void useForwardModelsInPlanning();  // Use forward models from prediction system in planning
+    void integratePredictionConfidenceWithPlanning();  // Integrate prediction confidence with planning depth
+    
+    // 4. Neuromodulation-Cognition Integration
+    void integrateNeuromodulationWithCognition();  // Use neuromodulation to modulate cognitive functions
+    void useDopamineForConceptLearning();  // Use dopamine for reward-based concept learning
+    void useSerotoninForExploration();  // Use serotonin for exploration vs. exploitation in concept selection
+    void useNorepinephrineForAttention();  // Use norepinephrine for attention in cognitive processing
+    void useAcetylcholineForMemoryConsolidation();  // Use acetylcholine for memory consolidation of concepts
+    
+    // 5. Development-Cognition Integration
+    void integrateDevelopmentWithCognition();  // Use developmental stage to influence cognitive system maturation
+    void useAgeRelatedPlasticityChanges();  // Use age-related plasticity changes to affect learning
+    void integrateDevelopmentalTiming();  // Integrate developmental timing with concept formation
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     

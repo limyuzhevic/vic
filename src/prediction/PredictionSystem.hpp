@@ -18,6 +18,9 @@ public:
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
+    // Store prediction for later comparison
+    void storePrediction(const std::vector<float>& prediction);
+    
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
@@ -33,6 +36,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Clear all predictions
+    void clearPredictions();
+    
+    // Get stored predictions
+    const std::vector<std::vector<float>>& getPredictions() const;
     
 private:
     struct Impl;

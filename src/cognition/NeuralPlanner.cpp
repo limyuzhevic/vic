@@ -218,9 +218,15 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
     return nextState;
 }
 
+void NeuralPlanner::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    brain_ = brain;
+    NLM_LOG_INFO("NeuralPlanner initialized");
+}
+
 void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                                     const std::vector<ActionType>& actualActions,
-                                     float actualReward) {
+                                      const std::vector<ActionType>& actualActions,
+                                      float actualReward) {
     // Update action quality based on how well plan worked
     size_t minLen = std::min(plannedActions.size(), actualActions.size());
     
@@ -239,6 +245,7 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
 
 void NeuralPlanner::clearCache() {
     // Clear any planning cache
+    currentPrediction_.clear();
 }
 
 bool NeuralPlanner::wasRecentPlanSuccessful() const {

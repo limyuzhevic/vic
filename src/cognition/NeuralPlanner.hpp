@@ -47,12 +47,13 @@ public:
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
                                       const std::vector<float>& startState);
 
-    // Get number of steps to look ahead
-    size_t getPlanningDepth() const { return planningDepth_; }
-    void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
-
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
+    
+    // Set prediction for planning
+    void setPrediction(const std::vector<float>& prediction) {
+        currentPrediction_ = prediction;
+    }
 
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
@@ -87,6 +88,9 @@ private:
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
+    
+    // Current prediction for planning
+    std::vector<float> currentPrediction_;
     
     // Current goal state
     std::vector<float> currentGoal_;
