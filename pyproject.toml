@@ -1,21 +1,31 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+name = "nlx-tools"
+version = "1.0.0"
+description = "Advanced command-line tools for neuroscience research with comprehensive experiment management, parameter exploration, and neural data analysis"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Project", email = "research@nlm-project.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = [
+    "neuroscience",
+    "neural-simulation",
+    "brain-models",
+    "research-tools",
+    "experiment-management",
+    "parameter-sweep",
+    "neural-analysis",
+    "visualization"
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -23,35 +33,117 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: C++",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Operating System :: OS Independent",
+    "Natural Language :: English",
 ]
-
-dependencies = []
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.6.0",
+    "matplotlib>=3.3.0",
+    "pandas>=1.2.0",
+    "scikit-learn>=0.24.0",
+    "tqdm>=4.48.0",
+    "joblib>=1.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest>=7.0.0",
+    "pytest-cov>=2.12.0",
+    "black>=21.0.0",
+    "flake8>=3.8.0",
+    "mypy>=0.910",
+    "pre-commit>=2.15.0",
+    "docstring-parser>=0.15.0",
+]
+
+docs = [
+    "mkdocs>=1.2.0",
+    "mkdocs-material>=7.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/nlm-project/nlm"
-Documentation = "https://nlm.readthedocs.io"
-Repository = "https://github.com/nlm-project/nlm.git"
+homepage = "https://github.com/nlm-project/nlm"
+documentation = "https://nlm.readthedocs.io"
+repository = "https://github.com/nlm-project/nlm.git"
+issues = "https://github.com/nlm-project/nlm/issues"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
+[project.scripts]
+nltools = "nlx_tools:main"
+nl-run = "nlx_tools:main"
+nl-parameter-sweep = "nlx_tools:main"
+nl-analyze = "nlx_tools:main"
+nl-visualize = "nlx_tools:main"
+nl-batch = "nlx_tools:main"
+nl-workflow = "nlx_tools:main"
+nl-journal = "nlx_tools:main"
+nl-compare = "nlx_tools:main"
+nl-train = "nlx_tools:main"
+nl-predict = "nlx_tools:main"
+nl-optimize = "nlx_tools:main"
+nl-share = "nlx_tools:main"
+nl-reproduce = "nlx_tools:main"
+nl-statistics = "nlx_tools:main"
+nl-metrics = "nlx_tools:main"
+nl-forecast = "nlx_tools:main"
+nl-convert = "nlx_tools:main"
+nl-validate = "nlx_tools:main"
+nl-monitor = "nlx_tools:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["nlx_tools"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+nlx_tools = ["*.json", "*.yml", "*.yaml", "*.txt", "*.md"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | env
+  | venv
+)/
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    "./.venv/",
+    "./build/",
+    "./tests/",
 ]
-
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "-v"
+]
+markers = [
+    "slow: slow tests",
+    "integration: integration tests",
+    "unit: unit tests",
+]

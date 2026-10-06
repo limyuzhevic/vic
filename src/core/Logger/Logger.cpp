@@ -147,6 +147,9 @@ void Logger::log(LogLevel level, const std::string& message,
 }
 
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
+    if (!isEnabled(LogLevel::Debug)) {
+        return;
+    }
     log(LogLevel::Debug, message, file, line, function);
 }
 
@@ -155,10 +158,16 @@ void Logger::info(const std::string& message, const std::string& file, int line,
 }
 
 void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
+    if (!isEnabled(LogLevel::Warning)) {
+        return;
+    }
     log(LogLevel::Warning, message, file, line, function);
 }
 
 void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
+    if (!isEnabled(LogLevel::Error)) {
+        return;
+    }
     log(LogLevel::Error, message, file, line, function);
 }
 

@@ -35,7 +35,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -43,7 +45,6 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -71,7 +72,7 @@ void Neuron::setFiringState(FiringState state) {
 }
 
 void Neuron::decrementRefractory() {
-    if (pImpl->state.refractoryRemaining > 0) {
+    if (pImpl && pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;

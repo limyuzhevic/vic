@@ -1,0 +1,22 @@
+numpy>=1.20
+scipy>=1.6.0
+matplotlib>=3.3.0
+pandas>=1.2.0
+pybind11>=2.11.0
+scikit-learn>=0.24.0
+tqdm>=4.48.0
+joblib>=1.0.0
+pytest>=7.0.0
+pytest-cov>=2.12.0
+
+# Development dependencies
+dev>=1.0.0
+black>=21.0.0
+flake8>=3.8.0
+mypy>=0.910
+pre-commit>=2.15.0
+
+# Documentation
+docstring-parser>=0.15.0
+mkdocs>=1.2.0
+mkdocs-material>=7.0.0

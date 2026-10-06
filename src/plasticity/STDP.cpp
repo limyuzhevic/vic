@@ -18,7 +18,21 @@ struct STDP::Impl {
 
 STDP::STDP() : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+STDP::~STDP() {
+    delete pImpl;
+}
+
+STDP::STDP(STDP&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+STDP& STDP::operator=(STDP&& other) noexcept {
+    if (this != &other) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,

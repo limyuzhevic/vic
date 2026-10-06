@@ -12,7 +12,21 @@ struct IntegrateAndFireDynamics::Impl {
 
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
-IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
+IntegrateAndFireDynamics::~IntegrateAndFireDynamics() {
+    delete pImpl;
+}
+
+IntegrateAndFireDynamics::IntegrateAndFireDynamics(IntegrateAndFireDynamics&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+IntegrateAndFireDynamics& IntegrateAndFireDynamics::operator=(IntegrateAndFireDynamics&& other) noexcept {
+    if (this != &other) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
     // TODO PHASE 2: Implement real integrate-and-fire dynamics

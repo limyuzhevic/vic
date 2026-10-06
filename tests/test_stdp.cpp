@@ -1,19 +1,26 @@
 // STDP Tests
+// Enhanced with NLM Test Framework
 #include "brain/Synapse.hpp"
 #include "plasticity/STDP.hpp"
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <string>
+
+// Test macros for NLM Test Framework
+#define NLM_TEST_CASE_LEGACY(name, testFunc) \
+    void name##TestLegacy() { testFunc; } \
+    NLM_TEST_CASE(name, name##TestLegacy)
 
 namespace test_stdp {
 
 void testSTDPCreation() {
     nlm::STDP stdp;
     
-    assert(stdp.getLTPWeight() == 0.01f);
-    assert(stdp.getLTDWeight() == 0.012f);
-    assert(stdp.getTimeConstant() == 20.0f);
+    NLM_ASSERT_EQ(stdp.getLTPWeight(), 0.01f);
+    NLM_ASSERT_EQ(stdp.getLTDWeight(), 0.012f);
+    NLM_ASSERT_EQ(stdp.getTimeConstant(), 20.0f);
     
     std::cout << "    testSTDPCreation passed" << std::endl;
 }
@@ -25,9 +32,9 @@ void testSTDPConfiguration() {
     stdp.setLTDWeight(0.06f);
     stdp.setTimeConstant(30.0f);
     
-    assert(stdp.getLTPWeight() == 0.05f);
-    assert(stdp.getLTDWeight() == 0.06f);
-    assert(stdp.getTimeConstant() == 30.0f);
+    NLM_ASSERT_EQ(stdp.getLTPWeight(), 0.05f);
+    NLM_ASSERT_EQ(stdp.getLTDWeight(), 0.06f);
+    NLM_ASSERT_EQ(stdp.getTimeConstant(), 30.0f);
     
     std::cout << "    testSTDPConfiguration passed" << std::endl;
 }
@@ -37,9 +44,9 @@ void testSTDPConfigure() {
     
     stdp.configure(0.03f, 0.035f, 25.0f);
     
-    assert(stdp.getLTPWeight() == 0.03f);
-    assert(stdp.getLTDWeight() == 0.035f);
-    assert(stdp.getTimeConstant() == 25.0f);
+    NLM_ASSERT_EQ(stdp.getLTPWeight(), 0.03f);
+    NLM_ASSERT_EQ(stdp.getLTDWeight(), 0.035f);
+    NLM_ASSERT_EQ(stdp.getTimeConstant(), 25.0f);
     
     std::cout << "    testSTDPConfigure passed" << std::endl;
 }
@@ -47,8 +54,8 @@ void testSTDPConfigure() {
 void testSTDPName() {
     nlm::STDP stdp;
     
-    assert(stdp.getName() != nullptr);
-    assert(std::string(stdp.getName()) == "STDP");
+    NLM_ASSERT_NOT_NULL(stdp.getName());
+    NLM_ASSERT_EQ(std::string(stdp.getName()), "STDP");
     
     std::cout << "    testSTDPName passed" << std::endl;
 }
@@ -73,7 +80,7 @@ void testSTDPPotentiation() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have increased due to pre-before-post
-    assert(finalWeight > initialWeight);
+    NLM_ASSERT_GT(finalWeight, initialWeight);
     
     std::cout << "    testSTDPPotentiation passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -98,7 +105,7 @@ void testSTDPDepression() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have decreased due to post-before-pre
-    assert(finalWeight < initialWeight);
+    NLM_ASSERT_LT(finalWeight, initialWeight);
     
     std::cout << "    testSTDPDepression passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -115,13 +122,13 @@ void testSTDPEmptySpikes() {
     std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0};
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    NLM_ASSERT_EQ(synapse.getWeight(), initialWeight);
     
     // Empty post spikes - should not change
     preSpikes = {1.0, 2.0};
     postSpikes = {};
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    NLM_ASSERT_EQ(synapse.getWeight(), initialWeight);
     
     std::cout << "    testSTDPEmptySpikes passed" << std::endl;
 }
@@ -140,13 +147,36 @@ void testSTDPWeightBounds() {
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
     // Weight should be clamped to max
-    assert(synapse.getWeight() <= 1.0f);
+    NLM_ASSERT_LE(synapse.getWeight(), 1.0f);
     
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
+// Modern test with enhanced STDP features
+void testSTDPEnhancedFeatures() {
+    nlm::STDP stdp;
+    
+    // Test enhanced STDP features
+    stdp.configure(0.02f, 0.025f, 40.0f);
+    
+    NLM_ASSERT_EQ(stdp.getLTPWeight(), 0.02f);
+    NLM_ASSERT_EQ(stdp.getLTDWeight(), 0.025f);
+    NLM_ASSERT_EQ(stdp.getTimeConstant(), 40.0f);
+    
+    // Test name
+    NLM_ASSERT_NOT_NULL(stdp.getName());
+    NLM_ASSERT_TRUE(std::string(stdp.getName()).find("STDP") != std::string::npos);
+    
+    // Test configuration
+    stdp.setLTPWeight(0.01f);
+    NLM_ASSERT_EQ(stdp.getLTPWeight(), 0.01f);
+    
+    std::cout << "    testSTDPEnhancedFeatures passed" << std::endl;
+}
+
 void runAll() {
-    std::cout << "Running STDP tests..." << std::endl;
+    std::cout << "Running Enhanced STDP tests..." << std::endl;
+    
     testSTDPCreation();
     testSTDPConfiguration();
     testSTDPConfigure();
@@ -155,6 +185,7 @@ void runAll() {
     testSTDPDepression();
     testSTDPEmptySpikes();
     testSTDPWeightBounds();
+    testSTDPEnhancedFeatures();
 }
 
 } // namespace test_stdp

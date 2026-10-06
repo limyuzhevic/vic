@@ -14,13 +14,23 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    
+    // Validate input
+    if (filepath.empty()) {
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -40,6 +50,11 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            if (key.empty()) {
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 

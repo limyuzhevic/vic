@@ -16,7 +16,21 @@ struct Hebbian::Impl {
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+Hebbian::~Hebbian() {
+    delete pImpl;
+}
+
+Hebbian::Hebbian(Hebbian&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Hebbian& Hebbian::operator=(Hebbian&& other) noexcept {
+    if (this != &other) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
