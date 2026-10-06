@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -11,7 +12,7 @@ namespace nlm {
 
 class RandomGenerator {
 public:
-    using result_type = uint32_t;
+    using result_type = uint64_t;
     
     // Create with explicit seed
     explicit RandomGenerator(uint64_t seed);

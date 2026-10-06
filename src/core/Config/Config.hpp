@@ -5,8 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <mutex>
+#include <chrono>
 
 namespace nlm {
+
+class Logger;
 
 // Forward declarations
 class Config;
@@ -37,10 +41,11 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::chrono::system_clock::time_point timestamp;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), timestamp() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), timestamp(std::chrono::system_clock::now()) {}
 };
 
 // Main configuration class
@@ -93,6 +98,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get last modified time
+    std::chrono::system_clock::time_point getLastModified() const;
+    
+    // Get validation error count
+    size_t getValidationErrorCount() const;
+    
+    // Get configuration file path
+    static std::string getDefaultConfigPath();
+    
+    // Load default configuration
+    void loadDefaultConfiguration();
+    
+    // Validate configuration
+    bool validate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +120,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Configuration schema validation
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    // Default configuration values
+    void setDefaultValues();
 };
 
 } // namespace nlm
+
+

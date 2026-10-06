@@ -39,7 +39,7 @@ public:
     void setPruningRate(float rate);
     
     // Update structural plasticity
-    void update(Brain* brain, class RandomGenerator& rng);
+    void update(Brain* brain, RandomGenerator& rng);
     
 private:
     struct Impl;

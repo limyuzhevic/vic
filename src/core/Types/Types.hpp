@@ -1,7 +1,8 @@
 #pragma once
-
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
 
@@ -19,6 +20,9 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    NeuronId& operator++() { ++value; return *this; }
+    NeuronId operator++(int) { NeuronId temp = *this; ++value; return temp; }
 };
 
 // Synapse identifier
@@ -33,6 +37,9 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    SynapseId& operator++() { ++value; return *this; }
+    SynapseId operator++(int) { SynapseId temp = *this; ++value; return temp; }
 };
 
 // Region identifier
@@ -47,6 +54,9 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    RegionId& operator++() { ++value; return *this; }
+    RegionId operator++(int) { RegionId temp = *this; ++value; return temp; }
 };
 
 // Population identifier
@@ -61,6 +71,9 @@ struct PopulationId {
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    PopulationId& operator++() { ++value; return *this; }
+    PopulationId operator++(int) { PopulationId temp = *this; ++value; return temp; }
 };
 
 // Simulation step counter
@@ -78,6 +91,9 @@ using SynapseIndex = uint64_t;
 using PopulationIndex = uint64_t;
 using RegionIndex = uint64_t;
 
+// Synapse handle type for sparse connectivity
+using SynapseHandle = uint64_t;
+
 // Synaptic weight type
 using SynapticWeight = float;
 
@@ -86,6 +102,10 @@ using MembranePotential = float;
 
 // Neuron firing rate type
 using FiringRate = float;
+
+// Invalid ID constants for neural structure components
+constexpr RegionId INVALID_REGION_ID = static_cast<RegionId>(-1);
+constexpr PopulationId INVALID_POPULATION_ID = static_cast<PopulationId>(-1);
 
 // Connection delay in simulation steps
 using Delay = uint32_t;
@@ -179,14 +199,35 @@ enum class FiringState : uint8_t {
     Inhibited
 };
 
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
-
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
-
 } // namespace nlm
+
+// Hash specializations for strong type identifiers (should be in std namespace)
+namespace std {
+    template<>
+    struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+    
+    template<>
+    struct hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+    
+    template<>
+    struct hash<nlm::RegionId> {
+        size_t operator()(const nlm::RegionId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+    
+    template<>
+    struct hash<nlm::PopulationId> {
+        size_t operator()(const nlm::PopulationId& id) const {
+            return hash<uint64_t>()(id.value);
+        }
+    };
+}

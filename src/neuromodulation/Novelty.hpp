@@ -30,10 +30,6 @@ public:
     // Decay novelty over time
     void update(TimestepDuration dt);
     
-    // Get novelty history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
-    
 private:
     struct Impl;
     Impl* pImpl;

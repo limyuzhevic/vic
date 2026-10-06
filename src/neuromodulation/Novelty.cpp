@@ -69,16 +69,10 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
 }
 
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
-}
-
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
-}
-
-void Novelty::clearHistory() {
-    pImpl->history.clear();
+    // Decay novelty over time
+    pImpl->level *= (1.0f - pImpl->decayRate * dt);
+    // Keep level in range [0, 1]
+    pImpl->level = std::max(0.0f, std::min(1.0f, pImpl->level));
 }
 
 } // namespace nlm

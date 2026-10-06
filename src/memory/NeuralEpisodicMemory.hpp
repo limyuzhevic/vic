@@ -117,7 +117,17 @@ public:
     // Enable/disable replay
     void enableReplay(bool enable) { replayEnabled_ = enable; }
     bool isReplayEnabled() const { return replayEnabled_; }
-
+    
+    // Set maximum number of episodes
+    void setMaxEpisodes(size_t max) {
+        maxEpisodes_ = max;
+    }
+    
+    // Get current maximum number of episodes
+    size_t getMaxEpisodes() const {
+        return maxEpisodes_;
+    }
+    
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
