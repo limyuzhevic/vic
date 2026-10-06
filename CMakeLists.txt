@@ -29,6 +29,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CLI/NLMCLI.cpp
+    src/core/CLI/NLMCLI.hpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -90,6 +92,7 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/CLI>
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
@@ -121,9 +124,9 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (advanced CLI)
 add_executable(nlm
-    src/main.cpp
+    src/nlm.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
