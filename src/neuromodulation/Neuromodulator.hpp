@@ -44,6 +44,9 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
+    // Initialize with brain reference for system integration
+    void initialize(class Brain* brain);
+    
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);

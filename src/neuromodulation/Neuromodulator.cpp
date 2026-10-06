@@ -1,21 +1,28 @@
 #include "Neuromodulator.hpp"
+#include "../brain/Brain.hpp"
 #include <algorithm>
 
 namespace nlm {
 
 struct Dopamine::Impl {
+    class Brain* brain;
     float level;
     float baseline;
     float peak;
     float decayRate;
     float releaseRate;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : brain(nullptr), level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
 
 Dopamine::~Dopamine() = default;
+
+void Dopamine::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Dopamine system initialized");
+}
 
 const char* Dopamine::getName() const {
     return "DA";

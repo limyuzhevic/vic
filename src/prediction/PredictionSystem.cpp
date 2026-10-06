@@ -1,18 +1,25 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
+#include "../environment/SensoryInput.hpp"
 
 namespace nlm {
 
 struct PredictionSystem::Impl {
-    float predictionError;
-    float confidence;
+    class Brain* brain;
+    size_t predictionHorizon;
     std::vector<float> errorHistory;
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : brain(nullptr), predictionHorizon(100) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
@@ -55,6 +62,14 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+}
+
+void PredictionSystem::setPredictionHorizon(size_t horizon) {
+    pImpl->predictionHorizon = horizon;
+}
+
+size_t PredictionSystem::getPredictionCount() const {
+    return pImpl->predictionHorizon;
 }
 
 } // namespace nlm

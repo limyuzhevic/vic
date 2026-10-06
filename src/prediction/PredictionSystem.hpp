@@ -14,6 +14,9 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference for system integration
+    void initialize(class Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
@@ -33,6 +36,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Set prediction horizon
+    void setPredictionHorizon(size_t horizon);
+    
+    // Get current prediction count
+    size_t getPredictionCount() const;
     
 private:
     struct Impl;
