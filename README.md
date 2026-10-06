@@ -18,51 +18,54 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+# NLM — 熙然
+
+**An Experimental Artificial Developmental Brain**
+
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 6: FINAL INTEGRATION (IN PROGRESS)**
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
-### Phase 6 Integration Achievements
+### Phase 6 Integration Status (from audit): ~36% complete
 
-#### Memory Systems
+#### ✅ Working Systems
 - Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
+- Episodic memory with experience encoding and replay  
 - Associative memory with Hebbian pattern associations
 - All memory systems connected to neural processing
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
+#### ⚠️ Partially Working
+- Neuromodulation affects neural excitability and plasticity
 - Novelty detection integrated with sensory processing
 - All neuromodulators connected to plasticity rules
-
-#### Prediction System
 - Prediction system integrated into brain loop
 - Prediction error signals affect learning
 - Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
 - All cognition systems connected to perception and action
-
-#### Development Integration
 - Developmental stages affect plasticity rates
 - Structural plasticity modulated by age
 - Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
+- Checkpoint save/load partially implemented
 - Brain state serialization working
 - Can resume from saved checkpoints
-
-#### Replay and Consolidation
 - Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+
+#### ❌ Not Working
+- **Dopamine system disconnected** (brain->getDopamine() returns nullptr)
+- **Curiosity system disconnected** (brain->getCuriosity() returns nullptr)
+- **Novelty system disconnected** (brain->getNovelty() returns nullptr)
+- **Prediction system disconnected** (brain->getPredictionSystem() returns nullptr)
+- **Working Memory disconnected** (brain->getWorkingMemory() returns nullptr)
+- **Episodic Memory disconnected** (brain->getEpisodicMemory() returns nullptr)
+- **Semantic Memory disconnected** (brain->getSemanticMemory() returns nullptr)
+- **Procedural Memory disconnected** (brain->getProceduralMemory() returns nullptr)
+- **Associative Memory disconnected** (brain->getAssociativeMemory() returns nullptr)
+- **Planner disconnected** (brain->getPlanner() returns nullptr)
+- **Concept Formation disconnected** (brain->getConceptFormation() returns nullptr)
+- **Attention disconnected** (brain->getAttention() returns nullptr)
+- **Development System disconnected** (brain->getDevelopmentSystem() returns nullptr)
 
 ## Building
 
@@ -75,44 +78,33 @@ make -j4
 
 ## Running
 
+### Phase 2 Demo (Real Neural Computation)
+```bash
+./nlm
+```
+
+This demonstrates basic LIF neuron dynamics, spike propagation, and plasticity rules.
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo
+```
+
+This demonstrates world interaction, sensory processing, and reward systems.
+
+### Phase 4 Demo  
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates integrated prediction, memory, cognition, and social learning.
+
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
-
-## Project Structure
-
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
-```
+This runs a comprehensive integration test verifying which systems are connected and functional.
 
 ## Phase Summary
 
@@ -152,15 +144,10 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (IN PROGRESS - ~36% Complete)
+- Core neural computation and memory systems working
+- Many cognition and neuromodulation systems disconnected
+- Integration verification shows which systems need work
 
 ## Scientific Limitations
 
@@ -179,7 +166,7 @@ Phase 6 does NOT claim:
 - Human-like reasoning
 - Genuine subjective experience
 
-Phase 6 DOES investigate:
+Phase 6 investigates:
 - Whether memory systems can integrate with neural dynamics
 - Whether neuromodulation can affect plasticity in a coordinated way
 - Whether prediction can become a central organizing principle
@@ -228,3 +215,38 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Project Improvements
+
+The NLM project actively seeks community contributions to improve the integration of brain systems:
+
+### Current Focus Areas
+
+1. **Neuromodulation Integration**: Implement disconnected dopamine, curiosity, and novelty systems
+2. **Prediction System**: Connect prediction system to neural processing
+3. **Cognition Systems**: Implement disconnected planner, concept formation, and attention
+4. **Memory Integration**: Ensure all memory systems are properly connected
+5. **Development Integration**: Complete development system implementation
+
+### For Users
+
+The Python bindings provide access to all NLM brain systems:
+
+```python
+import pynlm
+
+# Create brain with configuration
+brain = pynlm.Brain(pynlm.Config())
+brain.initialize()
+
+# Access integrated systems
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+prediction_system = brain.getPredictionSystem()
+
+# Run simulation
+brain.step(0, 0.0)
+```
+
+For full documentation, see the `/docs/` directory.
+
