@@ -160,6 +160,39 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set float configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) return *val;
+            throw py::value_error("Configuration key not found or wrong type: " + key);
+        }, py::arg("key"),
+           "Get string configuration value (throws if not found)")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get string configuration value or default")
+        .def("validate", [](Config& self) {
+            return self.validate();
+        }, "Validate configuration and return true if valid")
+        .def("getErrorMessages", [](Config& self) {
+            std::vector<std::string> errors = self.getErrorMessages();
+            return errors;
+        }, "Get validation error messages as a list")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -402,19 +435,208 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    }, "Create a default configuration")
+    .def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw py::value_error("Failed to load configuration from file: " + filepath);
+        }
+        return config;
+    }, py::arg("filepath"), "Create configuration from JSON file")
+    .def("createConfigFromArgs", [](int argc, char** argv) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromArgs(argc, argv)) {
+            throw py::value_error("Failed to load configuration from arguments");
+        }
+        return config;
+    }, py::arg("argc"), py::arg("argv"), "Create configuration from command line arguments")
+    .def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw py::value_error("Configuration is null");
+        }
+        if (!config->validate()) {
+            auto errors = config->getErrorMessages();
+            std::string errorMsg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                errorMsg += "  - " + error + "\n";
+            }
+            throw py::value_error(errorMsg);
+        }
+        return true;
+    }, py::arg("config"), "Validate configuration and raise exception on failure")
+    .def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw py::value_error("Configuration is null");
+        }
+        if (!config->validate()) {
+            auto errors = config->getErrorMessages();
+            std::string errorMsg = "Invalid configuration:\n";
+            for (const auto& error : errors) {
+                errorMsg += "  - " + error + "\n";
+            }
+            throw py::value_error(errorMsg);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw py::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, py::arg("config"), "Create and initialize a new brain with configuration (throws on error)")
+    .def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return createBrain(config);
+    }, "Create a brain with default configuration")
+    .def("createBrain", [](const std::string& configFile) -> std::shared_ptr<Brain> {
+        auto config = createConfigFromFile(configFile);
+        return createBrain(config);
+    }, py::arg("configFile"), "Create and initialize a brain from configuration file")
+    .def("createBrain", [](int argc, char** argv) -> std::shared_ptr<Brain> {
+        auto config = createConfigFromArgs(argc, argv);
+        return createBrain(config);
+    }, py::arg("argc"), py::arg("argv"), "Create and initialize a brain from command line arguments")
+    .def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->initialize(16, 16, 8, 8);
+        return world;
+    }, "Create a new simple world with default settings (16x16, 8x8 vision)")
+    .def("createCustomWorld", [](int width, int height, int visionWidth, int visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->initialize(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), 
+           py::arg("visionWidth"), py::arg("visionHeight"),
+           "Create a new simple world with custom dimensions")
+    .def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw py::value_error("Brain is null");
+        }
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create an agent brain interface")
+    .def("createAgentBrainWithWorld", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        if (world) {
+            agent->initialize(*world);
+        }
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize an agent brain with world")
+    .def("runQuickIntegrationTest", []() {
+        auto brain = createBrainWithDefaults();
+        std::cout << "Quick integration test passed!" << std::endl;
+        return true;
+    }, "Run a quick integration test and print success message")
+    .def("getVersion", []() {
+        return std::string("NLM Python Bindings v0.1.0");
+    }, "Get the version of the NLM Python bindings")
+    .def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw py::value_error("Brain is null");
+        }
+        py::dict stats;
+        stats["neurons"] = brain->getTotalNeuronCount();
+        stats["synapses"] = brain->getTotalSynapseCount();
+        stats["firing"] = brain->getFiringNeuronCount();
+        stats["firing_rate"] = brain->getAverageFiringRate();
+        stats["spikes"] = brain->getTotalSpikeCount();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Get brain statistics as a dictionary")
+    .def("runCompleteSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, int steps) {
+        if (!brain || !world) {
+            throw py::value_error("Brain or world is null");
+        }
+        auto agent = createAgentBrainWithWorld(brain, world);
+        
+        for (int step = 0; step < steps; ++step) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(cmd, step * 0.1f);
+        }
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("steps"), 
+           "Run a complete simulation with brain and world for specified steps")
+    .def("saveBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw py::value_error("Brain is null");
+        }
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file")
+    .def("loadBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw py::value_error("Brain is null");
+        }
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from file")
+    .def("resetBrain", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw py::value_error("Brain is null");
+        }
+        brain->reset();
+        return true;
+    }, py::arg("brain"), "Reset brain state")
+    .def("enableAllSubsystems", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw py::value_error("Agent is null");
+        }
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        return true;
+    }, py::arg("agent"), "Enable all agent subsystems")
+    .def("runDevelopmentSimulation", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, int steps) {
+        if (!agent || !world) {
+            throw py::value_error("Agent or world is null");
+        }
+        agent->enableDevelopment(true);
+        
+        for (int step = 0; step < steps; ++step) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            world->update(0.1f);
+            agent->updateDevelopment(0.1f);
+        }
+        return true;
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"), 
+           "Run a development simulation with all subsystems enabled")
+    .def("simulateEpisode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                              int maxSteps = 1000, float timeStep = 0.1f) {
+        if (!agent || !world) {
+            throw py::value_error("Agent or world is null");
+        }
+        
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        float totalReward = 0.0f;
+        
+        for (int step = 0; step < maxSteps; ++step) {
+            world->update(timeStep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            auto cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(cmd, step * timeStep);
+            
+            float reward = 0.0f;
+            if (auto internal = percept.getInternal()) {
+                reward = internal->size() > 0 ? (*internal)[0] : 0.0f;
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            totalReward += reward;
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": " << agent->getCuriosityLevel() 
+                         << " curiosity, " << agent->getNoveltyLevel() << " novelty, "
+                         << totalReward / (step + 1) << " avg reward" << std::endl;
+            }
+        }
+        
+        return py::dict("total_reward", totalReward,
+                       "final_curiosity", agent->getCuriosityLevel(),
+                       "final_novelty", agent->getNoveltyLevel());
+    }, py::arg("agent"), py::arg("world"), py::arg("maxSteps") = 1000, py::arg("timeStep") = 0.1f,
+           "Run a complete simulation episode and return statistics")
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -56,6 +56,11 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Phase 3: Advanced integration capabilities
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<ContinualLearning> continualLearning;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -1114,4 +1119,28 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// Get access to Phase 3 advanced systems
+    SelfModel* getSelfModel() {
+        return pImpl->selfModel.get();
+    }
+    
+    SocialLearning* getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
+    
+    ContinualLearning* getContinualLearning() {
+        return pImpl->continualLearning.get();
+    }
+    
+    const SelfModel* getSelfModel() const {
+        return pImpl->selfModel.get();
+    }
+    
+    const SocialLearning* getSocialLearning() const {
+        return pImpl->socialLearning.get();
+    }
+    
+    const ContinualLearning* getContinualLearning() const {
+        return pImpl->continualLearning.get();
+    }
+}

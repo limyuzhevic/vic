@@ -11,8 +11,9 @@
 
 namespace nlm {
 
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
+// Phase 3: Advanced Cognition Demo
+// This demo shows self-model development, social learning, and continual learning
+// demonstrating how the brain learns from experience and interacts with others
 
 class Phase3Demo {
 public:

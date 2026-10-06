@@ -1,13 +1,8 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../experiments/SelfModel.hpp"
+#include "../experiments/SocialLearning.hpp"
+#include "../experiments/ContinualLearning.hpp"
 
 namespace nlm {
 
@@ -28,6 +23,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class ContinualLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -155,14 +153,19 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // ========== ADVANCED PHASE 3 SYSTEMS ==========
+    
+    // Self-model for body schema and action consequences
+    SelfModel* getSelfModel();
+    
+    // Social learning - observation and imitation
+    SocialLearning* getSocialLearning();
+    
+    // Continual learning - task boundaries and transfer
+    ContinualLearning* getContinualLearning();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
