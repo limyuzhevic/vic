@@ -2,7 +2,7 @@
 
 ## Overview
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+NLM (熙然, meaning "serene flow") is designed as a modular computational brain with the following major components:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -127,94 +127,145 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Metrics**: Data analysis
 - **Phase4Experiment**: Phase 4 cognitive experiments
 
-## Data Flow
+## Phase 6: Final Integration
 
-### Phase 2: Neural Computation
-```
-Sensory Input (test signals)
-      ↓
-Brain.receiveSensoryInput()
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Plasticity (STDP, Hebbian)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
-```
+The current **Phase 6: FINAL INTEGRATION** represents the culmination of all previous phases, creating a coherent artificial brain system:
 
-### Phase 3: World Interaction
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
-      ↓
-AgentBrain.processSensoryInput()
-      ↓
-Brain.receiveSensoryInput() → Sensory Neurons
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Motor Decoding → MotorCommand
-      ↓
-AgentBrain.decodeMotorCommand()
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT (reward, success)
-      ↓
-Reward Prediction Error
-      ↓
-Neuromodulation (dopamine-like signal)
-      ↓
-Eligibility Trace Update
-      ↓
-Plasticity (STDP, Hebbian, Reward-Modulated)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
-      ↓
-Development System (stage progression)
-```
+### Phase 6 Integration Achievements
 
-### Phase 4: Emerging Cognition
+#### Memory Systems Integration
+- Working memory with persistent activity and competition
+- Episodic memory with experience encoding and replay
+- Associative memory with Hebbian pattern associations
+- All memory systems connected to neural processing through shared neural representation
+
+#### Neuromodulation Integration
+- Dopamine affects neural excitability and plasticity
+- Curiosity drives exploration behavior
+- Novelty detection integrated with sensory processing
+- All neuromodulators connected to plasticity rules for coordinated learning
+
+#### Prediction System Integration
+- Prediction system integrated into brain loop
+- Prediction error signals affect learning
+- Confidence tracking implemented
+- Multi-step forward prediction
+
+#### Cognition Systems Integration
+- Neural planner with action sequence evaluation
+- Concept formation from experience patterns
+- Attention with competitive selection dynamics
+- All cognition systems connected to perception and action
+
+#### Development Integration
+- Developmental stages affect plasticity rates
+- Structural plasticity modulated by age
+- Neural excitability changes with development
+- Lifelong learning capabilities
+
+#### Persistence
+- Checkpoint save/load implemented
+- Brain state serialization working
+- Can resume from saved checkpoints
+
+#### Replay and Consolidation
+- Episodic memory replay during simulation
+- Memory consolidation for important episodes
+- Integration with sleep/rest cycle
+- Sleep-dependent memory strengthening
+
+## Data Flow (Phase 6)
+
+### Complete Brain Loop
 ```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT
-      ↓
+WORLD (Simulation)
+  ↓
+SENSORY PERCEPT (Vision, Audio, Internal, Proprioception)
+  ↓
 ATTENTION (competitive selection)
-      ↓
-NEURAL PROCESSING
-      ↓
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+MEMORY UPDATE (working, episodic, associative)
+  ↓
 PREDICTION (temporal sequence learning)
-      ↓
-WORKING MEMORY (persistent activity)
-      ↓
-EPISODIC MEMORY (experience storage)
-      ↓
-CONCEPT FORMATION (pattern discovery)
-      ↓
-PLANNING (multi-step prediction)
-      ↓
-SELF-MODEL (sensorimotor learning)
-      ↓
-MOTOR ACTION
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT
-      ↓
-REWARD / ERROR
-      ↓
-NEUROMODULATION
-      ↓
-PLASTICITY
-      ↓
-SOCIAL LEARNING (observation/imitation)
+  ↓
+COGNITION (planning, attention, concept formation)
+  ↓
+NEUROMODULATION (dopamine, curiosity, novelty)
+  ↓
+ACTION SELECTION (motor command generation)
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / ERROR / SURPRISE
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+DEVELOPMENT (plasticity rates)
+  ↓
+CHANGED BRAIN STATE
+  ↓
+CHANGED FUTURE BEHAVIOR
 ```
+
+### Step-by-Step Integration
+
+1. **Sensory Processing**:
+   - Visual input captured from environment
+   - Internal state signals from brain
+   - Proprioceptive feedback
+   - Audio input (if enabled)
+
+2. **Attention Mechanism**:
+   - Select relevant sensory inputs
+   - Filter irrelevant information
+   - Focus processing resources
+   - Competitive dynamics between representations
+
+3. **Working Memory**:
+   - Maintain neural representations
+   - Update with new information
+   - Competitive selection of active traces
+   - Decay and interference management
+
+4. **Episodic Memory**:
+   - Store current experience patterns
+   - Encode reward predictions
+   - Create temporal sequences
+   - Link to existing memories
+
+5. **Prediction System**:
+   - Learn temporal regularities
+   - Predict upcoming states
+   - Generate prediction errors
+   - Update internal models
+
+6. **Cognitive Processing**:
+   - Concept formation from patterns
+   - Action planning and evaluation
+   - Self-model development
+   - Social learning integration
+
+7. **Neuromodulation**:
+   - Dopamine signals reward prediction errors
+   - Novelty detection drives exploration
+   - Curiosity modulates exploration intensity
+   - Integrated plasticity control
+
+8. **Action Selection**:
+   - Generate motor commands
+   - Convert to world actions
+   - Execute selected behaviors
+   - Monitor outcomes
+
+9. **Learning and Development**:
+   - Apply plasticity rules
+   - Structural reorganization
+   - Developmental stage progression
+   - Memory consolidation
 
 ## Agent-Brain Interface
 
