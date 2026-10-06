@@ -42,33 +42,153 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 3: Advanced Agent with Learning and Development
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
+def run_advanced_agent_simulation():
+    # Create brain with custom configuration
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 2000)
+    config.set("plasticity.stdp.enable", True)
+    config.set("neuromod.dopamine.scale", 1.5f)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(15.0, 15.0)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all learning subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("=== Advanced Agent Simulation ===")
+    print(f"Brain: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+    print("Enabled subsystems: Reward, Structural Plasticity, Development, Curiosity")
+    print()
+    
+    # Run simulation with comprehensive monitoring
+    for step in range(500):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process in agent/brain
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Get and apply action
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation (simulate goal reaching)
+        reward = 0.0f
+        if world.getAgentBody().x > 25.0 and world.getAgentBody().y > 25.0:
+            reward = 10.0f  # Goal reached
+        
+        agent.applyRewardModulation(reward, 0.0f)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Log progress every 50 steps
+        if step % 50 == 0:
+            print(f"Step {step:3d}: "
+                  f"Firing: {brain.getFiringNeuronCount():4d} | "
+                  f"Curiosity: {agent.getCuriosityLevel():.2f} | "
+                  f"Novelty: {agent.getNoveltyLevel():.2f} | "
+                  f"Dopamine: {agent.getNeuromodulationLevel():.2f} | "
+                  f"Dev Stage: {brain.getDevelopmentalStage()}")
+    
+    print("\n=== Simulation Complete ===")
+    print(f"Final brain stats:")
+    print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+    print(f"  Working memory traces: {brain.getWorkingMemory().getActiveTraces() if brain.getWorkingMemory() else 'N/A'}")
+    print(f"  Development stage: {brain.getDevelopmentalStage()}")
+    
+    return brain, agent, world
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
+# Run the advanced simulation
+advanced_brain, advanced_agent, advanced_world = run_advanced_agent_simulation()
+```
 
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+### Example 4: Batch Simulation with Checkpointing
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+```python
+import pynlm
+import time
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+def batch_simulation_with_checkpoints():
+    """Run multiple simulations with checkpointing"""
+    
+    # Create base configuration
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 1000)
+    
+    simulations = []
+    
+    for sim_id in range(3):
+        print(f"\n=== Simulation {sim_id + 1}/3 ===")
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=6, visionHeight=6)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        
+        # Run simulation with periodic checkpoints
+        start_time = time.time()
+        
+        for step in range(200):
+            world.update(0.1)
+            
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Simple reward for exploring
+            if step % 50 == 0:
+                agent.applyRewardModulation(1.0f, 0.0f)
+        
+        end_time = time.time()
+        
+        print(f"Simulation completed in {end_time - start_time:.2f}s")
+        print(f"Total reward: {brain.getTotalSpikeCount() * 0.01f:.2f}")
+        print(f"Final curiosity: {agent.getCuriosityLevel():.2f}")
+        
+        # Save checkpoint
+        checkpoint_file = f"checkpoint_sim_{sim_id + 1}.bin"
+        brain.save(checkpoint_file)
+        print(f"Checkpoint saved: {checkpoint_file}")
+        
+        simulations.append((brain, agent, world))
+    
+    print("\n=== All simulations completed ===")
+    return simulations
+
+# Run batch simulation
+batch_results = batch_simulation_with_checkpoints()
 ```
 
 ---
@@ -254,44 +374,98 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
----
+### Example 5: Command-Line Tools and Advanced Usage
 
-## Quick Reference
+```python
+import pynlm
+import subprocess
+import os
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+def demonstrate_command_line_tools():
+    """Demonstrate the advanced command-line tools"""
+    
+    print("=== Command-Line Tools Demonstration ===\n")
+    
+    # Example 1: Batch simulation with checkpointing
+    print("1. Running batch simulation with command-line arguments...")
+    
+    # You can run this command in terminal:
+    # ./nlm --batch 1000 --save brain_checkpoint.bin --experiment learning
+    # Or in Python using subprocess:
+    
+    print("   Command: nlm --batch 1000 --save brain_checkpoint.bin --experiment learning")
+    print("   This runs 1000 simulation steps and saves checkpoint")
+    print()
+    
+    # Example 2: Advanced experiment types
+    print("2. Advanced experiment types:")
+    experiment_types = [
+        ("learning", "Learning and plasticity demonstration"),
+        ("neuromodulation", "Neuromodulation system test"),
+        ("plasticity", "Plasticity mechanisms test"),
+        ("memory", "Memory integration test"),
+        ("development", "Development system test"),
+        ("full", "Complete integration test")
+    ]
+    
+    for exp_type, description in experiment_types:
+        print(f"   nlm --experiment {exp_type:12} # {description}")
+    
+    print()
+    
+    # Example 3: Configuration validation
+    print("3. Configuration validation:")
+    print("   nlm --validate --config my_config.json")
+    print("   Validates configuration before running simulation")
+    print()
+    
+    # Example 4: Statistics and profiling
+    print("4. Statistics and profiling:")
+    print("   nlm --stats --benchmark")
+    print("   Shows detailed statistics and runs benchmark tests")
+    print()
+    
+    return True
 
----
+def demonstrate_python_api_improvements():
+    """Demonstrate the new Python API improvements"""
+    
+    print("=== New Python API Improvements ===\n")
+    
+    print("1. Enhanced convenience methods:")
+    print("   brain.runSteps(1000, 0.001)  # Run multiple steps efficiently")
+    print("   agent.runEpisode(world, 500)  # Run complete agent episode")
+    print("   world.applyAction(action, time)  # Convenience alias")
+    print()
+    
+    print("2. Advanced system access:")
+    print("   spike_system = brain.getSpikeSystem()")
+    print("   stdp = brain.getSTDP()")
+    print("   curiosity = brain.getCuriosity()")
+    print("   working_memory = brain.getWorkingMemory()")
+    print()
+    
+    print("3. Comprehensive statistics:")
+    print("   stats = brain.getBrainStats()")
+    print("   neuromod_stats = agent.getNeuromodulationStats()")
+    print("   development_info = agent.getDevelopmentStats()")
+    print()
+    
+    print("4. System management:")
+    print("   agent.enableAllSubsystems()  # Enable everything")
+    print("   agent.disableAllSubsystems()  # Disable everything")
+    print("   agent.printStatus()  # Print comprehensive status")
+    print()
+    
+    return True
 
-## Troubleshooting
-
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
-
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
-
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
-
----
-
-## Next Steps
-
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
-
-That's it! You're now ready to use NLM.
+# Run demonstrations
+if __name__ == "__main__":
+    demonstrate_command_line_tools()
+    print("\n" + "="*60 + "\n")
+    demonstrate_python_api_improvements()
+    
+    print("\n" + "="*60)
+    print("Enhanced Python API and command-line tools demonstration complete!")
+    print("="*60)
+```
