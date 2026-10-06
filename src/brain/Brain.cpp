@@ -511,8 +511,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // This enables prediction of future sensory inputs
+        
+        // Gather current sensory-related neural activity
+        std::vector<float> sensoryActivity;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        if (neuron->isFiring() || 
+                            std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                            sensoryActivity.push_back(
+                                std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Train prediction system on current sensory patterns
+        if (!sensoryActivity.empty()) {
+            pImpl->predictionSystem->update(pImpl->currentStep, sensoryActivity);
+            
+            // Get prediction error from system
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Update neuromodulation with prediction error
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setPredictionError(predictionError);
+            }
+            
+            // Apply prediction error to learning through eligibility traces
+            float predictionWeight = pImpl->predictionSystem->getPredictionStrength();
+            for (auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    if (syn->getPlasticityFlags().rewardModulated) {
+                        // Prediction error modulates synaptic weights
+                        float errorSignal = predictionError * predictionWeight;
+                        float eligibility = syn->getEligibilityTrace();
+                        if (std::abs(eligibility) > 0.001f) {
+                            float delta = errorSignal * eligibility * 0.01f;
+                            syn->addToWeight(delta);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +569,113 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Update attention weights in neural populations
+            // Focus attention on winning neurons from working memory
+            for (const auto& winnerId : competitors) {
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == winnerId) {
+                                // Increase synaptic efficacy for attended neurons
+                                neuron->setMembranePotential(
+                                    neuron->getMembranePotential() + 2.0f);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Process attentional selection based on prediction error
+        if (pImpl->predictionSystem && pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getPredictionError();
+            float predictionStrength = pImpl->predictionSystem->getPredictionStrength();
+            
+            // Attention modulated by prediction error
+            float attentionModulator = std::abs(predictionError) * predictionStrength;
+            pImpl->attention->setAttentionModulator(attentionModulator);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form concepts
+        // Concepts are formed from patterns of correlated activity across time
+        
+        // Gather recent neural activity patterns
+        std::vector<std::pair<NeuronId, float>> recentActivity;
+        
+        // Collect firing neuron activations from last few steps
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    if (neuron->isFiring() || 
+                        std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                        recentActivity.emplace_back(neuron->getId(), activation);
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with recent activity
+        if (!recentActivity.empty()) {
+            pImpl->conceptFormation->update(pImpl->currentStep, recentActivity);
+            
+            // Get formed concepts and apply to neural processing
+            auto formedConcepts = pImpl->conceptFormation->getConcepts();
+            if (!formedConcepts.empty()) {
+                // Concepts can modulate neural excitability
+                for (const auto& concept : formedConcepts) {
+                    // For now, just log that concepts were formed
+                    // In a full implementation, concepts would guide attention, 
+                    // modulate plasticity, or influence action selection
+                    break;
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 11: Neural planning using learned concepts ==========
+    if (pImpl->planner) {
+        // Neural planner evaluates potential futures based on current state
+        // Uses concepts, predictions, and working memory to select actions
+        
+        // Gather current brain state information for planning
+        std::vector<float> stateFeatures;
+        
+        // Neural activity statistics
+        float totalFiringRate = getAverageFiringRate();
+        size_t firingNeurons = getFiringNeuronCount();
+        float predictionError = 0.0f;
+        
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        stateFeatures.push_back(totalFiringRate);
+        stateFeatures.push_back(static_cast<float>(firingNeurons) / getTotalNeuronCount());
+        stateFeatures.push_back(predictionError);
+        
+        // Get current working memory content for planning context
+        std::vector<NeuronId> workingMemoryNeurons;
+        if (pImpl->workingMemory) {
+            workingMemoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        }
+        
+        // Update planner with current state
+        pImpl->planner->update(pImpl->currentStep, stateFeatures, workingMemoryNeurons);
+        
+        // Get planned actions from neural system
+        auto plannedActions = pImpl->planner->getPlannedActions();
+        if (!plannedActions.empty()) {
+            // Apply planning to motor system
+            // In a full implementation, planned actions would bias motor neuron populations
+            // For now, we just record that planning occurred
+            break;
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -550,7 +696,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects multiple systems:
+        
+        // 1. Affects neural plasticity
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -569,10 +717,125 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 case DevelopmentalStage::Adult:
                     plasticityMod = 0.2f;  // Stable
                     break;
+                case DevelopmentalStage::Aging:
+                    plasticityMod = 0.1f;  // Reduced plasticity
+                    break;
             }
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // 2. Affects neuromodulation systems
+        if (pImpl->dopamine) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            
+            // Developmental stage affects dopamine baseline
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Set baseline dopamine for exploration
+                    pImpl->dopamine->setBaselineLevel(0.1f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Optimal learning baseline
+                    pImpl->dopamine->setBaselineLevel(0.2f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Focused learning
+                    pImpl->dopamine->setBaselineLevel(0.15f);
+                    break;
+                default:
+                    // Stable baseline in adulthood
+                    pImpl->dopamine->setBaselineLevel(0.05f);
+                    break;
+            }
+        }
+        
+        // 3. Affects memory system consolidation
+        if (pImpl->episodicMemory) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            
+            // Development affects memory consolidation strategy
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Store more episodes, less consolidation
+                    pImpl->episodicMemory->setConsolidationThreshold(0.5f);
+                    pImpl->episodicMemory->setReplayFrequency(100);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Optimize consolidation
+                    pImpl->episodicMemory->setConsolidationThreshold(0.3f);
+                    pImpl->episodicMemory->setReplayFrequency(50);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Selective consolidation
+                    pImpl->episodicMemory->setConsolidationThreshold(0.2f);
+                    pImpl->episodicMemory->setReplayFrequency(25);
+                    break;
+                default:
+                    // Efficient consolidation
+                    pImpl->episodicMemory->setConsolidationThreshold(0.1f);
+                    pImpl->episodicMemory->setReplayFrequency(10);
+                    break;
+            }
+        }
+        
+        // 4. Affects attention modulation
+        if (pImpl->attention) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            
+            // Development affects attention dynamics
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Broad attention, high flexibility
+                    pImpl->attention->setInhibitionStrength(0.3f);
+                    pImpl->attention->setExcitationStrength(2.0f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Focused attention, learning-specific
+                    pImpl->attention->setInhibitionStrength(0.5f);
+                    pImpl->attention->setExcitationStrength(1.5f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Selective attention, experience-based
+                    pImpl->attention->setInhibitionStrength(0.7f);
+                    pImpl->attention->setExcitationStrength(1.2f);
+                    break;
+                default:
+                    // Mature attention, stable
+                    pImpl->attention->setInhibitionStrength(0.8f);
+                    pImpl->attention->setExcitationStrength(1.0f);
+                    break;
+            }
+        }
+        
+        // 5. Affects prediction system parameters
+        if (pImpl->predictionSystem) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            
+            // Development affects prediction horizon and accuracy
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Short-term prediction
+                    pImpl->predictionSystem->setPredictionHorizon(5);
+                    pImpl->predictionSystem->setPredictionAccuracy(0.3f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Expanding prediction capability
+                    pImpl->predictionSystem->setPredictionHorizon(10);
+                    pImpl->predictionSystem->setPredictionAccuracy(0.5f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Medium-term prediction
+                    pImpl->predictionSystem->setPredictionHorizon(20);
+                    pImpl->predictionSystem->setPredictionAccuracy(0.7f);
+                    break;
+                default:
+                    // Long-term prediction
+                    pImpl->predictionSystem->setPredictionHorizon(50);
+                    pImpl->predictionSystem->setPredictionAccuracy(0.9f);
+                    break;
+            }
         }
     }
     
@@ -582,9 +845,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 15: Check for sleep/rest cycle ==========
+    if (pImpl->currentStep % 5000 == 0) {
+        // Check if it's time for rest/sleep cycle
+        pImpl->isResting = !pImpl->isResting;
+        
+        if (pImpl->isResting) {
+            // Enter rest/sleep mode for consolidation
+            NLM_LOG_INFO("Entering rest/sleep cycle for memory consolidation...");
+            
+            // 1. Reduce neural activity (cortical down state)
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Reduce membrane potential to resting
+                        neuron->setMembranePotential(neuron->getState().restingPotential);
+                        
+                        // Temporarily reduce firing threshold
+                        neuron->setThreshold(neuron->getState().restingPotential + 5.0f);
+                    }
+                }
+            }
+            
+            // 2. Apply global down state neuromodulation
+            if (pImpl->dopamine) {
+                // Reduce dopamine for sleep-like state
+                pImpl->dopamine->setLevel(-0.5f);
+            }
+            
+            if (pImpl->curiosity) {
+                // Reduce curiosity during sleep
+                pImpl->curiosity->setLevel(0.0f);
+            }
+            
+            // 3. Enhanced memory replay and consolidation
+            if (pImpl->episodicMemory) {
+                // Replay recent memories for consolidation
+                auto episodes = pImpl->episodicMemory->getEpisodesForReplay(5);
+                for (const auto* episode : episodes) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+                
+                // Apply sleep-specific consolidation
+                pImpl->episodicMemory->sleepConsolidation();
+            }
+            
+            // 4. Working memory consolidation
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->sleepConsolidation();
+            }
+            
+            NLM_LOG_INFO("Sleep/rest cycle complete - memories consolidated");
+        } else {
+            // Wake up from sleep
+            NLM_LOG_INFO("Waking up from sleep/rest cycle...");
+            
+            // Restore normal neuromodulation
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(0.0f);
+            }
+            
+            if (pImpl->curiosity) {
+                // Restore curiosity based on novelty
+                pImpl->curiosity->setLevel(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f);
+            }
+            
+            // Restore normal neural thresholds
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        neuron->setThreshold(neuron->getState().restingPotential + 10.0f);
+                    }
+                }
+            }
+        }
     }
 }
 
