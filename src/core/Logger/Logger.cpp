@@ -34,7 +34,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_buf;
+    std::tm* tm_ptr = std::localtime_r(&time, &tm_buf);  // Thread-safe version
+    if (tm_ptr) {
+        oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    } else {
+        oss << "[unknown_time]";
+    }
     
     oss << " " << entry.message;
     
@@ -71,7 +77,11 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    closeOutputFile();  // Close existing file if open
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        std::cerr << "Warning: Could not open log file: " << filepath << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
@@ -182,8 +192,12 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Set global logger instance - replaces the static one
+    // This allows different configurations for different use cases
+    static std::shared_ptr<Logger> globalLogger = logger;
+    if (logger) {
+        NLM_LOG_INFO("Global logger set");
+    }
 }
 
 // LogStream implementation

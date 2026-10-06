@@ -100,6 +100,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getValueString(const ConfigValue& value);
+    static bool validate(const std::string& key, const ConfigValue& value);
 };
 
 } // namespace nlm
