@@ -64,11 +64,21 @@ struct LearningExperiment {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        // Record initial weights from first available region (not hardcoded region 1)
+        bool foundRegion = false;
+        for (const auto& regionId : brain->getRegionIds()) {
+            auto* region = brain->getRegion(regionId);
+            if (region) {
+                for (const auto& syn : region->getSynapses()) {
+                    initialWeights.push_back(syn->getWeight());
+                }
+                foundRegion = true;
+                break;  // Just record from first available region
             }
+        }
+        
+        if (!foundRegion) {
+            NLM_LOG_WARNING("No regions found for recording initial weights");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -77,17 +87,30 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_INFO("  No weights recorded (no synapses in first region)");
         }
     }
     
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Record final weights from first available region
+        bool foundRegion = false;
+        for (const auto& regionId : brain->getRegionIds()) {
+            auto* region = brain->getRegion(regionId);
+            if (region) {
+                for (const auto& syn : region->getSynapses()) {
+                    finalWeights.push_back(syn->getWeight());
+                }
+                foundRegion = true;
+                break;  // Just record from first available region
             }
+        }
+        
+        if (!foundRegion) {
+            NLM_LOG_WARNING("No regions found for recording final weights");
+            return;
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -107,9 +130,12 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_WARNING("No weights recorded - cannot compute statistics");
             return;
         }
+        
+        // Use better precision for floating point comparisons
+        const float epsilon = 0.001f;
         
         // Compute weight changes
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
@@ -122,17 +148,28 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
-        // Count synapses that changed significantly
+        // Count synapses that changed significantly (with better threshold)
         size_t strengthened = 0;
         size_t weakened = 0;
         size_t unchanged = 0;
         
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+        if (minSize > 0) {
+            for (size_t i = 0; i < minSize; ++i) {
+                float delta = finalWeights[i] - initialWeights[i];
+                if (std::abs(delta) > epsilon) {
+                    if (delta > 0.01f) ++strengthened;
+                    else if (delta < -0.01f) ++weakened;
+                    else ++unchanged;
+                } else {
+                    ++unchanged;
+                }
+            }
+        }
+        
+        // Add any remaining synapses to unchanged count
+        if (initialWeights.size() != finalWeights.size()) {
+            unchanged += std::abs(static_cast<int>(initialWeights.size() - finalWeights.size()));
         }
         
         NLM_LOG_INFO("");
@@ -146,13 +183,19 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
+        // Determine if learning occurred (improved logic)
+        bool learningOccurred = (std::abs(finalMean - initialMean) > epsilon) ||
                                 (strengthened > 0 || weakened > 0);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
             NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+            if (strengthened > 0) {
+                NLM_LOG_INFO("  - Synaptic strengthening observed (LTP-like)");
+            }
+            if (weakened > 0) {
+                NLM_LOG_INFO("  - Synaptic weakening observed (LTD-like)");
+            }
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
@@ -211,11 +254,22 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+    // Enable plasticity on synapses in first available region
+    bool plasticityEnabled = false;
+    for (const auto& regionId : brain->getRegionIds()) {
+        auto* region = brain->getRegion(regionId);
+        if (region) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
+            plasticityEnabled = true;
+            break;
         }
+    }
+    
+    if (!plasticityEnabled) {
+        NLM_LOG_WARNING("Could not enable plasticity - no regions found");
+        return;
     }
     
     // Apply repeated input pattern to stimulate learning

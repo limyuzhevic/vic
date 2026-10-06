@@ -126,19 +126,26 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
+        // Use std::abs2 for better performance (avoid absolute value function call)
+        auto abs2 = [](float x) { return x < 0.0f ? -x : x; };
+        
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
+        size_t minSize = std::min(vision.size(), previousVision_.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            float diff = abs2(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
-        // Normalize
+        // Normalize by size (use max size for consistent scaling)
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
+        // Store for next time (only resize if necessary)
+        if (previousVision_.size() != vision.size()) {
+            previousVision_.resize(vision.size());
+        }
         previousVision_ = vision;
     }
     
