@@ -22,6 +22,17 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Validate file path
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    std::ifstream testFile(filepath);
+    if (!testFile.good()) {
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -56,20 +67,28 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true; // No arguments to process
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            continue; // Skip null pointers
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 3 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg.size() >= 2 && arg[0] == '-' && i + 1 < argc && argv[i + 1]) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
@@ -79,6 +98,16 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Check if we have write permissions by attempting to create the file
+    std::ofstream testFile(filepath);
+    if (!testFile.good()) {
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +115,46 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert value to string based on type
+        std::string valueStr;
+        if (std::holds_alternative<int>(entry.value)) {
+            valueStr = std::to_string(std::get<int>(entry.value));
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            valueStr = std::to_string(std::get<int64_t>(entry.value));
+        } else if (std::holds_alternative<double>(entry.value)) {
+            valueStr = std::to_string(std::get<double>(entry.value));
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            valueStr = std::get<bool>(entry.value) ? "true" : "false";
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            valueStr = std::get<std::string>(entry.value);
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            const auto& vec = std::get<std::vector<int>>(entry.value);
+            valueStr = "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) valueStr += ", ";
+                valueStr += std::to_string(vec[i]);
+            }
+            valueStr += "]";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            const auto& vec = std::get<std::vector<double>>(entry.value);
+            valueStr = "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) valueStr += ", ";
+                valueStr += std::to_string(vec[i]);
+            }
+            valueStr += "]";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            const auto& vec = std::get<std::vector<std::string>>(entry.value);
+            valueStr = "[";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) valueStr += ", ";
+                valueStr += "\"" + vec[i] + "\"";
+            }
+            valueStr += "]";
+        }
+        
+        file << entry.key << " = " << valueStr << "\n";
     }
     
     return true;
@@ -94,6 +162,10 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    if (key.empty()) {
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -104,6 +176,7 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Type mismatch - return empty optional
         return std::nullopt;
     }
 }
@@ -115,6 +188,10 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        return; // Invalid key, silently ignore
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,27 +204,109 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    if (key.empty()) {
+        return; // Invalid key, silently ignore
+    }
+    
+    // Basic validation for key
+    if (key.find('=') != std::string::npos || key.find(' ') != std::string::npos) {
+        // Key contains invalid characters
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    if (key.empty()) {
+        return; // Invalid key, silently ignore
+    }
+    
+    // Validate integer value ranges for common brain parameters
+    if (key == "brain.neuron_count") {
+        if (value < 100 || value > 1000000) {
+            return; // Invalid neuron count
+        }
+    }
+    
+    if (key == "brain.synapse_density") {
+        if (value < 0 || value > 1) {
+            return; // Invalid synapse density
+        }
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    if (key.empty()) {
+        return; // Invalid key, silently ignore
+    }
+    
+    // Validate double value ranges for common brain parameters
+    if (key == "brain.v_thresh") {
+        if (value < -100 || value > 100) {
+            return; // Invalid threshold potential
+        }
+    }
+    
+    if (key == "brain.v_rest") {
+        if (value < -100 || value > 100) {
+            return; // Invalid resting potential
+        }
+    }
+    
+    if (key == "brain.v_reset") {
+        if (value < -100 || value > 100) {
+            return; // Invalid reset potential
+        }
+    }
+    
+    if (key == "brain.tau_mem") {
+        if (value < 0 || value > 1000) {
+            return; // Invalid membrane time constant
+        }
+    }
+    
+    if (key == "brain.tau_ref") {
+        if (value < 0 || value > 100) {
+            return; // Invalid refractory period
+        }
+    }
+    
+    if (key == "brain.initial_weight_mean") {
+        if (value < 0 || value > 10) {
+            return; // Invalid initial weight mean
+        }
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    if (key.empty()) {
+        return; // Invalid key, silently ignore
+    }
+    
+    // Boolean values don't need additional validation
+    
     set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
+    if (key.empty()) {
+        return false;
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    if (key.empty()) {
+        return; // Nothing to remove
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -159,19 +318,96 @@ std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+        if (!entry.key.empty()) {
+            keys.push_back(entry.key);
+        }
     }
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+// Configuration validation methods
+bool Config::validate() const {
+    std::vector<std::string> errors;
+    
+    // Check for duplicate keys
+    std::set<std::string> uniqueKeys;
+    for (const auto& entry : pImpl->entries) {
+        if (uniqueKeys.count(entry.key) > 0) {
+            errors.push_back("Duplicate key: " + entry.key);
+        }
+        uniqueKeys.insert(entry.key);
+    }
+    
+    // Validate common configuration parameters
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == "brain.neuron_count") {
+            auto value = get<int>(entry.key);
+            if (value && (*value < 100 || *value > 1000000)) {
+                errors.push_back("Invalid brain.neuron_count: " + std::to_string(*value) +
+                               ". Must be between 100 and 1000000");
+            }
+        }
+        
+        if (entry.key == "brain.synapse_density") {
+            auto value = get<double>(entry.key);
+            if (value && (*value < 0 || *value > 1)) {
+                errors.push_back("Invalid brain.synapse_density: " + std::to_string(*value) +
+                               ". Must be between 0 and 1");
+            }
+        }
+        
+        if (entry.key == "brain.v_thresh") {
+            auto value = get<double>(entry.key);
+            if (value && (*value < -100 || *value > 100)) {
+                errors.push_back("Invalid brain.v_thresh: " + std::to_string(*value) +
+                               ". Must be between -100 and 100");
+            }
+        }
+        
+        if (entry.key == "brain.v_rest") {
+            auto value = get<double>(entry.key);
+            if (value && (*value < -100 || *value > 100)) {
+                errors.push_back("Invalid brain.v_rest: " + std::to_string(*value) +
+                               ". Must be between -100 and 100");
+            }
+        }
+        
+        if (entry.key == "brain.tau_mem") {
+            auto value = get<double>(entry.key);
+            if (value && (*value < 0 || *value > 1000)) {
+                errors.push_back("Invalid brain.tau_mem: " + std::to_string(*value) +
+                               ". Must be between 0 and 1000");
+            }
+        }
+        
+        if (entry.key == "brain.tau_ref") {
+            auto value = get<double>(entry.key);
+            if (value && (*value < 0 || *value > 100)) {
+                errors.push_back("Invalid brain.tau_ref: " + std::to_string(*value) +
+                               ". Must be between 0 and 100");
+            }
+        }
+        
+        // Check for empty values for critical parameters
+        if (entry.key.empty()) {
+            errors.push_back("Empty configuration key");
+        }
+    }
+    
+    return errors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    return std::vector<std::string>(); // Placeholder - implementation would collect errors
 }
 
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            continue; // Skip entries with empty keys
+        }
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
