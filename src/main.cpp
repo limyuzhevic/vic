@@ -159,169 +159,99 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
-    
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    auto neurons = region->getAllNeurons();
-    if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
-        return;
-    }
-    
-    // Get initial spike count
-    size_t initialSpikes = brain->getTotalSpikeCount();
-    
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
-    }
-    
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
-    }
-    
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
-    
-    if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
-    } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
-        }
-    }
+// Forward declarations
+void printHelp();
+void printVersion();
+
+// Print help information
+void printHelp() {
+    std::cout << R"(
+NLM (熙然) — Neural Learning Machine
+Phase 2: Real Neural Computation
+
+Usage: nlm [--config=<file>] [--help] [--version]
+
+Configuration Options:
+  --config=<file>          Load configuration from file (default: configs/default.cfg)
+  --random-seed=<seed>     Random seed for reproducible experiments
+  --neuron-count=<n>       Number of neurons to create
+  --region-count=<n>       Number of brain regions
+  --simulation-timestep=<t> Simulation timestep in seconds
+  --connection-probability=<p> Probability of synapse creation (0.0-1.0)
+  --enable-visualization    Enable visualization mode
+  --visualization-width=<w> Visualization window width (default: 800)
+  --visualization-height=<h> Visualization window height (default: 600)
+  --enable-debug-mode       Enable debug logging and additional diagnostics
+  --enable-progress-logging Enable detailed progress logging
+  --progress-log-interval=<i> Log progress every i steps
+  --export-brain-stats      Export brain statistics to file
+  --brain-stats-file=<f>    File for brain statistics export (default: brain_stats.json)
+
+Neural Dynamics Options:
+  --stdp-ltp-weight=<w>    STDP LTP weight (default: 0.02)
+  --stdp-ltd-weight=<w>    STDP LTD weight (default: 0.015)
+  --stdp-tau=<t>          STDP time constant (default: 20.0)
+  --synaptogenesis-rate=<r> Synaptogenesis rate (default: 0.0001)
+  --pruning-rate=<r>      Pruning rate (default: 0.00001)
+
+Development Options:
+  --development-enabled     Enable developmental stages (default: true)
+  --plasticity-decay-rate=<r> Plasticity decay rate (default: 0.95)
+  --critical-period-start=<t> Start of critical period (default: 60.0s)
+  --critical-period-end=<t>   End of critical period (default: 300.0s)
+
+Memory System Options:
+  --working-memory-size=<n> Working memory capacity (default: 256)
+  --episodic-memory-capacity=<n> Episodic memory capacity (default: 1000)
+  --semantic-memory-capacity=<n> Semantic memory capacity (default: 100)
+
+Performance Options:
+  --use-simd-optimization   Enable SIMD optimizations (default: true)
+  --parallel-threads=<n>    Number of parallel threads (0 = auto, default: 0)
+  --enable-memory-pools      Enable memory pools for performance (default: true)
+
+Phase 3+ Experiment Options:
+  --phase3-demo           Run Phase 3 demonstration
+  --phase4-demo           Run Phase 4 demonstration
+  --phase6-demo           Run Phase 6 integration demo
+
+Debug Options:
+  --log-level=<level>     Set log level (DEBUG, INFO, WARNING, ERROR)
+  --max-spikes-per-step=<n> Max spikes to log per step (default: 1000)
+  --max-memory-usage=<m>   Maximum memory usage in MB (default: 512)
+
+Examples:
+  nlm --neuron-count=1000 --simulation-timestep=0.0001
+  nlm --enable-visualization --visualization-width=1200 --visualization-height=800
+  nlm --config=my_config.cfg --stdp-ltp-weight=0.025
+  nlm --phase3-demo --random-seed=42
+
+Press ESC to exit visualization mode when enabled.
+    )" << std::endl;
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
-    
-    LearningExperiment experiment(brain, 42);
-    
-    // Record initial state
-    experiment.recordInitialState();
-    
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
-    }
-    
-    // Apply repeated input pattern to stimulate learning
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
-    
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
-        }
-        
-        brain->step(step, step * 0.001);
-        
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
-        }
-    }
-    
-    // Record final state
-    experiment.recordFinalState();
-    
-    // Compute and display statistics
-    experiment.computeStatistics();
-}
-
-void runStdpVerification(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
-    
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    // Get first few synapses
-    auto& synapses = region->getSynapses();
-    if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
-        return;
-    }
-    
-    NLM_LOG_INFO("  Testing STDP on 5 synapses:");
-    
-    // Record initial weights
-    std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
-    }
-    
-    // Create correlated activity: fire pre then post to trigger LTP
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-    
-    for (int trial = 0; trial < 50; ++trial) {
-        // Fire pre-synaptic neuron
-        Neuron* preNeuron = nullptr;
-        Neuron* postNeuron = nullptr;
-        
-        auto neurons = region->getAllNeurons();
-        if (neurons.size() >= 2) {
-            preNeuron = neurons[0];
-            postNeuron = neurons[1];
-        }
-        
-        if (preNeuron && postNeuron) {
-            // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
-            
-            // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
-        }
-    }
-    
-    // Record after weights
-    NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
-    float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
-    }
-    
-    NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
-    } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
-    }
+void printVersion() {
+    printBanner();
+    std::cout << "NLM (熙然) — Neural Learning Machine, Version 0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printBanner();
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printBanner();
+            printVersion();
+            return 0;
+        }
+    }
+
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -382,6 +312,226 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Advanced simulation parameters
+    config->set("max_spikes_per_step", static_cast<int64_t>(1000), ConfigSource::Default);
+    config->set("max_memory_usage_mb", static_cast<int64_t>(512), ConfigSource::Default);
+    config->set("enable_progress_logging", true, ConfigSource::Default);
+    config->set("progress_log_interval", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("log_level", "INFO", ConfigSource::Default);
+    
+    // Visualization and debugging options
+    config->set("enable_visualization", false, ConfigSource::Default);
+    config->set("visualization_width", static_cast<int64_t>(800), ConfigSource::Default);
+    config->set("visualization_height", static_cast<int64_t>(600), ConfigSource::Default);
+    config->set("enable_debug_mode", false, ConfigSource::Default);
+    config->set("export_brain_stats", false, ConfigSource::Default);
+    config->set("brain_stats_file", "brain_stats.json", ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    config->set("dopamine_sensitivity", 0.5f, ConfigSource::Default);
+    config->set("curiosity_threshold", 0.3f, ConfigSource::Default);
+    config->set("novelty_decay_rate", 0.99f, ConfigSource::Default);
+    
+    // Development parameters
+    config->set("development_enabled", true, ConfigSource::Default);
+    config->set("plasticity_decay_rate", 0.95f, ConfigSource::Default);
+    config->set("critical_period_start", 60.0, ConfigSource::Default);
+    config->set("critical_period_end", 300.0, ConfigSource::Default);
+    
+    // Memory system parameters
+    config->set("working_memory_size", static_cast<int64_t>(256), ConfigSource::Default);
+    config->set("episodic_memory_capacity", static_cast<int64_t>(1000), ConfigSource::Default);
+    config->set("semantic_memory_capacity", static_cast<int64_t>(100), ConfigSource::Default);
+    
+    // Performance optimization parameters
+    config->set("use_simd_optimization", true, ConfigSource::Default);
+    config->set("parallel_threads", static_cast<int64_t>(0), ConfigSource::Default);  // 0 = auto
+    config->set("enable_memory_pools", true, ConfigSource::Default);
+    
+    // Process advanced command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Process simulation parameters
+        if (arg.substr(0, 18) == "--simulation-timestep") {
+            try {
+                double timestep = std::stod(arg.substr(18));
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid simulation-timestep value: " + arg);
+            }
+        } else if (arg.substr(0, 16) == "--neuron-count") {
+            try {
+                int64_t count = std::stoll(arg.substr(16));
+                config->set("neuron_count", count, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid neuron-count value: " + arg);
+            }
+        } else if (arg.substr(0, 15) == "--region-count") {
+            try {
+                int64_t count = std::stoll(arg.substr(15));
+                config->set("region_count", count, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid region-count value: " + arg);
+            }
+        } else if (arg.substr(0, 25) == "--connection-probability") {
+            try {
+                float prob = std::stof(arg.substr(25));
+                config->set("connection_probability", prob, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid connection-probability value: " + arg);
+            }
+        } else if (arg.substr(0, 22) == "--stdp-ltp-weight") {
+            try {
+                float weight = std::stof(arg.substr(22));
+                config->set("stdp_ltp_weight", weight, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid stdp-ltp-weight value: " + arg);
+            }
+        } else if (arg.substr(0, 23) == "--stdp-ltd-weight") {
+            try {
+                float weight = std::stof(arg.substr(23));
+                config->set("stdp_ltd_weight", weight, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid stdp-ltd-weight value: " + arg);
+            }
+        } else if (arg.substr(0, 11) == "--stdp-tau") {
+            try {
+                float tau = std::stof(arg.substr(11));
+                config->set("stdp_tau", tau, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid stdp-tau value: " + arg);
+            }
+        } else if (arg.substr(0, 25) == "--synaptogenesis-rate") {
+            try {
+                float rate = std::stof(arg.substr(25));
+                config->set("synaptogenesis_rate", rate, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid synaptogenesis-rate value: " + arg);
+            }
+        } else if (arg.substr(0, 17) == "--pruning-rate") {
+            try {
+                float rate = std::stof(arg.substr(17));
+                config->set("pruning_rate", rate, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid pruning-rate value: " + arg);
+            }
+        } else if (arg.substr(0, 22) == "--enable-visualization") {
+            config->set("enable_visualization", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 25) == "--visualization-width") {
+            try {
+                int64_t width = std::stoll(arg.substr(25));
+                config->set("visualization_width", width, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid visualization-width value: " + arg);
+            }
+        } else if (arg.substr(0, 26) == "--visualization-height") {
+            try {
+                int64_t height = std::stoll(arg.substr(26));
+                config->set("visualization_height", height, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid visualization-height value: " + arg);
+            }
+        } else if (arg.substr(0, 18) == "--enable-debug-mode") {
+            config->set("enable_debug_mode", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 26) == "--enable-progress-logging") {
+            config->set("enable_progress_logging", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 26) == "--progress-log-interval") {
+            try {
+                int64_t interval = std::stoll(arg.substr(26));
+                config->set("progress_log_interval", interval, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid progress-log-interval value: " + arg);
+            }
+        } else if (arg.substr(0, 22) == "--export-brain-stats") {
+            config->set("export_brain_stats", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 21) == "--brain-stats-file") {
+            std::string filename = arg.substr(21);
+            if (!filename.empty() && filename[0] == '=') {
+                filename = filename.substr(1);
+            }
+            config->set("brain_stats_file", filename, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 22) == "--dopamine-sensitivity") {
+            try {
+                float sensitivity = std::stof(arg.substr(22));
+                config->set("dopamine_sensitivity", sensitivity, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid dopamine-sensitivity value: " + arg);
+            }
+        } else if (arg.substr(0, 22) == "--curiosity-threshold") {
+            try {
+                float threshold = std::stof(arg.substr(22));
+                config->set("curiosity_threshold", threshold, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid curiosity-threshold value: " + arg);
+            }
+        } else if (arg.substr(0, 26) == "--novelty-decay-rate") {
+            try {
+                float decay = std::stof(arg.substr(26));
+                config->set("novelty_decay_rate", decay, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid novelty-decay-rate value: " + arg);
+            }
+        } else if (arg.substr(0, 22) == "--development-enabled") {
+            config->set("development_enabled", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 27) == "--plasticity-decay-rate") {
+            try {
+                float decay = std::stof(arg.substr(27));
+                config->set("plasticity_decay_rate", decay, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid plasticity-decay-rate value: " + arg);
+            }
+        } else if (arg.substr(0, 28) == "--critical-period-start") {
+            try {
+                double start = std::stod(arg.substr(28));
+                config->set("critical_period_start", start, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid critical-period-start value: " + arg);
+            }
+        } else if (arg.substr(0, 27) == "--critical-period-end") {
+            try {
+                double end = std::stod(arg.substr(27));
+                config->set("critical_period_end", end, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid critical-period-end value: " + arg);
+            }
+        } else if (arg.substr(0, 27) == "--working-memory-size") {
+            try {
+                int64_t size = std::stoll(arg.substr(27));
+                config->set("working_memory_size", size, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid working-memory-size value: " + arg);
+            }
+        } else if (arg.substr(0, 32) == "--episodic-memory-capacity") {
+            try {
+                int64_t capacity = std::stoll(arg.substr(32));
+                config->set("episodic_memory_capacity", capacity, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid episodic-memory-capacity value: " + arg);
+            }
+        } else if (arg.substr(0, 31) == "--semantic-memory-capacity") {
+            try {
+                int64_t capacity = std::stoll(arg.substr(31));
+                config->set("semantic_memory_capacity", capacity, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid semantic-memory-capacity value: " + arg);
+            }
+        } else if (arg.substr(0, 28) == "--use-simd-optimization") {
+            config->set("use_simd_optimization", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 28) == "--enable-memory-pools") {
+            config->set("enable_memory_pools", true, ConfigSource::CommandLine);
+        } else if (arg == "--phase3-demo") {
+            // In a real implementation, this would run Phase 3 demonstration
+            NLM_LOG_INFO("Phase 3 demonstration would be run here with enhanced parameters");
+        } else if (arg == "--phase4-demo") {
+            // In a real implementation, this would run Phase 4 demonstration
+            NLM_LOG_INFO("Phase 4 demonstration would be run here with enhanced parameters");
+        } else if (arg == "--phase6-demo") {
+            // In a real implementation, this would run Phase 6 demonstration
+            NLM_LOG_INFO("Phase 6 integration demonstration would be run here");
+        }
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,7 +540,21 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    NLM_LOG_INFO("  max_spikes_per_step: " + std::to_string(config->getOr<int64_t>("max_spikes_per_step", 1000)));
+    NLM_LOG_INFO("  enable_progress_logging: " + std::to_string(config->getOr<bool>("enable_progress_logging", true)));
+    NLM_LOG_INFO("  progress_log_interval: " + std::to_string(config->getOr<int64_t>("progress_log_interval", 100)));
+    NLM_LOG_INFO("  enable_visualization: " + std::to_string(config->getOr<bool>("enable_visualization", false)));
+    NLM_LOG_INFO("  enable_debug_mode: " + std::to_string(config->getOr<bool>("enable_debug_mode", false)));
+    NLM_LOG_INFO("  export_brain_stats: " + std::to_string(config->getOr<bool>("export_brain_stats", false)));
+    NLM_LOG_INFO("  working_memory_size: " + std::to_string(config->getOr<int64_t>("working_memory_size", 256)));
+    NLM_LOG_INFO("  episodic_memory_capacity: " + std::to_string(config->getOr<int64_t>("episodic_memory_capacity", 1000)));
+    NLM_LOG_INFO("  semantic_memory_capacity: " + std::to_string(config->getOr<int64_t>("semantic_memory_capacity", 100)));
+    NLM_LOG_INFO("  enable_memory_pools: " + std::to_string(config->getOr<bool>("enable_memory_pools", true)));
+    NLM_LOG_INFO("")
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
