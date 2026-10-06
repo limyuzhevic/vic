@@ -1,0 +1,11 @@
+{
+    "test_json_config": {
+        "simple_string": "Hello from JSON",
+        "simple_int": 42,
+        "simple_double": 3.14159,
+        "simple_bool": true,
+        "string_array": ["one", "two", "three"],
+        "int_array": [1, 2, 3],
+        "double_array": [1.5, 2.5, 3.5]
+    }
+}

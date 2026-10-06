@@ -1,0 +1,510 @@
+#!/usr/bin/env python3
+"""
+NLM Config CLI Tool
+
+A comprehensive command-line interface for managing NLM configurations.
+Supports loading/saving configs in various formats, validation, comparison, merging,
+and environment variable integration.
+
+This version uses a standalone Config implementation that doesn't depend
+on the pynlm Python bindings module.
+"""
+
+import argparse
+import sys
+import os
+import json
+import yaml
+import tempfile
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+
+# Import standalone implementation
+sys.path.insert(0, str(Path(__file__).parent))
+
+from scripts._standalone_config import (
+    Config,
+    load_config_from_dict,
+    save_config_to_dict,
+    compare_configs,
+    ConfigValidator,
+    get_debug_config,
+    get_performance_config,
+    get_creative_config,
+)
+
+# Configuration templates
+templates = {
+    'default': get_debug_config() if 'get_debug_config' in locals() else {
+        "neuron_count": 1000,
+        "region_count": 3,
+        "simulation_timestep": 0.001,
+        "random_seed": 42,
+        "working_memory_capacity": 100,
+        "episodic_memory_max_episodes": 1000,
+        "enable_structural_plasticity": True,
+        "enable_development": True,
+        "enable_reward_modulation": True,
+        "enable_curiosity": True,
+        "enable_novelty_detection": False,
+    },
+    'debug': get_debug_config() if 'get_debug_config' in locals() else {
+        "neuron_count": 100,
+        "region_count": 2,
+        "simulation_timestep": 0.01,
+        "random_seed": 42,
+        "working_memory_capacity": 20,
+        "episodic_memory_max_episodes": 100,
+        "enable_structural_plasticity": True,
+        "enable_development": False,
+    },
+    'performance': get_performance_config() if 'get_performance_config' in locals() else {
+        "neuron_count": 5000,
+        "region_count": 1,
+        "simulation_timestep": 0.001,
+        "random_seed": 42,
+        "working_memory_capacity": 500,
+        "episodic_memory_max_episodes": 5000,
+        "enable_structural_plasticity": True,
+        "enable_development": True,
+        "enable_reward_modulation": True,
+        "enable_curiosity": True,
+    },
+    'creative': get_creative_config() if 'get_creative_config' in locals() else {
+        "neuron_count": 2000,
+        "region_count": 3,
+        "simulation_timestep": 0.001,
+        "random_seed": 12345,
+        "working_memory_capacity": 200,
+        "episodic_memory_max_episodes": 2000,
+        "enable_structural_plasticity": True,
+        "enable_development": True,
+        "enable_reward_modulation": False,
+        "enable_curiosity": True,
+        "enable_novelty_detection": True,
+    }
+}
+
+def load_config(file_path: Optional[str] = None, args: Optional[List[str]] = None) -> Config:
+    """Load configuration from file or command line arguments"""
+    config = Config()
+    
+    if file_path:
+        # Load from file
+        ext = Path(file_path).suffix.lower()
+        
+        if ext == '.json':
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+                config = load_config_from_dict(data)
+        elif ext in ['.yaml', '.yml']:
+            with open(file_path, 'r') as f:
+                data = yaml.safe_load(f)
+                config = load_config_from_dict(data)
+        elif ext == '.txt':
+            # Simple key=value format
+            with open(file_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        
+                        # Try to infer type
+                        if value.lower() in ['true', 'false']:
+                            config.set(key, value.lower() == 'true')
+                        elif value.isdigit():
+                            config.set(key, int(value))
+                        elif _is_float(value):
+                            config.set(key, float(value))
+                        else:
+                            config.set(key, value)
+        else:
+            raise ValueError(f"Unsupported file format: {ext}")
+    
+    elif args:
+        # Load from command line arguments (key=value pairs)
+        for arg in args:
+            if '=' in arg:
+                key, value = arg.split('=', 1)
+                config.set(key, value)
+            else:
+                print(f"Warning: Ignoring invalid argument format: {arg}")
+    
+    return config
+
+def _is_float(value: str) -> bool:
+    """Check if string can be converted to float"""
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+
+def save_config(config: Config, file_path: str, format: str = 'simple') -> bool:
+    """Save configuration to file in specified format"""
+    ext = Path(file_path).suffix.lower()
+    
+    try:
+        config_dict = save_config_to_dict(config)
+        
+        if format == 'json' or ext == '.json':
+            with open(file_path, 'w') as f:
+                json.dump(config_dict, f, indent=2)
+        elif format in ['yaml', 'yml'] or ext in ['.yaml', '.yml']:
+            with open(file_path, 'w') as f:
+                yaml.dump(config_dict, f, default_flow_style=False)
+        elif format == 'simple' or ext == '.txt':
+            with open(file_path, 'w') as f:
+                for key in config.get_keys():
+                    value = config.get_string(key)
+                    f.write(f"{key}={value}\n")
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+        
+        return True
+    except Exception as e:
+        print(f"Error saving config: {e}")
+        return False
+
+def run_list(config: Config, format: str = 'simple') -> None:
+    """List all configuration keys and values"""
+    if format == 'json':
+        config_dict = save_config_to_dict(config)
+        print(json.dumps(config_dict, indent=2))
+    elif format == 'yaml':
+        config_dict = save_config_to_dict(config)
+        print(yaml.dump(config_dict, default_flow_style=False))
+    else:  # simple format
+        print("Configuration keys and values:")
+        for key in sorted(config.get_keys()):
+            value = config.get_string(key)
+            print(f"  {key}: {value}")
+
+def run_get(config: Config, key: str) -> None:
+    """Get a specific configuration value"""
+    if config.has(key):
+        value = config.get_string(key)
+        print(f"{key}: {value}")
+    else:
+        print(f"Key '{key}' not found in configuration")
+        sys.exit(1)
+
+def run_set(config: Config, key: str, value: str) -> bool:
+    """Set a configuration value"""
+    try:
+        # Try to infer type
+        if value.lower() in ['true', 'false']:
+            config.set(key, value.lower() == 'true')
+        elif value.isdigit():
+            config.set(key, int(value))
+        elif _is_float(value):
+            config.set(key, float(value))
+        else:
+            config.set(key, value)
+        
+        print(f"Set {key} = {value}")
+        return True
+    except Exception as e:
+        print(f"Error setting {key}: {e}")
+        return False
+
+def run_template(name: str, output_file: Optional[str] = None) -> None:
+    """Generate a configuration template"""
+    if name not in templates:
+        print(f"Unknown template: {name}")
+        print(f"Available templates: {', '.join(templates.keys())}")
+        sys.exit(1)
+    
+    template_config = Config()
+    for key, value in templates[name].items():
+        template_config.set(key, value)
+    
+    if output_file:
+        save_config(template_config, output_file)
+        print(f"Template '{name}' saved to {output_file}")
+    else:
+        print(f"Template '{name}':")
+        run_list(template_config)
+
+def run_validate(config: Config, schema: Optional[str] = None) -> bool:
+    """Validate configuration"""
+    try:
+        validator = ConfigValidator(config)
+        
+        if not validator.validate_all():
+            print("Validation failed:")
+            if validator.errors:
+                print("Errors:")
+                for error in validator.errors:
+                    print(f"  - {error}")
+            if validator.warnings:
+                print("Warnings:")
+                for warning in validator.warnings:
+                    print(f"  - {warning}")
+            return False
+        
+        print("Configuration is valid!")
+        return True
+    except Exception as e:
+        print(f"Validation error: {e}")
+        return False
+
+def run_compare(config1: Config, config2: Config) -> None:
+    """Compare two configurations"""
+    try:
+        comparison = compare_configs(config1, config2)
+        
+        print("Configuration Comparison:")
+        print(f"  Keys only in config 1: {comparison['only_in_first']}")
+        print(f"  Keys only in config 2: {comparison['only_in_second']}")
+        print(f"  Common keys: {comparison['common_keys']}")
+        
+        if comparison['differences']:
+            print("Differences:")
+            for key, diff in comparison['differences'].items():
+                print(f"  {key}: {diff['from']} -> {diff['to']}")
+        
+        print(f"Summary: {comparison['summary']}")
+    except Exception as e:
+        print(f"Comparison error: {e}")
+
+def run_merge(configs: List[Config]) -> Config:
+    """Merge multiple configurations"""
+    if not configs:
+        print("No configurations to merge")
+        sys.exit(1)
+    
+    merged = configs[0]
+    
+    for config in configs[1:]:
+        for key in config.get_keys():
+            value = config.get_string(key)
+            merged.set(key, value)
+    
+    return merged
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="NLM Config CLI Tool - Manage NLM configurations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # List configuration keys
+  nlm-config list --file config.yaml
+  
+  # Get a specific value
+  nlm-config get --file config.yaml neuron_count
+  
+  # Set a value
+  nlm-config set --file config.yaml neuron_count 2000
+  
+  # Load from command line
+  nlm-config --file config.txt neuron_count=500 region_count=2
+  
+  # Validate config
+  nlm-config validate --file config.yaml
+  
+  # Generate a template
+  nlm-config template debug --output debug_config.yaml
+  
+  # Compare two configs
+  nlm-config compare config1.yaml config2.yaml
+  
+  # Save in different format
+  nlm-config save --file config.yaml --output config.json --format json
+        """
+    )
+    
+    # Main command
+    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    
+    # List command
+    list_parser = subparsers.add_parser('list', help='List all configuration keys')
+    list_parser.add_argument('--file', help='Configuration file to load')
+    list_parser.add_argument('--format', choices=['simple', 'json', 'yaml'], 
+                           default='simple', help='Output format')
+    
+    # Get command
+    get_parser = subparsers.add_parser('get', help='Get a configuration value')
+    get_parser.add_argument('--file', help='Configuration file to load')
+    get_parser.add_argument('key', help='Key to get')
+    
+    # Set command
+    set_parser = subparsers.add_parser('set', help='Set a configuration value')
+    set_parser.add_argument('--file', help='Configuration file to modify (will be saved)')
+    set_parser.add_argument('key', help='Key to set')
+    set_parser.add_argument('value', help='Value to set')
+    
+    # Template command
+    template_parser = subparsers.add_parser('template', help='Generate a configuration template')
+    template_parser.add_argument('name', choices=templates.keys(), 
+                               help='Template name')
+    template_parser.add_argument('--output', '-o', help='Output file for template')
+    
+    # Validate command
+    validate_parser = subparsers.add_parser('validate', help='Validate configuration')
+    validate_parser.add_argument('--file', help='Configuration file to validate')
+    validate_parser.add_argument('--schema', help='Schema file for validation')
+    
+    # Compare command
+    compare_parser = subparsers.add_parser('compare', help='Compare two configurations')
+    compare_parser.add_argument('file1', help='First configuration file')
+    compare_parser.add_argument('file2', help='Second configuration file')
+    
+    # Merge command
+    merge_parser = subparsers.add_parser('merge', help='Merge multiple configurations')
+    merge_parser.add_argument('files', nargs='+', help='Configuration files to merge')
+    
+    # Save command
+    save_parser = subparsers.add_parser('save', help='Save configuration to file')
+    save_parser.add_argument('--file', help='Configuration file to load (if not provided, uses current config)')
+    save_parser.add_argument('--output', '-o', required=True, help='Output file')
+    save_parser.add_argument('--format', choices=['simple', 'json', 'yaml'], 
+                           default='simple', help='Output format')
+    
+    # Load from environment
+    env_parser = subparsers.add_parser('env-load', help='Load configuration from environment variables')
+    env_parser.add_argument('--prefix', default='NLM_', 
+                           help='Environment variable prefix (default: NLM_)')
+    
+    # Export to environment
+    env_export_parser = subparsers.add_parser('env-export', help='Export configuration to environment variables')
+    env_export_parser.add_argument('--file', help='Configuration file to export')
+    env_export_parser.add_argument('--prefix', default='NLM_',
+                                 help='Environment variable prefix (default: NLM_)')
+    env_export_parser.add_argument('--unset', action='store_true',
+                                 help='Unset existing environment variables')
+    
+    # Global options
+    parser.add_argument('--config', '-c', help='Configuration file to load initially')
+    
+    args = parser.parse_args()
+    
+    # Handle environment variable commands
+    if args.command == 'env-load':
+        try:
+            from pynlm.helpers import load_config_from_env
+            config = load_config_from_env(args.prefix)
+            run_list(config)
+        except ImportError:
+            print("load_config_from_env not available")
+            sys.exit(1)
+        return
+    
+    elif args.command == 'env-export':
+        if args.unset:
+            # Unset environment variables
+            for key in os.environ:
+                if key.startswith(args.prefix):
+                    del os.environ[key]
+            print(f"Unset environment variables with prefix '{args.prefix}'")
+        else:
+            # Load config and export
+            config = load_config(args.file)
+            print(f"Environment variables to set with prefix '{args.prefix}':")
+            for key in config.get_keys():
+                value = config.get_string(key)
+                env_key = args.prefix + key.upper()
+                print(f"  export {env_key}={value}")
+        return
+    
+    # Load initial configuration if specified
+    config = Config()
+    if args.config:
+        try:
+            config = load_config(args.config)
+        except Exception as e:
+            print(f"Error loading config from {args.config}: {e}")
+            sys.exit(1)
+    
+    # Execute commands
+    if args.command == 'list':
+        if args.file and not config.get_keys():
+            try:
+                config = load_config(args.file)
+            except Exception as e:
+                print(f"Error loading config from {args.file}: {e}")
+                sys.exit(1)
+        
+        run_list(config, args.format)
+    
+    elif args.command == 'get':
+        if args.file and not config.get_keys():
+            try:
+                config = load_config(args.file)
+            except Exception as e:
+                print(f"Error loading config from {args.file}: {e}")
+                sys.exit(1)
+        
+        run_get(config, args.key)
+    
+    elif args.command == 'set':
+        if args.file and config.get_keys():
+            # Load existing config
+            try:
+                config = load_config(args.file)
+            except Exception as e:
+                print(f"Error loading config from {args.file}: {e}")
+                sys.exit(1)
+        
+        if run_set(config, args.key, args.value):
+            if args.file:
+                # Save the modified config
+                save_config(config, args.file)
+                print(f"Configuration saved to {args.file}")
+    
+    elif args.command == 'template':
+        run_template(args.name, args.output)
+    
+    elif args.command == 'validate':
+        if args.file:
+            try:
+                config = load_config(args.file)
+            except Exception as e:
+                print(f"Error loading config from {args.file}: {e}")
+                sys.exit(1)
+        
+        run_validate(config, args.schema)
+    
+    elif args.command == 'compare':
+        try:
+            config1 = load_config(args.file1)
+            config2 = load_config(args.file2)
+        except Exception as e:
+            print(f"Error loading configs: {e}")
+            sys.exit(1)
+        
+        run_compare(config1, config2)
+    
+    elif args.command == 'merge':
+        configs = []
+        for file_path in args.files:
+            try:
+                config = load_config(file_path)
+                configs.append(config)
+            except Exception as e:
+                print(f"Error loading config from {file_path}: {e}")
+                sys.exit(1)
+        
+        merged = run_merge(configs)
+        print("Merged configuration:")
+        run_list(merged)
+    
+    elif args.command == 'save':
+        if args.file and not config.get_keys():
+            try:
+                config = load_config(args.file)
+            except Exception as e:
+                print(f"Error loading config from {args.file}: {e}")
+                sys.exit(1)
+        
+        if save_config(config, args.output, args.format):
+            print(f"Configuration saved to {args.output}")
+    
+    else:
+        parser.print_help()
+
+if __name__ == '__main__':
+    main()

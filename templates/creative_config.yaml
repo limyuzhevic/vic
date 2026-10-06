@@ -1,0 +1,29 @@
+# NLM Creative/Config Exploration Configuration
+# Optimized for exploration and creativity
+
+# Core neural parameters
+neuron_count: 2000
+region_count: 3
+simulation_timestep: 0.001
+random_seed: 12345
+
+# Connection parameters
+connection_probability: 0.15
+stdp_ltp_weight: 0.015
+stdp_ltd_weight: 0.018
+
+# Memory systems
+working_memory_capacity: 200
+episodic_memory_max_episodes: 2000
+
+# Plasticity systems
+enable_structural_plasticity: true
+enable_development: true
+enable_reward_modulation: false  # More exploration
+enable_curiosity: true
+enable_novelty_detection: true
+
+# Performance settings
+stdp_tau: 30.0
+synaptogenesis_rate: 0.0002
+pruning_rate: 0.00002

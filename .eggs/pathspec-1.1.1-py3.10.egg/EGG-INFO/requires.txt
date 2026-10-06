@@ -1,0 +1,9 @@
+
+[hyperscan]
+hyperscan>=0.7
+
+[optional]
+typing-extensions>=4
+
+[re2]
+google-re2>=1.1

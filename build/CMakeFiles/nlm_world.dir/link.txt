@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_world.a CMakeFiles/nlm_world.dir/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_5f7d145d-d3ef-44a3-9694-72e4baa627e4/src/world/SimpleWorld.cpp.o
+/usr/bin/ranlib libnlm_world.a

@@ -20,7 +20,9 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
     ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
     ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
-    ${NLM_SOURCE_DIR}/brain/Neuron.cpp
+    ${NLM_SOURCE_DIR}/brain/NeuronBasics.cpp
+    ${NLM_SOURCE_DIR}/brain/NeuronLIF.cpp
+    ${NLM_SOURCE_DIR}/brain/NeuronInitialization.cpp
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp

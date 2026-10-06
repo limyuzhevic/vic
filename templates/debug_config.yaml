@@ -1,0 +1,26 @@
+# NLM Debug Configuration
+# Optimized for development and debugging
+
+# Core neural parameters
+neuron_count: 100
+region_count: 2
+simulation_timestep: 0.01
+random_seed: 42
+
+# Connection parameters
+connection_probability: 0.1
+stdp_ltp_weight: 0.05
+stdp_ltd_weight: 0.055
+
+# Memory systems
+working_memory_capacity: 20
+episodic_memory_max_episodes: 100
+
+# Plasticity systems
+enable_structural_plasticity: true
+enable_development: false  # Speed up for debugging
+
+# Performance settings
+stdp_tau: 10.0
+synaptogenesis_rate: 0.001
+pruning_rate: 0.0001

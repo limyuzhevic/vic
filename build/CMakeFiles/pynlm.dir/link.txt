@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -O3 -DNDEBUG -flto -shared  -o pynlm.cpython-310-x86_64-linux-gnu.so CMakeFiles/pynlm.dir/bindings.cpp.o  libnlm_core.a libnlm_agent.a libnlm_world.a libnlm_core.a 

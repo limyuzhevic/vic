@@ -1,0 +1,37 @@
+# Python dependencies for NLM testing
+
+# Core dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+numpy>=1.20.0
+
+# Optional dependencies for enhanced testing
+pandas>=1.3.0  # For data analysis
+matplotlib>=3.5.0  # For visualization testing
+seaborn>=0.11.0  # For statistical visualization
+
+# Performance and benchmarking
+memory_profiler>=0.5.0
+scikit-learn>=1.0.0  # For ML-based testing
+
+# Error handling and debugging
+pyyaml>=6.0  # For config testing
+
+# Documentation and reporting
+pytest-html>=3.2.0  # Generate HTML reports
+pytest-cov>=3.0.0  # Coverage reporting
+
+# Development tools
+docstring-parser>=0.15.0
+black>=22.0.0
+ruff>=0.1.0
+
+# Testing utilities
+hypothesis>=6.0.0  # Property-based testing
+mock>=4.0.0  # Mocking for tests
+
+# Integration testing
+requests>=2.25.0  # For HTTP-based tests if needed
+
+# Environment
+python-dateutil>=2.7.0

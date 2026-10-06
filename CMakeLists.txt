@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Find required packages
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(yaml-cpp 0.7.0 REQUIRED)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -30,8 +34,9 @@ add_library(nlm_core STATIC
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
+    src/brain/NeuronBasics.cpp
+    src/brain/NeuronLIF.cpp
+    src/brain/NeuronInitialization.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp

@@ -1,0 +1,29 @@
+# NLM Default Configuration
+# This is the base configuration for NLM neural simulation
+
+# Core neural parameters
+neuron_count: 1000
+region_count: 3
+simulation_timestep: 0.001
+random_seed: 42
+
+# Connection parameters
+connection_probability: 0.1
+stdp_ltp_weight: 0.01
+stdp_ltd_weight: 0.012
+
+# Memory systems
+working_memory_capacity: 100
+episodic_memory_max_episodes: 1000
+
+# Plasticity systems
+enable_structural_plasticity: true
+enable_development: true
+enable_reward_modulation: true
+enable_curiosity: true
+enable_novelty_detection: false
+
+# Performance settings
+stdp_tau: 20.0
+synaptogenesis_rate: 0.0001
+pruning_rate: 0.00001
