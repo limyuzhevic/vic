@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declaration to avoid circular include
+class Neuron;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -78,19 +81,49 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Helper to lock weak_ptr to Neuron
+    Neuron* lockNeuron(std::weak_ptr<Neuron>& weakNeuron) {
+        auto shared = weakNeuron.lock();
+        return shared.get();
+    }
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    const Neuron* lockNeuron(const std::weak_ptr<Neuron>& weakNeuron) const {
+        auto shared = weakNeuron.lock();
+        return shared.get();
+    }
+    
+    // Clear expired weak_ptrs
+    void cleanupExpiredWeakPtrs() {
+        auto cleanupList = [](auto& vec) {
+            vec.erase(std::remove_if(vec.begin(), vec.end(),
+                [](const auto& weakPtr) { return weakPtr.expired(); }),
+                vec.end());
+        };
+        cleanupList(motorForward_);
+        cleanupList(motorBackward_);
+        cleanupList(motorTurnLeft_);
+        cleanupList(motorTurnRight_);
+        cleanupList(motorInteract_);
+        cleanupList(motorWait_);
+        cleanupList(sensoryVision_);
+        cleanupList(sensoryTouch_);
+        cleanupList(sensoryInternal_);
+        cleanupList(sensoryProprioception_);
+    }
+    
+    // Motor neuron groups (use weak_ptr to avoid dangling pointers)
+    std::vector<std::weak_ptr<Neuron>> motorForward_;
+    std::vector<std::weak_ptr<Neuron>> motorBackward_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnLeft_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnRight_;
+    std::vector<std::weak_ptr<Neuron>> motorInteract_;
+    std::vector<std::weak_ptr<Neuron>> motorWait_;
+    
+    // Sensory neuron groups (use weak_ptr to avoid dangling pointers)
+    std::vector<std::weak_ptr<Neuron>> sensoryVision_;
+    std::vector<std::weak_ptr<Neuron>> sensoryTouch_;
+    std::vector<std::weak_ptr<Neuron>> sensoryInternal_;
+    std::vector<std::weak_ptr<Neuron>> sensoryProprioception_;
     
     // Neuromodulation state
     float dopamineLevel_;
