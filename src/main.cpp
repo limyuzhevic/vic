@@ -90,7 +90,13 @@ struct LearningExperiment {
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Safe access to spike system with null check
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (spikeSystem) {
+            mostActiveNeurons = spikeSystem->getMostActiveNeurons(10);
+        } else {
+            NLM_LOG_WARNING("Spike system not available for recording most active neurons");
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -356,11 +362,15 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load config from file (ignore if not found) - enhanced error handling
+    if (!configFile.empty() && configFile != "configs/default.cfg") {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_WARNING("Failed to load configuration from: " + configFile + ". Using defaults.");
+        }
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (no config file specified).");
     }
     
     // Override with command line args

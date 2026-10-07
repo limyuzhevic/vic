@@ -879,8 +879,19 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.firingState.size()) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
+                        // Fix: refractoryRemaining should be refractoryRemaining, not refractoryPeriod
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            // Convert time from milliseconds to steps (approximate at 1ms timestep)
+                            float refractoryMs = neuronData.refractoryRemaining[idx];
+                            uint32_t refractorySteps = static_cast<uint32_t>(std::round(refractoryMs / 0.001f));  // Convert ms to steps
+                            neuron->setRefractoryPeriod(std::max(1u, refractorySteps));  // Ensure minimum of 1 step
+                        }
+                        // Also fix refractoryRemaining steps (remaining time in the refractory period)
+                        if (idx < neuronData.refractoryRemaining.size()) {
+                            // Remaining time in ms, convert to steps
+                            float remainingMs = neuronData.refractoryRemaining[idx];
+                            uint32_t remainingSteps = static_cast<uint32_t>(std::round(remainingMs / 0.001f));
+                            neuron->getState().refractoryRemaining = std::max(0u, remainingSteps);
                         }
                     }
                     idx++;
