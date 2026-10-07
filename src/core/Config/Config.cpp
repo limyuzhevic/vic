@@ -27,8 +27,19 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Set a reasonable file size limit (1MB)
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    if (fileSize > 1024 * 1024) {
+        return false;
+    }
+    
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +59,15 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key
+            if (key.empty() || key.find_first_of(" =\t\n\r") != std::string::npos) {
+                continue;  // Skip invalid keys
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            // Skip malformed lines (no = sign)
+            continue;
         }
     }
     
@@ -56,7 +75,17 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Basic argument validation
+    if (!argv) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        // Check bounds before accessing argv[i]
+        if (!argv[i]) {
+            continue;
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,6 +94,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key length and content
+                if (key.length() > 100 || key.empty()) {
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,6 +107,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty() || key.find_first_of(" =\t\n\r") != std::string::npos) {
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -84,9 +125,26 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Set a reasonable line length limit
+    size_t maxLineLength = 1000;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        try {
+            file << "# " << entry.description << "\n";
+            
+            // Limit line length to avoid issues
+            std::ostringstream oss;
+            oss << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+            
+            if (oss.str().length() <= maxLineLength) {
+                file << oss.str();
+            } else {
+                file << entry.key << " = [LONG_VALUE]\n";
+            }
+        } catch (const std::exception&) {
+            // Continue with other entries if one fails
+            continue;
+        }
     }
     
     return true;
@@ -94,8 +152,13 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Validate input key
+    if (key.empty() || key.length() > 100) {
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&key](const ConfigEntry& e) { return e.key == key; });n
     
     if (it == pImpl->entries.end()) {
         return std::nullopt;
@@ -104,6 +167,9 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    } catch (...) {
+        // Catch any other exceptions and return null
         return std::nullopt;
     }
 }
@@ -115,6 +181,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input parameters
+    if (key.empty() || key.length() > 100) {
+        return;  // Skip invalid keys
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,6 +198,11 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate input
+    if (key.empty() || key.length() > 100) {
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
@@ -143,11 +219,21 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    // Validate input
+    if (key.empty() || key.length() > 100) {
+        return false;
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -173,14 +259,18 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
+        try {
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else {
+                    oss << arg;
+                }
+            }, entry.value);
+        } catch (...) {
+            oss << "ERROR";
+        }
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();

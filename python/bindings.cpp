@@ -342,6 +342,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -350,6 +352,70 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get the random generator")
+        
+        // Spike system access
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get the spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get the STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get the Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get the structural plasticity system")
+        
+        // Memory system access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get the working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get the episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get the associative memory system")
+        
+        // Prediction system access
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get the prediction system")
+        
+        // Cognition system access
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get the neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get the concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get the attentional selection system")
+        
+        // Development system access
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get the development system")
+        
+        // Neuromodulation system access
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get the dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get the curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get the novelty detection system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get the prediction error signal")
+        
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
@@ -398,7 +464,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("enableReplay", &AgentBrain::enableReplay,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("isReplayEnabled", &AgentBrain::isReplayEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -412,14 +484,96 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set reasonable defaults for advanced simulation
+        config->set("neuron_count", 2000, ConfigSource::Default);
+        config->set("region_count", 3, ConfigSource::Default);
+        config->set("connection_probability", 0.15, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("replay_interval", 100, ConfigSource::Default);
+        config->set("consolidation_interval", 1000, ConfigSource::Default);
+        
+        // Enable advanced features by default
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        
+        // Plasticity parameters
+        config->set("stdp_ltp_weight", 0.01, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012, ConfigSource::Default);
+        config->set("stdp_tau", 20.0, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001, ConfigSource::Default);
+        
+        return config;
+    }, "Create an advanced configuration with learning enabled");
+
+    m.def("createPerformanceConfig", [](size_t neuronCount, size_t maxSteps) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        config->set("neuron_count", neuronCount, ConfigSource::Default);
+        config->set("region_count", 3, ConfigSource::Default);
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("max_steps", maxSteps, ConfigSource::Default);
+        
+        // Optimize for performance
+        config->set("enable_reward_modulation", false, ConfigSource::Default);
+        config->set("enable_curiosity", false, ConfigSource::Default);
+        config->set("enable_structural_plasticity", false, ConfigSource::Default);
+        
+        return config;
+    }, py::arg("neuronCount"), py::arg("maxSteps"), "Create a performance-optimized configuration");
+
+    m.def("createDevelopmentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 2, ConfigSource::Default);
+        config->set("connection_probability", 0.08, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        // Enable developmental learning
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+        
+        // Developmental parameters
+        config->set("development_critical_period", 500, ConfigSource::Default);
+        config->set("development_maturation", 1500, ConfigSource::Default);
+        
+        return config;
+    }, "Create a development-focused configuration");
+
+    m.def("benchmarkSimulation", [](const std::shared_ptr<Config>& config, const std::shared_ptr<Brain>& brain, 
+                                   const std::shared_ptr<SimpleWorld>& world, const std::shared_ptr<AgentBrain>& agent, 
+                                   size_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        return std::make_pair(duration.count(), std::make_pair(
+            brain->getAverageFiringRate(),
+            brain->getTotalSpikeCount()
+        ));
+    }, py::arg("config"), py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+        "Run a simulation and return performance metrics");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
 } // namespace nlm
