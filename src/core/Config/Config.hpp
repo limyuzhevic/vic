@@ -58,11 +58,20 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Load from simple key=value format
+    bool loadFromSimpleFile(const std::string& filepath);
     
     // Get values
     template<typename T>
