@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+
+// Forward declarations
+namespace nlm {
+    class JSONParser;
+}
 
 namespace nlm {
 
@@ -55,7 +61,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +106,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    friend class JSONParser;
 };
 
 } // namespace nlm
