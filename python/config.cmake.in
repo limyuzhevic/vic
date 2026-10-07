@@ -1,0 +1,22 @@
+# Configuration template for NLM Python bindings
+# This file is configured during CMake configuration
+
+set(NLM_VERSION "0.1.0")
+set(PYNLM_PACKAGE_NAME "pynlm")
+
+# Include target configuration
+include("${CMAKE_CURRENT_LIST_DIR}/pynlm-targets.cmake")
+
+# Provide convenience variables
+if(TARGET pynlm AND TARGET nlm_core)
+    # Get the library location
+    get_target_property(PYNLM_LOCATION pynlm LOCATION)
+    get_target_property(NLM_CORE_LOCATION nlm_core LOCATION)
+    
+    # Export for downstream usage
+    if(EXPORT_BINDINGS)
+        export(TARGETS pynlm nlm_core nlm_agent nlm_world
+            FILE "${CMAKE_CURRENT_BINARY_DIR}/pynlm-export.cmake"
+        )
+    endif()
+endif()
