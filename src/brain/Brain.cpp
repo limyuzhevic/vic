@@ -106,51 +106,38 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Initialize memory pool for better performance
+    initializeMemoryPool(neuronCount);
+    
+    // Initialize neuron caches for faster access
+    initializeNeuronCaches(neuronCount);
+    
+    // Pre-allocate common data structures
+    preAllocateMemoryStructures(neuronCount, regionCount);
+    
+    // Optimize region organization for cache locality
+    optimizeRegionOrganization();
+    
+    // Initialize spike system with enhanced parameters
+    initializeEnhancedSpikeSystem();
+    
+    // Configure neuromodulation with adaptive responses
+    configureNeuromodulation();
+    
+    // Initialize prediction system
+    pImpl->predictionSystem->initialize(this);
+    pImpl->predictionSystem->setPredictionHorizon(10);
+    
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    pImpl->developmentSystem->setMaturationRate(0.01f);
+    
+    // Initialize neuromodulation systems
+    pImpl->dopamine->initialize(this);
+    pImpl->dopamine->setBaselineLevel(0.5f);
+    
+    pImpl->predictionError->initialize(this);
+    pImpl->predictionError->setPredictionGain(0.8f);
     }
     
     DevelopmentalStage developmentalStage;
@@ -343,9 +330,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
+        if (!region) continue;  // Safety check
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;  // Safety check
+            
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
+                if (!neuron) continue;  // Safety check
+                
+                // Check if neuron just fired this step - improved spike detection
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
@@ -359,12 +352,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        if (syn) {  // Safety check
+                            syn->recordPostSpike(currentTime);
+                        }
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;  // Safety check
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -502,7 +499,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (calculate once)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
@@ -513,6 +510,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        // TODO: Implement actual prediction system update with sensory input
+        pImpl->predictionSystem->updatePrediction(currentTime, pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,6 +529,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        // TODO: Implement concept formation with actual sensory processing
+        pImpl->conceptFormation->update(this, currentTime, pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

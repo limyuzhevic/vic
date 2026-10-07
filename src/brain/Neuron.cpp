@@ -92,7 +92,7 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
+    pImpl->state.refractoryPeriod = std::max<uint32_t>(steps, 0);
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
