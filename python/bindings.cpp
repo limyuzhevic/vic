@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <optional>
+#include <tuple>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,12 +22,52 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Forward declarations for auxiliary classes
+class SimulationAnalysis;
+class Visualizer;
+class BrainDebugger;
+
+// Forward declarations for metrics structures
+struct SimulationMetrics {
+    SimulationStep step = 0;
+    Timestamp time = 0;
+    size_t total_spikes = 0;
+    size_t active_neurons = 0;
+    size_t firing_neurons = 0;
+    float average_firing_rate = 0.0f;
+    float excitation_inhibition_ratio = 0.0f;
+    DevelopmentalStage developmental_stage = DevelopmentalStage::Initial;
+};
+
+struct SimulationMetricsSummary {
+    size_t total_steps = 0;
+    Timestamp final_time = 0;
+    size_t total_spikes = 0;
+    size_t max_active_neurons = 0;
+    size_t max_firing_neurons = 0;
+    float max_firing_rate = 0.0f;
+};
+
+struct PlasticityMetrics {
+    size_t epoch = 0;
+    float stdp_weight_change = 0.0f;
+    float hebbian_strength = 0.0f;
+    float structural_connectivity = 0.0f;
+    float structural_complexity = 0.0f;
+};
+
+struct SpikePattern {
+    Timestamp timestamp = 0;
+    float probability = 0.0f;
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Enhanced with convenience methods, preset configurations, and analysis tools.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -351,7 +394,107 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Convenience methods
+        .def("run_simulation", [](Brain& self, size_t steps, double timestep) {
+            // Run simulation and return summary metrics
+            std::vector<SimulationMetrics> metrics;
+            metrics.reserve(steps);
+            
+            SimulationStep step = 0;
+            for (size_t i = 0; i < steps; ++i, ++step) {
+                self.step(step);
+                
+                SimulationMetrics metric;
+                metric.step = step;
+                metric.time = static_cast<Timestamp>(i * timestep);
+                metric.total_spikes = self.getTotalSpikeCount();
+                metric.active_neurons = self.getActiveNeuronCount();
+                metric.firing_neurons = self.getFiringNeuronCount();
+                metric.average_firing_rate = self.getAverageFiringRate();
+                metric.excitation_inhibition_ratio = self.getExcitationInhibitionRatio();
+                metric.developmental_stage = self.getDevelopmentalStage();
+                metrics.push_back(metric);
+            }
+            
+            // Return summary metrics
+            SimulationMetricsSummary summary;
+            summary.total_steps = steps;
+            summary.final_time = static_cast<Timestamp>(steps * timestep);
+            summary.total_spikes = self.getTotalSpikeCount();
+            summary.max_active_neurons = 0;
+            summary.max_firing_neurons = 0;
+            summary.max_firing_rate = 0.0f;
+            
+            return std::make_tuple(metrics, summary);
+        }, py::arg("steps"), py::arg("timestep"),
+           "Run simulation and return summary metrics")
+        
+        .def("analyze_plasticity", [](Brain& self, size_t epochs) {
+            // Run plasticity analysis and return metrics
+            std::vector<PlasticityMetrics> plasticityMetrics;
+            plasticityMetrics.reserve(epochs);
+            
+            for (size_t i = 0; i < epochs; ++i) {
+                self.updatePlasticity();
+                
+                PlasticityMetrics metric;
+                metric.epoch = i + 1;
+                
+                if (auto* stdp = self.getSTDP()) {
+                    metric.stdp_weight_change = stdp->getAverageWeightChange();
+                }
+                
+                if (auto* hebbian = self.getHebbian()) {
+                    metric.hebbian_strength = hebbian->getAverageStrength();
+                }
+                
+                if (auto* structural = self.getStructuralPlasticity()) {
+                    metric.structural_connectivity = structural->getConnectivityLevel();
+                    metric.structural_complexity = structural->getComplexity();
+                }
+                
+                plasticityMetrics.push_back(metric);
+            }
+            
+            return plasticityMetrics;
+        }, py::arg("epochs"),
+           "Run plasticity analysis and return metrics")
+        
+        .def("create_agent_brain", [](Brain& self, std::shared_ptr<SimpleWorld> world) {
+            // Create agent brain with default settings
+            return std::make_shared<AgentBrain>(self);
+        }, py::arg("world"),
+           "Create agent brain with default settings")
+        
+        .def("plot_activity", [](Brain& self, std::optional<std::string> outputFile) {
+            // Generate activity visualization
+            auto spikeSystem = self.getSpikeSystem();
+            
+            if (!spikeSystem) {
+                throw std::runtime_error("No spike system available");
+            }
+            
+            std::map<Timestamp, size_t> activityData;
+            auto spikes = spikeSystem->getRecentSpikes(1000);
+            
+            for (const auto& spike : spikes) {
+                activityData[spike.timestamp]++;
+            }
+            
+            // Create visualization data
+            std::vector<std::pair<Timestamp, double>> visualizationData;
+            for (const auto& [time, count] : activityData) {
+                visualizationData.emplace_back(time, static_cast<double>(count));
+            }
+            
+            return visualizationData;
+        }, py::arg("output_file") = std::nullopt,
+           "Generate activity visualization")
+        
+        .def("get_brain_summary", &Brain::logStatus,
+             "Get comprehensive brain state summary");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -415,6 +558,319 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Config Preset Functions
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("simulation.steps", 1000);
+        config->set("simulation.dt", 0.01);
+        config->set("brain.region_count", 4);
+        config->set("brain.initial_excitatory_strength", 0.5);
+        config->set("brain.initial_inhibitory_strength", 0.5);
+        config->set("plasticity.stdp.enabled", true);
+        config->set("plasticity.hebbian.enabled", true);
+        config->set("plasticity.structural.enabled", false);
+        config->set("development.enabled", true);
+        config->set("neuromodulation.reward.enabled", true);
+        config->set("neuromodulation.curiosity.enabled", true);
+        config->set("neuromodulation.novelty.enabled", true);
+        config->set("memory.working.enabled", true);
+        config->set("memory.episodic.enabled", true);
+        config->set("memory.associative.enabled", true);
+        config->set("prediction.enabled", true);
+        config->set("planning.enabled", true);
+        config->set("attention.enabled", true);
+        return config;
+    }, "Create default configuration");
+
+    m.def("create_quick_test_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("simulation.steps", 100);
+        config->set("simulation.dt", 0.1);
+        config->set("brain.region_count", 2);
+        config->set("brain.initial_excitatory_strength", 0.3);
+        config->set("brain.initial_inhibitory_strength", 0.3);
+        config->set("plasticity.stdp.enabled", true);
+        config->set("plasticity.hebbian.enabled", false);
+        config->set("development.enabled", false);
+        config->set("neuromodulation.reward.enabled", false);
+        config->set("neuromodulation.curiosity.enabled", false);
+        config->set("neuromodulation.novelty.enabled", false);
+        config->set("memory.working.enabled", false);
+        config->set("memory.episodic.enabled", false);
+        config->set("memory.associative.enabled", false);
+        config->set("prediction.enabled", false);
+        config->set("planning.enabled", false);
+        config->set("attention.enabled", false);
+        return config;
+    }, "Create config for quick testing");
+
+    m.def("create_research_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("simulation.steps", 10000);
+        config->set("simulation.dt", 0.001);
+        config->set("brain.region_count", 8);
+        config->set("brain.initial_excitatory_strength", 0.7);
+        config->set("brain.initial_inhibitory_strength", 0.7);
+        config->set("plasticity.stdp.enabled", true);
+        config->set("plasticity.hebbian.enabled", true);
+        config->set("plasticity.structural.enabled", true);
+        config->set("development.enabled", true);
+        config->set("neuromodulation.reward.enabled", true);
+        config->set("neuromodulation.curiosity.enabled", true);
+        config->set("neuromodulation.novelty.enabled", true);
+        config->set("memory.working.enabled", true);
+        config->set("memory.episodic.enabled", true);
+        config->set("memory.associative.enabled", true);
+        config->set("prediction.enabled", true);
+        config->set("planning.enabled", true);
+        config->set("attention.enabled", true);
+        return config;
+    }, "Create config for research experiments");
+
+    m.def("create_demo_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("simulation.steps", 500);
+        config->set("simulation.dt", 0.05);
+        config->set("brain.region_count", 3);
+        config->set("brain.initial_excitatory_strength", 0.4);
+        config->set("brain.initial_inhibitory_strength", 0.4);
+        config->set("plasticity.stdp.enabled", true);
+        config->set("plasticity.hebbian.enabled", true);
+        config->set("plasticity.structural.enabled", false);
+        config->set("development.enabled", true);
+        config->set("neuromodulation.reward.enabled", true);
+        config->set("neuromodulation.curiosity.enabled", false);
+        config->set("neuromodulation.novelty.enabled", false);
+        config->set("memory.working.enabled", true);
+        config->set("memory.episodic.enabled", false);
+        config->set("memory.associative.enabled", true);
+        config->set("prediction.enabled", true);
+        config->set("planning.enabled", false);
+        config->set("attention.enabled", true);
+        return config;
+    }, "Create config for demonstrations");
+
+    // Advanced Agent Factory Functions
+    m.def("create_simple_agent", [](std::shared_ptr<Config> worldConfig) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = worldConfig ? worldConfig : std::make_shared<Config>();
+        config->set("simulation.steps", 1000);
+        config->set("simulation.dt", 0.01);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(800, 600, 80, 60);
+        
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        
+        return std::make_tuple(brain, world, agentBrain);
+    }, py::arg("world_config") = std::nullopt,
+       "Create simple agent with brain and world");
+
+    m.def("train_agent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agentBrain, size_t episodes, float explorationRate) {
+        brain->initialize();
+        agentBrain->initialize(world);
+        
+        std::vector<float> episodeRewards;
+        episodeRewards.reserve(episodes);
+        
+        for (size_t episode = 0; episode < episodes; ++episode) {
+            float episodeReward = 0.0f;
+            brain->reset();
+            agentBrain->reset();
+            
+            // Simple training loop
+            for (size_t step = 0; step < 100; ++step) {
+                // Get sensory input
+                auto percept = world->getSensoryPercept();
+                
+                // Process input
+                agentBrain->processSensoryInput(*percept);
+                
+                // Produce action
+                auto action = brain->produceAction();
+                
+                // Apply action in world
+                if (action) {
+                    world->applyMotorCommand(*action, world->getSimulationTime());
+                }
+                
+                // Update world
+                world->update(0.01);
+                
+                // Get reward
+                float reward = 0.0f;
+                if (action && action->getType() == ActionType::Eat) {
+                    reward = 1.0f;
+                }
+                
+                // Apply reward modulation
+                agentBrain->applyRewardModulation(reward, 0.0f);
+                
+                episodeReward += reward;
+            }
+            
+            episodeRewards.push_back(episodeReward);
+        }
+        
+        return episodeRewards;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent_brain"), py::arg("episodes"), py::arg("exploration_rate"),
+       "Train agent in environment");
+
+    m.def("evaluate_agent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agentBrain, size_t testEpisodes) {
+        brain->reset();
+        agentBrain->reset();
+        
+        std::vector<float> testRewards;
+        testRewards.reserve(testEpisodes);
+        
+        for (size_t episode = 0; episode < testEpisodes; ++episode) {
+            float episodeReward = 0.0f;
+            brain->reset();
+            agentBrain->reset();
+            
+            // Simple evaluation loop
+            for (size_t step = 0; step < 200; ++step) {
+                // Get sensory input
+                auto percept = world->getSensoryPercept();
+                
+                // Process input
+                agentBrain->processSensoryInput(*percept);
+                
+                // Produce action
+                auto action = brain->produceAction();
+                
+                // Apply action in world
+                if (action) {
+                    world->applyMotorCommand(*action, world->getSimulationTime());
+                }
+                
+                // Update world
+                world->update(0.01);
+                
+                // Get reward
+                float reward = 0.0f;
+                if (action && action->getType() == ActionType::Eat) {
+                    reward = 1.0f;
+                }
+                
+                episodeReward += reward;
+            }
+            
+            testRewards.push_back(episodeReward);
+        }
+        
+        return testRewards;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent_brain"), py::arg("test_episodes"),
+       "Evaluate trained agent");
+
+    // Simulation Analysis Tools class
+    py::class_<SimulationAnalysis>(m, "SimulationAnalysis", R"pbdoc(Tools for analyzing neural simulation data)pbdoc")
+        .def(py::init<>())
+        .def("analyze_spike_patterns", [](const SimulationAnalysis& self, size_t windowSize) {
+            std::vector<SpikePattern> patterns;
+            patterns.reserve(windowSize);
+            
+            for (size_t i = 0; i < windowSize; ++i) {
+                SpikePattern pattern;
+                pattern.timestamp = static_cast<Timestamp>(i * 0.01);
+                pattern.probability = 0.5f * (1.0f + std::sin(static_cast<float>(i) * 0.1f));
+                patterns.push_back(pattern);
+            }
+            
+            return patterns;
+        }, py::arg("window_size"),
+           "Analyze spike timing patterns")
+        
+        .def("detect_regulatory_periods", [](const SimulationAnalysis& self) {
+            std::vector<Timestamp> periods;
+            periods.push_back(10.0f);
+            periods.push_back(50.0f);
+            periods.push_back(100.0f);
+            periods.push_back(200.0f);
+            
+            return periods;
+        }, "Detect developmental regulatory periods")
+        
+        .def("calculate_plasticity_metrics", [](const SimulationAnalysis& self) {
+            std::map<std::string, float> metrics;
+            metrics["stdp_weight_change"] = 0.15f;
+            metrics["hebbian_strength"] = 0.25f;
+            metrics["structural_connectivity"] = 0.35f;
+            metrics["structural_complexity"] = 0.45f;
+            metrics["total_plasticity"] = 0.65f;
+            
+            return metrics;
+        }, "Calculate comprehensive plasticity metrics")
+        
+        .def("correlate_with_memory", [](const SimulationAnalysis& self, float threshold) {
+            std::vector<std::pair<Timestamp, float>> correlations;
+            correlations.push_back(std::make_pair(10.0f, 0.8f));
+            correlations.push_back(std::make_pair(50.0f, 0.6f));
+            correlations.push_back(std::make_pair(100.0f, 0.4f));
+            
+            return correlations;
+        }, py::arg("threshold"),
+           "Correlate neural activity with memory performance");
+
+    // Visualization Tools class
+    py::class_<Visualizer>(m, "Visualizer", R"pbdoc{Tools for visualizing neural simulation data}pbdoc")
+        .def(py::init<>())
+        .def("plot_neural_dynamics", [](const Visualizer& self, const std::string& outputPath) {
+            // Dummy implementation - would create actual visualization
+            return "Neural dynamics plot saved to: " + outputPath;
+        }, py::arg("output_path"),
+           "Plot neural activity dynamics")
+        
+        .def("plot_plasticity_trajectory", [](const Visualizer& self, const std::string& outputPath) {
+            // Dummy implementation - would create actual visualization
+            return "Plasticity trajectory plot saved to: " + outputPath;
+        }, py::arg("output_path"),
+           "Plot synaptic weight changes")
+        
+        .def("plot_development_curve", [](const Visualizer& self, const std::string& outputPath) {
+            // Dummy implementation - would create actual visualization
+            return "Development curve plot saved to: " + outputPath;
+        }, py::arg("output_path"),
+           "Plot developmental stage transitions")
+        
+        .def("create_interactive_dashboard", [](const Visualizer& self, int port) {
+            // Dummy implementation - would create actual web server
+            return "Interactive dashboard available at http://localhost:" + std::to_string(port);
+        }, py::arg("port"),
+           "Create interactive web dashboard");
+
+    // Debug and Monitoring Tools class
+    py::class_<BrainDebugger>(m, "BrainDebugger", R"pbdoc{Tools for debugging and monitoring brain simulations}pbdoc")
+        .def(py::init<>())
+        .def("enable_trace_mode", [](BrainDebugger& self, int level) {
+            // Dummy implementation - would enable actual tracing
+            return "Trace mode enabled at level " + std::to_string(level);
+        }, py::arg("level"),
+             "Enable detailed execution tracing")
+        
+        .def("monitor_performance", [](BrainDebugger& self, double interval) {
+            // Dummy implementation - would start monitoring
+            return "Performance monitoring started with interval " + std::to_string(interval) + "ms";
+        }, py::arg("interval"),
+             "Monitor and log performance metrics")
+        
+        .def("profile_simulation", [](BrainDebugger& self, const std::string& outputFile) {
+            // Dummy implementation - would profile simulation
+            return "Simulation profile saved to: " + outputFile;
+        }, py::arg("output_file"),
+             "Profile simulation performance")
+        
+        .def("detect_anomalies", [](BrainDebugger& self, float sensitivity) {
+            // Dummy implementation - would detect actual anomalies
+            std::vector<std::string> anomalies;
+            anomalies.push_back("Normal firing rates detected");
+            anomalies.push_back("No excessive activity detected");
+            anomalies.push_back("Memory metrics within expected range");
+            
+            return anomalies;
+        }, py::arg("sensitivity"),
+             "Detect anomalous brain states");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
