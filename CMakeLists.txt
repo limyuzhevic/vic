@@ -127,13 +127,18 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase 6 demo executable (updated from original Phase 3/4 demo pattern)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Legacy Phase 3 and Phase 4 demo executables (for backward compatibility)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )

@@ -4,10 +4,13 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**Phase 6 Status**: NLM is now in **Phase 6: Final Integration**, where all previously separate systems have been integrated into a coherent artificial brain. This represents a major architectural shift from previous phases that built disconnected components to a unified, integrated system.
+
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
 3. Using the NLM Python API
+4. **Phase 6 Integration Testing** (NEW)
 
 ---
 
@@ -46,27 +49,322 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | **Main simulation executable (Phase 6: Final Integration)** |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration (legacy) |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration (legacy) |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
 
-### Build Options
+### Running the Demos
+
+#### Phase 6 Integration Demo (Recommended)
 
 ```bash
-# Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+# Run Phase 6 integration demo
+./nlm_phase6_demo
 
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
-
-# Install to custom prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
+# Run with custom configuration
+./nlm_phase6_demo --config=custom_config.cfg
 ```
+
+This runs a comprehensive Phase 6 integration test verifying that all brain systems work together:
+
+- **Memory Integration**: Tests working, episodic, and semantic memory systems
+- **Neuromodulation Integration**: Verifies dopamine, curiosity, and novelty systems
+- **Development Integration**: Checks age-dependent plasticity and development stages
+- **Checkpoint & Replay**: Validates save/load and experience replay
+- **Full Integration**: Runs a complete brain simulation with all systems interacting
+
+#### Legacy Demos
+
+```bash
+# Run Phase 3 demonstration
+./nlm_phase3_demo
+
+# Run Phase 4 demonstration  
+./nlm_phase4_demo
+```
+
+These are maintained for backward compatibility and testing specific phase features.
+
+#### Main Simulation Executable
+
+```bash
+# Run main simulation (Phase 6)
+./nlm
+
+# Run with command line options
+./nlm --random_seed=42 --neuron_count=500
+```
+
+The main executable provides:
+
+- **Phase 6 Integration Tests**: All integration tests in a single run
+- **Configurable Brain**: Build with different neuron counts and parameters
+- **Comprehensive Logging**: Detailed output for debugging and analysis
+- **Integration Verification**: Tests all major brain systems and their interactions
+
+### Running Phase 6 Integration Tests
+
+The Phase 6 integration tests verify that the NLM brain systems work together as a coherent artificial neural substrate. Key tests include:
+
+1. **Integration Verification**: Checks basic brain connectivity and essential systems
+2. **Memory Integration**: Tests working, episodic, and semantic memory functionality
+3. **Neuromodulation Integration**: Verifies dopamine, curiosity, and novelty processing
+4. **Development Integration**: Checks age-dependent plasticity and developmental stages
+5. **Checkpoint & Replay**: Validates save/load and experience replay functionality
+6. **Full Integration Experiment**: Runs a complete simulation with all systems interacting
+
+### Example: Phase 6 Integration Run
+
+```bash
+# Create and build
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run Phase 6 integration demo
+./nlm_phase6_demo
+
+# Run with custom configuration
+./nlm_phase6_demo --config=./configs/custom_phase6.cfg
+
+# Run main simulation with specific parameters
+./nlm --neuron_count=2000 --random_seed=123
+```
+
+### Expected Outputs
+
+#### Integration Test Summary
+
+The Phase 6 integration demo produces output showing:
+
+```
+=== Phase 6 Integration Test Suite ===
+Test 1: Integration Verification
+  ✓ Brain integration verified
+Test 2: Memory Integration Verification
+  ✓ Working memory present
+  ✓ Episodic memory present
+  ✓ Memory systems responsive to updates
+Test 3: Neuromodulation Integration Verification
+  ✓ Neuromodulation systems present
+  ✓ Neuromodulation signals can be applied
+...
+=== Phase 6 Integration Complete ===
+✓ Memory systems connected to neural processing
+✓ Neuromodulation affects plasticity and neural dynamics
+✓ Development affects plasticity rates
+✓ Prediction system integrated with memory
+✓ Replay and consolidation functional
+✓ Checkpoint save/load working
+✓ Integrated brain loop functions coherently
+```
+
+#### Key Integration Achievements
+
+The Phase 6 integration tests verify that NLM has successfully integrated all previously separate systems into a coherent artificial brain with:
+
+- **Memory Systems**: Working, episodic, semantic, and procedural memory connected to neural processing
+- **Neuromodulation**: Dopamine, curiosity, novelty, and prediction error systems affecting plasticity and dynamics
+- **Development**: Age-dependent plasticity rates and developmental stages
+- **Prediction**: Prediction system integrated with memory for learning
+- **Replay & Consolidation**: Episodic memory replay and memory consolidation functionality
+- **Checkpointing**: Save/load and experience replay capabilities
+- **Coherent Brain Loop**: All systems working together in a unified framework
+
+### Monitoring Integration Success
+
+For detailed monitoring of Phase 6 integration, check:
+
+- **Integration Test Results**: Final summary shows all systems connected
+- **Performance Metrics**: Spiking activity, memory capacity, and learning efficiency
+- **Neuromodulation Levels**: Dopamine, curiosity, and novelty signals
+- **Development Progress**: Current developmental stage and plasticity modifier
+- **Checkpoint Status**: Whether save/load and replay are working
+
+The Phase 6 integration represents the completion of NLM's goal to make the existing systems work together as a coherent whole, not just add disconnected components.
+
+---
+
+## Part 1: Building the C++ Project from Source
+
+### Prerequisites
+
+- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher
+- **Python**: 3.8+ (for Python bindings)
+- **pybind11**: Version 2.11.0+ (for Python bindings)
+
+### Build Steps
+
+```bash
+# Navigate to the project directory
+cd /path/to/nlm
+
+# Create a build directory
+mkdir -p build
+cd build
+
+# Configure with CMake (Release build for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | **Main simulation executable (Phase 6: Final Integration)** |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration (legacy) |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration (legacy) |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_test` | Executable | Unit test suite |
+
+### Running the Demos
+
+#### Phase 6 Integration Demo (Recommended)
+
+```bash
+# Run Phase 6 integration demo
+./nlm_phase6_demo
+
+# Run with custom configuration
+./nlm_phase6_demo --config=custom_config.cfg
+```
+
+This runs a comprehensive Phase 6 integration test verifying that all brain systems work together:
+
+- **Memory Integration**: Tests working, episodic, and semantic memory systems
+- **Neuromodulation Integration**: Verifies dopamine, curiosity, and novelty systems
+- **Development Integration**: Checks age-dependent plasticity and development stages
+- **Checkpoint & Replay**: Validates save/load and experience replay
+- **Full Integration**: Runs a complete brain simulation with all systems interacting
+
+#### Legacy Demos
+
+```bash
+# Run Phase 3 demonstration
+./nlm_phase3_demo
+
+# Run Phase 4 demonstration  
+./nlm_phase4_demo
+```
+
+These are maintained for backward compatibility and testing specific phase features.
+
+#### Main Simulation Executable
+
+```bash
+# Run main simulation (Phase 6)
+./nlm
+
+# Run with command line options
+./nlm --random_seed=42 --neuron_count=500
+```
+
+The main executable provides:
+
+- **Phase 6 Integration Tests**: All integration tests in a single run
+- **Configurable Brain**: Build with different neuron counts and parameters
+- **Comprehensive Logging**: Detailed output for debugging and analysis
+- **Integration Verification**: Tests all major brain systems and their interactions
+
+### Running Phase 6 Integration Tests
+
+The Phase 6 integration tests verify that the NLM brain systems work together as a coherent artificial neural substrate. Key tests include:
+
+1. **Integration Verification**: Checks basic brain connectivity and essential systems
+2. **Memory Integration**: Tests working, episodic, and semantic memory functionality
+3. **Neuromodulation Integration**: Verifies dopamine, curiosity, and novelty processing
+4. **Development Integration**: Checks age-dependent plasticity and developmental stages
+5. **Checkpoint & Replay**: Validates save/load and experience replay functionality
+6. **Full Integration Experiment**: Runs a complete simulation with all systems interacting
+
+### Example: Phase 6 Integration Run
+
+```bash
+# Create and build
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run Phase 6 integration demo
+./nlm_phase6_demo
+
+# Run with custom configuration
+./nlm_phase6_demo --config=./configs/custom_phase6.cfg
+
+# Run main simulation with specific parameters
+./nlm --neuron_count=2000 --random_seed=123
+```
+
+### Expected Outputs
+
+#### Integration Test Summary
+
+The Phase 6 integration demo produces output showing:
+
+```
+=== Phase 6 Integration Test Suite ===
+Test 1: Integration Verification
+  ✓ Brain integration verified
+Test 2: Memory Integration Verification
+  ✓ Working memory present
+  ✓ Episodic memory present
+  ✓ Memory systems responsive to updates
+Test 3: Neuromodulation Integration Verification
+  ✓ Neuromodulation systems present
+  ✓ Neuromodulation signals can be applied
+...
+=== Phase 6 Integration Complete ===
+✓ Memory systems connected to neural processing
+✓ Neuromodulation affects plasticity and neural dynamics
+✓ Development affects plasticity rates
+✓ Prediction system integrated with memory
+✓ Replay and consolidation functional
+✓ Checkpoint save/load working
+✓ Integrated brain loop functions coherently
+```
+
+#### Key Integration Achievements
+
+The Phase 6 integration tests verify that NLM has successfully integrated all previously separate systems into a coherent artificial brain with:
+
+- **Memory Systems**: Working, episodic, semantic, and procedural memory connected to neural processing
+- **Neuromodulation**: Dopamine, curiosity, novelty, and prediction error systems affecting plasticity and dynamics
+- **Development**: Age-dependent plasticity rates and developmental stages
+- **Prediction**: Prediction system integrated with memory for learning
+- **Replay & Consolidation**: Episodic memory replay and memory consolidation functionality
+- **Checkpointing**: Save/load and experience replay capabilities
+- **Coherent Brain Loop**: All systems working together in a unified framework
+
+### Monitoring Integration Success
+
+For detailed monitoring of Phase 6 integration, check:
+
+- **Integration Test Results**: Final summary shows all systems connected
+- **Performance Metrics**: Spiking activity, memory capacity, and learning efficiency
+- **Neuromodulation Levels**: Dopamine, curiosity, and novelty signals
+- **Development Progress**: Current developmental stage and plasticity modifier
+- **Checkpoint Status**: Whether save/load and replay are working
+
+The Phase 6 integration represents the completion of NLM's goal to make the existing systems work together as a coherent whole, not just add disconnected components.
+
+---
 
 ---
 
