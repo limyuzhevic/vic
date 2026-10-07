@@ -1,5 +1,6 @@
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
+#include <algorithm>
 #include <cmath>
 
 namespace nlm {
@@ -10,8 +11,11 @@ struct PredictionError::Impl {
     float predictedValue;
     float actualValue;
     std::vector<float> history;
+    float decayRate;
+    float baseline;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f), 
+             decayRate(0.05f), baseline(0.0f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
@@ -36,6 +40,8 @@ void PredictionError::computeError(float predicted, float actual) {
 
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
+    // Decay prediction error over time
+    pImpl->error = std::max(0.0f, pImpl->error - pImpl->decayRate);
 }
 
 const std::vector<float>& PredictionError::getHistory() const {

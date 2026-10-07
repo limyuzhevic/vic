@@ -46,8 +46,14 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Acetylcholine> acetylcholine;
     std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<Novelty> novelty;
     std::unique_ptr<PredictionError> predictionError;
+    std::unique_ptr<Reward> reward;
+    std::unique_ptr<Reward> explorationReward;
     std::unique_ptr<Novelty> novelty;
     
     // Phase 2: Real neural computation components
@@ -126,9 +132,36 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        predictionError = std::make_unique<PredictionError>();
+        reward = std::make_unique<Reward>();
+        explorationReward = std::make_unique<Reward>();
+        
+        // Initialize the new neuromodulators with proper parameters
+        if (norepinephrine) {
+            auto* nePtr = new Norepinephrine();
+            norepinephrine.reset(nePtr);
+        }
+        if (serotonin) {
+            auto* seroPtr = new Serotonin();
+            serotonin.reset(seroPtr);
+        }
+        if (acetylcholine) {
+            auto* achPtr = new Acetylcholine();
+            acetylcholine.reset(achPtr);
+        }
+        if (reward) {
+            auto* rewardPtr = new Reward();
+            reward.reset(rewardPtr);
+        }
+        if (explorationReward) {
+            auto* explRewardPtr = new Reward();
+            explorationReward.reset(explRewardPtr);
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -1057,6 +1090,18 @@ Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
 Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
@@ -1067,6 +1112,14 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+Reward* Brain::getReward() {
+    return pImpl->reward.get();
+}
+
+Reward* Brain::getExplorationReward() {
+    return pImpl->explorationReward.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
@@ -1100,6 +1153,30 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionError->getError()));
+    }
+    if (pImpl->reward) {
+        NLM_LOG_INFO("Reward value: " + std::to_string(pImpl->reward->getValue()));
+    }
+    if (pImpl->explorationReward) {
+        NLM_LOG_INFO("Exploration reward value: " + std::to_string(pImpl->explorationReward->getValue()));
     }
     
     // Development status
