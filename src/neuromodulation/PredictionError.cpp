@@ -1,41 +1,56 @@
 #include "PredictionError.hpp"
-#include "../core/Logger/Logger.hpp"
+#include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
 struct PredictionError::Impl {
-    class Brain* brain;
-    float error;
+    float currentError;
     float predictedValue;
-    float actualValue;
+    float learningRate;
+    float decayRate;
     std::vector<float> history;
+    static constexpr size_t MAX_HISTORY = 100;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : currentError(0.0f), predictedValue(0.0f), learningRate(0.01f), decayRate(0.1f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
 
-void PredictionError::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("PredictionError system initialized");
+void PredictionError::initialize(class Brain* brain) {
+    // Store brain reference if needed for future integration
+    // Currently placeholder implementation
 }
 
 float PredictionError::getError() const {
-    return pImpl->error;
+    return pImpl->currentError;
 }
 
 void PredictionError::computeError(float predicted, float actual) {
+    // Compute prediction error as difference between predicted and actual values
+    // Sign indicates direction of error (positive = predicted too low, negative = predicted too high)
+    
     pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
-    pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+    pImpl->currentError = actual - predicted;
+    
+    // Store in history
+    pImpl->history.push_back(pImpl->currentError);
+    if (pImpl->history.size() > Impl::MAX_HISTORY) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
+    // Update predicted value
     pImpl->predictedValue = newPrediction;
+    
+    // Add to history
+    pImpl->history.push_back(pImpl->currentError);
+    if (pImpl->history.size() > Impl::MAX_HISTORY) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
 }
 
 const std::vector<float>& PredictionError::getHistory() const {
@@ -47,7 +62,8 @@ void PredictionError::clearHistory() {
 }
 
 float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+    // Return absolute value of error for neuromodulation
+    return std::abs(pImpl->currentError);
 }
 
 } // namespace nlm

@@ -1,13 +1,20 @@
 #include "Reward.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
 struct Reward::Impl {
     float currentValue;
     float accumulatedReward;
+    float baseline;
+    float decayRate;
+    float learningRate;
     std::vector<float> history;
+    static constexpr size_t MAX_HISTORY = 100;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    Impl() : currentValue(0.0f), accumulatedReward(0.0f), baseline(0.0f), 
+             decayRate(0.1f), learningRate(0.01f) {}
 };
 
 Reward::Reward() : pImpl(new Impl) {}
@@ -20,11 +27,12 @@ float Reward::getValue() const {
 
 void Reward::setValue(float value) {
     pImpl->currentValue = value;
+    pImpl->accumulatedReward += value;
 }
 
 void Reward::add(float delta) {
-    pImpl->accumulatedReward += delta;
     pImpl->currentValue += delta;
+    pImpl->accumulatedReward += delta;
 }
 
 void Reward::reset() {
