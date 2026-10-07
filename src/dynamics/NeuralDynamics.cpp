@@ -1,5 +1,6 @@
 #include "NeuralDynamics.hpp"
 #include <cmath>
+#include <memory>
 
 namespace nlm {
 
@@ -13,6 +14,15 @@ struct IntegrateAndFireDynamics::Impl {
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
+
+IntegrateAndFireDynamics::IntegrateAndFireDynamics(IntegrateAndFireDynamics&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+IntegrateAndFireDynamics& IntegrateAndFireDynamics::operator=(IntegrateAndFireDynamics&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
     // TODO PHASE 2: Implement real integrate-and-fire dynamics

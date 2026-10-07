@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
+#include <memory>
 
 namespace nlm {
 
@@ -35,7 +36,7 @@ public:
 class IntegrateAndFireDynamics : public NeuralDynamics {
 public:
     IntegrateAndFireDynamics();
-    ~IntegrateAndFireDynamics() override;
+    ~IntegrateAndFireDynamics() override = default;
     
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
@@ -43,13 +44,17 @@ public:
     bool shouldFire(const Neuron* neuron) const override;
     void reset() override;
     
+    // Enable moving
+    IntegrateAndFireDynamics(IntegrateAndFireDynamics&&) noexcept;
+    IntegrateAndFireDynamics& operator=(IntegrateAndFireDynamics&&) noexcept;
+    
     // Parameters
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Hodgkin-Huxley dynamics (detailed model)

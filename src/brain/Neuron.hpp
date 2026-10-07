@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
 
 namespace nlm {
 
@@ -47,7 +48,7 @@ public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
-    ~Neuron();
+    ~Neuron() = default;
     
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
@@ -145,7 +146,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

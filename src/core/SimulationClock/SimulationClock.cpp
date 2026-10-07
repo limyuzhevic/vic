@@ -1,5 +1,6 @@
 #include "SimulationClock.hpp"
 #include <chrono>
+#include <memory>
 
 namespace nlm {
 
@@ -18,15 +19,11 @@ SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(tim
 
 SimulationClock::~SimulationClock() = default;
 
-SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }

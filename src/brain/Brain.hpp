@@ -53,7 +53,7 @@ public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
     
-    ~Brain();
+    ~Brain() = default;
     
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
@@ -195,7 +195,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

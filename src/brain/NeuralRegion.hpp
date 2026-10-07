@@ -20,7 +20,7 @@ public:
     // Create region with ID and name
     NeuralRegion(RegionId id, const std::string& name);
     
-    ~NeuralRegion();
+    ~NeuralRegion() = default;
     
     // Disable copying, enable moving
     NeuralRegion(const NeuralRegion&) = delete;
@@ -81,7 +81,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

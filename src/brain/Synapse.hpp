@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
+#include <array>
+#include <memory>
 
 namespace nlm {
 
@@ -15,7 +18,7 @@ public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
-    ~Synapse();
+    ~Synapse() = default;
     
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;
@@ -82,7 +85,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

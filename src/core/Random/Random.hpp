@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <memory>
 
 namespace nlm {
 
@@ -19,7 +20,7 @@ public:
     // Create with time-based seed (not deterministic)
     RandomGenerator();
     
-    ~RandomGenerator();
+    ~RandomGenerator() = default;
     
     // Disable copying
     RandomGenerator(const RandomGenerator&) = delete;
@@ -88,7 +89,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations
