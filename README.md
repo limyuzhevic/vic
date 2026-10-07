@@ -82,112 +82,144 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+### Configuration File Options
 
+The NLM framework supports multiple configuration file formats:
+
+#### Simple Key=Value Format (Default)
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+# Example config file
+neuron_count = 1000
+region_count = 1
+connection_probability = 0.15
+dopamine_baseline = 0.1
+reward_discount_factor = 0.99
+simulation_timestep = 0.001
 ```
 
-## Phase Summary
+#### JSON Format
+```json
+{
+  "neuron_count": 1000,
+  "region_count": 1,
+  "connection_probability": 0.15,
+  "dopamine_baseline": 0.1,
+  "reward_discount_factor": 0.99,
+  "simulation_timestep": 0.001,
+  "stdp_ltp_weight": 0.01,
+  "stdp_ltd_weight": 0.012
+}
+```
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+#### YAML Format
+```yaml
+neuron_count: 1000
+region_count: 1
+connection_probability: 0.15
+dopamine_baseline: 0.1
+reward_discount_factor: 0.99
+simulation_timestep: 0.001
+stdp_ltp_weight: 0.01
+stdp_ltd_weight: 0.012
+```
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+## Command Line Interface
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+### Phase 6 Demo Options
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+```bash
+nlm_phase6_demo [options]
+```
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+**Options:**
+- `--neurons=N` Number of neurons (default: 500)
+- `--steps=N` Maximum simulation steps (default: 1000)
+- `--regions=N` Number of brain regions (default: 1)
+- `--conn_prob=VAL` Connection probability (default: 0.15)
+- `--dev[elopment]` Enable development system
+- `--checkpoint=FILE` Checkpoint file path (enable checkpointing)
+- `--config=FILE` Load configuration from file
+- `--verbose` Enable verbose output
+- `--help` Show this help message
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+**Examples:**
+```bash
+nlm_phase6_demo --neurons=1000 --steps=5000
+nlm_phase6_demo --dev --checkpoint=./checkpoint.bin
+nlm_phase6_demo --config=./myconfig.json --verbose
+```
 
-## Scientific Limitations
+### Configuration Generation
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+```bash
+nlm_phase6_demo --config=./myconfig.json --verbose
+```
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+This will load the configuration from the specified file. The framework automatically detects
+whether the file is in JSON, YAML, or simple key=value format.
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+## Testing
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+The framework includes comprehensive tests that verify:
 
-## Architecture Philosophy
+1. **Config Class Tests**
+   - Basic functionality (set, get, remove, keys)
+   - JSON and YAML parsing
+   - File loading and saving
+   - Validation and error handling
+
+2. **Brain System Tests**
+   - Initialization and basic functionality
+   - Simulation and spike generation
+   - Memory system integration
+   - Neuromodulation system integration
+   - Prediction system integration
+   - Development system integration
+   - Cognition system integration
+
+3. **Agent Tests**
+   - Agent brain initialization
+   - Sensory processing
+   - Motor decoding
+
+4. **Phase 6 Integration Tests**
+   - Complete integration verification
+   - Memory integration tests
+   - Neuromodulation integration tests
+   - Checkpointing and replay tests
+
+To run the comprehensive test suite:
+```bash
+cd tests
+./nlm_test
+```
+
+## Configuration File Format Examples
+
+### Default Configuration
+The framework includes a default configuration file (`configs/default.cfg`) in simple key=value format. It can be customized by:
+
+1. **Command line arguments:** `--key=value`
+2. **Configuration files:** JSON, YAML, or simple format
+3. **Runtime settings:** Modify during simulation
+
+### Configuration File Loading Priority
+
+1. **Command line arguments** (highest priority)
+2. **Configuration file** (specified with `--config` or loaded from default)
+3. **Default configuration** (built into the application)
+
+### Configuration Validation
+
+The framework validates configuration parameters:
+- Neuron count must be > 0
+- Step count must be > 0
+- Region count must be > 0
+- Connection probability must be between 0.0 and 1.0
+
+## Technical Details
+
+### Architecture
 
 The NLM brain operates as a closed-loop system:
 
@@ -220,6 +252,73 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+### Key Features
+
+#### 1. Neural Dynamics
+- Leaky Integrate-and-Fire (LIF) neuron model
+- Event-driven spike propagation with delays
+- Synaptic transmission and plasticity
+
+#### 2. Memory Systems
+- Working memory with persistent activity
+- Episodic memory with experience encoding and replay
+- Semantic and procedural memory systems
+- Associative memory with Hebbian learning
+
+#### 3. Neuromodulation
+- Dopamine for reward prediction error
+- Curiosity for exploration behavior
+- Novelty detection for learning modulation
+
+#### 4. Prediction System
+- Forward models for sensory prediction
+- Prediction error signals for learning
+- Confidence estimation for decision making
+
+#### 5. Cognitive Mechanisms
+- Neural planning and action selection
+- Concept formation from patterns
+- Attentional selection and competition
+
+#### 6. Development
+- Developmental stages affecting plasticity
+- Structural changes over time
+- Maturation of cognitive abilities
+
+#### 7. Persistence
+- Checkpoint save/load functionality
+- Memory consolidation during replay
+- Experience replay for learning
+
+## Scientific Limitations
+
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No detailed cortical architecture
+- No claim of consciousness, intelligence, or human-like cognition
+- Limited to what can be simulated with available computing resources
+
+Phase 6 does NOT claim:
+- Human intelligence
+- Consciousness or sentience
+- Human-like reasoning
+- Genuine subjective experience
+
+Phase 6 DOES investigate:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in a coordinated way
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+- Whether the complete brain loop functions coherently
+
+## Architecture Philosophy
+
+The NLM brain operates as a closed-loop system where all components interact dynamically through neuromodulation, prediction, and plasticity mechanisms. The system continuously learns from experience and develops new capabilities through interaction with its environment.
 
 ## License
 

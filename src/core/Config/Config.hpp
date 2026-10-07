@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <cstdint>
 
 namespace nlm {
 
@@ -15,6 +16,7 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    uint64_t,
     double,
     bool,
     std::string,
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -75,6 +77,8 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, uint64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -100,6 +104,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isJSONFormat(const std::string& content);
+    static bool isYAMLFormat(const std::string& content);
+    bool loadFromSimpleFormat(const std::string& content);
+    bool loadFromJSON(const std::string& content);
+    bool loadFromYAML(const std::string& content);
+    ConfigValue jsonValueToConfigValue(const nlohmann::json& json);
+    ConfigValue yamlValueToConfigValue(const YAML::Node& yaml);
+    
+    template<typename T, typename ElementType>
+    static bool allElementsAreType(const nlohmann::json& json);
 };
 
 } // namespace nlm
