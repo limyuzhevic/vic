@@ -256,13 +256,14 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### Key Classes and Methods (ENHANCED)
 
 #### Brain Class
 
 ```python
-# Creation
-brain = pynlm.createBrain(config)
+# Creation (ENHANCED)
+brain = pynlm.createQuickBrain()  # NEW: Quick setup with defaults
+brain = pynlm.createBrain(config)  # Existing
 
 # Initialization
 brain.initialize()
@@ -276,12 +277,14 @@ brain.reset()                     # Reset brain state
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
 action = brain.produceAction()             # Get motor action
 
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
+# Enhanced Statistics (NEW PROPERTIES)
+brain.neuron_count                    # NEW: Total neurons
+brain.synapse_count                   # NEW: Total synapses
+brain.firing_neuron_count             # NEW: Currently firing
+brain.average_firing_rate             # NEW: Average firing rate
+brain.excitation_inhibition_ratio    # NEW: E/I balance
+brain.total_spike_count               # NEW: Total spikes
+brain.developmental_stage             # NEW: Current developmental stage
 
 # State
 brain.save("checkpoint.bin")       # Save state
@@ -292,11 +295,13 @@ region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
 ```
 
-#### Config Class
+#### Config Class (ENHANCED)
 
 ```python
-# Create
-config = pynlm.createDefaultConfig()
+# Creation (ENHANCED with presets)
+config = pynlm.createDefaultConfig()      # NEW: Default settings
+config = pynlm.createMinimalConfig()      # NEW: Quick testing
+config = pynlm.createResearchConfig()     # NEW: Research experiments
 
 # Query
 if config.has("brain.neuron_count"):
@@ -311,11 +316,14 @@ config.loadFromFile("config.json")
 config.saveToFile("config.json")
 ```
 
-#### AgentBrain Class
+#### AgentBrain Class (ENHANCED)
 
 ```python
-# Creation
+# Creation (ENHANCED)
 agent = pynlm.createAgentBrain(brain)
+
+# NEW: Create complete agent setup
+brain, agent = pynlm.createAgentSetup(world)
 
 # Initialization
 agent.initialize(world)
@@ -333,17 +341,18 @@ agent.applyRewardModulation(reward, predicted_reward)
 agent.updateDevelopment(timestep)
 agent.getDevelopmentalStage()
 
+# Enhanced statistics (NEW PROPERTIES)
+agent.curiosity_level               # NEW: Current curiosity
+agent.novelty_level                 # NEW: Current novelty
+agent.neuromodulation_level         # NEW: Current neuromodulation
+agent.prediction_error              # NEW: Current prediction error
+agent.developmental_stage            # NEW: Current developmental stage
+
 # Subsystem enable/disable
 agent.enableRewardModulation(True/False)
 agent.enableStructuralPlasticity(True/False)
 agent.enableDevelopment(True/False)
 agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
 ```
 
 #### SimpleWorld Class
