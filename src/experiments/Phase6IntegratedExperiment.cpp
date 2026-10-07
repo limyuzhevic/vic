@@ -45,13 +45,23 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     SimpleWorld world;
     world.initialize(16, 16);
     
-    // Create agent
-    AgentBrain agent(brain);
+    // Create agent with config
+    AgentBrain agent(brain, cfg);
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
+    
+    // Set additional config values for AgentBrain
+    cfg->set("sensory_vision_scale", 5.0f, ConfigSource::Default);
+    cfg->set("sensory_touch_scale", 8.0f, ConfigSource::Default);
+    cfg->set("sensory_internal_scale", 5.0f, ConfigSource::Default);
+    cfg->set("sensory_proprioception_scale", 3.0f, ConfigSource::Default);
+    cfg->set("curiosity_threshold", 0.3f, ConfigSource::Default);
+    cfg->set("exploration_rate", 0.3f, ConfigSource::Default);
+    cfg->set("action_selection_threshold", 0.5f, ConfigSource::Default);
+    cfg->set("enable_advanced_commands", true, ConfigSource::Default);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     

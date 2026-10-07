@@ -1,12 +1,10 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+#include "Config.hpp"
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config)
     : brain_(brain)
+    , config_(config)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -89,37 +87,41 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
+    float visionScale = config_ ? config_->getOr<float>("sensory_vision_scale", 5.0f) : 5.0f;
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * visionScale;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
+    float touchScale = config_ ? config_->getOr<float>("sensory_touch_scale", 8.0f) : 8.0f;
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * touchScale;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
+    float internalScale = config_ ? config_->getOr<float>("sensory_internal_scale", 5.0f) : 5.0f;
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 2.0f - 1.0f) * internalScale;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
+    float proprioScale = config_ ? config_->getOr<float>("sensory_proprioception_scale", 3.0f) : 3.0f;
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 2.0f - 1.0f) * proprioScale;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -138,9 +140,13 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
-        previousVision_ = vision;
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Store previous vision for next comparison
+    previousVision_ = vision;
+}
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
@@ -149,7 +155,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
@@ -202,7 +207,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    float actionSelectionThreshold = config_ ? config_->getOr<float>("action_selection_threshold", 0.5f) : 0.5f;
+    if (bestActivity < actionSelectionThreshold) {
         return MotorCommand::Wait;
     }
     
@@ -210,15 +216,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 29); // 0-28 inclusive (29 values)
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -226,8 +225,30 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 3: return MotorCommand::TurnRight;
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 6: return MotorCommand::LookUp;
+                case 7: return MotorCommand::LookDown;
+                case 8: return MotorCommand::TurnAround;
+                case 9: return MotorCommand::Crouch;
+                case 10: return MotorCommand::Jump;
+                case 11: return MotorCommand::Attack;
+                case 12: return MotorCommand::Flee;
+                case 13: return MotorCommand::Investigate;
+                case 14: return MotorCommand::Speak;
+                case 15: return MotorCommand::Grasp;
+                case 16: return MotorCommand::Drop;
+                case 17: return MotorCommand::Open;
+                case 18: return MotorCommand::Close;
+                case 19: return MotorCommand::Use;
+                case 20: return MotorCommand::Give;
+                case 21: return MotorCommand::Take;
+                case 22: return MotorCommand::Follow;
+                case 23: return MotorCommand::Guard;
+                case 24: return MotorCommand::Patrol;
+                case 25: return MotorCommand::Sleep;
+                case 26: return MotorCommand::Die;
+                case 27: return MotorCommand::Custom;
+                case 28: return MotorCommand::Wait;
+                default: return MotorCommand::Wait; // Fallback
             }
         }
     }

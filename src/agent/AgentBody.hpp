@@ -62,7 +62,30 @@ enum class MotorCommand {
     LookLeft = 4,      // Pan sensor left
     LookRight = 5,     // Pan sensor right
     Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    Wait = 7,          // No movement
+    // Advanced commands for more sophisticated behavior
+    LookUp = 8,        // Raise head/view up
+    LookDown = 9,      // Lower head/view down
+    TurnAround = 10,   // Rotate 180 degrees
+    Crouch = 11,       // Lower body position
+    Jump = 12,         // Jump/exert force
+    Attack = 13,       // Attack nearby entity
+    Flee = 14,         // Escape from danger
+    Investigate = 15,  // Investigate nearby object
+    Speak = 16,        // Make sound/communication
+    Grasp = 17,        // Grasp object
+    Drop = 18,         // Release object
+    Open = 19,         // Open doors/container
+    Close = 20,        // Close doors/container
+    Use = 21,          // Use item/object
+    Give = 22,         // Give item to nearby
+    Take = 23,         // Take item from environment
+    Follow = 24,       // Follow another entity
+    Guard = 25,        // Guard position/object
+    Patrol = 26,       // Walk in pattern
+    Sleep = 27,        // Enter rest state
+    Die = 28,          // Death state
+    Custom = 99        // For custom user commands
 };
 
 // Action result from the world's perspective

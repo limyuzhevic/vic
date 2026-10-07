@@ -13,7 +13,7 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
     ~AgentBrain();
     
     // Initialize with world
@@ -75,8 +75,9 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<Config> config_;  // Configuration for AgentBrain
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
