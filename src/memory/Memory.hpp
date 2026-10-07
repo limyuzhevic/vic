@@ -14,25 +14,11 @@ public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Get neurons in working memory
+    std::vector<NeuronId> getMemoryNeurons() const;
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
-    
-    // Check if item exists
-    bool contains(NeuronId neuron) const;
-    
-    // Clear all
-    void clear();
-    
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
-    
-    // Decay all items
-    void decay(float decayRate);
+    // Store to neuron (alias for store)
+    void storeToNeuron(NeuronId neuron, float value);
     
 private:
     struct Impl;

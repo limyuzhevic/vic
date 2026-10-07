@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -25,9 +12,14 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MotorSystem;
+class VisualizationInterface;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -96,6 +88,19 @@ public:
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
+    
+    // Apply neuromodulatory signals
+    void applyNeuromodulation();
+    
+    // Get neuromodulator levels
+    float getDopamineLevel() const;
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
+    
+    // Motor system access
+    MotorSystem* getMotorSystem();
+    const MotorSystem* getMotorSystem() const;
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);

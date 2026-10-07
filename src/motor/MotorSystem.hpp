@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Action.hpp"
+#include "../brain/Brain.hpp"
 #include <memory>
 #include <vector>
 
@@ -14,9 +15,12 @@ public:
     MotorSystem();
     ~MotorSystem();
     
+    // Initialize motor system with brain reference
+    void initialize(Brain* brain);
+    
     // Select action based on neural activity
     // TODO PHASE 2: Implement real action selection
-    std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
+    std::unique_ptr<Action> selectAction(const NeuralRegion& motorRegion);
     
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;

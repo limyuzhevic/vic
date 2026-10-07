@@ -54,15 +54,30 @@ size_t WorkingMemory::getCapacity() const {
     return pImpl->capacity;
 }
 
-size_t WorkingMemory::getCurrentSize() const {
-    return pImpl->items.size();
-}
-
-void WorkingMemory::decay(float decayRate) {
-    for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
+    size_t WorkingMemory::getCurrentSize() const {
+        return pImpl->items.size();
     }
-}
+    
+    void WorkingMemory::decay(float decayRate) {
+        for (auto& item : pImpl->items) {
+            item.second *= (1.0f - decayRate);
+        }
+    }
+    
+    // Store to neuron (alias for store)
+    void WorkingMemory::storeToNeuron(NeuronId neuron, float value) {
+        store(neuron, value);
+    }
+    
+    // Get neurons in working memory
+    std::vector<NeuronId> WorkingMemory::getMemoryNeurons() const {
+        std::vector<NeuronId> neurons;
+        neurons.reserve(pImpl->items.size());
+        for (const auto& item : pImpl->items) {
+            neurons.push_back(item.first);
+        }
+        return neurons;
+    }
 
 // Episodic Memory Implementation
 struct EpisodicMemory::Impl {

@@ -14,25 +14,16 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
-    // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
-    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    // Initialize prediction system with reference to brain
+    void initialize(const Brain* brain) {
+        pImpl->brain = brain;
+    }
     
-    // Update predictions based on actual observation
-    void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    // Set prediction model based on neural activity
+    void setModelFromNeurons();
     
-    // Get prediction error
-    float getPredictionError() const;
-    
-    // Get prediction confidence
-    float getConfidence() const;
-    
-    // Get prediction history
-    const std::vector<float>& getErrorHistory() const;
-    void clearHistory();
-    
-    // Train prediction model
-    void train(const SensoryInput& observation);
+    // Get current prediction based on neural state
+    std::unique_ptr<SensoryInput> getCurrentPrediction() const;
     
 private:
     struct Impl;
