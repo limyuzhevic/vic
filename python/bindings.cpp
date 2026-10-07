@@ -19,12 +19,58 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Python exception types for better error handling
+class PythonConfigError : public std::runtime_error {
+public:
+    explicit PythonConfigError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class PythonBrainError : public std::runtime_error {
+public:
+    explicit PythonBrainError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class PythonSimulationError : public std::runtime_error {
+public:
+    explicit PythonSimulationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Usage Example:
+        ```python
+        import pynlm
+        
+        # Create configuration with sensible defaults
+        config = pynlm.Config()
+        config.set("neuron_count", 100)
+        config.set("region_count", 2)
+        config.set("connection_probability", 0.1)
+        
+        # Create brain
+        brain = pynlm.Brain(config)
+        brain.initialize()
+        
+        # Main simulation loop
+        for step in range(1000):
+            brain.step(step)
+            if step % 100 == 0:
+                print(f"Step {step}: Average firing rate = {brain.getAverageFiringRate():.2f}")
+        
+        # Get brain statistics
+        stats = {
+            "total_neurons": brain.getTotalNeuronCount(),
+            "total_synapses": brain.getTotalSynapseCount(),
+            "active_neurons": brain.getActiveNeuronCount(),
+            "firing_neurons": brain.getFiringNeuronCount(),
+            "avg_firing_rate": brain.getAverageFiringRate()
+        }
+        ```
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -142,7 +188,9 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        // Python context manager support for automatic cleanup
+    py::class_<Config> config_class(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc");
+    config_class
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -162,6 +210,40 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        // Add Python-specific convenience methods
+        .def("get_int", [](Config& self, const std::string& key, int default_value) {
+            auto val = self.get<int>(key);
+            return val ? *val : default_value;
+        }, py::arg("key"), py::arg("default_value"), "Get integer value or default")
+        .def("get_float", [](Config& self, const std::string& key, float default_value) {
+            auto val = self.get<double>(key);
+            return val ? *val : default_value;
+        }, py::arg("key"), py::arg("default_value"), "Get float value or default")
+        .def("get_string", [](Config& self, const std::string& key, const std::string& default_value) {
+            auto val = self.get<std::string>(key);
+            return val ? *val : default_value;
+        }, py::arg("key"), py::arg("default_value"), "Get string value or default")
+        .def("get_bool", [](Config& self, const std::string& key, bool default_value) {
+            auto val = self.get<bool>(key);
+            return val ? *val : default_value;
+        }, py::arg("key"), py::arg("default_value"), "Get boolean value or default")
+        .def("set_int", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set integer value")
+        .def("set_float", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set float value")
+        .def("set_string", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set string value")
+        .def("set_bool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set boolean value")
+        // Python context manager support
+        .def("__enter__", [](Config& self) { return &self; })
+        .def("__exit__", [](Config& self, py::args) {
+            self.clear();
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -348,12 +430,10 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+              "Log brain status");
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -420,6 +500,19 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Register custom Python exception types
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const PythonConfigError& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const PythonBrainError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const PythonSimulationError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
 }
 
 } // namespace nlm
