@@ -14,6 +14,19 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
+# Create a list of all binding source files
+file(GLOB NLM_BINDING_SOURCES
+    "id_types.cpp"
+    "enums.cpp"
+    "config_bindings.cpp"
+    "sensory_bindings.cpp"
+    "state_bindings.cpp"
+    "world_bindings.cpp"
+    "brain_bindings.cpp"
+    "agent_bindings.cpp"
+    "main_bindings.cpp"
+)
+
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
@@ -87,7 +100,8 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Main Python module
+pybind11_add_module(pynlm ${NLM_BINDING_SOURCES})
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
@@ -99,4 +113,64 @@ install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+enable_testing()
+add_test(NAME test_python_bindings
+    COMMAND ${PYTHON_EXECUTABLE} -c "import pynlm; print('Python bindings imported successfully')"
+)
+
+# Documentation target for generating API docs
+add_custom_target(generate_python_docs
+    COMMAND ${PYTHON_EXECUTABLE} -c "
+import pynlm
+import inspect
+
+# Get all public classes and functions from the module
+classes = []
+functions = []
+
+for name in dir(pynlm):
+    if not name.startswith('_'):
+        obj = getattr(pynlm, name)
+        if inspect.isclass(obj):
+            classes.append(name)
+        elif callable(obj) and not inspect.ismethod(obj):
+            functions.append(name)
+
+# Create documentation structure
+doc = {
+    'module': 'pynlm',
+    'classes': classes,
+    'functions': functions,
+    'version': '0.1.0'
+}
+
+# Write to documentation file
+with open('python_bindings_api.md', 'w') as f:
+    f.write('# NLM Python Bindings API Documentation\\n\\n')
+    f.write(f"**Version**: {doc['version']}\\n\\n")
+    f.write('## Classes\\n')
+    for cls in sorted(classes):
+        f.write(f'- `{cls}`\\n')
+    f.write('\\n## Functions\\n')
+    for func in sorted(functions):
+        f.write(f'- `{func}`\\n')
+"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Generate Python bindings documentation"
+    VERBATIM
+)
+
+# Help target for developers
+add_custom_target(help
+    COMMAND ${CMAKE_COMMAND} -E echo "Available targets for Python bindings:"
+    COMMAND ${CMAKE_COMMAND} -E echo "  all - Build all targets (default)"
+    COMMAND ${CMAKE_COMMAND} -E echo "  pynlm - Build Python module only"
+    COMMAND ${CMAKE_COMMAND} -E echo "  nlm_core - Build core C++ library only"
+    COMMAND ${CMAKE_COMMAND} -E echo "  tests - Run Python binding tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  generate_python_docs - Generate API documentation"
+    COMMAND ${CMAKE_COMMAND} -E echo "  help - Show this help message"
+    COMMENT "Show available build targets for Python bindings"
+    VERBATIM
 )
