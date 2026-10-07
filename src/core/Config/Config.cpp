@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +20,72 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Parse JSON using nlohmann/json
+        auto json = nlohmann::json::parse(file);
+        
+        clear();
+        
+        // Process JSON object
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            
+            // Determine value type and store appropriately
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File);
+            } else if (it->is_number_unsigned()) {
+                set(key, static_cast<int64_t>(it->get<uint64_t>()), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // Try to infer array element type
+                if (!it->empty()) {
+                    auto firstElem = it->front();
+                    if (firstElem.is_string()) {
+                        std::vector<std::string> strArray;
+                        for (const auto& elem : *it) {
+                            strArray.push_back(elem.get<std::string>());
+                        }
+                        set(key, strArray, ConfigSource::File);
+                    } else if (firstElem.is_number_integer()) {
+                        std::vector<int64_t> intArray;
+                        for (const auto& elem : *it) {
+                            intArray.push_back(elem.get<int64_t>());
+                        }
+                        set(key, intArray, ConfigSource::File);
+                    } else if (firstElem.is_number_float()) {
+                        std::vector<double> doubleArray;
+                        for (const auto& elem : *it) {
+                            doubleArray.push_back(elem.get<double>());
+                        }
+                        set(key, doubleArray, ConfigSource::File);
+                    }
+                }
+            }
+        }
+        
+        return true;
+        
+    } catch (const nlohmann::json::exception& e) {
+        // If JSON parsing fails, fall back to simple key=value format
+        // for backward compatibility
+        return loadFromSimpleFile(filepath);
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
+    // Backward compatibility: parse simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,10 +148,62 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Write in JSON format for better compatibility
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": \"";
+        
+        // Convert value to string based on type
+        std::visit([&file](const auto& val) {
+            if constexpr (std::is_same_v<decltype(val), std::string>) {
+                file << val;
+            } else if constexpr (std::is_same_v<decltype(val), int> ||
+                                 std::is_same_v<decltype(val), int64_t>) {
+                file << val;
+            } else if constexpr (std::is_same_v<decltype(val), double>) {
+                // Format double with reasonable precision
+                file << std::fixed << std::setprecision(6) << val;
+            } else if constexpr (std::is_same_v<decltype(val), bool>) {
+                file << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << val[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << val[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << "\"" << val[j] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "\"UNKNOWN_TYPE\"";
+            }
+        }, entry.value);
+        
+        file << "\"";
+        
+        // Add source information as comment for debugging
+        file << " // Source: " << static_cast<int>(entry.source);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
+    file << "}\n";
     
     return true;
 }
