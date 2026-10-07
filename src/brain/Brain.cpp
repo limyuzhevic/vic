@@ -91,7 +91,11 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -130,27 +134,51 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // **CONFIGURATION VALIDATION: Validate plasticity parameters**
+    if (ltpWeight < 0.0f || ltpWeight > 1.0f) {
+        NLM_LOG_WARNING("STDP LTP weight " + std::to_string(ltpWeight) + " outside typical range [0.0, 1.0]");
+    }
+    if (ltdWeight < 0.0f || ltdWeight > 1.0f) {
+        NLM_LOG_WARNING("STDP LTD weight " + std::to_string(ltdWeight) + " outside typical range [0.0, 1.0]");
+    }
+    if (tau < 1.0f || tau > 100.0f) {
+        NLM_LOG_WARNING("STDP time constant " + std::to_string(tau) + " outside typical range [1.0, 100.0] ms");
+    }
+    
+    // **VALIDATION: Structural plasticity rates**
+    if (synaptogenesisRate < 0.0f || synaptogenesisRate > 0.01f) {
+        NLM_LOG_WARNING("Synaptogenesis rate " + std::to_string(synaptogenesisRate) + " outside typical range [0.0, 0.01]");
+    }
+    if (pruningRate < 0.0f || pruningRate > 0.0001f) {
+        NLM_LOG_WARNING("Pruning rate " + std::to_string(pruningRate) + " outside typical range [0.0, 0.0001]");
+    }
+    
+    // **VALIDATION: Simulation timestep**
+    if (timestep <= 0.0 || timestep > 0.01) {
+        NLM_LOG_WARNING("Simulation timestep " + std::to_string(timestep) + " outside typical range (0.0, 0.01] s");
+    }
+    
+    // **VALIDATION: Integration intervals**
+    if (replayInterval < 1 || replayInterval > 10000) {
+        NLM_LOG_WARNING("Replay interval " + std::to_string(replayInterval) + " outside typical range [1, 10000] steps");
+    }
+    if (consolidationInterval < 100 || consolidationInterval > 1000000) {
+        NLM_LOG_WARNING("Consolidation interval " + std::to_string(consolidationInterval) + " outside typical range [100, 1000000] steps");
+    }
+    
+    // **CONFIGURATION VALIDATION: Log validated parameters for debugging**
+    NLM_LOG_INFO("Validated configuration:");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(neuronCount));
+    NLM_LOG_INFO("  region_count: " + std::to_string(regionCount));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(connectionProbability));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(ltpWeight));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(ltdWeight));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(tau));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(synaptogenesisRate));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(pruningRate));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(timestep));
+    NLM_LOG_INFO("  replay_interval: " + std::to_string(replayInterval));
+    NLM_LOG_INFO("  consolidation_interval: " + std::to_string(consolidationInterval));
     }
     
     DevelopmentalStage developmentalStage;
@@ -177,10 +205,37 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // **CRITICAL VALIDATION: Ensure configuration is properly loaded**
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain initialization failed: Config not properly initialized");
+        return false;
+    }
+    
+    // Get configuration values with enhanced validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    
+    // **VALIDATION: Neuron count must be within reasonable bounds for simulation**
+    if (neuronCount < 10) {
+        NLM_LOG_WARNING("Neuron count very low (" + std::to_string(neuronCount) + ") - may not produce meaningful results");
+    } else if (neuronCount > 100000) {
+        NLM_LOG_WARNING("Neuron count very high (" + std::to_string(neuronCount) + ") - may impact performance");
+    }
+    
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    
+    // **VALIDATION: Region count should be reasonable**
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("Brain initialization failed: Region count must be at least 1");
+        return false;
+    }
+    
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // **VALIDATION: Connection probability should be within valid range**
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Brain initialization failed: Connection probability must be between 0.0 and 1.0");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");

@@ -13,7 +13,8 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
     
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
+    explicit Impl(RegionId id) : id(id), name(""), nextSynapseId(1) {}
+    Impl(RegionId id, const std::string& name) : id(id), name(name), nextSynapseId(1) {}
 };
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}

@@ -23,7 +23,8 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
+    Impl() : id(INVALID_NEURON_ID), type(NeuronType::Internal), 
+             regionId(INVALID_REGION_ID), populationId(INVALID_POPULATION_ID),
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
