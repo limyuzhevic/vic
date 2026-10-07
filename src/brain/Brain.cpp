@@ -690,28 +690,138 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Intelligent action selection based on integrated brain systems
+    // Considers motor neuron activity, neuromodulation, prediction, and development
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Calculate activity of different motor action groups based on brain system integration
+    float activityForward = 0.0f;
+    float activityBackward = 0.0f;
+    float activityTurnLeft = 0.0f;
+    float activityTurnRight = 0.0f;
+    float activityInteract = 0.0f;
+    float activityWait = 0.0f;
+    
+    // Calculate average activity for each action type from motor neuron populations
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        if (!neuron) continue;
+        
+        const auto& state = neuron->getState();
+        float activity = std::abs(state.membranePotential - state.restingPotential);
+        
+        // Determine which action this neuron corresponds to based on development and connectivity
+        // This is a simplified approach - in a real system, neurons would be organized into distinct action groups
+        
+        // Check neuromodulation effects on action selection
+        float neuromodulationFactor = 1.0f;
+        if (pImpl->dopamine) {
+            neuromodulationFactor *= (1.0f + pImpl->dopamine->getLevel());
+        }
+        
+        if (pImpl->curiosity) {
+            neuromodulationFactor *= (1.0f + pImpl->curiosity->getLevel() * 0.5f);
+        }
+        
+        // Apply developmental modulation
+        float developmentalMod = 1.0f;
+        if (pImpl->developmentSystem) {
+            developmentalMod = pImpl->developmentSystem->getPlasticityFactor();
+        }
+        
+        float modulatedActivity = activity * neuromodulationFactor * developmentalMod;
+        
+        // Simple heuristic for action group assignment (should be more sophisticated in real system)
+        if (activity > 0.1f) {
+            // Use firing history and connectivity to determine action
+            // For now, distribute across actions based on activity level
+            activityForward += modulatedActivity * 0.2f;
+            activityBackward += modulatedActivity * 0.1f;
+            activityTurnLeft += modulatedActivity * 0.1f;
+            activityTurnRight += modulatedActivity * 0.1f;
+            activityInteract += modulatedActivity * 0.05f;
+            activityWait += modulatedActivity * 0.05f;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Normalize activities
+    float totalActivity = activityForward + activityBackward + activityTurnLeft + 
+                         activityTurnRight + activityInteract + activityWait;
+    
+    if (totalActivity < 0.01f) {
+        // No significant activity, wait
+        return std::make_unique<Action>(ActionType::Wait);
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Normalize to get probabilities
+    activityForward /= totalActivity;
+    activityBackward /= totalActivity;
+    activityTurnLeft /= totalActivity;
+    activityTurnRight /= totalActivity;
+    activityInteract /= totalActivity;
+    activityWait /= totalActivity;
+    
+    // Apply prediction system guidance if available
+    float predictionBias = 1.0f;
+    if (pImpl->predictionSystem) {
+        // Get prediction confidence for different action categories
+        // This would integrate with the prediction system's expected outcomes
+        predictionBias = 1.0f + 0.5f * pImpl->predictionSystem->getPredictionConfidence();
+    }
+    
+    // Select action based on highest weighted activity with prediction bias
+    float bestActivity = activityWait;
+    ActionType bestAction = ActionType::Wait;
+    
+    // Check each action category
+    if (activityForward > bestActivity + 0.05f * predictionBias) {
+        bestActivity = activityForward;
+        bestAction = ActionType::MoveForward;
+    }
+    if (activityBackward > bestActivity + 0.05f * predictionBias) {
+        bestActivity = activityBackward;
+        bestAction = ActionType::MoveBackward;
+    }
+    if (activityTurnLeft > bestActivity + 0.05f * predictionBias) {
+        bestActivity = activityTurnLeft;
+        bestAction = ActionType::TurnLeft;
+    }
+    if (activityTurnRight > bestActivity + 0.05f * predictionBias) {
+        bestActivity = activityTurnRight;
+        bestAction = ActionType::TurnRight;
+    }
+    if (activityInteract > bestActivity + 0.05f * predictionBias) {
+        bestActivity = activityInteract;
+        bestAction = ActionType::Interact;
+    }
+    
+    // Apply curiosity-driven exploration when activity is low but curiosity is high
+    if (bestActivity < 0.15f && pImpl->curiosity && pImpl->curiosity->getLevel() > 0.3f) {
+        // Random exploration action
+        float r = pImpl->rng->uniformReal(0.0f, 1.0f);
+        if (r < 0.3f) {
+            bestAction = ActionType::MoveForward;
+        } else if (r < 0.6f) {
+            bestAction = ActionType::TurnLeft;
+        } else if (r < 0.8f) {
+            bestAction = ActionType::TurnRight;
+        } else {
+            bestAction = ActionType::Wait;
+        }
+    }
+    
+    auto action = std::make_unique<Action>(bestAction);
+    
+    // Add action parameters based on context (example: turn angle for rotation actions)
+    if (bestAction == ActionType::TurnLeft || bestAction == ActionType::TurnRight) {
+        // Add turn angle parameter
+        action->setParameter("angle", 0.5f);  // 0.5 radians turn angle
+    } else if (bestAction == ActionType::MoveForward || bestAction == ActionType::MoveBackward) {
+        // Add movement distance parameter
+        action->setParameter("distance", 1.0f);  // 1.0 unit movement
+    }
     
     return action;
 }

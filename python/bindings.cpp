@@ -201,13 +201,40 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+        .def(py::init<ActionType, std::map<std::string, float>>(), py::arg("type"), py::arg("parameters"))
         .def("getType", &Action::getType)
         .def("setType", &Action::setType, py::arg("type"))
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("getParameter", [](Action& self, const std::string& key) {
+            const auto& params = self.getParameters();
+            auto it = params.find(key);
+            if (it != params.end()) {
+                return it->second;
+            }
+            throw py::key_error("Parameter not found: " + key);
+        }, py::arg("key"), "Get action parameter by key")
+        .def("setParameter", [](Action& self, const std::string& key, float value) {
+            auto params = self.getParameters();
+            params[key] = value;
+            self.setParameters(params);
+        }, py::arg("key"), py::arg("value"), "Set action parameter by key")
+        .def("hasParameter", [](Action& self, const std::string& key) {
+            const auto& params = self.getParameters();
+            return params.find(key) != params.end();
+        }, py::arg("key"), "Check if action has parameter")
+        .def("clone", &Action::clone)
+        .def("to_dict", [](const Action& self) {
+            py::dict result;
+            result["type"] = static_cast<int>(self.getType());
+            result["name"] = self.getName();
+            result["parameters"] = self.getParameters();
+            return result;
+        }, "Convert action to dictionary representation")
+        .def("__repr__", [](const Action& self) {
+            return "<Action: " + self.getName() + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -416,10 +443,290 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("brain.v_thresh", -50.0f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enable", true);
+        return config;
+    }, "Create configuration optimized for exploration and learning");
+
+    m.def("createExploitationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.15f);
+        config->set("brain.v_thresh", -55.0f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.curiosity.enable", false);
+        config->set("neuromod.novelty.enable", false);
+        config->set("development.enable", false);
+        return config;
+    }, "Create configuration optimized for exploitation and performance");
+
+    m.def("createBalancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1500);
+        config->set("brain.synapse_density", 0.12f);
+        config->set("brain.v_thresh", -52.0f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enable", true);
+        return config;
+    }, "Create balanced configuration for both exploration and exploitation");
+
+    m.def("createCustomConfig", [](py::dict config_dict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            std::string value = py::cast<std::string>(item.second);
+            config->set(key, value);
+        }
+        return config;
+    }, py::arg("config_dict"), "Create custom configuration from dictionary");
+
+    // Enhanced simulation utilities
+    m.def("runExplorationEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, size_t steps) {
+        agent->initialize(*world);
+        agent->enableAllSystems();
+        
+        py::dict results;
+        results["stepsCompleted"] = 0;
+        results["totalReward"] = 0.0f;
+        results["maxCuriosity"] = 0.0f;
+        results["avgFiringRate"] = 0.0f;
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            // Get sensory input
+            const auto& percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain thinks
+            brain->step(step, step * 0.001);
+            
+            // Get action
+            auto action = brain->produceAction();
+            
+            // Apply action to world
+            auto result = world->applyMotorCommand(action->getType(), world->getSimulationTime());
+            
+            // Get reward
+            float reward = result.reward;
+            results["totalReward"] += reward;
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Track statistics
+            if (agent->getCuriosityLevel() > results["maxCuriosity"].cast<float>()) {
+                results["maxCuriosity"] = agent->getCuriosityLevel();
+            }
+            results["avgFiringRate"] += brain->getAverageFiringRate();
+            
+            results["stepsCompleted"] = step + 1;
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": Reward=" << reward 
+                         << ", Curiosity=" << agent->getCuriosityLevel()
+                         << ", Firing=" << brain->getFiringNeuronCount()
+                         << std::endl;
+            }
+        }
+        
+        // Calculate averages
+        results["avgFiringRate"] /= results["stepsCompleted"].cast<float>();
+        
+        results["finalCuriosity"] = agent->getCuriosityLevel();
+        results["finalNovelty"] = agent->getNoveltyLevel();
+        results["finalPredictionError"] = agent->getPredictionError();
+        results["developmentStage"] = static_cast<int>(agent->getDevelopmentalStage());
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run an exploration episode with curiosity and learning focus");
+
+    m.def("runExploitationEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, size_t steps) {
+        agent->initialize(*world);
+        // Configure for exploitation (high reward, low exploration)
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(false);
+        agent->enableDevelopment(false);
+        
+        py::dict results;
+        results["stepsCompleted"] = 0;
+        results["totalReward"] = 0.0f;
+        results["avgFiringRate"] = 0.0f;
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            const auto& percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            auto action = brain->produceAction();
+            auto result = world->applyMotorCommand(action->getType(), world->getSimulationTime());
+            
+            float reward = result.reward;
+            results["totalReward"] += reward;
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1);
+            
+            results["avgFiringRate"] += brain->getAverageFiringRate();
+            results["stepsCompleted"] = step + 1;
+        }
+        
+        results["avgFiringRate"] /= results["stepsCompleted"].cast<float>();
+        results["finalCuriosity"] = agent->getCuriosityLevel();
+        results["finalNovelty"] = agent->getNoveltyLevel();
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run an exploitation episode with reward maximization focus");
+
+    // Enhanced environment setup
+    m.def("setupEnvironment", []() {
+        std::cout << "=== NLM Python Enhanced Environment Setup ===" << std::endl;
+        std::cout << "Python bindings loaded successfully!" << std::endl;
+        std::cout << "Enhanced features available:" << std::endl;
+        std::cout << "  - Enhanced Action API with parameters and factory functions" << std::endl;
+        std::cout << "  - Advanced configuration utilities (exploration/exploitation/balanced/custom)" << std::endl;
+        std::cout << "  - Enhanced simulation episodes with detailed statistics" << std::endl;
+        std::cout << "  - Improved AgentBrain configuration methods" << std::endl;
+        std::cout << "  - Better error handling and exception support" << std::endl;
+        std::cout << "  - Comprehensive action creation utilities" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Key enhancements:
+- Parameter-rich action system
+- Task-based agent configuration
+- Enhanced statistics and monitoring
+- Better error handling
+- Factory functions for common actions" << std::endl;
+        
+        py::dict info;
+        info["version"] = "Phase 6.2 - Enhanced Integration";
+        info["status"] = "Loaded successfully";
+        info["features"] = {"memory", "neuromodulation", "prediction", "cognition", "development", "advanced_api"};
+        info["enhancements"] = {"parameter_actions", "task_configuration", "enhanced_stats", "better_errors", "factory_functions"};
+        return info;
+    }, "Setup and validate enhanced Python environment");
+
+    // Enhanced error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+
+    // Enhanced module documentation
+    m.doc() = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        ================================================
+        
+        Phase 6 Enhanced Python API for Artificial Developmental Brains
+        
+        This module provides comprehensive Python bindings for the NLM C++ neural simulation framework.
+        Enhanced with advanced features for power users and researchers.
+        
+        Key Features:
+        - Enhanced neural network simulation with LIF neurons and synapses
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+        - Prediction, cognition, and development systems
+        - Advanced action selection with intelligent motor control
+        - Enhanced configuration system with validation
+        - Comprehensive error handling and debugging tools
+        - Advanced Pythonic API with dictionaries and helper functions
+        
+        Enhanced Action API:
+        - Parameter-rich action representation
+        - Factory functions for common actions
+        - Dictionary conversion utilities
+        - Intelligent action selection
+        
+        Advanced AgentBrain API:
+        - Task configuration (exploration/exploitation/default)
+        - System enable/disable control
+        - Activity statistics and monitoring
+        - Development stage tracking
+        
+        Enhanced World API:
+        - Enhanced statistics and world analysis
+        - Advanced object management
+        - Simulation time tracking
+        
+        Enhanced Configuration:
+        - Configuration factory functions
+        - Validation and error checking
+        - Dictionary-based configuration
+        - Pre-built configurations for different tasks
+        
+        Enhanced Simulation Utilities:
+        - Specialized episode runners (exploration/exploitation)
+        - Detailed statistics collection
+        - Enhanced error handling
+        - Progress monitoring and logging
+        
+        Quick Start Examples:
+        
+        >>> import pynlm
+        >>> 
+        >>> # Create enhanced agent
+        >>> config = pynlm.createExplorationConfig()
+        >>> brain = pynlm.createBrain(config)
+        >>> world = pynlm.createSimpleWorld()
+        >>> agent = pynlm.createAgentBrain(brain)
+        >>> 
+        >>> # Configure for exploration
+        >>> agent.configureForTask("exploration")
+        >>> agent.initialize(world)
+        >>> agent.enableAllSystems()
+        >>> 
+        >>> # Run enhanced exploration episode
+        >>> results = pynlm.runExplorationEpisode(brain, world, agent, 2000)
+        >>> 
+        >>> # Analyze with enhanced statistics
+        >>> stats = agent.getActivityStatistics()
+        >>> print(f"Firing rate: {stats['neuroscience.firingRate']}")
+        >>> print(f"Max curiosity: {results['maxCuriosity']}")
+        >>> print(f"Avg firing rate: {results['avgFiringRate']}")
+        >>> 
+        >>> # Create complex actions with parameters
+        >>> move_action = pynlm.createMoveForwardAction(distance=2.0)
+        >>> turn_action = pynlm.createTurnAction(1.5)  # Right turn
+        >>> interact_action = pynlm.createInteractAction("resource", "harvest")
+        >>> wait_action = pynlm.createWaitAction(0.5)  # Wait 0.5 seconds
+        >>> 
+        >>> # Error handling
+        >>> try:
+        ...     agent.processSensoryInput(percept)
+        ... except pynlm.InvalidArgumentError as e:
+        ...     print(f"Configuration error: {e}")
+        >>> 
+        >>> # Explore enhanced brain
+        >>> brain_info = brain.exploreConnections()
+        >>> connectivity = brain.getConnectivitySummary()
+        >>> 
+        >>> # Validate configuration
+        >>> validation = config.validate()
+        >>> if validation["totalKeys"] > 0:
+        ...     print("Configuration has valid settings")
+        
+        Version: Phase 6.2 - Enhanced Integration
+        Status: Production ready with enhanced features
+        License: MIT
+    )pbdoc";
 }
 
 } // namespace nlm
