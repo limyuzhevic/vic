@@ -302,15 +302,18 @@ void SimpleWorld::generateVision() {
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     
-    const int rayCount = 16;
+    const int rayCount = visionWidth_;
     const float fov = M_PI / 2.0f;  // 90 degree FOV
     const float maxRange = 8.0f;
     
     std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
     
     for (int i = 0; i < rayCount; ++i) {
-        // Angle for this ray
-        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+        // Angle for this ray - safe division check
+        float angle = agent_.orientation - fov / 2.0f;
+        if (rayCount > 1) {
+            angle += (fov * i) / (rayCount - 1);
+        }
         
         // Cast ray
         float dx = std::cos(angle);
@@ -342,7 +345,7 @@ void SimpleWorld::generateVision() {
                 break;
             }
             
-            t += 0.1f;
+            t += 0.1f;  // Step size
         }
     }
     
@@ -365,7 +368,7 @@ void SimpleWorld::generateVision() {
                 touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
                 break;
             }
-            t += 0.1f;
+            t += 0.1f;  // Step size
         }
     }
     sensory_.setTouch(touch);

@@ -69,13 +69,12 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Utility methods
+    bool isBrainValid() const { return brain_ != nullptr; }
+    void logNeuronDistribution() const;
+    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+    // Core components
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -112,6 +111,15 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+private:
+    // Private helper methods
+    void initializeNeuronGroups();
+    MotorCommand decodeFromMotorNeurons();
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Reserve memory for vectors to improve performance
+    void reserveMemoryForNeuronGroups();
 };
 
 } // namespace nlm

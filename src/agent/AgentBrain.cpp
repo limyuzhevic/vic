@@ -20,20 +20,47 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with null pointers for safety
+    motorForward_.reserve(50);
+    motorBackward_.reserve(50);
+    motorTurnLeft_.reserve(50);
+    motorTurnRight_.reserve(50);
+    motorInteract_.reserve(50);
+    motorWait_.reserve(50);
+    
+    sensoryVision_.reserve(100);
+    sensoryTouch_.reserve(20);
+    sensoryInternal_.reserve(10);
+    sensoryProprioception_.reserve(20);
+    
+    // Ensure brain exists before trying to access it
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
+        initializeNeuronGroups();
+    }
+}
+
+void AgentBrain::initializeNeuronGroups() {
+    // Initialize motor and sensory neuron groups safely
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot initialize neuron groups: brain pointer is null");
+        return;
+    }
+    
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Distribute motor neurons to different action groups
+                    size_t idx = motorForward_.size() + motorBackward_.size() + 
+                                motorTurnLeft_.size() + motorTurnRight_.size() +
+                                motorInteract_.size() + motorWait_.size();
+                    
+                    // Safe modulo operation
+                    if (!pop->getNeurons().empty()) {
+                        int caseIdx = idx % static_cast<int>(pop->getNeurons().size());
+                        switch (caseIdx % 6) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -42,13 +69,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                             case 5: motorWait_.push_back(n); break;
                         }
                     }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
+                }
+            } else if (type == NeuronType::Sensory) {
+                for (Neuron* n : pop->getNeurons()) {
+                    // Distribute sensory neurons
+                    size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                                sensoryInternal_.size() + sensoryProprioception_.size();
+                    
+                    // Safe modulo operation
+                    if (!pop->getNeurons().empty()) {
+                        int caseIdx = idx % static_cast<int>(pop->getNeurons().size());
+                        switch (caseIdx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -59,19 +90,33 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    NLM_LOG_INFO("Neuron groups initialized: " +
+                 std::to_string(motorForward_.size()) + " motorForward, " +
+                 std::to_string(motorBackward_.size()) + " motorBackward, " +
+                 std::to_string(motorTurnLeft_.size()) + " motorTurnLeft, " +
+                 std::to_string(motorTurnRight_.size()) + " motorTurnRight, " +
+                 std::to_string(motorInteract_.size()) + " motorInteract, " +
+                 std::to_string(motorWait_.size()) + " motorWait, " +
+                 std::to_string(sensoryVision_.size()) + " sensoryVision, " +
+                 std::to_string(sensoryTouch_.size()) + " sensoryTouch, " +
+                 std::to_string(sensoryInternal_.size()) + " sensoryInternal, " +
+                 std::to_string(sensoryProprioception_.size()) + " sensoryProprioception");
 }
 
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    size_t visionSize = world.getVisionWidth() * world.getVisionHeight();
+    previousVision_.resize(visionSize, 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                 std::to_string(visionSize) + " vision pixels");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -85,61 +130,72 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot process sensory input: brain pointer is null");
+        return;
+    }
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Process vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    if (!vision.empty()) {
+        size_t visionSize = vision.size();
+        size_t numVisionNeurons = std::min(sensoryVision_.size(), visionSize);
+        
+        for (size_t i = 0; i < numVisionNeurons; ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+            }
+        }
+        
+        // Compute novelty (difference from previous vision)
+        float totalDiff = 0.0f;
+        size_t compareSize = std::min(visionSize, previousVision_.size());
+        
+        for (size_t i = 0; i < compareSize; ++i) {
+            float diff = std::abs(vision[i] - previousVision_[i]);
+            totalDiff += diff;
+        }
+        
+        // Normalize and update novelty level
+        if (!vision.empty()) {
+            noveltyLevel_ = totalDiff / static_cast<float>(std::max<size_t>(compareSize, 1));
+            noveltyLevel_ *= sensoryNoveltyDecay_;
+            
+            // Store for next time
+            previousVision_ = vision;
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
+    // Process touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+    size_t numTouchNeurons = std::min(sensoryTouch_.size(), touch.size());
+    for (size_t i = 0; i < numTouchNeurons; ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
+    // Process internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    size_t numInternalNeurons = std::min(sensoryInternal_.size(), intern.size());
+    for (size_t i = 0; i < numInternalNeurons; ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    // Process proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    size_t numProprioceptionNeurons = std::min(sensoryProprioception_.size(), proprio.size());
+    for (size_t i = 0; i < numProprioceptionNeurons; ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
     }
     
     // Update curiosity based on novelty
@@ -149,8 +205,37 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
+MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    // Exploration: occasionally choose random action when curiosity is high
+    if (curiosityLevel_ > 0.5f && brain_) {
+        // Higher curiosity = more exploration
+        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            // Random motor command
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            switch (choice) {
+                case 0: return MotorCommand::MoveForward;
+                case 1: return MotorCommand::MoveBackward;
+                case 2: return MotorCommand::TurnLeft;
+                case 3: return MotorCommand::TurnRight;
+                case 4: return MotorCommand::LookLeft;
+                case 5: return MotorCommand::LookRight;
+                case 6: return MotorCommand::Interact;
+                default: return MotorCommand::Wait;
+            }
+        }
+    }
+    
+    return defaultCmd;
+}
+
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot decode motor command: brain pointer is null");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -169,7 +254,9 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         float sum = 0.0f;
         for (Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (n) {
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
         }
         return sum / neurons.size();
     };
@@ -209,34 +296,16 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
-    }
-    
-    return defaultCmd;
-}
-
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Validate inputs
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        NLM_LOG_WARNING("Invalid reward values: reward=" + std::to_string(reward) + 
+                        ", predictedReward=" + std::to_string(predictedReward));
+        reward = 0.0f;
+        predictedReward = 0.0f;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -253,6 +322,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;  // Safety check
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -281,6 +352,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
+    
+    // Validate timestep
+    if (timestep < 0.0) {
+        NLM_LOG_WARNING("Negative timestep in updateDevelopment, using absolute value");
+        timestep = std::abs(timestep);
+    }
     
     developmentalAge_ += timestep;
     
@@ -347,4 +424,41 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+void AgentBrain::logNeuronDistribution() const {
+    if (!brain_) {
+        NLM_LOG_INFO("AgentBrain: No brain available for neuron distribution log");
+        return;
+    }
+    
+    NLM_LOG_INFO("AgentBrain Neuron Distribution Report:");
+    NLM_LOG_INFO("  Motor neurons: " + std::to_string(motorForward_.size()) + " forward, " +
+                 std::to_string(motorBackward_.size()) + " backward, " +
+                 std::to_string(motorTurnLeft_.size()) + " left, " +
+                 std::to_string(motorTurnRight_.size()) + " right, " +
+                 std::to_string(motorInteract_.size()) + " interact, " +
+                 std::to_string(motorWait_.size()) + " wait");
+    NLM_LOG_INFO("  Sensory neurons: " + std::to_string(sensoryVision_.size()) + " vision, " +
+                 std::to_string(sensoryTouch_.size()) + " touch, " +
+                 std::to_string(sensoryInternal_.size()) + " internal, " +
+                 std::to_string(sensoryProprioception_.size()) + " proprioception");
+    
+    // Log brain statistics
+    NLM_LOG_INFO("  Brain statistics: " + std::to_string(brain_->getTotalNeuronCount()) + " total neurons, " +
+                 std::to_string(brain_->getTotalSynapseCount()) + " synapses");
+}
+
+void AgentBrain::reserveMemoryForNeuronGroups() {
+    // Pre-allocate memory for better performance
+    // Reserve reasonable amounts based on expected population sizes
+    motorForward_.reserve(50);
+    motorBackward_.reserve(50);
+    motorTurnLeft_.reserve(50);
+    motorTurnRight_.reserve(50);
+    motorInteract_.reserve(50);
+    motorWait_.reserve(50);
+    
+    sensoryVision_.reserve(100);
+    sensoryTouch_.reserve(20);
+    sensoryInternal_.reserve(10);
+    sensoryProprioception_.reserve(20);
+}
