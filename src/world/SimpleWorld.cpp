@@ -55,6 +55,7 @@ void SimpleWorld::reset() {
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
+    resetLastReward();  // Initialize last reward
     
     // Place some resource objects (positive reward when touched)
     for (int i = 0; i < 5; ++i) {
@@ -392,12 +393,58 @@ void SimpleWorld::generateVision() {
     sensory_.setAudio({});
 }
 
-void SimpleWorld::checkCollisions() {
-    // Passive collision check (for damage when moving into objects)
-    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
-    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
-    }
+void SimpleWorld::resetLastReward() {
+    lastReward_ = 0.0f;
 }
 
-} // namespace nlm
+float SimpleWorld::computeReward(const NeuralRegion* neuralRegion) const {
+    float totalReward = 0.0f;
+    
+    // Reward based on agent state
+    if (agent_.health <= 0.0f) {
+        // Agent dead - negative reward
+        totalReward -= 100.0f;
+    } else {
+        // Health reward - keep agent alive
+        totalReward += agent_.health * 0.5f;
+        
+        // Energy reward - maintain energy
+        if (agent_.energy < 20.0f) {
+            totalReward -= 5.0f;  // Low energy penalty
+        } else if (agent_.energy > maxEnergy_ * 0.9f) {
+            totalReward += 2.0f;  // High energy bonus
+        }
+    }
+    
+    // Reward based on objects in world
+    for (const auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dx = agent_.x - obj.x;
+        float dy = agent_.y - obj.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        
+        // Proximity reward - objects nearby are more valuable
+        if (dist < 3.0f) {
+            totalReward += obj.value * (1.0f - dist / 3.0f);
+        }
+    }
+    
+    // Time-based reward - longer survival is better
+    totalReward += simTime_ * 0.01f;
+    
+    // Neural region bonus - if we have a neural region, provide bonus for complexity
+    if (neuralRegion != nullptr) {
+        float firingRate = neuralRegion->getAverageFiringRate();
+        // Healthy firing rate is good for learning
+        totalReward += firingRate * 0.1f;
+    }
+    
+    // Apply any immediate rewards from last action
+    totalReward += lastReward_;
+    
+    // Store for future reference
+    lastReward_ = totalReward;
+    
+    return totalReward;
+}

@@ -68,8 +68,10 @@ void WorkingMemory::decay(float decayRate) {
 struct EpisodicMemory::Impl {
     std::vector<EpisodicMemoryItem> episodes;
     size_t maxEpisodes;
+    float consolidationThreshold;
+    float relevanceThreshold;
     
-    Impl(size_t max) : maxEpisodes(max) {}
+    Impl(size_t max) : maxEpisodes(max), consolidationThreshold(0.3f), relevanceThreshold(0.5f) {}
 };
 
 EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
@@ -77,15 +79,29 @@ EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
 EpisodicMemory::~EpisodicMemory() = default;
 
 void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
-    if (pImpl->episodes.size() >= pImpl->maxEpisodes) {
-        pImpl->episodes.erase(pImpl->episodes.begin());
+    // Create episode with age tracking
+    EpisodicMemoryItem stored = episode;
+    stored.age = 0;
+    stored.relevance = 0.0f;
+    
+    episodes_.push_back(stored);
+    
+    // Remove old episodes if over capacity
+    while (episodes_.size() > maxEpisodes_) {
+        episodes_.erase(episodes_.begin());
     }
-    pImpl->episodes.push_back(episode);
+    
+    // Age all episodes
+    for (auto& ep : episodes_) {
+        ep.age++;
+    }
 }
 
 EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
-    if (index < pImpl->episodes.size()) {
-        return pImpl->episodes[index];
+    if (index < episodes_.size()) {
+        // Age the retrieved episode (memory access strengthens it)
+        episodes_[index].age = 0;
+        return episodes_[index];
     }
     return EpisodicMemoryItem();
 }
@@ -96,19 +112,72 @@ size_t EpisodicMemory::getEpisodeCount() const {
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
     std::vector<EpisodicMemoryItem> result;
-    size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
-    for (size_t i = start; i < pImpl->episodes.size(); ++i) {
-        result.push_back(pImpl->episodes[i]);
+    size_t start = count > episodes_.size() ? 0 : episodes_.size() - count;
+    for (size_t i = start; i < episodes_.size(); ++i) {
+        result.push_back(episodes_[i]);
     }
+    
+    // Sort by recency (most recent first)
+    std::sort(result.begin(), result.end(),
+              [](const EpisodicMemoryItem& a, const EpisodicMemoryItem& b) {
+                  return a.timestamp > b.timestamp;
+              });
+    
     return result;
 }
 
 void EpisodicMemory::clear() {
-    pImpl->episodes.clear();
+    episodes_.clear();
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Move high-relevance episodes to long-term storage
+    // For now, we'll just age episodes and remove low-relevance ones
+    
+    // Calculate episode relevance based on:
+    // 1. Recentness (age)
+    // 2. Reward value
+    // 3. Unpredictability (sensory variation)
+    for (auto& ep : episodes_) {
+        // Recency contribution
+        float recencyScore = 1.0f / (ep.age + 1);
+        
+        // Reward contribution
+        float rewardScore = ep.reward / 100.0f;  // Normalize by typical reward range
+        
+        // Calculate variation based on stored data
+        float variationScore = 0.0f;
+        if (!ep.sensoryState.empty()) {
+            float mean = std::accumulate(ep.sensoryState.begin(), ep.sensoryState.end(), 0.0f) / ep.sensoryState.size();
+            float variance = 0.0f;
+            for (float val : ep.sensoryState) {
+                variance += (val - mean) * (val - mean);
+            }
+            variance /= ep.sensoryState.size();
+            variationScore = std::min(1.0f, variance / 100.0f);
+        }
+        
+        // Combined relevance
+        ep.relevance = (recencyScore * 0.4f + rewardScore * 0.4f + variationScore * 0.2f);
+        
+        // If episode is below threshold, mark for removal
+        if (ep.relevance < relevanceThreshold) {
+            ep.age = 1000;  // Prevent immediate removal
+        }
+    }
+    
+    // Remove low-relevance episodes
+    std::vector<size_t> toRemove;
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        if (episodes_[i].relevance < relevanceThreshold && episodes_[i].age > 500) {
+            toRemove.push_back(i);
+        }
+    }
+    
+    // Remove in reverse order
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        episodes_.erase(episodes_.begin() + *it);
+    }
 }
 
 // Semantic Memory Implementation

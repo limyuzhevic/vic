@@ -54,6 +54,15 @@ public:
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
+    // Get reward for current state
+    float computeReward(const NeuralRegion* neuralRegion) const;
+    
+    // Get reward for last action
+    float getLastReward() const { return lastReward_; }
+    
+    // Reset last reward
+    void resetLastReward() { lastReward_ = 0.0f; }
+    
     // Add object to world
     void addObject(const WorldObject& obj);
     
@@ -123,6 +132,10 @@ private:
     
     // Simple RNG state
     uint64_t rngState_;
+    
+    // Last computed reward
+    mutable float lastReward_;
+    
     uint64_t nextRandom();
 };
 

@@ -70,6 +70,9 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Working memory integration
+    NeuralWorkingMemory* workingMemory_;
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
@@ -113,5 +116,7 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
+
+} // namespace nlm
 
 } // namespace nlm

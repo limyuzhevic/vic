@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , workingMemory_(nullptr)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -57,6 +58,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 }
             }
+        }
+    }
+    
+    // Get working memory from brain for integration
+    if (brain_) {
+        workingMemory_ = brain_->getWorkingMemory();
+        if (workingMemory_) {
+            NLM_LOG_INFO("AgentBrain connected to working memory");
         }
     }
 }
