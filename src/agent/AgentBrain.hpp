@@ -19,11 +19,14 @@ public:
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    // Convert motor command to string (for debugging)
+    static const char* motorCommandToString(MotorCommand cmd);
     
     // Get motor output size expected
     size_t getMotorOutputSize() const;
+    
+    // Convert motor command to string (for debugging)
+    static const char* motorCommandToString(MotorCommand cmd);
     
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);

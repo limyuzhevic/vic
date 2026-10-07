@@ -39,16 +39,275 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics           ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                    ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printAdvancedHelp() {
+    printBanner();
+    
+    std::cout << "=== ADVANCED COMMAND LINE OPTIONS ===" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Core Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version, -v                 Show version information" << std::endl;
+    std::cout << "  --quiet, -q                   Suppress all output except errors" << std::endl;
+    std::cout << "  --verbose, -V                 Enable verbose logging" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  --config=file                Load configuration from file" << std::endl;
+    std::cout << "  --neuron-count=N             Set number of neurons" << std::endl;
+    std::cout << "  --region-count=N             Set number of brain regions" << std::endl;
+    std::cout << "  --connection-prob=P          Set connection probability (0.0-1.0)" << std::endl;
+    std::cout << "  --timestep=T                 Set simulation timestep in seconds" << std::endl;
+    std::cout << "  --seed=N                     Set random seed for reproducible results" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Plasticity Options:" << std::endl;
+    std::cout << "  --plasticity-off             Disable all plasticity" << std::endl;
+    std::cout << "  --hebbian-off               Disable Hebbian plasticity" << std::endl;
+    std::cout << "  --stdp-off                  Disable STDP plasticity" << std::endl;
+    std::cout << "  --structural-off            Disable structural plasticity" << std::endl;
+    std::cout << "  --plasticity-factor=F       Scale all plasticity (0.0-2.0)" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Development Options:" << std::endl;
+    std::cout << "  --development-off           Disable developmental processes" << std::endl;
+    std::cout << "  --developmental-stage=S    Set developmental stage (Initial|CriticalPeriod|Maturation|Adult|Aging)" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Neuromodulation Options:" << std::endl;
+    std::cout << "  --reward-modulation-off     Disable reward-based learning" << std::endl;
+    std::cout << "  --curiosity-off             Disable curiosity-driven exploration" << std::endl;
+    std::cout << "  --novelty-off               Disable novelty detection" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Memory Options:" << std::endl;
+    std::cout << "  --working-memory-off        Disable working memory" << std::endl;
+    std::cout << "  --episodic-memory-off       Disable episodic memory" << std::endl;
+    std::cout << "  --associative-memory-off    Disable associative memory" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Experiment Modes:" << std::endl;
+    std::cout << "  --mode=basic               Basic connectivity test only" << std::endl;
+    std::cout << "  --mode=plasticity          Plasticity learning experiment only" << std::endl;
+    std::cout << "  --mode=stdp                STDP verification only" << std::endl;
+    std::cout << "  --mode=full                All tests (default)" << std::endl;
+    std::cout << "  --mode=replay              Test replay and consolidation" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Output Options:" << std::endl;
+    std::cout << "  --output-type=plain         Plain text output" << std::endl;
+    std::cout << "  --output-type=json          JSON output for machine reading" << std::endl;
+    std::cout << "  --output-type=csv          CSV format for data analysis" << std::endl;
+    std::cout << "  --output-file=FILE          Save output to file" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Debug Options:" << std::endl;
+    std::cout << "  --debug-neurons             Enable per-neuron debug output" << std::endl;
+    std::cout << "  --debug-synapses            Enable per-synapse debug output" << std::endl;
+    std::cout << "  --debug-memory             Enable memory trace output" << std::endl;
+    std::cout << "  --debug-plasticity         Enable plasticity update output" << std::endl;
+    std::cout << "  --debug-development        Enable developmental process output" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Save/Load Options:" << std::endl;
+    std::cout << "  --save=FILE                Save brain state to file" << std::endl;
+    std::cout << "  --load=FILE                Load brain state from file" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Performance Options:" << std::endl;
+    std::cout << "  --performance-mode         Optimize for speed over accuracy" << std::endl;
+    std::cout << "  --debug-mode              Enable debug compatibility mode" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Advanced Features:" << std::endl;
+    std::cout << "  --enable-all              Enable all advanced features" << std::endl;
+    std::cout << "  --disable-all            Disable all non-essential features" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Phase 3 Integration (for advanced users):" << std::endl;
+    std::cout << "  --phase3-demo             Run Phase 3 environment integration demo" << std::endl;
+    std::cout << "  --phase4-demo             Run Phase 4 cognition and planning demo" << std::endl;
+    std::cout << "  --phase6-demo             Run Phase 6 integration demo" << std::endl;
+    std::cout << "  --phase6-quick            Quick integration verification only" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --neuron-count=100 --timestep=0.01 --mode=full" << std::endl;
+    std::cout << "  nlm --plasticity-off --reward-modulation-off --quiet" << std::endl;
+    std::cout << "  nlm --phase6-demo --output-file=results.json" << std::endl;
+    std::cout << "  nlm --config=myconfig.cfg --debug-neurons --verbose" << std::endl;
+    std::cout << std::endl;
+}
+
+void parseAdvancedOptions(int argc, char** argv, std::shared_ptr<Config> config) {
+    // Parse advanced command-line options
+    std::string mode = "full";
+    bool enableAllFeatures = false;
+    bool disableAllFeatures = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --mode= option
+        if (arg.find("--mode=") == 0) {
+            mode = arg.substr(7);
+        }
+        
+        // Handle --plasticity-factor option
+        if (arg.find("--plasticity-factor=") == 0) {
+            float factor = std::stof(arg.substr(22));
+            config->set("plasticity_factor", factor, ConfigSource::CommandLine);
+        }
+        
+        // Handle --timestep option
+        if (arg.find("--timestep=") == 0) {
+            double timestep = std::stod(arg.substr(11));
+            config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+        }
+        
+        // Handle --seed option
+        if (arg.find("--seed=") == 0) {
+            int64_t seed = std::stoll(arg.substr(8));
+            config->set("random_seed", seed, ConfigSource::CommandLine);
+        }
+        
+        // Handle --neuron-count option
+        if (arg.find("--neuron-count=") == 0) {
+            int64_t count = std::stoll(arg.substr(17));
+            config->set("neuron_count", count, ConfigSource::CommandLine);
+        }
+        
+        // Handle --region-count option
+        if (arg.find("--region-count=") == 0) {
+            int64_t count = std::stoll(arg.substr(15));
+            config->set("region_count", count, ConfigSource::CommandLine);
+        }
+        
+        // Handle --connection-prob option
+        if (arg.find("--connection-prob=") == 0) {
+            float prob = std::stof(arg.substr(20));
+            config->set("connection_probability", prob, ConfigSource::CommandLine);
+        }
+        
+        // Handle boolean flags (disable options)
+        if (arg == "--plasticity-off") {
+            config->set("hebbian_enabled", false, ConfigSource::CommandLine);
+            config->set("stdp_enabled", false, ConfigSource::CommandLine);
+            config->set("structural_plasticity_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--hebbian-off") {
+            config->set("hebbian_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--stdp-off") {
+            config->set("stdp_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--structural-off") {
+            config->set("structural_plasticity_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--development-off") {
+            config->set("development_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--reward-modulation-off") {
+            config->set("reward_modulation_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--curiosity-off") {
+            config->set("curiosity_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--novelty-off") {
+            config->set("novelty_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--working-memory-off") {
+            config->set("working_memory_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--episodic-memory-off") {
+            config->set("episodic_memory_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--associative-memory-off") {
+            config->set("associative_memory_enabled", false, ConfigSource::CommandLine);
+        }
+        
+        // Handle enable/disable all flags
+        if (arg == "--enable-all") {
+            enableAllFeatures = true;
+        }
+        
+        if (arg == "--disable-all") {
+            disableAllFeatures = true;
+        }
+        
+        // Handle developmental stage
+        if (arg.find("--developmental-stage=") == 0) {
+            std::string stage = arg.substr(25);
+            config->set("developmental_stage", stage, ConfigSource::CommandLine);
+        }
+        
+        // Handle save/load options
+        if (arg.find("--save=") == 0) {
+            std::string filename = arg.substr(7);
+            config->set("checkpoint_path", filename, ConfigSource::CommandLine);
+        }
+        
+        if (arg.find("--load=") == 0) {
+            std::string filename = arg.substr(8);
+            config->set("checkpoint_load_path", filename, ConfigSource::CommandLine);
+        }
+        
+        // Handle phase demo options
+        if (arg == "--phase3-demo") {
+            config->set("run_phase3_demo", true, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--phase4-demo") {
+            config->set("run_phase4_demo", true, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--phase6-demo") {
+            config->set("run_phase6_demo", true, ConfigSource::CommandLine);
+        }
+        
+        if (arg == "--phase6-quick") {
+            config->set("run_phase6_demo", true, ConfigSource::CommandLine);
+            config->set("quick_mode", true, ConfigSource::CommandLine);
+        }
+    }
+    
+    // Apply enable/disable all logic
+    if (enableAllFeatures) {
+        config->set("enable_all_features", true, ConfigSource::CommandLine);
+    }
+    
+    if (disableAllFeatures) {
+        config->set("enable_all_features", false, ConfigSource::CommandLine);
+    }
+    
+    // Set default mode if not specified
+    if (mode != "full" && mode != "basic" && mode != "plasticity" && mode != "stdp" && mode != "replay") {
+        mode = "full";  // Default
+    }
+    
+    config->set("experiment_mode", mode, ConfigSource::CommandLine);
+}
+
+// Forward declarations for test functions
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -322,6 +581,21 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version flags first
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printAdvancedHelp();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printBanner();
+            std::cout << "Version: NLM Phase 2.0" << std::endl;
+            std::cout << "Build date: " << __DATE__ << " " << __TIME__ << std::endl;
+            std::cout << "Description: Experimental Artificial Developmental Brain" << std::endl;
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -363,6 +637,9 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
+    // Parse advanced command-line options
+    parseAdvancedOptions(argc, argv, config);
+    
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
@@ -392,6 +669,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // Get experiment mode from config
+    std::string experimentMode = config->getOr<std::string>("experiment_mode", "full");
+    
+    // Log experiment mode
+    NLM_LOG_INFO("Experiment mode: " + experimentMode);
+    
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
@@ -409,20 +692,42 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run experiments based on mode
+    if (experimentMode == "basic") {
+        NLM_LOG_INFO("Running basic connectivity test...");
+        runBasicConnectivityTest(brain);
+    } else if (experimentMode == "plasticity") {
+        NLM_LOG_INFO("Running plasticity learning experiment...");
+        runPlasticityExperiment(brain);
+    } else if (experimentMode == "stdp") {
+        NLM_LOG_INFO("Running STDP verification...");
+        runStdpVerification(brain);
+    } else if (experimentMode == "replay") {
+        NLM_LOG_INFO("Running replay test...");
+        // TODO: Implement replay test function
+        NLM_LOG_INFO("[TODO] Replay test not yet implemented");
+    } else { // Default "full" mode
+        NLM_LOG_INFO("Running full experiment suite...");
+        
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        // TODO: Add replay test when implemented
+        // NLM_LOG_INFO("Running replay test...");
+        // runReplayTest(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

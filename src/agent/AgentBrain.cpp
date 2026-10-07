@@ -347,4 +347,18 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+const char* AgentBrain::motorCommandToString(MotorCommand cmd) {
+    switch (cmd) {
+        case MotorCommand::MoveForward: return "MoveForward";
+        case MotorCommand::MoveBackward: return "MoveBackward";
+        case MotorCommand::TurnLeft: return "TurnLeft";
+        case MotorCommand::TurnRight: return "TurnRight";
+        case MotorCommand::LookLeft: return "LookLeft";
+        case MotorCommand::LookRight: return "LookRight";
+        case MotorCommand::Interact: return "Interact";
+        case MotorCommand::Wait: return "Wait";
+        default: return "Unknown";
+    }
+}
+
 } // namespace nlm
