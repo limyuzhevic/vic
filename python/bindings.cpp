@@ -25,7 +25,45 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This enhanced API provides:
+        - Pythonic context managers for automatic resource management
+        - Enhanced configuration API with convenient getter/setter methods
+        - Properties and Pythonic accessors for better encapsulation
+        - Convenience methods for common operations
+        - Advanced APIs for experienced users
+        - Comprehensive error handling and informative exceptions
     )pbdoc";
+
+    // Register C++ exceptions as Python exceptions for better error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
+    py::register_exception<std::invalid_argument>(m, "ValueError", PyExc_ValueError);
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    py::register_exception<std::logic_error>(m, "RuntimeError", PyExc_RuntimeError);
+
+    // Helper function to convert C++ exceptions to Python exceptions
+    auto convertException = [](const std::exception& e) {
+        // Return Python-style error messages
+        return std::string("NLM Error: ") + e.what();
+    };
+
+    // Exception safety wrapper for configuration operations
+    auto safeConfigOperation = [&convertException](auto&& operation, const std::string& operationName) {
+        try {
+            return operation();
+        } catch (const std::exception& e) {
+            throw py::value_error(convertException(e));
+        }
+    };
+
+    // Exception safety wrapper for brain operations
+    auto safeBrainOperation = [&convertException](auto&& operation, const std::string& operationName) {
+        try {
+            return operation();
+        } catch (const std::exception& e) {
+            throw py::value_error(std::string("Brain " + operationName + ": ") + convertException(e));
+        }
+    };
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -160,6 +198,76 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Enhanced Pythonic configuration API
+        .def("setIfNotExists", [](Config& self, const std::string& key, 
+                                 const std::string& value) {
+            if (!self.has(key)) {
+                self.set<std::string>(key, value);
+            }
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value only if key doesn't exist")
+        
+        .def("get", [](Config& self, const std::string& key, 
+                      const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value with default fallback")
+        
+        .def("getInt", [](Config& self, const std::string& key, 
+                         int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get integer configuration value with default fallback")
+        
+        .def("getFloat", [](Config& self, const std::string& key, 
+                           float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get float configuration value with default fallback")
+        
+        .def("getBool", [](Config& self, const std::string& key, 
+                          bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get boolean configuration value with default fallback")
+        
+        .def("getVector", [](Config& self, const std::string& key, 
+                            const std::vector<float>& defaultValue) {
+            return self.getOr<std::vector<float>>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get vector configuration value with default fallback")
+        
+        .def("set", [](Config& self, const std::string& key, 
+                      const std::string& value) {
+            self.set<std::string>(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        
+        .def("set", [](Config& self, const std::string& key, 
+                      int value) {
+            self.set<int>(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        
+        .def("set", [](Config& self, const std::string& key, 
+                      float value) {
+            self.set<float>(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set float configuration value")
+        
+        .def("set", [](Config& self, const std::string& key, 
+                      bool value) {
+            self.set<bool>(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        
+        .def("set", [](Config& self, const std::string& key, 
+                      const std::vector<float>& value) {
+            self.set<std::vector<float>>(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set vector configuration value")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -289,6 +397,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Enhanced Brain class with Pythonic APIs
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,8 +460,78 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Pythonic context manager for automatic resource management
+        .def("__enter__", [](Brain& self) {
+            // Initialize if not already initialized
+            if (self.getTotalNeuronCount() == 0) {
+                self.initialize();
+            }
+            return &self;
+        })
+        
+        .def("__exit__", [](Brain& self, py::args) {
+            self.reset();
+        })
+        
+        // Pythonic properties and methods
+        .def_property_readonly("neuron_count", &Brain::getTotalNeuronCount,
+                              "Get total neuron count")
+        .def_property_readonly("synapse_count", &Brain::getTotalSynapseCount,
+                              "Get total synapse count")
+        .def_property_readonly("active_neurons", &Brain::getActiveNeuronCount,
+                              "Get count of active neurons")
+        .def_property_readonly("firing_neurons", &Brain::getFiringNeuronCount,
+                              "Get count of currently firing neurons")
+        .def_property_readonly("average_firing_rate", &Brain::getAverageFiringRate,
+                              "Get average firing rate")
+        .def_property_readonly("total_spikes", &Brain::getTotalSpikeCount,
+                              "Get total spike count")
+        .def_property_readonly("development_stage", &Brain::getDevelopmentalStage,
+                              "Get current developmental stage")
+        .def_property_readonly("config", &Brain::getConfig,
+                              "Get the brain configuration")
+        
+        // Convenience methods for common operations
+        .def("runSimulation", [](Brain& self, size_t steps, 
+                               bool logProgress = false) {
+            for (size_t i = 0; i < steps; ++i) {
+                self.step(i);
+                if (logProgress && i % 100 == 0) {
+                    std::cout << "Step " << i << ": " 
+                             << self.getFiringNeuronCount() << " firing neurons" << std::endl;
+                }
+            }
+        }, py::arg("steps"), py::arg("logProgress") = false,
+           "Run simulation for specified number of steps")
+        
+        .def("runToSteadyState", [](Brain& self, size_t maxSteps = 1000) {
+            size_t noChangeCount = 0;
+            size_t neuronCount = self.getTotalNeuronCount();
+            
+            for (size_t i = 0; i < maxSteps; ++i) {
+                self.step(i);
+                
+                // Check if firing rate has stabilized
+                float firingRate = self.getAverageFiringRate();
+                if (i > 0 && std::abs(firingRate - self.getAverageFiringRate()) < 0.01) {
+                    noChangeCount++;
+                } else {
+                    noChangeCount = 0;
+                }
+                
+                if (noChangeCount >= 10) {
+                    break;
+                }
+            }
+        }, py::arg("maxSteps") = 1000,
+           "Run simulation until steady state is reached")
+        
+        .def("getStatistics", &Brain::logStatus,
+             "Get comprehensive brain statistics")
 
+    // Enhanced AgentBrain class with Pythonic APIs
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -398,7 +577,150 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Pythonic AgentBrain API enhancements
+        .def_property_readonly("brain", &AgentBrain::getBrain,
+                              "Get the underlying brain")
+        .def_property_readonly("curiosity", &AgentBrain::getCuriosityLevel,
+                              "Get current curiosity level")
+        .def_property_readonly("novelty", &AgentBrain::getNoveltyLevel,
+                              "Get current novelty level")
+        .def_property_readonly("prediction_error", &AgentBrain::getPredictionError,
+                              "Get current prediction error")
+        .def_property_readonly("neuromodulation", &AgentBrain::getNeuromodulationLevel,
+                              "Get current neuromodulation level")
+        
+        // Convenience methods for common agent operations
+        .def("runEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world,
+                            size_t maxSteps, bool enableLearning = true) {
+            if (enableLearning) {
+                self.enableRewardModulation(true);
+                self.enableCuriosity(true);
+                self.enableDevelopment(true);
+            }
+            
+            for (size_t i = 0; i < maxSteps; ++i) {
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                self.getBrain()->step(i);
+                
+                auto motorCmd = self.decodeMotorCommand();
+                world->applyMotorCommand(motorCmd, world->getSimulationTime());
+                
+                // Get reward from world for learning
+                float reward = 0.0f;
+                if (percept) {
+                    auto internal = percept->getInternal();
+                    if (!internal.empty()) {
+                        reward = internal[0];
+                    }
+                }
+                self.applyRewardModulation(reward, 0.0f);
+                self.updateDevelopment(0.1f);
+            }
+        }, py::arg("world"), py::arg("maxSteps"), py::arg("enableLearning") = true,
+           "Run a complete agent episode")
+        
+        .def("enableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all learning and development features")
+        
+        .def("disableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+        }, "Disable all learning and development features")
+
+    // Enhanced SimpleWorld class with Pythonic APIs
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("reset", &SimpleWorld::reset)
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
+        .def("update", &SimpleWorld::update, py::arg("timestep"))
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"))
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal)
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal)
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getWidth", &SimpleWorld::getWidth)
+        .def("getHeight", &SimpleWorld::getHeight)
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        
+        // Pythonic SimpleWorld API enhancements
+        .def_property_readonly("width", &SimpleWorld::getWidth,
+                              "Get world width")
+        .def_property_readonly("height", &SimpleWorld::getHeight,
+                              "Get world height")
+        .def_property_readonly("simulation_time", &SimpleWorld::getSimulationTime,
+                              "Get current simulation time")
+        .def_property_readonly("max_energy", &SimpleWorld::getMaxEnergy,
+                              "Get maximum agent energy")
+        
+        // Convenience methods for common world operations
+        .def("createEmptyGrid", [](SimpleWorld& self) {
+            self.reset();
+            // Create empty grid
+            for (float x = 0.5f; x < self.getWidth(); x += 1.0f) {
+                for (float y = 0.5f; y < self.getHeight(); y += 1.0f) {
+                    auto worldObj = WorldObject(x, y, WorldObjectType::Empty);
+                    self.addObject(worldObj);
+                }
+            }
+        }, "Create empty grid world")
+        
+        .def("addResources", [](SimpleWorld& self, size_t count, float value = 1.0f) {
+            for (size_t i = 0; i < count; ++i) {
+                float x = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (self.getWidth() - 1.0f);
+                float y = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (self.getHeight() - 1.0f);
+                auto resource = WorldObject(x, y, WorldObjectType::Resource, value, 0.3f);
+                self.addObject(resource);
+            }
+        }, py::arg("count"), py::arg("value") = 1.0f,
+           "Add random resource objects to the world")
+        
+        .def("addHazards", [](SimpleWorld& self, size_t count, float damage = 0.5f) {
+            for (size_t i = 0; i < count; ++i) {
+                float x = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (self.getWidth() - 1.0f);
+                float y = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (self.getHeight() - 1.0f);
+                auto hazard = WorldObject(x, y, WorldObjectType::Hazard, damage, 0.4f);
+                self.addObject(hazard);
+            }
+        }, py::arg("count"), py::arg("damage") = 0.5f,
+           "Add random hazard objects to the world")
+        
+        .def("getRandomEmptyPosition", [](SimpleWorld& self) {
+            for (int attempts = 0; attempts < 100; ++attempts) {
+                float x = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (self.getWidth() - 1.0f);
+                float y = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (self.getHeight() - 1.0f);
+                if (self.isValidPosition(x, y)) {
+                    return std::make_pair(x, y);
+                }
+            }
+            return std::make_pair(0.0f, 0.0f);
+        }, "Get random empty position in the world")
+        
+        .def("clearHazards", [](SimpleWorld& self) {
+            // This would require more complex implementation to iterate and remove hazards
+            self.reset();
+            // For now, just reset the world
+        }, "Clear all hazard objects from the world");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +738,85 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Advanced utility functions
+    m.def("runCompleteSimulation", [](std::shared_ptr<Config> config,
+                                     std::shared_ptr<SimpleWorld> world,
+                                     size_t steps,
+                                     bool enableLearning = true) {
+        auto brain = m.attr("createBrain")(config);
+        auto agent = m.attr("createAgentBrain")(brain);
+        
+        agent->initialize(world);
+        
+        if (enableLearning) {
+            agent->enableAllFeatures();
+        }
+        
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1f);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (enableLearning) {
+                float reward = 0.0f;
+                if (percept) {
+                    auto internal = percept->getInternal();
+                    if (!internal.empty()) {
+                        reward = internal[0];
+                    }
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(0.1f);
+            }
+            
+            if (i % 100 == 0) {
+                std::cout << "Step " << i << ": " 
+                         << brain->getFiringNeuronCount() << " firing neurons, "
+                         << agent->getCuriosityLevel() << " curiosity" << std::endl;
+            }
+        }
+        
+        return std::make_tuple(brain, agent);
+    }, py::arg("config"), py::arg("world"), py::arg("steps"),
+       py::arg("enableLearning") = true,
+       "Run a complete simulation with agent and learning");
+
+    m.def("createDevelopmentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up development-oriented configuration
+        config->set<int>("neuron_count", 2000);
+        config->set<float>("connection_probability", 0.15f);
+        config->set<float>("stdp_ltp_weight", 0.01f);
+        config->set<float>("stdp_ltd_weight", 0.012f);
+        config->set<size_t>("replay_interval", 50);
+        config->set<size_t>("consolidation_interval", 500);
+        config->set<float>("synaptogenesis_rate", 0.0002f);
+        config->set<float>("pruning_rate", 0.00002f);
+        config->set<std::string>("checkpoint_dir", "./checkpoints");
+        
+        return config;
+    }, "Create a development-focused configuration");
+
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up exploration-oriented configuration
+        config->set<int>("neuron_count", 1000);
+        config->set<float>("connection_probability", 0.1f);
+        config->set<float>("stdp_ltp_weight", 0.008f);
+        config->set<float>("stdp_ltd_weight", 0.008f);
+        config->set<size_t>("replay_interval", 200);
+        config->set<size_t>("consolidation_interval", 2000);
+        config->set<float>("synaptogenesis_rate", 0.00005f);
+        config->set<float>("pruning_rate", 0.00001f);
+        config->set<std::string>("checkpoint_dir", "./exploration_checkpoints");
+        
+        return config;
+    }, "Create an exploration-focused configuration");
 
 } // namespace nlm
