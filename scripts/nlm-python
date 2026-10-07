@@ -1,0 +1,594 @@
+#!/usr/bin/env python3
+"""
+NLM Python CLI - Command-line interface for NLM (Neural Learning Machine)
+
+This script provides a unified command-line interface for NLM simulations,
+wrapping the C++ NLM functionality with enhanced Python features.
+"""
+
+import argparse
+import sys
+import json
+import time
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+# Add the NLM Python bindings to the path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+try:
+    import pynlm
+    PYNLM_AVAILABLE = True
+except ImportError:
+    PYNLM_AVAILABLE = False
+    print("Warning: NLM Python bindings not available. Some features will be limited.")
+class NLMCLI:
+    """NLM Command Line Interface"""
+    
+    def __init__(self):
+        self.brain = None
+        self.world = None
+        self.agent = None
+        self.config = None
+        
+    def create_brain(self, config_file: Optional[str] = None) -> bool:
+        """Create and initialize a brain"""
+        try:
+            self.config = pynlm.createDefaultConfig()
+            
+            if config_file:
+                self.config.loadFromFile(config_file)
+            
+            self.brain = pynlm.createBrain(self.config)
+            self.brain.initialize()
+            
+            print(f"Brain created successfully!")
+            print(f"  Neurons: {self.brain.getTotalNeuronCount()}")
+            print(f"  Synapses: {self.brain.getTotalSynapseCount()}")
+            return True
+            
+        except Exception as e:
+            print(f"Error creating brain: {e}")
+            return False
+    
+    def create_world(self, width: int = 20, height: int = 20, 
+                    vision_width: int = 8, vision_height: int = 8) -> bool:
+        """Create a simple world"""
+        try:
+            self.world = pynlm.createSimpleWorld()
+            self.world.configure(width, height, vision_width, vision_height)
+            self.world.reset()
+            print(f"World created: {width}x{height} with {vision_width}x{vision_height} vision")
+            return True
+            
+        except Exception as e:
+            print(f"Error creating world: {e}")
+            return False
+    
+    def create_agent(self) -> bool:
+        """Create an agent brain interface"""
+        try:
+            if not self.brain:
+                print("No brain created. Create a brain first.")
+                return False
+            
+            self.agent = pynlm.createAgentBrain(self.brain)
+            
+            if self.world:
+                self.agent.initialize(self.world)
+            
+            print("Agent brain interface created successfully")
+            return True
+            
+        except Exception as e:
+            print(f"Error creating agent: {e}")
+            return False
+    
+    def run_simulation(self, steps: int = 100) -> bool:
+        """Run a simulation for the specified number of steps"""
+        try:
+            if not self.brain:
+                print("No brain created. Create a brain first.")
+                return False
+            
+            print(f"Running simulation for {steps} steps...")
+            
+            for step in range(steps):
+                if self.agent and self.world:
+                    # Process sensory input
+                    percept = self.world.getSensoryPercept()
+                    self.agent.processSensoryInput(percept)
+                    
+                    # Run brain step
+                    self.brain.step(step)
+                    
+                    # Decode motor command
+                    motor_cmd = self.agent.decodeMotorCommand()
+                    
+                    # Apply motor command to world
+                    self.world.applyMotorCommand(motor_cmd, self.world.getSimulationTime())
+                    
+                    # Apply reward modulation
+                    reward = 0.0
+                    if percept.getInternal():
+                        reward = percept.getInternal()[0]
+                    self.agent.applyRewardModulation(reward, 0.0)
+                    
+                    # Update development
+                    self.agent.updateDevelopment(0.1)
+                
+                elif self.brain:
+                    # Simple brain-only simulation
+                    self.brain.step(step)
+                
+                if step % 20 == 0:
+                    self.print_status(step)
+            
+            print("Simulation complete!")
+            return True
+            
+        except Exception as e:
+            print(f"Error running simulation: {e}")
+            return False
+    
+    def print_status(self, step: int = -1):
+        """Print current simulation status"""
+        if not self.brain:
+            print("No brain to report status for")
+            return
+        
+        print(f"\n--- Step {step} ---")
+        print(f"  Firing neurons: {self.brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {self.brain.getTotalSpikeCount()}")
+        print(f"  Average firing rate: {self.brain.getAverageFiringRate():.2f}")
+        print(f"  E/I ratio: {self.brain.getExcitationInhibitionRatio():.2f}")
+        
+        if self.agent:
+            print(f"  Neuromodulation level: {self.agent.getNeuromodulationLevel():.3f}")
+            print(f"  Curiosity level: {self.agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {self.agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction error: {self.agent.getPredictionError():.3f}")
+        
+        if self.world:
+            body = self.world.getAgentBody()
+            print(f"  Agent position: ({body.x:.1f}, {body.y:.1f})")
+            print(f"  Agent energy: {body.energy:.1f}")
+            print(f"  Simulation time: {self.world.getSimulationTime():.1f}")
+    
+    def save_brain(self, filename: str) -> bool:
+        """Save brain state to file"""
+        try:
+            if not self.brain:
+                print("No brain to save")
+                return False
+            
+            self.brain.save(filename)
+            print(f"Brain saved to {filename}")
+            return True
+            
+        except Exception as e:
+            print(f"Error saving brain: {e}")
+            return False
+    
+    def load_brain(self, filename: str) -> bool:
+        """Load brain state from file"""
+        try:
+            if not self.brain:
+                self.config = pynlm.createDefaultConfig()
+                self.brain = pynlm.createBrain(self.config)
+            
+            self.brain.load(filename)
+            print(f"Brain loaded from {filename}")
+            return True
+            
+        except Exception as e:
+            print(f"Error loading brain: {e}")
+            return False
+    
+    def enable_subsystem(self, subsystem: str) -> bool:
+        """Enable a subsystem"""
+        try:
+            if not self.agent:
+                print("No agent created. Create an agent first.")
+                return False
+            
+            if subsystem == "reward_modulation":
+                self.agent.enableRewardModulation(True)
+                print("Reward modulation enabled")
+            elif subsystem == "structural_plasticity":
+                self.agent.enableStructuralPlasticity(True)
+                print("Structural plasticity enabled")
+            elif subsystem == "development":
+                self.agent.enableDevelopment(True)
+                print("Development enabled")
+            elif subsystem == "curiosity":
+                self.agent.enableCuriosity(True)
+                print("Curiosity enabled")
+            else:
+                print(f"Unknown subsystem: {subsystem}")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error enabling subsystem: {e}")
+            return False
+    
+    def disable_subsystem(self, subsystem: str) -> bool:
+        """Disable a subsystem"""
+        try:
+            if not self.agent:
+                print("No agent created. Create an agent first.")
+                return False
+            
+            if subsystem == "reward_modulation":
+                self.agent.enableRewardModulation(False)
+                print("Reward modulation disabled")
+            elif subsystem == "structural_plasticity":
+                self.agent.enableStructuralPlasticity(False)
+                print("Structural plasticity disabled")
+            elif subsystem == "development":
+                self.agent.enableDevelopment(False)
+                print("Development disabled")
+            elif subsystem == "curiosity":
+                self.agent.enableCuriosity(False)
+                print("Curiosity disabled")
+            else:
+                print(f"Unknown subsystem: {subsystem}")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error disabling subsystem: {e}")
+            return False
+    
+    def run_phase6_demo(self, episodes: int = 5, steps_per_episode: int = 200) -> bool:
+        """Run Phase 6 demo"""
+        try:
+            print(f"Running Phase 6 demo: {episodes} episodes, {steps_per_episode} steps each")
+            
+            # Create components
+            self.create_brain()
+            self.create_world()
+            self.create_agent()
+            
+            # Configure agent
+            self.agent.enableRewardModulation(True)
+            self.agent.enableStructuralPlasticity(True)
+            self.agent.enableDevelopment(True)
+            self.agent.enableCuriosity(True)
+            
+            # Run episodes
+            for episode in range(episodes):
+                print(f"\n--- Episode {episode + 1}/{episodes} ---")
+                
+                self.world.reset()
+                if self.agent:
+                    self.agent.reset()
+                if self.brain:
+                    self.brain.reset()
+                    self.brain.initialize()
+                
+                episode_reward = 0.0
+                
+                for step in range(steps_per_episode):
+                    # Get sensory input
+                    percept = self.world.getSensoryPercept()
+                    
+                    # Process sensory input
+                    if self.agent:
+                        self.agent.processSensoryInput(percept)
+                    
+                    # Run brain step
+                    if self.brain:
+                        self.brain.step(step)
+                    
+                    # Decode motor command
+                    if self.agent:
+                        motor_cmd = self.agent.decodeMotorCommand()
+                    else:
+                        motor_cmd = pynlm.MotorCommand::Wait
+                    
+                    # Apply motor command
+                    action_result = self.world.applyMotorCommand(motor_cmd, self.world.getSimulationTime())
+                    
+                    # Apply reward
+                    if self.agent:
+                        reward = action_result.reward if hasattr(action_result, 'reward') else 0.0
+                        self.agent.applyRewardModulation(reward, 0.0)
+                        self.agent.updateDevelopment(0.1)
+                    
+                    episode_reward += action_result.reward if hasattr(action_result, 'reward') else 0.0
+                    
+                    if step % 50 == 0:
+                        self.print_status(step)
+                
+                print(f"Episode {episode + 1} reward: {episode_reward:.2f}")
+            
+            print("\nPhase 6 demo complete!")
+            return True
+            
+        except Exception as e:
+            print(f"Error running Phase 6 demo: {e}")
+            return False
+    
+    def run_benchmark(self, steps: int = 1000) -> bool:
+        """Run performance benchmark"""
+        try:
+            print(f"Running benchmark: {steps} simulation steps")
+            
+            # Create brain
+            self.create_brain()
+            
+            # Warm-up
+            for i in range(100):
+                self.brain.step(i)
+            
+            # Actual benchmark
+            start_time = time.time()
+            
+            for i in range(steps):
+                self.brain.step(i)
+            
+            end_time = time.time()
+            elapsed = end_time - start_time
+            
+            print(f"\nBenchmark Results:")
+            print(f"  Steps: {steps}")
+            print(f"  Time: {elapsed:.2f} seconds")
+            print(f"  Steps per second: {steps/elapsed:.0f}")
+            print(f"  Time per step: {elapsed/steps*1000:.2f} ms")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error running benchmark: {e}")
+            return False
+    
+    def reset_all(self):
+        """Reset all components"""
+        if self.brain:
+            self.brain.reset()
+            self.brain.initialize()
+        
+        if self.world:
+            self.world.reset()
+        
+        if self.agent:
+            self.agent.reset()
+        
+        print("All components reset")
+
+    def print_help(self):
+        """Print help message"""
+        help_text = """
+NLM Python CLI - Neural Learning Machine Command Line Interface
+
+Usage: nlm-python [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  create-brain [options]     Create and initialize a brain
+  create-world [options]     Create a world
+  create-agent                Create an agent brain interface
+  run [steps]                Run simulation
+  save <file>                Save brain state
+  load <file>                Load brain state
+  enable-subsystem <name>    Enable a subsystem
+  disable-subsystem <name>   Disable a subsystem
+  list-subsystems             List enabled subsystems
+  reset                       Reset all components
+  status                      Show current status
+  run-phase6 <episodes> [steps]  Run Phase 6 demo
+  benchmark [steps]           Run performance benchmark
+  config [file]              Configuration management
+  help                        Show this help message
+
+Options:
+  --config-file <file>        Configuration file path
+  --help, -h                  Show this help message
+
+Examples:
+  nlm-python create-brain --config-file config.json
+  nlm-python run-phase6 5 200
+  nlm-python benchmark 1000
+  nlm-python create-brain create-world create-agent run 100
+
+Subsystems:
+  reward_modulation           Reward-based learning
+  structural_plasticity      Structural plasticity
+  development                 Developmental processes
+  curiosity                   Curiosity-driven exploration
+        """
+        print(help_text)
+def run_cli():
+    """Main CLI entry point"""
+    parser = argparse.ArgumentParser(
+        description="NLM Python CLI - Neural Learning Machine Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    parser.add_argument('--help', '-h', action='store_true',
+                       help='Show this help message')
+    
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Create brain command
+    brain_parser = subparsers.add_parser('create-brain', help='Create and initialize a brain')
+    brain_parser.add_argument('--config-file', help='Configuration file path')
+    brain_parser.add_argument('--neurons', type=int, default=1000, help='Number of neurons')
+    brain_parser.add_argument('--regions', type=int, default=2, help='Number of brain regions')
+    brain_parser.add_argument('--density', type=float, default=0.1, help='Connection probability')
+    
+    # Create world command
+    world_parser = subparsers.add_parser('create-world', help='Create a world')
+    world_parser.add_argument('--width', type=int, default=20, help='World width')
+    world_parser.add_argument('--height', type=int, default=20, help='World height')
+    world_parser.add_argument('--vision-width', type=int, default=8, help='Vision width')
+    world_parser.add_argument('--vision-height', type=int, default=8, help='Vision height')
+    
+    # Create agent command
+    agent_parser = subparsers.add_parser('create-agent', help='Create an agent brain interface')
+    
+    # Run command
+    run_parser = subparsers.add_parser('run', help='Run simulation')
+    run_parser.add_argument('steps', type=int, nargs='?', default=100, help='Number of steps to run')
+    
+    # Save command
+    save_parser = subparsers.add_parser('save', help='Save brain state')
+    save_parser.add_argument('file', help='File to save to')
+    
+    # Load command
+    load_parser = subparsers.add_parser('load', help='Load brain state')
+    load_parser.add_argument('file', help='File to load from')
+    
+    # Enable subsystem command
+    enable_parser = subparsers.add_parser('enable-subsystem', help='Enable a subsystem')
+    enable_parser.add_argument('name', choices=['reward_modulation', 'structural_plasticity', 
+                                              'development', 'curiosity'], help='Subsystem name')
+    
+    # Disable subsystem command
+    disable_parser = subparsers.add_parser('disable-subsystem', help='Disable a subsystem')
+    disable_parser.add_argument('name', choices=['reward_modulation', 'structural_plasticity', 
+                                                'development', 'curiosity'], help='Subsystem name')
+    
+    # List subsystems command
+    subparsers.add_parser('list-subsystems', help='List enabled subsystems')
+    
+    # Reset command
+    subparsers.add_parser('reset', help='Reset all components')
+    
+    # Status command
+    subparsers.add_parser('status', help='Show current status')
+    
+    # Phase 6 demo command
+    phase6_parser = subparsers.add_parser('run-phase6', help='Run Phase 6 demo')
+    phase6_parser.add_argument('episodes', type=int, default=5, help='Number of episodes')
+    phase6_parser.add_argument('steps', type=int, nargs='?', default=200, help='Steps per episode')
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser('benchmark', help='Run performance benchmark')
+    benchmark_parser.add_argument('steps', type=int, nargs='?', default=1000, help='Number of steps')
+    
+    # Config command
+    config_parser = subparsers.add_parser('config', help='Configuration management')
+    config_parser.add_argument('file', nargs='?', help='Configuration file path')
+    
+    # Help command
+    subparsers.add_parser('help', help='Show this help message')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Create CLI instance
+    cli = NLMCLI()
+    
+    # Handle commands
+    if args.command == 'help' or not args.command:
+        cli.print_help()
+        return 0
+    
+    try:
+        if args.command == 'create-brain':
+            config_file = args.config_file
+            if cli.create_brain(config_file):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'create-world':
+            if cli.create_world(args.width, args.height, args.vision_width, args.vision_height):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'create-agent':
+            if cli.create_agent():
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'run':
+            if cli.run_simulation(args.steps):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'save':
+            if cli.save_brain(args.file):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'load':
+            if cli.load_brain(args.file):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'enable-subsystem':
+            if cli.enable_subsystem(args.name):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'disable-subsystem':
+            if cli.disable_subsystem(args.name):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'list-subsystems':
+            cli.print_help()
+            return 0
+                
+        elif args.command == 'reset':
+            cli.reset_all()
+            return 0
+                
+        elif args.command == 'status':
+            cli.print_status()
+            return 0
+                
+        elif args.command == 'run-phase6':
+            if cli.run_phase6_demo(args.episodes, args.steps):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'benchmark':
+            if cli.run_benchmark(args.steps):
+                return 0
+            else:
+                return 1
+                
+        elif args.command == 'config':
+            if args.file:
+                # Load config file
+                if cli.config:
+                    cli.config.loadFromFile(args.file)
+                    print(f"Configuration loaded from {args.file}")
+                else:
+                    print("No config loaded. Create a brain first.")
+            else:
+                # Show config
+                if cli.config:
+                    print(f"Configuration: {cli.config.summary()}")
+                else:
+                    print("No configuration loaded. Create a brain first.")
+            return 0
+        
+        else:
+            print(f"Unknown command: {args.command}")
+            cli.print_help()
+            return 1
+            
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+        return 130
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+if __name__ == "__main__":
+    exit_code = run_cli()
+    sys.exit(exit_code)
