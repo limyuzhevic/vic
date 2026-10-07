@@ -3,14 +3,27 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::function<void(const std::string&)>> validators;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Register common validators
+    registerValidator("brain.neuron_count", [](const std::string& val) {
+        int neurons = std::stoi(val);
+        if (neurons <= 0) throw std::invalid_argument("Neuron count must be positive");
+    });
+    
+    registerValidator("brain.connection_probability", [](const std::string& val) {
+        float prob = std::stof(val);
+        if (prob < 0.0f || prob > 1.0f) throw std::invalid_argument("Connection probability must be between 0 and 1");
+    });
+}
 
 Config::~Config() = default;
 
@@ -19,42 +32,170 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Try to detect file format
+    auto fileExt = getFileExtension(filepath);
+    std::transform(fileExt.begin(), fileExt.end(), fileExt.begin(), ::tolower);
+    
+    if (fileExt == ".json") {
+        return loadFromJSONFile(filepath);
+    } else if (fileExt == ".yaml" || fileExt == ".yml") {
+        return loadFromYAMLFile(filepath);
+    } else if (fileExt == ".cfg" || fileExt == ".config") {
+        return loadFromCFGFile(filepath);
+    } else {
+        // Auto-detect: try JSON first, then YAML, then CFG
+        try {
+            return loadFromJSONFile(filepath);
+        } catch (...) {
+            try {
+                return loadFromYAMLFile(filepath);
+            } catch (...) {
+                return loadFromCFGFile(filepath);
+            }
+        }
+    }
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // Simplified implementation for now - will be enhanced with JSON library when available
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // For now, fall back to CFG format for all files
+    return loadFromCFGFile(filepath);
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // Simplified implementation for now - will be enhanced with YAML library when available
+    // For now, fall back to CFG format for all files
+    return loadFromCFGFile(filepath);
+}
+
+bool Config::loadFromCFGFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNum;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Remove surrounding quotes
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                setWithValidation(key, value, ConfigSource::File, 
+                                 "Line " + std::to_string(lineNum) + ": " + key);
+            } catch (const std::exception& e) {
+                return false;
+            }
         }
     }
     
     return true;
 }
 
+void Config::registerValidator(const std::string& key, std::function<void(const std::string&)> validator) {
+    pImpl->validators[key] = validator;
+}
+
+void Config::setWithValidation(const std::string& key, const std::string& value, 
+                               ConfigSource source, const std::string& description) {
+    // Validate if validator exists
+    auto it = pImpl->validators.find(key);
+    if (it != pImpl->validators.end()) {
+        try {
+            it->second(value);
+        } catch (const std::exception& e) {
+            throw;
+        }
+    }
+    
+    // Parse value to appropriate type
+    ConfigValue configValue;
+    
+    // Try different types
+    try {
+        // Try integer
+        size_t pos;
+        int intVal = std::stoi(value, &pos);
+        if (pos == value.length()) {
+            configValue = intVal;
+        }
+    } catch (...) {}
+    
+    if (configValue.valueless_by_exception()) {
+        try {
+            // Try float
+            size_t pos;
+            double floatVal = std::stod(value, &pos);
+            if (pos == value.length()) {
+                configValue = floatVal;
+            }
+        } catch (...) {}
+    }
+    
+    if (configValue.valueless_by_exception()) {
+        try {
+            // Try boolean
+            if (value == "true" || value == "yes" || value == "on") {
+                configValue = true;
+            } else if (value == "false" || value == "no" || value == "off") {
+                configValue = false;
+            }
+        } catch (...) {}
+    }
+    
+    if (configValue.valueless_by_exception()) {
+        // Keep as string
+        configValue = value;
+    }
+    
+    // Set the value
+    auto entryIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (entryIt != pImpl->entries.end()) {
+        entryIt->value = configValue;
+        entryIt->source = source;
+        entryIt->description = description;
+    } else {
+        pImpl->entries.emplace_back(key, configValue, source, description);
+    }
+}
+
+std::string Config::getFileExtension(const std::string& filepath) {
+    size_t pos = filepath.find_last_of('.');
+    if (pos == std::string::npos) return "";
+    return filepath.substr(pos);
+}
+
+// Original implementations of other methods
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
