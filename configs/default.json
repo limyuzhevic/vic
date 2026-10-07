@@ -1,0 +1,122 @@
+{
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "lif_leak_coefficient": 0.1,
+    "lif_threshold": -55.0,
+    "lif_reset_potential": -70.0,
+    "lif_refractory_period": 0.002
+  },
+  "plasticity": {
+    "learning_rate": 0.01,
+    "hebbian": {
+      "weight_increment": 0.01,
+      "weight_decay": 0.995
+    },
+    "stdp": {
+      "ltp_weight": 0.02,
+      "ltd_weight": 0.015,
+      "time_constant": 20.0,
+      "trace_decay": 0.95,
+      "pre_trace_duration": 100.0,
+      "post_trace_duration": 80.0
+    },
+    "structural_plasticity": {
+      "synaptogenesis_rate": 0.001,
+      "pruning_rate": 0.0001,
+      "min_synapse_weight": 0.01,
+      "max_synapse_weight": 1.0
+    }
+  },
+  "development": {
+    "synaptogenesis_rate": 0.001,
+    "pruning_rate": 0.0001,
+    "maturation_speed": 1.0,
+    "critical_period_start": 100.0,
+    "critical_period_end": 1000.0,
+    "plasticity_during_critical_period": 2.0
+  },
+  "neuromodulation": {
+    "dopamine": {
+      "baseline": 0.1,
+      "reward_gain": 1.0,
+      "error_decay": 0.95,
+      "phasing": 0.1
+    },
+    "curiosity": {
+      "threshold": 0.05,
+      "decay_rate": 0.99,
+      "exponent": 2.0,
+      "prediction_weight": 0.5,
+      "novelty_weight": 0.5
+    },
+    "novelty": {
+      "decay": 0.98,
+      "sensitivity": 1.0,
+      "window_size": 100
+    },
+    "prediction_error": {
+      "scaling": 1.0,
+      "decay": 0.9,
+      "confidence_threshold": 0.5
+    }
+  },
+  "reward": {
+    "discount_factor": 0.99,
+    "exploration_bonus": 0.1,
+    "punishment_factor": 0.5,
+    "stability": 0.1
+  },
+  "environment": {
+    "name": "GridWorld",
+    "dimensions": {
+      "width": 10,
+      "height": 10
+    },
+    "obstacle_density": 0.1,
+    "reward_for_goal": 1.0,
+    "reward_for_obstacle": -0.1,
+    "sensory": {
+      "vision": {
+        "width": 8,
+        "height": 8,
+        "field_of_view": 180.0,
+        "noise_level": 0.01
+      },
+      "audio": {
+        "sensitivity": 0.5
+      }
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "to_file": false,
+    "filename": "nlm.log",
+    "file_rotations": 5,
+    "max_size_mb": 100,
+    "include_timestamps": true,
+    "include_thread_ids": true
+  },
+  "simulation": {
+    "max_steps": 10000,
+    "time_limit_seconds": 0.0,
+    "checkpoint_interval_steps": 1000,
+    "save_time": true,
+    "compress": true,
+    "random_seed": 42
+  },
+  "visualization": {
+    "enabled": false,
+    "update_rate_hz": 30.0,
+    "show_neurons": true,
+    "show_synapses": true,
+    "show_spikes": true,
+    "show_weights": true,
+    "show_memory": true,
+    "window_width": 1280,
+    "window_height": 720,
+    "neuron_radius": 3.0,
+    "synapse_line_width": 1.0
+  }
+}

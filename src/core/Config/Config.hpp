@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -42,6 +43,17 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// JSON value types
+using JSONValue = std::variant<
+    std::monostate, // null
+    bool,
+    double,
+    int64_t,
+    std::string,
+    std::vector<JSONValue>,     // array
+    std::map<std::string, JSONValue>  // object
+>;
 
 // Main configuration class
 class Config {
@@ -92,6 +104,9 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // JSON parsing support
+    bool parseJSON(const JSONValue& jsonValue);
     
 private:
     struct Impl;

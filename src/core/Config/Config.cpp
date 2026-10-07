@@ -1,8 +1,13 @@
 #include "Config.hpp"
+#include "Utils/JSONParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <memory>
+#include <limits>
+#include <numeric>
 
 namespace nlm {
 
@@ -19,9 +24,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first (new format)
+    auto jsonValue = JSONParser::parseFile(filepath);
+    if (jsonValue.has_value()) {
+        return parseJSON(*jsonValue);
+    }
     
+    // Fall back to simple key=value format (legacy support)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -52,6 +61,94 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    return true;
+}
+
+bool Config::parseJSON(const JSONValue& jsonValue) {
+    // Clear existing entries
+    clear();
+    
+    // Check if it's an object
+    if (!std::holds_alternative<std::map<std::string, JSONValue>>(jsonValue)) {
+        return false;
+    }
+    
+    const auto& obj = std::get<std::map<std::string, JSONValue>>(jsonValue);
+    
+    for (const auto& pair : obj) {
+        const std::string& key = pair.first;
+        const JSONValue& value = pair.second;
+        
+        // Convert JSON value to ConfigValue
+        ConfigValue configValue;
+        if (std::holds_alternative<std::monostate>(value)) {
+            // null -> string "null"
+            configValue = "null";
+        } else if (std::holds_alternative<bool>(value)) {
+            configValue = std::get<bool>(value);
+        } else if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            // Check if it's an integer
+            if (val == static_cast<int64_t>(val) && val >= INT64_MIN && val <= INT64_MAX) {
+                configValue = static_cast<int64_t>(val);
+            } else if (val >= std::numeric_limits<float>::min() && val <= std::numeric_limits<float>::max()) {
+                configValue = static_cast<float>(val);
+            } else {
+                configValue = val;
+            }
+        } else if (std::holds_alternative<int64_t>(value)) {
+            configValue = std::get<int64_t>(value);
+        } else if (std::holds_alternative<std::string>(value)) {
+            configValue = std::get<std::string>(value);
+        } else if (std::holds_alternative<std::vector<JSONValue>>(value)) {
+            // Arrays are not directly supported, convert to string
+            configValue = "[array]";
+        } else if (std::holds_alternative<std::map<std::string, JSONValue>>(value)) {
+            // Objects are not directly supported, convert to string
+            configValue = "[object]";
+        }
+        
+        set(key, configValue, ConfigSource::File);
+    }
+    
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    // Create a JSON object for saving
+    std::map<std::string, JSONValue> jsonObj;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Convert ConfigValue to JSONValue
+        JSONValue jsonValue;
+        if (std::holds_alternative<int>(entry.value)) {
+            jsonValue = std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            jsonValue = std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            jsonValue = std::get<double>(entry.value);
+        } else if (std::holds_alternative<float>(entry.value)) {
+            jsonValue = static_cast<double>(std::get<float>(entry.value));
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            jsonValue = std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            jsonValue = std::get<std::string>(entry.value);
+        } else {
+            // For unsupported types, use string representation
+            jsonValue = "[" + std::to_string(static_cast<int>(entry.value.index())) + "]";
+        }
+        
+        jsonObj[entry.key] = std::move(jsonValue);
+    }
+    
+    std::string jsonString = JSONParser::serialize(jsonObj, 0);
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << jsonString;
     return true;
 }
 
@@ -197,6 +294,55 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+// JSON parsing support
+bool Config::parseJSON(const JSONValue& jsonValue) {
+    // Clear existing entries
+    clear();
+    
+    // Check if it's an object
+    if (!std::holds_alternative<std::map<std::string, JSONValue>>(jsonValue)) {
+        return false;
+    }
+    
+    const auto& obj = std::get<std::map<std::string, JSONValue>>(jsonValue);
+    
+    for (const auto& pair : obj) {
+        const std::string& key = pair.first;
+        const JSONValue& value = pair.second;
+        
+        // Convert JSON value to ConfigValue
+        ConfigValue configValue;
+        if (std::holds_alternative<std::monostate>(value)) {
+            // null -> string "null"
+            configValue = "null";
+        } else if (std::holds_alternative<bool>(value)) {
+            configValue = std::get<bool>(value);
+        } else if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            // Check if it's an integer
+            if (val == static_cast<int64_t>(val) && val >= INT64_MIN && val <= INT64_MAX) {
+                configValue = static_cast<int64_t>(val);
+            } else if (val >= std::numeric_limits<float>::min() && val <= std::numeric_limits<float>::max()) {
+                configValue = static_cast<float>(val);
+            } else {
+                configValue = val;
+            }
+        } else if (std::holds_alternative<int64_t>(value)) {
+            configValue = std::get<int64_t>(value);
+        } else if (std::holds_alternative<std::string>(value)) {
+            configValue = std::get<std::string>(value);
+        } else if (std::holds_alternative<std::vector<JSONValue>>(value)) {
+            // Arrays are not directly supported, convert to string
+            configValue = "[array]";
+        } else if (std::holds_alternative<std::map<std::string, JSONValue>>(value)) {
+            // Objects are not directly supported, convert to string
+            configValue = "[object]";
+        }
+        
+        set(key, configValue, ConfigSource::File);
+    }
+    
+    return true;
 }
 
 // Explicit template instantiations

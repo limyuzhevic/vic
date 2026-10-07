@@ -1,0 +1,66 @@
+name: NLM CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [Debug, Release]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ python3-dev libjson-c-dev libssl-dev
+    
+    - name: Configure and build
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+                 -DBUILD_TESTS=ON -DBUILD_PYTHON=ON
+        make -j$(nproc)
+    
+    - name: Run unit tests
+      run: |
+        cd build
+        ./nlm_test
+    
+    - name: Run integration tests
+      run: |
+        cd build
+        ./nlm_phase6_demo
+    
+    - name: Run Python tests
+      run: |
+        python -m pytest python/tests/ -v
+    
+    - name: Generate coverage
+      run: |
+        cd build
+        ./coverage --output=coverage.xml
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.build-type }}
+        path: |
+          build/test_results/
+          build/coverage.xml
