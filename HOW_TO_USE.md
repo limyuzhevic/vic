@@ -274,7 +274,7 @@ brain.reset()                     # Reset brain state
 
 # Input/Output
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+action = brain.produceAction()           # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -401,7 +401,10 @@ pynlm.DevelopmentalStage.Aging
 
 # Action types
 pynlm.ActionType.MoveForward
+pynlm.ActionType.MoveBackward
 pynlm.ActionType.TurnLeft
+pynlm.ActionType.TurnRight
+pynlm.ActionType.Look
 pynlm.ActionType.Interact
 pynlm.ActionType.Eat
 # ... and more
@@ -498,7 +501,7 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 6: Troubleshooting
 
 ### Build Issues
 
