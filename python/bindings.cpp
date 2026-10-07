@@ -380,8 +380,14 @@ PYBIND11_MODULE(pynlm, m) {
              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+.def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error")
+        .def("getExpectedReward", &AgentBrain::getExpectedReward,
+             "Get expected reward (internal state)")
+        .def("getDevelopmentalAge", &AgentBrain::getDevelopmentalAge,
+             "Get current developmental age")
+        .def("getPlasticityModifier", &AgentBrain::getPlasticityModifier,
+             "Get current plasticity modifier")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
@@ -395,6 +401,10 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
+        .def("enableAllSystems", &AgentBrain::enableAllSystems,
+             "Enable all neuromodulation systems")
+        .def("disableAllSystems", &AgentBrain::disableAllSystems,
+             "Disable all neuromodulation systems")
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)

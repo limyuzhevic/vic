@@ -334,6 +334,18 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getExpectedReward() const {
+    return expectedReward_;
+}
+
+double AgentBrain::getDevelopmentalAge() const {
+    return developmentalAge_;
+}
+
+float AgentBrain::getPlasticityModifier() const {
+    return plasticityModifier_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

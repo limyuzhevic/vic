@@ -1,6 +1,18 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "setuptools>=45", "wheel>=30"]
 build-backend = "scikit_build_core.build"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+    "coverage>=6.0",
+    "mypy>=0.9",
+    "black>=22.0",
+    "flake8>=5.0",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+]
 
 [project]
 name = "pynlm"

@@ -52,11 +52,21 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get expected reward (added for better transparency)
+    float getExpectedReward() const;
+    
+    // Get developmental age (added for debugging)
+    double getDevelopmentalAge() const;
+    
+    // Get plasticity modifier (added for monitoring)
+    float getPlasticityModifier() const;
+    
     // Reset agent for new episode
     void reset();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -68,6 +78,21 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Additional convenience methods for better API
+    void enableAllSystems() {
+        rewardModulationEnabled_ = true;
+        structuralPlasticityEnabled_ = true;
+        developmentEnabled_ = true;
+        curiosityEnabled_ = true;
+    }
+    
+    void disableAllSystems() {
+        rewardModulationEnabled_ = false;
+        structuralPlasticityEnabled_ = false;
+        developmentEnabled_ = false;
+        curiosityEnabled_ = false;
+    }
     
 private:
     // Motor decoding: convert neural activity to motor command
