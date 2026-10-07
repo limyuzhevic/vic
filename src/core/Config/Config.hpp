@@ -55,13 +55,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
+    // Load from command line arguments (advanced parsing)
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Load from file (JSON/YAML/legacy format)
+    bool loadFromFile(const std::string& filepath);
+    
+    // Save to file (JSON format preferred)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,13 +93,44 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Command line argument parsing (alias for loadFromArgs)
+    bool parseCommandLine(int argc, char** argv) {
+        return loadFromArgs(argc, argv);
+    }
+    
+    static void printHelp(const std::string& programName);
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const std::string& value, const ConfigValue& expectedType);
+    static std::string valueToString(const ConfigValue& value);
+    static std::string getDataTypeName(const ConfigValue& value);
+    
+    // Configuration file helpers
+    static std::string getFileExtension(const std::string& filename);
+    static std::vector<std::string> splitKeyPath(const std::string& key);
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string formatConfigValue(const ConfigValue& value);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // JSON/YAML parsing helpers
+#ifdef HAVE_NLOHMANN_JSON
+    bool loadFromJSON(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
+    nlohmann::json configValueToJSON(const ConfigValue& value);
+    void parseJSONToConfig(const nlohmann::json& jsonData, const std::string& prefix, ConfigSource source);
+    ConfigValue jsonValueToConfigValue(const nlohmann::json& jsonVal);
+#endif
+    
+    bool loadFromYAML(const std::string& filepath);
+    bool saveToYAML(const std::string& filepath) const;
+    
+    bool loadFromLegacy(const std::string& filepath);
+    bool saveToLegacyFile(const std::string& filepath) const;
 };
 
 } // namespace nlm

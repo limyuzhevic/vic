@@ -18,6 +18,18 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Try to find nlohmann/json (for configuration parsing)
+find_package(nlohmann_json QUIET)
+if(nlohmann_json_FOUND)
+    message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
+    add_definitions(-DHAVE_NLOHMANN_JSON)
+else()
+    message(WARNING "nlohmann_json not found. Configuration file will use legacy simple format only.")
+endif()
+
+# Exceptions library
+add_subdirectory(src/core/Exceptions)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -29,6 +41,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Exceptions
+    src/core/Exceptions/NLMMExceptions.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -71,7 +85,6 @@ add_library(nlm_core STATIC
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
     # Prediction
-    src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
@@ -86,6 +99,13 @@ add_library(nlm_core STATIC
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(nlm_core PUBLIC nlm_exceptions)
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

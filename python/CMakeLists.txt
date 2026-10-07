@@ -12,6 +12,13 @@ endif()
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
 
+# Try to find nlohmann/json (for configuration parsing in Python bindings)
+find_package(nlohmann_json QUIET)
+if(nlohmann_json_FOUND)
+    message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
+    add_definitions(-DHAVE_NLOHMANN_JSON)
+endif()
+
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
 set(NLM_CORE_SOURCES
@@ -20,6 +27,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
     ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
     ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
+    ${NLM_SOURCE_DIR}/core/Exceptions/NLMMExceptions.cpp
     ${NLM_SOURCE_DIR}/brain/Neuron.cpp
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
@@ -49,7 +57,6 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/sensory/Vision.cpp
     ${NLM_SOURCE_DIR}/sensory/Audio.cpp
     ${NLM_SOURCE_DIR}/sensory/InternalSignals.cpp
-    ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
     ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
@@ -59,6 +66,18 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
+
+add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
+    $<INSTALL_INTERFACE:include>
+)
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+target_link_libraries(nlm_core PUBLIC nlm_exceptions)
 
 set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
