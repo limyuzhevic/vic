@@ -176,10 +176,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
+    // Inject strong current using config value (default: 50.0f)
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
+    double currentStrength = brain->getConfig()->getOr<double>("test_current_injection", 50.0f);
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(static_cast<float>(currentStrength));  // Strong excitatory input
     }
     
     // Run a few steps
@@ -222,10 +223,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
+    // Get config values for input strength and pattern
+    double sensoryInputStrength = brain->getConfig()->getOr<double>("sensory_input_strength", 30.0f);
+    double patternFrequency = brain->getConfig()->getOr<double>("plasticity_test_pattern_freq", 0.25f);
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, static_cast<float>(sensoryInputStrength));
         }
         
         brain->step(step, step * 0.001);
@@ -274,6 +279,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
+    // Get config values for STDP test parameters
+    double stdpTestPrePostInterval = brain->getConfig()->getOr<double>("stdp_test_pre_post_interval", 2.0);
+    double stdpTestCurrentStrength = brain->getConfig()->getOr<double>("stdp_test_current_strength", 60.0f);
+    
     for (int trial = 0; trial < 50; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
@@ -287,11 +296,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
+            preNeuron->injectCurrent(static_cast<float>(stdpTestCurrentStrength));
             brain->step(trial * 2, trial * 2 * 0.001);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
+            postNeuron->injectCurrent(static_cast<float>(stdpTestCurrentStrength));
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
         }
     }
