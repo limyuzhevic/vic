@@ -3,12 +3,102 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <unordered_map>
+
+// Try to include nlohmann/json if available
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
+
+// Helper function to detect JSON file based on extension
+bool isJsonFile(const std::string& filepath) {
+    std::string lower = filepath;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    return lower.ends_with(".json");
+}
+
+// Convert ConfigValue to JSON value
+#ifdef HAVE_NLOHMANN_JSON
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    nlohmann::json result;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = arg;
+        }
+    }, value);
+    return result;
+}
+
+// Convert JSON value to ConfigValue
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonVal) {
+    if (jsonVal.is_string()) {
+        return jsonVal.get<std::string>();
+    } else if (jsonVal.is_number_integer()) {
+        return jsonVal.get<int64_t>();
+    } else if (jsonVal.is_number_unsigned()) {
+        return jsonVal.get<uint64_t>();
+    } else if (jsonVal.is_number()) {
+        // Check if it's an integer or float
+        if (jsonVal.is_number_integer()) {
+            return jsonVal.get<int64_t>();
+        } else {
+            return jsonVal.get<double>();
+        }
+    } else if (jsonVal.is_boolean()) {
+        return jsonVal.get<bool>();
+    } else if (jsonVal.is_array()) {
+        // Determine array type
+        if (!jsonVal.empty()) {
+            if (jsonVal[0].is_number_integer()) {
+                std::vector<int64_t> intArray;
+                for (const auto& item : jsonVal) {
+                    intArray.push_back(item.get<int64_t>());
+                }
+                return intArray;
+            } else if (jsonVal[0].is_number()) {
+                std::vector<double> doubleArray;
+                for (const auto& item : jsonVal) {
+                    doubleArray.push_back(item.get<double>());
+                }
+                return doubleArray;
+            } else if (jsonVal[0].is_string()) {
+                std::vector<std::string> stringArray;
+                for (const auto& item : jsonVal) {
+                    stringArray.push_back(item.get<std::string>());
+                }
+                return stringArray;
+            }
+        }
+        // Default to empty int array
+        return std::vector<int64_t>();
+    }
+    // Default for unknown types
+    return std::string("");
+}
+#endif
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -18,10 +108,56 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Enhanced loadFromFile with JSON support
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check if it's a JSON file
+    if (isJsonFile(filepath)) {
+#ifdef HAVE_NLOHMANN_JSON
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        try {
+            nlohmann::json jsonConfig;
+            file >> jsonConfig;
+            
+            // Clear existing entries
+            clear();
+            
+            // Parse JSON configuration
+            if (jsonConfig.contains("configuration")) {
+                const auto& config = jsonConfig["configuration"];
+                
+                if (config.contains("entries") && config["entries"].is_array()) {
+                    for (const auto& entry : config["entries"]) {
+                        if (entry.is_object() && entry.contains("key") && entry.contains("value")) {
+                            std::string key = entry["key"];
+                            std::string description = entry.value("description", "");
+                            
+                            ConfigValue value;
+                            try {
+                                value = jsonToConfigValue(entry["value"]);
+                                set(key, value, ConfigSource::File);
+                            } catch (const std::exception& e) {
+                                // Skip invalid entries
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return true;
+        } catch (const std::exception& e) {
+            return false;
+        }
+#else
+        // JSON not available, fall back to simple format
+#endif
+    }
     
+    // Original simple key=value format parsing
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -78,12 +214,55 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+// Enhanced saveToFile with JSON support
 bool Config::saveToFile(const std::string& filepath) const {
+    bool isJson = isJsonFile(filepath);
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    if (isJson && std::filesystem::exists(filepath)) {
+#ifdef HAVE_NLOHMANN_JSON
+        try {
+            nlohmann::json jsonConfig;
+            
+            // Load existing JSON if file exists
+            std::ifstream readFile(filepath);
+            if (readFile.is_open()) {
+                readFile >> jsonConfig;
+            }
+            
+            // Update configuration entries
+            if (!jsonConfig.contains("configuration")) {
+                jsonConfig["configuration"] = nlohmann::json::object();
+            }
+            
+            auto& config = jsonConfig["configuration"];
+            config["entries"] = nlohmann::json::array();
+            
+            for (const auto& entry : pImpl->entries) {
+                nlohmann::json jsonEntry;
+                jsonEntry["key"] = entry.key;
+                jsonEntry["value"] = configValueToJson(entry.value);
+                jsonEntry["source"] = static_cast<int>(entry.source);
+                jsonEntry["description"] = entry.description;
+                config["entries"].push_back(jsonEntry);
+            }
+            
+            // Write formatted JSON
+            file << std::setw(2) << jsonConfig << std::endl;
+            return true;
+        } catch (const std::exception& e) {
+            return false;
+        }
+#else
+        // JSON not available, fall back to simple format
+#endif
+    }
+    
+    // Original simple key=value format
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";

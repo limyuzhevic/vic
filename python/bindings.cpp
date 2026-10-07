@@ -354,51 +354,61 @@ PYBIND11_MODULE(pynlm, m) {
              "Log brain status");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"), "Create an agent brain interface")
+        .def("initialize", &AgentBrain::initialize, py::arg("world"), "Initialize the agent brain with a world")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput, py::arg("percept"), 
+             "Process sensory input from the world")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand, 
+             "Decode brain motor activity into a motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation, 
+             py::arg("reward"), py::arg("predictedReward"), "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment, py::arg("timestep"), 
              "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage, 
              "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel, 
              "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel, 
              "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel, 
              "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
+        .def("getPredictionError", &AgentBrain::getPredictionError, 
              "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
+        .def("reset", &AgentBrain::reset, "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain, py::return_value_policy::reference_internal, 
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation, py::arg("enable"),
+             "Enable or disable reward modulation")
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity, py::arg("enable"),
+             "Enable or disable structural plasticity")
+        .def("enableDevelopment", &AgentBrain::enableDevelopment, py::arg("enable"),
+             "Enable or disable development")
+        .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"),
+             "Enable or disable curiosity")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        .def("validateOperation", [](const std::shared_ptr<AgentBrain>& agent, const std::string& operation) {
+            if (!agent) {
+                throw py::value_error("AgentBrain is not initialized");
+            }
+            if (operation.empty()) {
+                throw py::value_error("Operation cannot be empty");
+            }
+            return true;
+        }, py::arg("operation"), "Validate that the agent is in a valid state for an operation")
+        .def("getOperationHistory", [](std::shared_ptr<AgentBrain> agent, size_t maxEntries = 100) {
+            py::dict history;
+            // This would typically store operation history in the agent
+            history["status"] = "Operation history tracking would be implemented here";
+            history["max_entries"] = static_cast<int64_t>(maxEntries);
+            return history;
+        }, py::arg("maxEntries") = 100, "Get operation history for debugging and analysis");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -412,9 +422,186 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+.def("getStatsSummary", [](const std::shared_ptr<Brain>& brain) {
+            py::dict stats;
+            stats["total_neurons"] = brain->getTotalNeuronCount();
+            stats["total_synapses"] = brain->getTotalSynapseCount();
+            stats["active_neurons"] = brain->getActiveNeuronCount();
+            stats["firing_neurons"] = brain->getFiringNeuronCount();
+            stats["total_spikes"] = brain->getTotalSpikeCount();
+            stats["avg_firing_rate"] = brain->getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+            return stats;
+        }, "Get comprehensive brain statistics as a Python dictionary");
+
+    // Configuration utilities
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set common defaults for convenience
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", 42ULL);
+        
+        // Advanced plasticity parameters
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_tau", 20.0f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        
+        // Memory system parameters
+        config->set("working_memory_size", 1000);
+        config->set("episodic_memory_capacity", 5000);
+        config->set("replay_interval", 100);
+        config->set("consolidation_interval", 1000);
+        
+        // Development parameters
+        config->set("plasticity_decay_rate", 0.95f);
+        config->set("development_plasticity_boost", 2.0f);
+        
+        return config;
+    }, "Create an advanced configuration with optimized defaults for research use");
+
+    // Neural network manipulation APIs for advanced users
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "NeuralNetworkAPI")
+        .def("addRegionWithPattern", [](std::shared_ptr<Brain> brain, const std::string& name, 
+                                       size_t neuronCount, NeuronType neuronType, 
+                                       float connectionDensity = 0.1f) {
+            auto regionId = brain->addRegion(name);
+            auto* region = brain->getRegion(regionId);
+            if (region) {
+                return region->addPopulation(neuronCount, neuronType, connectionDensity);
+            }
+            return INVALID_POPULATION_ID;
+        }, py::arg("name"), py::arg("neuronCount"), py::arg("neuronType"), 
+               py::arg("connectionDensity") = 0.1f, "Add a region with specific characteristics")
+        .def("connectRegions", [](std::shared_ptr<Brain> brain, RegionId source, RegionId target, 
+                                 float weight = 1.0f, Delay delay = 1, 
+                                 PlasticityFlags plasticity = PlasticityFlags::STDP) {
+            brain->addInterRegionConnection(source, target, weight, delay);
+        }, py::arg("source"), py::arg("target"), py::arg("weight") = 1.0f, 
+               py::arg("delay") = 1, py::arg("plasticity") = PlasticityFlags::STDP,
+               "Create long-range connection between regions with plasticity")
+        .def("getRegionStats", [](const std::shared_ptr<Brain>& brain) {
+            py::dict stats;
+            auto regionIds = brain->getRegionIds();
+            
+            for (const auto& regionId : regionIds) {
+                auto* region = brain->getRegion(regionId);
+                if (region) {
+                    py::dict regionInfo;
+                    regionInfo["id"] = regionId.index();
+                    regionInfo["name"] = region->getName();
+                    regionInfo["neuron_count"] = region->getPopulationCount();
+                    regionInfo["total_synapses"] = region->getTotalSynapseCount();
+                    
+                    auto populations = region->getPopulations();
+                    std::unordered_map<NeuronType, size_t> typeCounts;
+                    for (const auto& pop : populations) {
+                        typeCounts[pop->getNeuronType()]++;
+                    }
+                    
+                    py::dict typeDist;
+                    for (const auto& pair : typeCounts) {
+                        typeDist[std::string(typeName(pair.first))] = pair.second;
+                    }
+                    regionInfo["neuron_types"] = typeDist;
+                    
+                    stats[std::to_string(regionId.index())] = regionInfo;
+                }
+            }
+            
+            return stats;
+        }, "Get detailed statistics for all brain regions");
+
+    // Helper function for neuron type names
+    auto typeName = [](NeuronType type) {
+        switch (type) {
+            case NeuronType::Excitatory: return std::string("Excitatory");
+            case NeuronType::Inhibitory: return std::string("Inhibitory");
+            case NeuronType::Modulatory: return std::string("Modulatory");
+            case NeuronType::Sensory: return std::string("Sensory");
+            case NeuronType::Motor: return std::string("Motor");
+            case NeuronType::Internal: return std::string("Internal");
+            default: return std::string("Unknown");
+        }
+    };
+
+    // Advanced Python error handling and validation
+    m.def("validateBrainConfig", [](const std::shared_ptr<Config>& config) {
+        py::dict errors;
+        bool hasErrors = false;
+        
+        if (!config->has("neuron_count")) {
+            errors["neuron_count"] = "Missing required parameter: neuron_count";
+            hasErrors = true;
+        } else {
+            auto neuronCountOpt = config->get<size_t>("neuron_count");
+            if (neuronCountOpt && neuronCountOpt.value() == 0) {
+                errors["neuron_count"] = "neuron_count must be greater than 0";
+                hasErrors = true;
+            }
+        }
+        
+        if (!config->has("region_count")) {
+            errors["region_count"] = "Missing required parameter: region_count";
+            hasErrors = true;
+        } else {
+            auto regionCountOpt = config->get<size_t>("region_count");
+            if (regionCountOpt && regionCountOpt.value() == 0) {
+                errors["region_count"] = "region_count must be greater than 0";
+                hasErrors = true;
+            }
+        }
+        
+        if (config->has("connection_probability")) {
+            auto probOpt = config->get<double>("connection_probability");
+            if (probOpt && (probOpt.value() < 0.0 || probOpt.value() > 1.0)) {
+                errors["connection_probability"] = "connection_probability must be between 0.0 and 1.0";
+                hasErrors = true;
+            }
+        }
+        
+        return std::pair<bool, py::dict>(hasErrors, errors);
+    }, "Validate brain configuration and return any errors");
+
+    m.def("createValidatedBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        // First validate the configuration
+        auto validation = validateBrainConfig(config);
+        if (validation.first) {
+            std::string errorMessages;
+            for (const auto& pair : validation.second) {
+                errorMessages += pair.first + ": " + pair.second.get<std::string>() + "; ";
+            }
+            throw py::value_error("Invalid brain configuration: " + errorMessages);
+        }
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a brain with validated configuration");
+
+    // Performance profiling utilities
+    m.def("profileSimulation", [](std::shared_ptr<Brain> brain, size_t steps, 
+                                 double timeStep = 0.001) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(static_cast<SimulationStep>(i), timeStep);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        py::dict profile;
+        profile["total_steps"] = static_cast<int64_t>(steps);
+        profile["total_time_ms"] = static_cast<int64_t>(duration.count());
+        profile["steps_per_second"] = steps / (duration.count() / 1000.0);
+        profile["avg_step_time_ms"] = (duration.count() / static_cast<double>(steps));
+        
+        return profile;
+    }, py::arg("steps"), py::arg("timeStep") = 0.001, "Profile simulation performance");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

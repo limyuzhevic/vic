@@ -288,10 +288,23 @@ print("Agent simulation complete!")
 ---
 
 ## Next Steps
-
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. **Read `HOW_TO_USE.md` for more details**
+3. Read `docs/ARCHITECTURE.md` to understand how it all works
+4. **Read `ADVANCED_USAGE.md` for advanced features** - Comprehensive guide for power users
+5. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+## For Advanced Users
+
+Check out the [Advanced Usage Guide](ADVANCED_USAGE.md) for comprehensive examples of:
+- Context managers and resource management
+- Batch processing and performance optimization
+- Configuration validation and JSON support
+- Performance profiling and error handling
+- Neural network manipulation APIs
+- Multi-agent systems
+- State serialization and integration
+- Best practices for production use
+
+This guide provides extensive examples for working with the NLM brain simulator at an advanced level.
