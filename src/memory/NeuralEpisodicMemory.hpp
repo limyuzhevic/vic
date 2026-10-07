@@ -60,7 +60,7 @@ struct EpisodicMemoryItem {
 
 class NeuralEpisodicMemory {
 public:
-    NeuralEpisodicMemory();
+NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();
 
     // Initialize with brain reference
@@ -70,6 +70,12 @@ public:
     // The experience is encoded as neural activity and can influence future processing
     void storeEpisode(const EpisodicMemoryItem& episode);
 
+    // Enhanced consolidation with relevance-based prioritization
+    void consolidate(float relevanceThreshold);
+    
+    // Enhanced relevance-based consolidation implementation
+    void consolidateWithRelevance(float relevanceThreshold);
+
     // Retrieve episodes similar to a query pattern
     // Returns episodes ordered by relevance
     std::vector<const EpisodicMemoryItem*> retrieveSimilar(const std::vector<float>& sensoryPattern,
@@ -77,20 +83,19 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
-    // Replay an episode - reactivates the neural patterns associated with it
-    // This allows the brain to "relive" the experience
+    // Enhanced replay with cross-system integration
     void replayEpisode(const EpisodicMemoryItem* episode);
 
     // Update episode relevance based on recent use
@@ -109,9 +114,6 @@ public:
     float getAverageReward() const;
 
     // Clear old episodes
-    void consolidate(float relevanceThreshold);
-
-    // Clear all episodes
     void clear();
 
     // Enable/disable replay
@@ -121,10 +123,33 @@ public:
     // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
+    // Enhanced replay parameters
+    enum class ConsolidationModel { SIMPLE, ENHANCED };
+    void setConsolidationModel(ConsolidationModel model) { consolidationModel_ = model; }
+    ConsolidationModel getConsolidationModel() const { return consolidationModel_; }
+    
+    // Configure consolidation timing
+    void setConsolidationInterval(size_t interval) { consolidationInterval_ = interval; }
+    size_t getConsolidationInterval() const { return consolidationInterval_; }
+    
+    // Set cross-level integration
+    void enableCrossLevelIntegration(bool enable) { crossLevelIntegration_ = enable; }
+    bool isCrossLevelIntegrationEnabled() const { return crossLevelIntegration_; }
+    
+    // Configure priority boost factor
+    void setPriorityBoostFactor(float factor) { priorityBoostFactor_ = std::max(1.0f, factor); }
+    float getPriorityBoostFactor() const { return priorityBoostFactor_; }
+
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
 private:
+    // Enhanced relevance calculation with multiple factors
+    float calculateEnhancedRelevance(size_t index) const;
+    
+    // Enhanced replay effects with system-wide influence
+    void enhanceReplayEffects(const EpisodicMemoryItem* episode);
+
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
                           const EpisodicMemoryItem& episode) const;
@@ -143,6 +168,13 @@ private:
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+    
+    // Enhanced consolidation parameters
+    ConsolidationModel consolidationModel_;
+    size_t consolidationInterval_;
+    float consolidationDecayRate_;
+    bool crossLevelIntegration_;
+    float priorityBoostFactor_;
 };
 
 // AssociativeMemory: Creates and retrieves relationships between experiences

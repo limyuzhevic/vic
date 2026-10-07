@@ -22,6 +22,11 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , decayModel_(1)  // 0: exponential, 1: power-law
+    , maxTraceAge_(2000)
+    , competitionThreshold_(0.35f)
+    , winnerPriorityBoost_(1.5f)
+    , memoryEfficiency_(1.0f)
 {
 }
 
@@ -81,6 +86,11 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        
+        // Enhanced efficiency calculation
+        if (memoryNeurons_.size() > 0) {
+            memoryEfficiency_ = std::min(1.0f, static_cast<float>(memoryNeurons_.size()) / capacity_);
+        }
     }
     
     // Inject current to maintain activation
@@ -152,58 +162,121 @@ void NeuralWorkingMemory::clear() {
     pImpl->maintenanceSynapses.clear();
 }
 
-void NeuralWorkingMemory::strengthenMemory(float factor) {
-    for (auto& activation : memoryActivations_) {
-        activation = std::min(1.0f, activation * factor);
+float NeuralWorkingMemory::getMemoryEfficiency() const {
+    return memoryEfficiency_;
+}
+
+void NeuralWorkingMemory::setWinnerPriorityBoost(float boost) {
+    winnerPriorityBoost_ = std::max(1.0f, std::min(3.0f, boost));
+}
+
+// Enhanced decay based on trace age and activation
+void NeuralWorkingMemory::decayWeakTraces() {
+    std::vector<size_t> toRemove;
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        float activation = memoryActivations_[i];
+        size_t age = memoryTimestamps_[i];
+        
+        if (activation < 0.01f) {
+            toRemove.push_back(i);
+            continue;
+        }
+        
+        // Enhanced decay algorithm based on trace age
+        float decayFactor;
+        if (decayModel_ == 0) {
+            // Exponential decay with age modulation
+            decayFactor = decayRate_ * (1.0f + static_cast<float>(age) / maxTraceAge_ * 2.0f);
+        } else {
+            // Power-law decay (more biologically plausible for working memory)
+            decayFactor = decayRate_ * std::pow(1.0f + static_cast<float>(age) / 100.0f, -0.5f);
+        }
+        
+        // Apply decay
+        activation *= (1.0f - decayFactor);
+        
+        // Adaptive thresholding based on memory efficiency
+        float adaptiveThreshold = 0.01f * (1.0f - memoryEfficiency_ * 0.5f);
+        
+        if (activation < adaptiveThreshold) {
+            toRemove.push_back(i);
+        } else {
+            memoryActivations_[i] = activation;
+        }
+    }
+    
+    // Remove weak traces (in reverse order to maintain indices)
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        size_t idx = *it;
+        
+        // Update memory efficiency
+        if (memoryNeurons_.size() > 0) {
+            memoryEfficiency_ = std::min(1.0f, static_cast<float>(memoryNeurons_.size() - 1) / capacity_);
+        }
+        
+        // Remove from all arrays
+        memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+        memoryActivations_.erase(memoryActivations_.begin() + idx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
     }
 }
 
+// Enhanced competition with priority-based selection
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
     if (memoryActivations_.empty()) return;
     
-    // Find neurons with above-threshold activation
-    float threshold = 0.3f;
+    // Enhanced competition algorithm with priority weighting
+    std::vector<std::pair<size_t, float>> scoredNeurons;
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
-            winners_.push_back(memoryNeurons_[i]);
-        }
-    }
-    
-    // Inhibitory competition - suppress non-winners
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+        float activation = memoryActivations_[i];
         
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        // Apply priority boost based on recency (younger traces get priority)
+        float recencyBonus = 1.0f;
+        if (memoryTimestamps_[i] < 500) {
+            recencyBonus = 1.2f;
+        } else if (memoryTimestamps_[i] < 1000) {
+            recencyBonus = 1.1f;
+        }
+        
+        // Apply efficiency-based modulation
+        float efficiencyMod = 1.0f + (1.0f - memoryEfficiency_) * 0.2f;
+        
+        float effectiveActivation = activation * recencyBonus * efficiencyMod;
+        
+        // Apply competition threshold
+        if (effectiveActivation >= competitionThreshold_ * winnerPriorityBoost_) {
+            scoredNeurons.emplace_back(i, effectiveActivation);
         }
     }
-}
-
-bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
-}
-
-float NeuralWorkingMemory::getMemoryActivity() const {
-    if (memoryActivations_.empty()) return 0.0f;
     
-    float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
-    }
-    return total / memoryActivations_.size();
-}
-
-void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
-    }
+    // Sort by effective activation (descending)
+    std::sort(scoredNeurons.begin(), scoredNeurons.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    // Apply lateral inhibition among winners
+    for (size_t i = 0; i < scoredNeurons.size(); ++i) {
+        size_t neuronIdx = scoredNeurons[i].first;
+        float activation = scoredNeurons[i].second;
+        
+        // Apply winner excitation
+        winners_.push_back(memoryNeurons_[neuronIdx]);
+        
+        // Apply lateral inhibition to other traces
+        for (size_t j = i + 1; j < scoredNeurons.size() && j < i + 3; ++j) {
+            if (j < scoredNeurons.size()) {
+                // Inhibit based on relative strength
+                float inhibition = std::min(1.0f, (scoredNeurons[i].second - scoredNeurons[j].second) * 2.0f);
+                if (brain_) {
+                    brain_->injectCurrent(memoryNeurons_[scoredNeurons[j].first], 
+                                       -inhibition * activation * 3.0f);
+                }
+            }
+        }
+    }
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
@@ -225,22 +298,71 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
     }
 }
 
-void NeuralWorkingMemory::decayWeakTraces() {
-    std::vector<size_t> toRemove;
-    
-    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        memoryActivations_[i] *= (1.0f - decayRate_);
+void NeuralWorkingMemory::createOptimizedRecurrentConnections() {
+    // Enhanced maintenance connections with strength-based placement
+    if (memoryNeurons_.size() >= 2) {
+        // Create stronger connections between more active neurons
+        std::vector<std::pair<size_t, float>> neuronStrengths;
         
-        if (memoryActivations_[i] < 0.01f) {
-            toRemove.push_back(i);
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            neuronStrengths.emplace_back(i, memoryActivations_[i]);
+        }
+        
+        // Sort by strength descending
+        std::sort(neuronStrengths.begin(), neuronStrengths.end(),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+        
+        // Create connections between top N neurons
+        size_t numConnections = std::min(size_t(3), neuronStrengths.size());
+        for (size_t i = 0; i < numConnections - 1; ++i) {
+            size_t fromIdx = neuronStrengths[i].first;
+            size_t toIdx = neuronStrengths[i + 1].first;
+            
+            if (fromIdx != toIdx) {
+                float strength = std::min(1.0f, neuronStrengths[i].second * neuronStrengths[i + 1].second);
+                createRecurrentConnection(memoryNeurons_[fromIdx], memoryNeurons_[toIdx], strength * 0.5f);
+            }
         }
     }
+}
+
+void NeuralWorkingMemory::optimizeTraceDistribution() {
+    // Optimize memory usage by redistributing traces
+    if (memoryNeurons_.empty() || memoryEfficiency_ < 0.3f) {
+        // Clear and rebuild when efficiency is too low
+        clear();
+        return;
+    }
     
-    // Remove weak traces (in reverse order to maintain indices)
-    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    // Ensure capacity constraint is met
+    if (memoryNeurons_.size() > capacity_) {
+        std::vector<std::pair<size_t, float>> neuronPriorities;
+        
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            // Calculate priority based on activation, recency, and efficiency
+            float recency = 1.0f / (1.0f + static_cast<float>(memoryTimestamps_[i]) / maxTraceAge_);
+            float priority = memoryActivations_[i] * recency * memoryEfficiency_;
+            neuronPriorities.emplace_back(i, priority);
+        }
+        
+        // Sort by priority descending
+        std::sort(neuronPriorities.begin(), neuronPriorities.end(),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+        
+        // Remove lowest priority traces
+        size_t toRemove = memoryNeurons_.size() - capacity_;
+        std::vector<size_t> removeIndices;
+        for (size_t i = neuronPriorities.size() - toRemove; i < neuronPriorities.size(); ++i) {
+            removeIndices.push_back(neuronPriorities[i].first);
+        }
+        
+        // Remove in reverse order to maintain indices
+        for (auto it = removeIndices.rbegin(); it != removeIndices.rend(); ++it) {
+            size_t idx = *it;
+            memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+            memoryActivations_.erase(memoryActivations_.begin() + idx);
+            memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
+        }
     }
 }
 

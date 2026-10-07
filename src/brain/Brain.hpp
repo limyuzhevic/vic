@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class EnhancedAssociativeMemory;
+class EmotionalMemoryPrioritizer;
+class HierarchicalMemory;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -145,10 +148,14 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Enhanced associative memory with fuzzy pattern completion
+    EnhancedAssociativeMemory* getEnhancedAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // Emotional memory prioritization system
+    EmotionalMemoryPrioritizer* getEmotionalMemoryPrioritizer();
+    
+    // Hierarchical memory architecture
+    HierarchicalMemory* getHierarchicalMemory();
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
