@@ -27,12 +27,46 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "typing-extensions>=4.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.5.0",
+    "pandas>=1.3.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.0.0",
+    "black>=22.0",
+    "isort>=5.0",
+    "mypy>=0.991",
+    "pytest-cov>=3.0",
+    "memory-profiler>=0.61.0",
+    "psutil>=5.8.0",
+]
+
+[project.optional-dependencies]
+research = [
+    "numpy>=1.20",
+    "scipy>=1.7.0",
+    "matplotlib>=3.5.0",
+    "pandas>=1.3.0",
+    "scikit-learn>=1.0.0",
+    "networkx>=2.8.0",
+    "torch>=1.13.0; sys_platform != 'win32'",
+    "tensorflow>=2.10.0; sys_platform != 'win32'",
+]
+
+[project.optional-dependencies]
+debug = [
+    "py-spy>=0.3.14",
+    "snakeviz>=2.1.1",
+    "gprof2dot>=0.2.2",
+    "graphviz>=0.20",
 ]
 
 [project.urls]

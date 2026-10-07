@@ -139,13 +139,21 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Implementation Status Tracking
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Add implementation status tracker tool
+add_executable(nlm_status_tracker
+    src/core/ImplementationStatus.cpp
+)
+
+target_link_libraries(nlm_status_tracker PUBLIC nlm_core)
+target_compile_features(nlm_status_tracker PRIVATE cxx_std_20)
+
+# Add status tracker as diagnostic tool
+add_custom_target(status_check
+    COMMAND ./nlm_status_tracker
+    COMMENT "Checking NLM implementation status"
+    VERBATIM
 )
