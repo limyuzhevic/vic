@@ -36,34 +36,34 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Clear existing memory for new pattern
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    pImpl->maintenanceSynapses.clear();
+    
+    // Find neurons to encode this pattern from sensory neurons
+    // Use brain to get all available neurons
+    size_t neuronsNeeded = std::min(pattern.size(), brain_->getTotalNeuronCount());
+    size_t neuronIndex = 0;
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
+        // Get next neuron from brain (cycle through all neurons)
+        // In a real implementation, we'd use proper neural encoding
+        size_t regionIndex = neuronIndex / 100; // Distribute across regions
+        size_t neuronInRegion = neuronIndex % 100;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Find a suitable neuron to use (prefer sensory neurons first)
+        NeuronId targetNeuron = NeuronId(neuronIndex + 1000); // Unique ID
         
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
+        // For now, store the pattern information
+        // In a full implementation, we'd find actual neurons in the brain
+        memoryNeurons_.push_back(targetNeuron);
+        memoryActivations_.push_back(pattern[i] * strength);
+        memoryTimestamps_.push_back(0);
     }
     
-    // Create maintenance connections if needed
+    // Create maintenance connections for pattern persistence
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }

@@ -63,11 +63,13 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -108,6 +110,7 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool planningEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

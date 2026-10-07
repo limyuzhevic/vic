@@ -184,6 +184,17 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== ADVANCED NEUROMODULATION ==========
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     

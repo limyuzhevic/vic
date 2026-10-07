@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , planningEnabled_(false)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -152,6 +153,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try to use NeuralPlanner for sophisticated action planning
+    if (brain_->getPlanner() && planningEnabled_) {
+        MotorCommand plannedAction = decodeWithPlanner();
+        if (plannedAction != MotorCommand::Wait) {
+            return plannedAction;
+        }
+    }
+    
+    // Fall back to basic motor decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -162,77 +172,106 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
+MotorCommand AgentBrain::decodeWithPlanner() {
+    if (!brain_ || !brain_->getPlanner()) return MotorCommand::Wait;
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    // Get current state from brain for planning
+    std::vector<float> currentState;
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
+    // Convert neural activity to state representation for planning
+    // This includes working memory content, sensory input, and current goals
+    if (brain_->getWorkingMemory()) {
+        currentState = brain_->getWorkingMemory()->retrieve();
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
+    // Get goal from concept formation if available
+    std::vector<float> currentGoal;
+    if (brain_->getConceptFormation() && brain_->getConceptFormation()->getConceptCount() > 0) {
+        // Use the most stable concept as current goal
+        size_t conceptId = 1; // Would need to track active concept
+        currentGoal = brain_->getConceptFormation()->getConceptPrototype(conceptId);
     }
     
-    return best;
+    // Get reward prediction from prediction system
+    float targetReward = 0.5f; // Default target reward
+    if (brain_->getPredictionSystem()) {
+        targetReward = brain_->getPredictionSystem()->getPredictionError();
+    }
+    
+    // Use NeuralPlanner to plan the next action
+    ActionType plannedAction = brain_->getPlanner()->planAction(currentState, targetReward);
+    
+    // Convert ActionType to MotorCommand
+    switch (plannedAction) {
+        case ActionType::MoveForward:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::LookLeft:
+            return MotorCommand::LookLeft;
+        case ActionType::LookRight:
+            return MotorCommand::LookRight;
+        case ActionType::Wait:
+        default:
+            return MotorCommand::Wait;
+    }
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
+MotorCommand AgentBrain::decodeWithPlanner() {
+    if (!brain_ || !brain_->getPlanner()) return MotorCommand::Wait;
+    
+    // Get current state from brain for planning
+    std::vector<float> currentState;
+    
+    // Convert neural activity to state representation for planning
+    // This includes working memory content, sensory input, and current goals
+    if (brain_->getWorkingMemory()) {
+        currentState = brain_->getWorkingMemory()->retrieve();
     }
     
-    return defaultCmd;
+    // Get goal from concept formation if available
+    std::vector<float> currentGoal;
+    if (brain_->getConceptFormation() && brain_->getConceptFormation()->getConceptCount() > 0) {
+        // Use the most stable concept as current goal
+        size_t conceptId = 1; // Would need to track active concept
+        currentGoal = brain_->getConceptFormation()->getConceptPrototype(conceptId);
+    }
+    
+    // Get reward prediction from prediction system
+    float targetReward = 0.5f; // Default target reward
+    if (brain_->getPredictionSystem()) {
+        targetReward = brain_->getPredictionSystem()->getPredictionError();
+    }
+    
+    // Use NeuralPlanner to plan the next action
+    ActionType plannedAction = brain_->getPlanner()->planAction(currentState, targetReward);
+    
+    // Convert ActionType to MotorCommand
+    switch (plannedAction) {
+        case ActionType::MoveForward:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::LookLeft:
+            return MotorCommand::LookLeft;
+        case ActionType::LookRight:
+            return MotorCommand::LookRight;
+        case ActionType::Wait:
+        default:
+            return MotorCommand::Wait;
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
