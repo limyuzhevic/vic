@@ -68,6 +68,10 @@ public:
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
     
+    // Get episodes with relevance scores (for replay)
+    std::vector<std::pair<EpisodicMemoryItem, float>> getRelevantEpisodes(
+        size_t maxCount = 10, float minRelevance = 0.5f) const;
+    
     // Clear all
     void clear();
     
@@ -114,8 +118,12 @@ struct Skill {
     std::string name;
     std::vector<NeuronId> neuralPattern;
     float proficiency;
+    float stability;
+    Timestamp lastPracticed;
+    Timestamp lastImproved;
+    std::vector<float> performanceHistory;
     
-    Skill() : proficiency(0.0f) {}
+    Skill() : proficiency(0.0f), stability(1.0f), lastPracticed(0.0f), lastImproved(0.0f) {}
 };
 
 class ProceduralMemory {
@@ -123,17 +131,33 @@ public:
     ProceduralMemory();
     ~ProceduralMemory();
     
-    // Learn skill
+    // Learn skill from neural pattern
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
     
-    // Retrieve skill
+    // Retrieve skill by name
     Skill* getSkill(const std::string& name);
+    const Skill* getSkill(const std::string& name) const;
     
-    // Get all skills
+    // Get all skills (with proficiency thresholds)
     std::vector<Skill*> getAllSkills();
+    std::vector<const Skill*> getAllSkills() const;
+    
+    // Filter skills by proficiency
+    std::vector<Skill*> getSkillsAboveProficiency(float threshold);
+    std::vector<const Skill*> getSkillsAboveProficiency(float threshold) const;
     
     // Update proficiency
     void updateProficiency(const std::string& name, float delta);
+    
+    // Practice skill to improve proficiency
+    void practiceSkill(const std::string& name, float performance);
+    
+    // Get average proficiency
+    float getAverageProficiency() const;
+    
+    // Get best skills
+    std::vector<Skill*> getBestSkills(size_t count = 5);
+    std::vector<const Skill*> getBestSkills(size_t count = 5) const;
     
     // Clear all
     void clear();
@@ -146,25 +170,55 @@ private:
 // Associative memory: relationships between representations
 // PLACEHOLDER - Phase 2 will implement real associative memory
 
+struct Association {
+    std::vector<NeuronId> patternA;
+    std::vector<NeuronId> patternB;
+    float strength;
+    float stability;
+    float frequency;
+    Timestamp lastActivated;
+    
+    Association(const std::vector<NeuronId>& a, const std::vector<NeuronId>& b) 
+        : patternA(a), patternB(b), strength(0.0f), stability(1.0f), frequency(0), lastActivated(0.0f) {}
+};
+
 class AssociativeMemory {
 public:
     AssociativeMemory();
     ~AssociativeMemory();
     
-    // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
+    // Create association between two neural patterns
+    void associate(const std::vector<NeuronId>& patternA, const std::vector<NeuronId>& patternB, float strength = 0.5f);
     
-    // Get associated neurons
+    // Get associations for a pattern (returns patternB)
+    std::vector<NeuronId> getAssociations(const std::vector<NeuronId>& pattern) const;
+    
+    // Get associations for a single neuron
     std::vector<NeuronId> getAssociations(NeuronId neuron) const;
     
     // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
+    float getAssociationStrength(const std::vector<NeuronId>& patternA, const std::vector<NeuronId>& patternB) const;
     
-    // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
+    // Update association strength
+    void updateAssociation(const std::vector<NeuronId>& patternA, const std::vector<NeuronId>& patternB, float delta);
     
-    // Clear all
+    // Find associations for pattern (auto-match)
+    bool findAssociation(const std::vector<NeuronId>& pattern, std::vector<NeuronId>& matchedPattern) const;
+    
+    // Get all associations
+    std::vector<Association> getAllAssociations() const;
+    
+    // Update association based on activation (Hebbian-like)
+    void updateFromActivation(const std::vector<NeuronId>& patternA, const std::vector<NeuronId>& patternB);
+    
+    // Clear all associations
     void clear();
+    
+    // Get average association strength
+    float getAverageStrength() const;
+    
+    // Find strongest associations
+    std::vector<Association> getStrongestAssociations(size_t count = 10) const;
     
 private:
     struct Impl;

@@ -75,6 +75,16 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Neuromodulation subsystem enable/disable flags
+    bool rewardModulationEnabled;
+    bool structuralPlasticityEnabled;
+    bool developmentEnabled;
+    bool curiosityEnabled;
+    bool predictionEnabled;
+    bool planningEnabled;
+    bool conceptFormationEnabled;
+    bool attentionEnabled;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +102,14 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , rewardModulationEnabled(true)
+        , structuralPlasticityEnabled(true)
+        , developmentEnabled(true)
+        , curiosityEnabled(true)
+        , predictionEnabled(true)
+        , planningEnabled(true)
+        , conceptFormationEnabled(true)
+        , attentionEnabled(true)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -1075,6 +1093,273 @@ std::shared_ptr<const Config> Brain::getConfig() const {
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    pImpl->developmentalStage = stage;
+}
+
+// ========== ADVANCED BRAIN FEATURES ==========
+
+bool Brain::isRewardModulationEnabled() const {
+    return pImpl->rewardModulationEnabled;
+}
+
+void Brain::enableRewardModulation(bool enable) {
+    pImpl->rewardModulationEnabled = enable;
+}
+
+bool Brain::isStructuralPlasticityEnabled() const {
+    return pImpl->structuralPlasticityEnabled;
+}
+
+void Brain::enableStructuralPlasticity(bool enable) {
+    pImpl->structuralPlasticityEnabled = enable;
+}
+
+bool Brain::isDevelopmentEnabled() const {
+    return pImpl->developmentEnabled;
+}
+
+void Brain::enableDevelopment(bool enable) {
+    pImpl->developmentEnabled = enable;
+}
+
+bool Brain::isCuriosityEnabled() const {
+    return pImpl->curiosityEnabled;
+}
+
+void Brain::enableCuriosity(bool enable) {
+    pImpl->curiosityEnabled = enable;
+}
+
+bool Brain::isPredictionEnabled() const {
+    return pImpl->predictionEnabled;
+}
+
+void Brain::enablePrediction(bool enable) {
+    pImpl->predictionEnabled = enable;
+}
+
+bool Brain::isPlanningEnabled() const {
+    return pImpl->planningEnabled;
+}
+
+void Brain::enablePlanning(bool enable) {
+    pImpl->planningEnabled = enable;
+}
+
+bool Brain::isConceptFormationEnabled() const {
+    return pImpl->conceptFormationEnabled;
+}
+
+void Brain::enableConceptFormation(bool enable) {
+    pImpl->conceptFormationEnabled = enable;
+}
+
+bool Brain::isAttentionEnabled() const {
+    return pImpl->attentionEnabled;
+}
+
+void Brain::enableAttention(bool enable) {
+    pImpl->attentionEnabled = enable;
+}
+
+// System statistics
+float Brain::getExcitationInhibitionRatio() const {
+    float excitationSum = 0.0f, inhibitionSum = 0.0f;
+    for (const auto& region : pImpl->regions) {
+        excitationSum += region->getExcitatoryWeightSum();
+        inhibitionSum += region->getInhibitoryWeightSum();
+    }
+    float total = excitationSum + inhibitionSum;
+    if (total == 0.0f) return 1.0f;
+    return excitationSum / total;
+}
+
+size_t Brain::getTotalSpikeCount() const {
+    return pImpl->totalSpikesTotal;
+}
+
+size_t Brain::getPendingSpikeEventCount() const {
+    return pImpl->spikeSystem ? pImpl->spikeSystem->getPendingCount() : 0;
+}
+
+// Memory system statistics
+Brain::MemoryStats Brain::getMemoryStats() const {
+    MemoryStats stats;
+    
+    if (pImpl->workingMemory) {
+        stats.workingMemorySize = pImpl->workingMemory->getCurrentSize();
+        stats.workingMemoryCapacity = pImpl->workingMemory->getCapacity();
+    }
+    
+    if (pImpl->episodicMemory) {
+        stats.episodicMemoryCount = pImpl->episodicMemory->getEpisodeCount();
+    }
+    
+    // For semantic, procedural, and associative memory, we'd need to implement
+    // count methods in those classes
+    stats.semanticMemoryFactCount = 0;
+    stats.proceduralMemorySkillCount = 0;
+    stats.associativeMemoryAssociationCount = 0;
+    
+    return stats;
+}
+
+// Cognitive system statistics
+Brain::CognitiveStats Brain::getCognitiveStats() const {
+    CognitiveStats stats;
+    
+    // These would need to be implemented based on the specific cognitive systems
+    if (pImpl->planner) {
+        stats.plannerActivationLevel = pImpl->planner->getActivationLevel();
+    }
+    if (pImpl->conceptFormation) {
+        stats.conceptFormationActivationLevel = pImpl->conceptFormation->getActivationLevel();
+    }
+    if (pImpl->attention) {
+        stats.attentionFocusLevel = pImpl->attention->getFocusLevel();
+    }
+    
+    // These would need to be implemented based on the specific cognitive systems
+    stats.activeConcepts = 0;
+    stats.plannedActions = 0;
+    
+    return stats;
+}
+
+// Development system statistics
+Brain::DevelopmentStats Brain::getDevelopmentStats() const {
+    DevelopmentStats stats;
+    
+    stats.stage = pImpl->developmentalStage;
+    
+    if (pImpl->developmentSystem) {
+        stats.plasticityRate = pImpl->developmentSystem->getPlasticityRate();
+        stats.maturityLevel = pImpl->developmentSystem->getMaturityLevel();
+        stats.learningCapacity = pImpl->developmentSystem->getLearningCapacity();
+    }
+    
+    return stats;
+}
+
+// Neuromodulation system statistics
+Brain::NeuromodulationStats Brain::getNeuromodulationStats() const {
+    NeuromodulationStats stats;
+    
+    if (pImpl->dopamine) {
+        stats.dopamineLevel = pImpl->dopamine->getLevel();
+    }
+    if (pImpl->curiosity) {
+        stats.curiosityLevel = pImpl->curiosity->getLevel();
+    }
+    if (pImpl->novelty) {
+        stats.noveltyLevel = pImpl->novelty->getLevel();
+    }
+    if (pImpl->predictionError) {
+        stats.predictionError = pImpl->predictionError->getErrorLevel();
+    }
+    
+    // Calculate overall neuromodulation level
+    float sum = 0.0f;
+    int count = 0;
+    if (pImpl->dopamine) { sum += stats.dopamineLevel; count++; }
+    if (pImpl->curiosity) { sum += stats.curiosityLevel; count++; }
+    if (pImpl->novelty) { sum += stats.noveltyLevel; count++; }
+    if (pImpl->predictionError) { sum += stats.predictionError; count++; }
+    
+    stats.overallNeuromodulationLevel = (count > 0) ? (sum / count) : 0.0f;
+    
+    return stats;
+}
+
+// Memory management
+void Brain::clearAllMemory() {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->clear();
+    }
+}
+
+void Brain::resetMemories() {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+    // Other memory systems could be reset here
+}
+
+// System integration status
+bool Brain::isMemoryIntegrated() const {
+    return (pImpl->workingMemory != nullptr) && 
+           (pImpl->episodicMemory != nullptr) &&
+           (pImpl->associativeMemory != nullptr);
+}
+
+bool Brain::isPredictionIntegrated() const {
+    return pImpl->predictionSystem != nullptr;
+}
+
+bool Brain::isCognitionIntegrated() const {
+    return (pImpl->planner != nullptr) && 
+           (pImpl->conceptFormation != nullptr) &&
+           (pImpl->attention != nullptr);
+}
+
+bool Brain::isDevelopmentIntegrated() const {
+    return pImpl->developmentSystem != nullptr;
+}
+
+bool Brain::isNeuromodulationIntegrated() const {
+    return (pImpl->dopamine != nullptr) && 
+           (pImpl->curiosity != nullptr) &&
+           (pImpl->novelty != nullptr) &&
+           (pImpl->predictionError != nullptr);
+}
+
+// Comprehensive integration status
+Brain::IntegrationStatus Brain::getIntegrationStatus() const {
+    IntegrationStatus status;
+    
+    status.memoryIntegrated = isMemoryIntegrated();
+    status.predictionIntegrated = isPredictionIntegrated();
+    status.cognitionIntegrated = isCognitionIntegrated();
+    status.developmentIntegrated = isDevelopmentIntegrated();
+    status.neuromodulationIntegrated = isNeuromodulationIntegrated();
+    
+    status.integratedSystems = 0;
+    if (status.memoryIntegrated) status.integratedSystems++;
+    if (status.predictionIntegrated) status.integratedSystems++;
+    if (status.cognitionIntegrated) status.integratedSystems++;
+    if (status.developmentIntegrated) status.integratedSystems++;
+    if (status.neuromodulationIntegrated) status.integratedSystems++;
+    
+    status.totalSystems = 5;  // Memory, prediction, cognition, development, neuromodulation
+    
+    status.overallIntegrationLevel = 
+        static_cast<float>(status.integratedSystems) / status.totalSystems;
+    
+    return status;
+}
+
+// Checkpoint operations
+bool Brain::checkpointExists(const std::string& filepath) const {
+    std::ifstream file(filepath);
+    return file.good();
+}
+
+size_t Brain::getCheckpointSize(const std::string& filepath) const {
+    std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+    if (!file) return 0;
+    return static_cast<size_t>(file.tellg());
 }
 
 void Brain::logStatus() const {

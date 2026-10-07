@@ -350,8 +350,203 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+    // ========== MEMORY SYSTEM ACCESSORS ==========
+    
+    // Working memory access
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    
+    // Episodic memory access
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    
+    // Associative memory access
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+    
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
+    
+    // Prediction system access
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system")
+    
+    // ========== COGNITION SYSTEM ACCESSORS ==========
+    
+    // Neural planner access
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner")
+    
+    // Concept formation access
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get concept formation system")
+    
+    // Attention system access
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get attention system")
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    // Development system access
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    // Dopamine system access
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine system")
+    
+    // Curiosity system access
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity system")
+    
+    // Novelty system access
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty system")
+    
+    // Prediction error system access
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error signal")
+    
+    // ========== ADVANCED BRAIN FEATURES ==========
+    
+    // Get random generator
+    .def("getRandomGenerator", &Brain::getRandomGenerator,
+         py::return_value_policy::reference_internal,
+         "Get random number generator")
+    
+    // Apply neuromodulatory signal
+    .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+         py::arg("signal"),
+         "Apply neuromodulatory signal")
+    
+    // Update plasticity rules
+    .def("updatePlasticity", &Brain::updatePlasticity,
+         "Update plasticity rules")
+    
+    // Apply developmental changes
+    .def("develop", &Brain::develop,
+         "Apply developmental changes")
+    
+    // Apply reward modulation through agent
+    .def("applyRewardModulation", [](Brain& brain, float reward, float predictedReward) {
+        if (auto* agentBrain = brain.getAgentBrain()) {
+            agentBrain->applyRewardModulation(reward, predictedReward);
+        }
+    }, py::arg("reward"), py::arg("predictedReward"),
+         "Apply reward modulation (requires agent brain)")
+    
+    // Apply reward modulation using dopamine system
+    .def("applyDopamineModulation", [](Brain& brain, float reward, float predictionError) {
+        if (auto* dopamine = brain.getDopamine()) {
+            // Create a reward prediction error signal
+            RewardPredictionError signal(reward, predictionError);
+            brain.applyNeuromodulation(signal);
+        }
+    }, py::arg("reward"), py::arg("predictionError"),
+         "Apply dopamine-based reward modulation")
+    
+    // Check if reward modulation is enabled
+    .def("isRewardModulationEnabled", &Brain::isRewardModulationEnabled,
+         "Check if reward modulation is enabled")
+    
+    // Enable/disable neuromodulation subsystems
+    .def("enableRewardModulation", &Brain::enableRewardModulation,
+         py::arg("enable"),
+         "Enable/disable reward modulation")
+    .def("enableStructuralPlasticity", &Brain::enableStructuralPlasticity,
+         py::arg("enable"),
+         "Enable/disable structural plasticity")
+    .def("enableDevelopment", &Brain::enableDevelopment,
+         py::arg("enable"),
+         "Enable/disable development")
+    .def("enableCuriosity", &Brain::enableCuriosity,
+         py::arg("enable"),
+         "Enable/disable curiosity")
+    .def("enablePrediction", &Brain::enablePrediction,
+         py::arg("enable"),
+         "Enable/disable prediction system")
+    .def("enablePlanning", &Brain::enablePlanning,
+         py::arg("enable"),
+         "Enable/disable neural planning")
+    .def("enableConceptFormation", &Brain::enableConceptFormation,
+         py::arg("enable"),
+         "Enable/disable concept formation")
+    .def("enableAttention", &Brain::enableAttention,
+         py::arg("enable"),
+         "Enable/disable attention system")
+    
+    // Get neuromodulation levels
+    .def("getNeuromodulationLevel", &Brain::getNeuromodulationLevel,
+         "Get overall neuromodulation level")
+    .def("getCuriosityLevel", &Brain::getCuriosityLevel,
+         "Get curiosity level")
+    .def("getNoveltyLevel", &Brain::getNoveltyLevel,
+         "Get novelty level")
+    .def("getPredictionError", &Brain::getPredictionError,
+         "Get prediction error signal level")
+    
+    // Get brain statistics
+    .def("getMemoryStats", &Brain::getMemoryStats,
+         "Get comprehensive memory system statistics")
+    .def("getCognitiveStats", &Brain::getCognitiveStats,
+         "Get cognitive system statistics")
+    .def("getDevelopmentStats", &Brain::getDevelopmentStats,
+         "Get development system statistics")
+    .def("getNeuromodulationStats", &Brain::getNeuromodulationStats,
+         "Get neuromodulation system statistics")
+    
+    // Checkpoint operations
+    .def("createCheckpoint", &Brain::save, py::arg("filepath"),
+         "Create a checkpoint/snapshot of current brain state")
+    .def("loadCheckpoint", &Brain::load, py::arg("filepath"),
+         "Load brain state from checkpoint file")
+    .def("checkpointExists", [](const Brain& brain, const std::string& filepath) {
+        std::ifstream file(filepath);
+        return file.good();
+    }, py::arg("filepath"),
+         "Check if checkpoint file exists")
+    
+    // Get file size of checkpoint
+    .def("getCheckpointSize", [](const Brain& brain, const std::string& filepath) {
+        std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+        return file.tellg();
+    }, py::arg("filepath"),
+         "Get size of checkpoint file in bytes")
+    
+    // Memory management operations
+    .def("clearAllMemory", &Brain::clearAllMemory,
+         "Clear all memory systems (working, episodic, semantic, procedural, associative)")
+    .def("resetMemories", &Brain::resetMemories,
+         "Reset all memory systems to initial state")
+    
+    // Integration queries
+    .def("isMemoryIntegrated", &Brain::isMemoryIntegrated,
+         "Check if memory systems are integrated with brain loop")
+    .def("isPredictionIntegrated", &Brain::isPredictionIntegrated,
+         "Check if prediction system is integrated")
+    .def("isCognitionIntegrated", &Brain::isCognitionIntegrated,
+         "Check if cognitive systems are integrated")
+    .def("isDevelopmentIntegrated", &Brain::isDevelopmentIntegrated,
+         "Check if development system is integrated")
+    .def("isNeuromodulationIntegrated", &Brain::isNeuromodulationIntegrated,
+         "Check if neuromodulation systems are integrated")
+    
+    // Get system integration status
+    .def("getIntegrationStatus", &Brain::getIntegrationStatus,
+         "Get comprehensive integration status of all systems")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
