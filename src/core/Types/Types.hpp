@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 
@@ -177,6 +178,13 @@ enum class FiringState : uint8_t {
     Active,
     Refractory,
     Inhibited
+};
+
+// Neuromodulation statistics
+struct NeuromodulationStats {
+    size_t totalSteps = 0;            // Total number of simulation steps processed
+    size_t plasticityUpdateCount = 0;  // Number of plasticity updates applied
+    size_t stateUpdateCount = 0;       // Number of neuromodulation state updates
 };
 
 // Generic handle types for efficiency

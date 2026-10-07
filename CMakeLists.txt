@@ -54,6 +54,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/NeuralDynamics.cpp
+    src/neuromodulation/PlasticityManager.cpp
+    src/neuromodulation/NeuromodulationManager.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp

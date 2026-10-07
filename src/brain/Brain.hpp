@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../motor/Action.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -11,7 +12,7 @@
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for all system classes
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -24,10 +25,17 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
+class DevelopmentManager;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuromodulationManager;
+class NeuralDynamics;
+class PlasticityManager;
+class MemoryManager;
+class CheckpointManager;
+class CognitionManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,9 +172,13 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Cognition manager for integrated cognition system orchestration
+    CognitionManager* getCognitionManager();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentManager* getDevelopmentManager();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
@@ -184,13 +196,16 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Neuromodulation manager
+    void initializeNeuromodulationManager();
+    NeuromodulationStats getNeuromodulationStats() const;
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
+    // Neural dynamics manager access
+    NeuralDynamics* getNeuralDynamics();
+    const NeuralDynamics* getNeuralDynamics() const;
     void logStatus() const;
     
 private:

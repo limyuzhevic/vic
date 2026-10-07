@@ -1,11 +1,12 @@
 #include "Memory.hpp"
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
 // Working Memory Implementation
 struct WorkingMemory::Impl {
-    std::vector<std::pair<NeuronId, float>> items;
+    std::unordered_map<NeuronId, float> items;  // O(1) lookup instead of O(N)
     size_t capacity;
     
     Impl(size_t cap) : capacity(cap) {}
@@ -17,33 +18,19 @@ WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
-        }
-    }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
-    }
+    pImpl->items[neuron] = value;  // O(1) update instead of O(N) search
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return item.second;
-        }
+    auto it = pImpl->items.find(neuron);
+    if (it != pImpl->items.end()) {
+        return it->second;
     }
     return 0.0f;
 }
 
 bool WorkingMemory::contains(NeuronId neuron) const {
-    for (const auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            return true;
-        }
-    }
-    return false;
+    return pImpl->items.find(neuron) != pImpl->items.end();
 }
 
 void WorkingMemory::clear() {
@@ -113,7 +100,7 @@ void EpisodicMemory::consolidate(float relevanceThreshold) {
 
 // Semantic Memory Implementation
 struct SemanticMemory::Impl {
-    std::vector<std::pair<std::string, std::string>> facts;
+    std::unordered_map<std::string, std::string> facts;  // O(1) lookup instead of O(N)
 };
 
 SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
@@ -121,35 +108,28 @@ SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
 SemanticMemory::~SemanticMemory() = default;
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
-    for (auto& fact : pImpl->facts) {
-        if (fact.first == key) {
-            fact.second = value;
-            return;
-        }
-    }
-    pImpl->facts.emplace_back(key, value);
+    pImpl->facts[key] = value;  // O(1) update instead of O(N) search
 }
 
 std::string SemanticMemory::retrieveFact(const std::string& key) const {
-    for (const auto& fact : pImpl->facts) {
-        if (fact.first == key) {
-            return fact.second;
-        }
+    auto it = pImpl->facts.find(key);
+    if (it != pImpl->facts.end()) {
+        return it->second;
     }
     return "";
 }
 
 bool SemanticMemory::hasFact(const std::string& key) const {
-    for (const auto& fact : pImpl->facts) {
-        if (fact.first == key) {
-            return true;
-        }
-    }
-    return false;
+    return pImpl->facts.find(key) != pImpl->facts.end();
 }
 
 std::vector<std::pair<std::string, std::string>> SemanticMemory::getAllFacts() const {
-    return pImpl->facts;
+    std::vector<std::pair<std::string, std::string>> result;
+    result.reserve(pImpl->facts.size());
+    for (const auto& pair : pImpl->facts) {
+        result.push_back(pair);
+    }
+    return result;
 }
 
 void SemanticMemory::clear() {
@@ -158,7 +138,7 @@ void SemanticMemory::clear() {
 
 // Procedural Memory Implementation
 struct ProceduralMemory::Impl {
-    std::vector<Skill> skills;
+    std::unordered_map<std::string, Skill> skills;  // O(1) lookup instead of O(N)
 };
 
 ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
@@ -166,41 +146,30 @@ ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
 ProceduralMemory::~ProceduralMemory() = default;
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
-    for (auto& skill : pImpl->skills) {
-        if (skill.name == name) {
-            skill.neuralPattern = pattern;
-            return;
-        }
-    }
-    Skill skill;
-    skill.name = name;
-    skill.neuralPattern = pattern;
-    pImpl->skills.push_back(skill);
+    pImpl->skills[name] = Skill{name, pattern, 0.0f};  // O(1) update instead of O(N) search
 }
 
 Skill* ProceduralMemory::getSkill(const std::string& name) {
-    for (auto& skill : pImpl->skills) {
-        if (skill.name == name) {
-            return &skill;
-        }
+    auto it = pImpl->skills.find(name);
+    if (it != pImpl->skills.end()) {
+        return &it->second;
     }
     return nullptr;
 }
 
 std::vector<Skill*> ProceduralMemory::getAllSkills() {
     std::vector<Skill*> result;
-    for (auto& skill : pImpl->skills) {
-        result.push_back(&skill);
+    result.reserve(pImpl->skills.size());
+    for (auto& pair : pImpl->skills) {
+        result.push_back(&pair.second);
     }
     return result;
 }
 
 void ProceduralMemory::updateProficiency(const std::string& name, float delta) {
-    for (auto& skill : pImpl->skills) {
-        if (skill.name == name) {
-            skill.proficiency = std::clamp(skill.proficiency + delta, 0.0f, 1.0f);
-            return;
-        }
+    auto it = pImpl->skills.find(name);
+    if (it != pImpl->skills.end()) {
+        it->second.proficiency = std::clamp(it->second.proficiency + delta, 0.0f, 1.0f);
     }
 }
 
@@ -210,8 +179,10 @@ void ProceduralMemory::clear() {
 
 // Associative Memory Implementation
 struct AssociativeMemory::Impl {
-    // Pairs of (a, b) associations with strength
-    std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
+    // Use multiple hash maps for O(1) bidirectional lookups
+    std::unordered_map<NeuronId, std::vector<NeuronId>> forwardMap;  // neuronId -> list of associated neurons
+    std::unordered_map<NeuronId, std::vector<NeuronId>> reverseMap; // neuronId -> list of neurons associated with it
+    std::unordered_map<std::pair<NeuronId, NeuronId>, float> strengthMap; // pair(a,b) -> strength
 };
 
 AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
@@ -219,50 +190,51 @@ AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
 AssociativeMemory::~AssociativeMemory() = default;
 
 void AssociativeMemory::associate(NeuronId a, NeuronId b, float strength) {
-    for (auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            std::get<2>(assoc) = strength;
-            return;
-        }
-    }
-    pImpl->associations.emplace_back(a, b, strength);
+    // Update both directions
+    pImpl->forwardMap[a].push_back(b);
+    pImpl->reverseMap[b].push_back(a);
+    pImpl->strengthMap[{a, b}] = strength;
+    pImpl->strengthMap[{b, a}] = strength;  // Store reverse direction for fast lookup
 }
 
 std::vector<NeuronId> AssociativeMemory::getAssociations(NeuronId neuron) const {
     std::vector<NeuronId> result;
-    for (const auto& assoc : pImpl->associations) {
-        if (std::get<0>(assoc) == neuron) {
-            result.push_back(std::get<1>(assoc));
-        } else if (std::get<1>(assoc) == neuron) {
-            result.push_back(std::get<0>(assoc));
-        }
+    
+    // Get forward associations
+    auto itForward = pImpl->forwardMap.find(neuron);
+    if (itForward != pImpl->forwardMap.end()) {
+        result.insert(result.end(), itForward->second.begin(), itForward->second.end());
     }
+    
+    // Get reverse associations
+    auto itReverse = pImpl->reverseMap.find(neuron);
+    if (itReverse != pImpl->reverseMap.end()) {
+        result.insert(result.end(), itReverse->second.begin(), itReverse->second.end());
+    }
+    
     return result;
 }
 
 float AssociativeMemory::getAssociationStrength(NeuronId a, NeuronId b) const {
-    for (const auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            return std::get<2>(assoc);
-        }
+    auto it = pImpl->strengthMap.find({a, b});
+    if (it != pImpl->strengthMap.end()) {
+        return it->second;
     }
     return 0.0f;
 }
 
 void AssociativeMemory::updateAssociation(NeuronId a, NeuronId b, float delta) {
-    for (auto& assoc : pImpl->associations) {
-        if ((std::get<0>(assoc) == a && std::get<1>(assoc) == b) ||
-            (std::get<0>(assoc) == b && std::get<1>(assoc) == a)) {
-            std::get<2>(assoc) = std::clamp(std::get<2>(assoc) + delta, 0.0f, 1.0f);
-            return;
-        }
+    auto it = pImpl->strengthMap.find({a, b});
+    if (it != pImpl->strengthMap.end()) {
+        it->second = std::clamp(it->second + delta, 0.0f, 1.0f);
+        pImpl->strengthMap[{b, a}] = it->second;  // Update reverse direction
     }
 }
 
 void AssociativeMemory::clear() {
-    pImpl->associations.clear();
+    pImpl->forwardMap.clear();
+    pImpl->reverseMap.clear();
+    pImpl->strengthMap.clear();
 }
 
 } // namespace nlm

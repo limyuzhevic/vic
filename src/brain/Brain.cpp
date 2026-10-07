@@ -6,14 +6,21 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
+#include "../development/DevelopmentManager.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/NeuralDynamics.hpp"
+#include "../neuromodulation/PlasticityManager.hpp"
+#include "../neuromodulation/NeuromodulationManager.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/MemoryManager.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/CognitionManager.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -28,27 +35,20 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    // ========== INTEGRATED NEURAL DYNAMICS ==========
+    std::unique_ptr<NeuralDynamics> neuralDynamics;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    // ========== INTEGRATED PLASTICITY ==========
+    std::unique_ptr<PlasticityManager> plasticityManager;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    // ========== INTEGRATED NEUROMODULATION ==========
+    std::unique_ptr<NeuromodulationManager> neuromodulationManager;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    // ========== INTEGRATED MEMORY ==========
+    std::unique_ptr<MemoryManager> memoryManager;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // ========== INTEGRATED COGNITION ==========
+    std::unique_ptr<CognitionManager> cognitionManager;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -123,12 +123,31 @@ struct Brain::Impl {
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
+        developmentManager = std::make_unique<DevelopmentManager>(
+            this, structuralPlasticity.get(), developmentSystem.get());
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Initialize neural dynamics system
+        neuralDynamics = std::make_unique<NeuralDynamics>(
+            this, spikeSystem.get(), developmentManager.get());
+        neuralDynamics->setWorkingMemory(workingMemory.get());
+        neuralDynamics->setNeuromodulator(dopamine.get());
+        
+        // Initialize plasticity system
+        plasticityManager = std::make_unique<PlasticityManager>(
+            this, stdp.get(), hebbian.get(), structuralPlasticity.get());
+        
+        // Initialize neuromodulation system
+        neuromodulationManager = std::make_unique<NeuromodulationManager>(
+            this, dopamine.get(), curiosity.get(), predictionError.get(), novelty.get());
+        
+        // Initialize memory system
+        memoryManager = std::make_unique<MemoryManager>(
+            this, workingMemory.get(), episodicMemory.get(), associativeMemory.get(),
+            replayInterval, consolidationInterval);
+        
+        // Initialize cognition system
+        cognitionManager = std::make_unique<CognitionManager>(
+            this, planner.get(), conceptFormation.get(), attention.get(), predictionSystem.get());
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -254,6 +273,10 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize cognition manager
+    pImpl->cognitionManager = std::make_unique<CognitionManager>();
+    pImpl->cognitionManager->initialize(this);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -509,27 +532,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
-        
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
-        }
-    }
-    
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 8-11: Cognition systems update ==========
+    if (pImpl->cognitionManager) {
+        pImpl->cognitionManager->update(currentStep, currentTime);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -547,33 +552,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
+    if (pImpl->developmentManager) {
+        // Use DevelopmentManager to handle development updates and effects
+        pImpl->developmentManager->update(
+            currentStep, 
+            pImpl->timestep * 1000, 
+            *pImpl->rng, 
+            pImpl->developmentalStage
+        );
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -731,8 +717,18 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // Development updates structural plasticity via DevelopmentManager
+    if (pImpl->developmentManager) {
+        pImpl->developmentManager->update(
+            pImpl->currentStep,
+            pImpl->timestep * 1000,
+            *pImpl->rng,
+            pImpl->developmentalStage
+        );
+    } else {
+        // Fallback for backward compatibility
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
 }
 
 void Brain::reset() {
@@ -1037,10 +1033,18 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+CognitionManager* Brain::getCognitionManager() {
+    return pImpl->cognitionManager.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
+}
+
+DevelopmentManager* Brain::getDevelopmentManager() {
+    return pImpl->developmentManager.get();
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {

@@ -25,12 +25,14 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <sstream>
 
 using namespace nlm;
 
 void printBanner() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
+    ╔══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
