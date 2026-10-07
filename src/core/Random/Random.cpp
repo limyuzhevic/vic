@@ -1,5 +1,7 @@
 #include "Random.hpp"
 #include <stdexcept>
+#include <numeric>
+#include <algorithm>
 
 namespace nlm {
 
@@ -16,15 +18,13 @@ RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+// Move constructor with std::exchange for cleaner code
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(std::exchange(other.pImpl, nullptr)) {}
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
     }
     return *this;
 }
@@ -38,6 +38,7 @@ uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
 }
 
+// Use std::optional for better error handling
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
@@ -109,9 +110,10 @@ uint32_t RandomGenerator::randomBit() {
     return uniformInt(0, 1);
 }
 
-uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
+// Use optional for error handling
+std::optional<uint64_t> RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
+        return std::nullopt;
     }
     return uniformInt(0, n - 1);
 }

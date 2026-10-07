@@ -346,10 +346,11 @@ int main(int argc, char** argv) {
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+        std::string_view arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+            size_t pos = arg.find('=');
+            if (pos != std::string_view::npos) {
+                configFile = std::string(arg.substr(pos + 1));
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }

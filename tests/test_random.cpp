@@ -89,9 +89,14 @@ void testPickRandomIndex() {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
-        uint64_t idx = rng.pickRandomIndex(10);
-        assert(idx < 10);
+        auto idx = rng.pickRandomIndex(10);
+        assert(idx.has_value());
+        assert(idx.value() < 10);
     }
+    
+    // Test edge case: pick from 0 items should return nullopt
+    auto idx = rng.pickRandomIndex(0);
+    assert(!idx.has_value());
     
     std::cout << "    testPickRandomIndex passed" << std::endl;
 }

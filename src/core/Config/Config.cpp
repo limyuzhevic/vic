@@ -35,18 +35,21 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
+    // Parse simple key=value pairs using string_view for efficiency
+    size_t pos = line.find('=');
+    if (pos != std::string::npos) {
+        std::string key = trim(std::string(line.substr(0, pos)));
+        std::string value = trim(std::string(line.substr(pos + 1)));
+        
+        // Remove quotes if present using views
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == \'\' && value.back() == \'\'))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
+    }
             
             set(key, value, ConfigSource::File);
         }
@@ -147,13 +150,8 @@ bool Config::has(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
+        auto& entries = pImpl->entries;
+    std::erase_if(entries, [&key](const ConfigEntry& e) { return e.key == key; });
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;

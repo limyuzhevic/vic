@@ -69,8 +69,8 @@ public:
     template<typename Container>
     auto pickRandom(const Container& container) -> typename Container::const_reference;
     
-    // Pick random index from 0 to n-1
-    uint64_t pickRandomIndex(uint64_t n);
+    // Pick random index from 0 to n-1 (returns nullopt if n == 0)
+    std::optional<uint64_t> pickRandomIndex(uint64_t n);
     
     // Fill range with random bytes
     void fillBytes(void* data, size_t size);

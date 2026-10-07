@@ -82,37 +82,195 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+## Advanced NLM Features
 
+### Advanced Python API
+
+NLM now includes an advanced Python API module (`advanced_nlm.py`) that provides enhanced functionality for research and experimentation:
+
+#### Key Features
+
+**1. Advanced Brain Interface**
+- Enhanced brain simulation with advanced feature management
+- Comprehensive metrics collection and analysis
+- Activity pattern analysis and stability measures
+- Learning dynamics tracking
+
+**2. Experiment Management**
+- Parameter sweep experiments
+- Multi-experiment result aggregation
+- Experiment result persistence and loading
+- Automated data collection
+
+**3. Data Processing & Analysis**
+- Advanced data collection utilities
+- Statistical analysis and summary statistics
+- Feature extraction capabilities
+- Data filtering and processing
+
+**4. Visualization & Profiling**
+- Spike histogram generation
+- Activity pattern analysis
+- Learning curve extraction
+- Stability and exploration metrics
+
+**5. Machine Learning Integration**
+- Feature extraction from neural activity
+- Support for multiple ML model types
+- Model training and prediction utilities
+- Integration with popular ML frameworks
+
+#### Usage Examples
+
+**Basic Advanced Brain Usage:**
+```python
+import advanced_nlm
+
+# Create advanced brain
+brain = advanced_nlm.createAdvancedBrain()
+
+# Enable advanced features
+brain.enable_advanced_features(
+    reward_modulation=True,
+    structural_plasticity=True,
+    development=True,
+    curiosity=True
+)
+
+# Run simulation with metrics collection
+metrics = brain.run_dynamics(1000, collect_metrics=True)
+
+# Analyze activity patterns
+patterns = brain.get_activity_pattern(100)
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+**Experiment Management:**
+```python
+import advanced_nlm
+
+# Create experiment manager
+experiment_manager = advanced_nlm.ExperimentManager()
+
+# Run parameter sweep
+results = experiment_manager.run_sweep_experiment()
+
+# Save results
+experiment_manager.save_experiment_results("experiment_results.json")
 ```
+
+**Machine Learning Integration:**
+```python
+import advanced_nlm
+
+# Create ML integration
+ml_integration = advanced_nlm.MLIntegration()
+
+# Register feature extractor
+ml_integration.register_feature_extractor(
+    'spike_statistics',
+    lambda brain: {
+        'total_spikes': brain.getTotalSpikeCount(),
+        'firing_rate': brain.getAverageFiringRate(),
+        'stability': brain.calculate_stability()
+    }
+)
+
+# Extract features
+features = ml_integration.extract_features(brain, 'spike_statistics')
+
+# Train ML model
+model = ml_integration.train_supervised_model(X, y, 'random_forest')
+```
+
+#### Installation
+
+For basic usage, install with:
+```bash
+pip install pynlm
+```
+
+For advanced features:
+```bash
+pip install advanced-nlm
+# or
+pip install pynlm[advanced]
+```
+
+#### Available Modules
+
+**Core NLM Modules:**
+- `pynlm` - Basic NLM interface
+- `advanced_nlm` - Advanced utilities and analysis
+
+**Installation Options:**
+- `pip install pynlm[advanced]` - Includes all advanced features
+- `pip install pynlm[dev]` - Development tools and tests
+- `pip install pynlm[visualization]` - Visualization tools
+- `pip install pynlm[ml]` - Machine learning integration
+
+#### Advanced API Functions
+
+- `createAdvancedBrain(config)` - Create advanced brain with optional configuration
+- `runAdvancedExperiment(brain, experiment_type, **kwargs)` - Run advanced experiments
+- `profileNeuronalActivity(brain, window_size)` - Profile neuronal activity
+- `analyzeLearningDynamics(brain)` - Analyze learning patterns
+
+#### Research Capabilities
+
+The advanced API provides researchers with:
+
+1. **Controlled Experiments**: Systematic parameter sweeps and controlled experimental setups
+2. **Data Collection**: Comprehensive data collection and processing capabilities
+3. **Statistical Analysis**: Advanced statistical analysis and visualization tools
+4. **Machine Learning Integration**: Integration with popular ML frameworks
+5. **Reproducibility**: Tools for reproducible research and experiment management
+
+#### Development and Testing
+
+To develop and test advanced features:
+
+```bash
+# Install development dependencies
+pip install -e .[dev]
+
+# Run tests
+pytest tests/
+pytest advanced_tests/  # Additional advanced tests
+
+# Run example notebooks
+jupyter nbconvert --execute examples/advanced_examples.ipynb
+```
+
+#### API Reference
+
+For complete API documentation, see the docstrings in the `advanced_nlm.py` module or visit the online documentation.
+
+#### Advanced Features Status
+
+**Implemented:**
+- ✅ Advanced Brain Interface
+- ✅ Experiment Management
+- ✅ Data Collection & Processing
+- ✅ Visualization & Profiling
+- ✅ Machine Learning Integration
+
+**Planned for Future Updates:**
+- Distributed computing support
+- Real-time visualization
+- Advanced neural network architectures
+- Integration with simulation frameworks
+
+#### License
+
+MIT
+
+#### Authors
+
+Research project — See docs for scientific background.
+
+---
+
+**Phase 6 Integration** is now complete with advanced Python API support for research and experimentation.
 
 ## Phase Summary
 
