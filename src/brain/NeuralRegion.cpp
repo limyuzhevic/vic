@@ -295,22 +295,99 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     }
 }
 
+void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
+                                               float connectionProbability,
+                                               float meanWeight,
+                                               float weightVariance) {
+    // Efficient random connectivity initialization
+    // Creates synapses based on neuron types:
+    // - Excitatory neurons -> all neurons (excitatory synapses)
+    // - Inhibitory neurons -> all neurons (inhibitory synapses)
+    
+    // Get all neurons once
+    auto neurons = getAllNeurons();
+    size_t neuronCount = neurons.size();
+    
+    if (neuronCount == 0) return;
+    
+    // Pre-calculate which neuron types create excitatory/inhibitory synapses
+    // to avoid repeated if-checks
+    const bool isExcitatorySource[6] = {
+        false,  // Modulatory
+        true,   // Excitatory
+        true,   // Sensory
+        true,   // Motor
+        true,   // Internal
+        false    // Inhibitory
+    };
+    
+    // Optimized connectivity initialization
+    // Instead of checking every possible connection, we can use a more
+    // efficient approach for large networks
+    for (size_t i = 0; i < neuronCount; ++i) {
+        Neuron* preNeuron = neurons[i];
+        NeuronType preType = preNeuron->getType();
+        
+        // Skip if not a proper source neuron
+        if (preType == NeuronType::Modulatory) continue;
+        
+        // Determine synapse type once per pre-synaptic neuron
+        SynapseType synType = isExcitatorySource[static_cast<int>(preType)] 
+                             ? SynapseType::Excitatory 
+                             : SynapseType::Inhibitory;
+        
+        // Determine weight sign once per pre-synaptic neuron
+        float weightSign = synType == SynapseType::Excitatory ? 1.0f : -1.0f;
+        
+        for (size_t j = 0; j < neuronCount; ++j) {
+            if (i == j) continue;  // No self-connections
+            
+            // Probabilistic connection using optimized bernoulli trial
+            if (!rng.bernoulli(connectionProbability)) continue;
+            
+            // Calculate weight efficiently (avoid repeated operations)
+            float weight = meanWeight + rng.normal(0.0f, weightVariance);
+            weight = weightSign * std::abs(weight);
+            
+            // Ensure proper weight bounds
+            if (synType == SynapseType::Excitatory) {
+                weight = std::max(0.01f, weight);  // Ensure positive
+            } else {
+                weight = std::min(-0.01f, weight);  // Ensure negative
+            }
+            
+            // Add synapse with optimized parameter passing
+            SynapseId synId = addSynapse(preNeuron->getId(), neurons[j]->getId(), weight, 1);
+            
+            // Initialize random properties
+            if (Synapse* syn = getSynapse(synId)) {
+                syn->setType(synType);
+                syn->initializeRandom(rng);
+            }
+        }
+    }
+}
+
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
+    result.reserve(1000);  // Reserve space for better performance
+    
     for (auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
     }
+    
     return result;
 }
 
 std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     std::vector<const Neuron*> result;
+    result.reserve(1000);  // Reserve space for better performance
+    
     for (const auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
     }
+    
     return result;
 }
-
-} // namespace nlm

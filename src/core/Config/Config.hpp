@@ -10,6 +10,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -29,6 +30,21 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration validation interface
+class ConfigValidator {
+public:
+    virtual ~ConfigValidator() = default;
+    virtual bool validate(const std::string& key, const ConfigValue& value) const = 0;
+    virtual std::string getValidationError(const std::string& key, const ConfigValue& value) const = 0;
+};
+
+// Default configuration schema
+class DefaultConfigValidator : public ConfigValidator {
+public:
+    bool validate(const std::string& key, const ConfigValue& value) const override;
+    std::string getValidationError(const std::string& key, const ConfigValue& value) const override;
 };
 
 // Configuration entry
@@ -92,6 +108,18 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Additional useful methods
+    std::vector<std::pair<std::string, ConfigValue>> getAll() const;
+    bool isFileLoaded() const;
+    std::string getFilePath() const;
+    std::time_t getFileModificationTime() const;
+    
+    // Configuration validation
+    void setValidator(std::unique_ptr<ConfigValidator> validator);
+    
+    // File operations
+    bool isFileOutOfDate() const;
     
 private:
     struct Impl;
