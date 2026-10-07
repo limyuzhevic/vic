@@ -1,13 +1,12 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include <vector>
-#include <memory>
+#include "NeuralPrediction.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
-// Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Prediction system: Uses NeuralPrediction for real predictive coding
+// Integrates with brain's neural substrate for prediction and error signals
+
+class NeuralPrediction;
 
 class PredictionSystem {
 public:

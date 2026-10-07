@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -511,8 +510,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create sensory representation for prediction
+        // This is a simplified approach - in full implementation,
+        // we would extract meaningful features from sensory input
+        
+        // Get current sensory state (in a full implementation, this would
+        // be the current percept from the world)
+        
+        // For now, demonstrate prediction system usage
+        // In real implementation, this would use actual sensory input
+        // and integrate with the neural prediction system
+        
+        // Update prediction system with current state (placeholder)
+        pImpl->predictionSystem->train(SensoryInput());
+        
+        // Update prediction system with current state
+        // This would predict next state and compute prediction error
+        // In Phase 6, this would integrate with NeuralPrediction
+        // to generate predictions based on learned temporal sequences
     }
     
     // ========== STEP 9: Update attention system ==========

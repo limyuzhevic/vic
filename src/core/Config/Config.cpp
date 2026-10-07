@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
 
 namespace nlm {
 
@@ -18,15 +20,143 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Simple JSON parsing implementation
+bool Config::parseJSON(const std::string& content) {
+    // Simple JSON parser for basic objects and arrays
+    // Supports: { "key": "value", "num": 42, "bool": true }
+    // And: ["item1", "item2", 123]
     
+    size_t pos = 0;
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size()) {
+        return true; // Empty JSON is valid
+    }
+    
+    if (content[pos] == '{') {
+        // Parse object
+        pos++; // Skip {
+        skipWhitespace(content, pos);
+        
+        while (pos < content.size() && content[pos] != '}') {
+            skipWhitespace(content, pos);
+            
+            // Parse key
+            if (content[pos] == '"') {
+                size_t keyEnd = content.find('"', pos + 1);
+                if (keyEnd == std::string::npos) return false;
+                
+                std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+                pos = keyEnd + 1;
+                
+                skipWhitespace(content, pos);
+                if (pos >= content.size() || content[pos] != ':') return false;
+                pos++;
+                skipWhitespace(content, pos);
+                
+                // Parse value
+                std::string valueStr;
+                if (parseJSONValue(content, pos, valueStr)) {
+                    set(key, valueStr, ConfigSource::File);
+                }
+                
+                skipWhitespace(content, pos);
+                if (pos < content.size() && content[pos] == ',') {
+                    pos++;
+                }
+            }
+        }
+        
+        if (pos < content.size() && content[pos] == '}') {
+            pos++;
+        }
+    } else if (content[pos] == '[') {
+        // Parse array - for now just skip it
+        // In a full implementation, we would parse array values
+        pos++; // Skip [
+        while (pos < content.size() && content[pos] != ']') {
+            pos++;
+        }
+        if (pos < content.size() && content[pos] == ']') {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseJSONValue(const std::string& content, size_t& pos, std::string& outValue) {
+    skipWhitespace(content, pos);
+    
+    if (pos >= content.size()) return false;
+    
+    char firstChar = content[pos];
+    
+    if (firstChar == '"') {
+        // String
+        size_t endQuote = content.find('"', pos + 1);
+        if (endQuote == std::string::npos) return false;
+        
+        outValue = content.substr(pos + 1, endQuote - pos - 1);
+        pos = endQuote + 1;
+    } else if (firstChar == 'f' || firstChar == 't') {
+        // Boolean
+        if (content.substr(pos, 4) == "false") {
+            outValue = "false";
+            pos += 5;
+        } else if (content.substr(pos, 4) == "true") {
+            outValue = "true";
+            pos += 4;
+        } else {
+            return false;
+        }
+    } else if (firstChar == '-' || std::isdigit(firstChar)) {
+        // Number
+        size_t numEnd = pos;
+        while (numEnd < content.size() && (std::isdigit(content[numEnd]) || content[numEnd] == '.' || content[numEnd] == '-' || content[numEnd] == 'e' || content[numEnd] == 'E')) {
+            numEnd++;
+        }
+        
+        outValue = content.substr(pos, numEnd - pos);
+        pos = numEnd;
+    } else if (firstChar == 'n') {
+        // null
+        if (content.substr(pos, 4) == "null") {
+            outValue = "null";
+            pos += 4;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    
+    skipWhitespace(content, pos);
+    return true;
+}
+
+void Config::skipWhitespace(const std::string& content, size_t& pos) {
+    while (pos < content.size() && std::isspace(content[pos])) {
+        pos++;
+    }
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try to parse as JSON first
+    if (parseJSON(content)) {
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
