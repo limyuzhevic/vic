@@ -47,9 +47,29 @@ public:
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Enhanced membrane parameters
+    void setMembraneResistance(float R);
+    float getMembraneResistance() const;
+    void setCapacitance(float C);
+    float getCapacitance() const;
+    void setRestingPotential(float V_rest);
+    float getRestingPotential() const;
+    void setThresholdPotential(float V_th);
+    float getThresholdPotential() const;
+    void setResetPotential(float V_reset);
+    float getResetPotential() const;
+    
+    // Synaptic parameters
+    void setSynapticTimeConstant(float tau);
+    float getSynapticTimeConstant() const;
+    
+    // Refractory parameters
+    void setRefractoryPeriod(float period);
+    float getRefractoryPeriod() const;
+    
+    // Spike timing and synaptic efficacy
+    Timestamp getLastSpikeTime(const NeuronId& neuronId) const;
+    float getSynapticEfficacy(const SynapseId& synapseId, Timestamp currentTime) const;
 };
 
 // Hodgkin-Huxley dynamics (detailed model)

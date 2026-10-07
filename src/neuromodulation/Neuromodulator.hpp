@@ -48,6 +48,16 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Advanced dopamine dynamics
+    float getEligibilityTrace() const;
+    void resetEligibilityTrace();
+    float getExpectedReward() const;
+    float getPredictionError() const;
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setPredictionErrorWeight(float weight);
+    float getPredictionErrorWeight() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
