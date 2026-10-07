@@ -6,15 +6,12 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -49,6 +46,11 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -124,13 +126,14 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Initialize serotonin, norepinephrine, acetylcholine neuromodulators
+        serotonin = std::make_unique<Serotonin>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         
-        // Configure STDP parameters
+        // Initialize self-model and social learning
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
@@ -509,12 +512,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // This enables prediction error signals and temporal sequence learning
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Compute prediction error from sensory input
+        if (pImpl->predictionError) {
+            // Get sensory input pattern for prediction
+            std::vector<float> sensoryPattern;
+            if (!pImpl->sensoryNeurons.empty()) {
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    sensoryPattern.push_back(activation);
+                }
+            }
+            
+            // Compute prediction error
+            if (!sensoryPattern.empty()) {
+                float predictedValue = pImpl->predictionSystem->getLastPrediction();
+                float actualValue = 0.0f;
+                for (float activation : sensoryPattern) {
+                    actualValue += activation;
+                }
+                actualValue /= sensoryPattern.size();
+                
+                pImpl->predictionError->computeError(predictedValue, actualValue);
+            }
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -528,8 +557,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Update concept formation with working memory content
+        if (pImpl->workingMemory) {
+            std::vector<float> memoryPattern = pImpl->workingMemory->retrieve();
+            if (!memoryPattern.empty()) {
+                pImpl->conceptFormation->processPattern(memoryPattern, pImpl->currentTime);
+            }
+        }
+    }
+    
+    // ========== STEP 11: Planning (NeuralPlanner) ==========
+    if (pImpl->planner) {
+        // Update planner with current state and goals
+        pImpl->planner->update(pImpl->currentTime);
+        
+        // Generate action plan based on current state and predictions
+        std::vector<float> currentState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential);
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Set current goal based on prediction errors
+        if (pImpl->predictionError && pImpl->predictionError->getMagnitude() > 0.5f) {
+            // High prediction error = need to explore/goal
+            std::vector<float> goal(3, 0.5f); // Default goal state
+            pImpl->planner->setCurrentGoal(goal);
+        }
+        
+        // Plan action
+        if (!currentState.empty()) {
+            ActionType plannedAction = pImpl->planner->planAction(currentState);
+            // Note: Action will be selected by motor system based on neural activity
+        }
+    }
+    
+    // ========== STEP 12: Self-model update ==========
+    if (pImpl->selfModel) {
+        // Update self-model with current action outcomes
+        pImpl->selfModel->update(pImpl->timestep);
+        
+        // Record self-action learning if we have motor neuron activity
+        if (!pImpl->motorNeurons.empty()) {
+            for (auto* neuron : pImpl->motorNeurons) {
+                if (neuron->isFiring()) {
+                    // This represents taking an action
+                    // The self-model should learn the sensory consequences
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 13: Social learning update ==========
+    if (pImpl->socialLearning) {
+        // Update social learning capabilities
+        pImpl->socialLearning->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1037,7 +1125,15 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
-// ========== DEVELOPMENT SYSTEM ==========
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
+// ========== DEVELOPMENT SYSTEM =========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
@@ -1063,6 +1159,18 @@ Curiosity* Brain::getCuriosity() {
 
 Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {

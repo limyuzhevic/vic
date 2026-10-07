@@ -23,11 +23,16 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -161,10 +166,13 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+// Self-model for sensorimotor self-awareness
+    SelfModel* getSelfModel();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Social learning for observation and imitation
+    SocialLearning* getSocialLearning();
+    
+    // ========== DEVELOPMENT SYSTEM =========
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
@@ -181,8 +189,14 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Serotonin - arousal and attention modulation
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - alertness and stress response
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - memory encoding and attention
+    Acetylcholine* getAcetylcholine();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
