@@ -14,11 +14,26 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_memory.cpp
+    test_neuromodulation.cpp
+    test_prediction.cpp
+    test_development.cpp
+    test_checkpoint_replay.cpp
+    test_new_tests.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
+# Add plugin demo as an additional executable
+add_executable(nlm_plugin_demo
+    plugin/plugin_demo.cpp
+)
+
+target_link_libraries(nlm_plugin_demo PRIVATE nlm_core)
+target_compile_features(nlm_plugin_demo PRIVATE cxx_std_20)
+
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_plugin_demo COMMAND nlm_plugin_demo)
