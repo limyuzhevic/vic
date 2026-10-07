@@ -7,7 +7,8 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Real neural neuromodulation with biological plausibility
+// Integrates with neural systems to modulate learning and behavior
 
 class Neuromodulator {
 public:
@@ -16,16 +17,31 @@ public:
     // Get modulator name
     virtual const char* getName() const = 0;
     
-    // Get current concentration/level
+    // Get current concentration/level (0.0 to 1.0 normalized)
     virtual float getLevel() const = 0;
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Real modulation based on neuromodulator type and concentration
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    // Update neuromodulator state with biological dynamics
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Signal external event (reward, prediction error, novelty)
+    virtual void signalEvent(float magnitude) = 0;
+    
+    // Get neuromodulation statistics for monitoring
+    struct NeuromodulationStats {
+        float currentLevel;
+        float baselineLevel;
+        float peakLevel;
+        float meanLevel;
+        float totalEvents;
+        float lastEventTime;
+    };
+    
+    virtual NeuromodulationStats getStats() const = 0;
     
 protected:
     Neuromodulator() = default;

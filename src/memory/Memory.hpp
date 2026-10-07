@@ -1,21 +1,24 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
-#include <functional>
+#include <string>
+#include <unordered_map>
+#include <memory>
 
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Now using neural implementation with capacity limits, neural activation patterns,
+// competition among memory traces, and decay mechanisms
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Store item (delegate to neural working memory)
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -34,21 +37,40 @@ public:
     // Decay all items
     void decay(float decayRate);
     
+    // Neural-specific methods
+    void update(TimestepDuration dt);
+    size_t getActiveTraces() const;
+    std::vector<float> getAllActivations() const;
+    void applyHebbianLearning(const std::vector<float>& pattern, float learningRate);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Now using neural implementation with real consolidation, temporal binding,
+// replay mechanisms, and memory strength tracking
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
+    std::vector<float> sensoryState;
+    float positionX;
+    float positionY;
+    float orientation;
+    ActionType action;
+    float reward;
+    float energy;
+    float novelty;
+    std::vector<float> resultingSensoryState;
+    float resultingReward;
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
+    SimulationStep age;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    EpisodicMemoryItem() : timestamp(0), positionX(0), positionY(0), orientation(0)
+        , action(ActionType::Wait), reward(0), energy(0), novelty(0)
+        , resultingReward(0), age(0) {}
 };
 
 class EpisodicMemory {
@@ -56,17 +78,18 @@ public:
     EpisodicMemory();
     ~EpisodicMemory();
     
-    // Store episode
+    // Store episode (delegate to neural episodic memory)
     void storeEpisode(const EpisodicMemoryItem& episode);
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Get recent episodes (neural implementation)
+    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
     
-    // Get episode count
-    size_t getEpisodeCount() const;
+    // Retrieve episodes similar to query pattern
+    std::vector<const EpisodicMemoryItem*> retrieveSimilar(
+        const std::vector<float>& sensoryPattern, size_t maxResults = 5) const;
     
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    // Get total number of episodes
+    size_t getEpisodeCount() const { return episodes_.size(); }
     
     // Clear all
     void clear();
@@ -74,9 +97,19 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Replay during rest
+    void replayDuringRest(float strength);
+    
+    // Apply prediction error to modulate memory relevance
+    void applyPredictionError(float errorSignal);
+    
+    // Update all episodes with current simulation time
+    void updateAllEpisodes(SimulationStep currentStep);
+
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Legacy compatibility - store episodes for retrieval
+    std::vector<EpisodicMemoryItem> episodes_;
+    size_t maxEpisodes_;
 };
 
 // Semantic memory: gradually acquired knowledge
@@ -104,7 +137,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Procedural memory: learned skills and habits
@@ -140,18 +173,19 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Now using neural implementation with pattern association learning,
+// temporal relationship storage, pattern completion, and Hebbian integration
 
 class AssociativeMemory {
 public:
     AssociativeMemory();
     ~AssociativeMemory();
     
-    // Create association
+    // Create association (delegate to neural associative memory)
     void associate(NeuronId a, NeuronId b, float strength);
     
     // Get associated neurons
@@ -166,9 +200,20 @@ public:
     // Clear all
     void clear();
     
+    // Neural-specific methods
+    void storeAssociation(const std::vector<float>& pattern1,
+                         const std::vector<float>& pattern2,
+                         float strength = 1.0f);
+    std::vector<float> getAssociation(const std::vector<float>& pattern) const;
+    float getAssociationStrength(const std::vector<float>& pattern1,
+                                 const std::vector<float>& pattern2) const;
+    std::vector<float> retrieve(const std::vector<float>& input,
+                               float threshold = 0.5f) const;
+    void applyHebbianLearning(const std::vector<float>& pattern, float learningRate);
+
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

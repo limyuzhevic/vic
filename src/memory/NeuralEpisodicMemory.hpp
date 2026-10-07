@@ -123,6 +123,15 @@ public:
 
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
+    
+    // Apply prediction error signals to modulate memory relevance
+    void applyPredictionError(float errorSignal);
+    
+    // Update all episodes with current simulation time
+    void updateAllEpisodes(SimulationStep currentStep);
+    
+    // Apply Hebbian learning from replay activity
+    void applyHebbianLearningFromReplay();
 
 private:
     // Compute similarity between query and stored episode

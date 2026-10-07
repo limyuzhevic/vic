@@ -206,6 +206,119 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
     pImpl->maintenanceSynapses.emplace_back(from, to);
 }
 
+// Additional helper methods for NeuralWorkingMemory
+void NeuralWorkingMemory::updateRecurrentConnections() {
+    // Apply maintenance currents through recurrent connections
+    for (const auto& conn : pImpl->maintenanceSynapses) {
+        float fromActivation = 0.0f;
+        
+        // Find from neuron activation
+        auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
+        if (it != memoryNeurons_.end()) {
+            size_t idx = std::distance(memoryNeurons_.begin(), it);
+            fromActivation = memoryActivations_[idx];
+        }
+        
+        if (fromActivation > 0.1f && brain_) {
+            // Send maintenance signal
+            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::decayWeakTraces() {
+    std::vector<size_t> toRemove;
+    
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        memoryActivations_[i] *= (1.0f - decayRate_);
+        
+        if (memoryActivations_[i] < 0.01f) {
+            toRemove.push_back(i);
+        }
+    }
+    
+    // Remove weak traces (in reverse order to maintain indices)
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
+        memoryActivations_.erase(memoryActivations_.begin() + *it);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    }
+}
+
+void NeuralWorkingMemory::decayTraces(float decayRate) {
+    // Apply decay to all memory traces
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        memoryActivations_[i] *= (1.0f - decayRate);
+        
+        // Also apply to maintenance current
+        if (brain_ && memoryActivations_[i] > 0.01f) {
+            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 2.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::applyHebbianLearning(const std::vector<float>& inputPattern, float learningRate) {
+    if (!brain_ || inputPattern.size() != memoryActivations_.size()) return;
+    
+    // Apply Hebbian learning: strengthen connections between co-active neurons
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId neuron = memoryNeurons_[i];
+        float inputActivation = inputPattern[i];
+        float memoryActivation = memoryActivations_[i];
+        
+        if (inputActivation > 0.1f && memoryActivation > 0.1f) {
+            // Find the neuron in the brain and strengthen its connections
+            // This is a simplified Hebbian update
+            for (size_t j = 0; j < memoryNeurons_.size(); ++j) {
+                if (i == j) continue;
+                
+                NeuronId otherNeuron = memoryNeurons_[j];
+                float otherActivation = memoryActivations_[j];
+                
+                if (otherActivation > 0.1f) {
+                    // Create a bidirectional Hebbian connection
+                    brain_->injectCurrent(otherNeuron, learningRate * inputActivation * memoryActivation);
+                }
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::rehearseMemory(size_t neuronsToRehearse) {
+    // Strengthen selected memory traces for rehearsal
+    if (memoryNeurons_.empty()) return;
+    
+    // Select neurons to rehearse (typically the strongest traces)
+    std::vector<size_t> traceIndices(memoryNeurons_.size());
+    std::iota(traceIndices.begin(), traceIndices.end(), 0);
+    
+    // Sort by activation strength (descending)
+    std::sort(traceIndices.begin(), traceIndices.end(),
+              [this](size_t a, size_t b) { return memoryActivations_[a] > memoryActivations_[b]; });
+    
+    // Rehearse top traces
+    size_t count = std::min(neuronsToRehearse, traceIndices.size());
+    for (size_t i = 0; i < count; ++i) {
+        size_t idx = traceIndices[i];
+        if (brain_) {
+            // Inject strong current to reinforce this trace
+            brain_->injectCurrent(memoryNeurons_[idx], memoryActivations_[idx] * 10.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::applyPredictionError(float errorSignal) {
+    // Use prediction error to modulate memory strength
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (brain_) {
+            // Positive error (better than expected) strengthens memory
+            // Negative error (worse than expected) weakens memory
+            float modulation = errorSignal * memoryActivations_[i];
+            brain_->injectCurrent(memoryNeurons_[i], modulation * 0.5f);
+        }
+    }
+}
+
 void NeuralWorkingMemory::updateRecurrentConnections() {
     // Apply maintenance currents through recurrent connections
     for (const auto& conn : pImpl->maintenanceSynapses) {

@@ -85,11 +85,18 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+
+# Debugging and Monitoring
+    src/core/Logger/Logger.cpp
+    src/core/Logger/EnhancedLogger.cpp
+    src/core/Debugging/RealTimeDebugSystem.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/Debugging
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
