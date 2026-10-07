@@ -254,6 +254,120 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Advanced Learning with Command Line Interface
+
+```python
+import pynlm
+
+# Create brain with enhanced configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable advanced learning features
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Create world
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent.initialize(world)
+
+# Run extended learning simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: firing={brain.getFiringNeuronCount()}, curiosity={agent.getCuriosityLevel():.3f}, dev={brain.getDevelopmentalStage()}")
+        
+# Save brain state
+brain.save("my_brain_checkpoint.bin")
+print("Simulation complete! Brain saved to checkpoint file.")
+```
+
+### Project 5: Batch Processing Multiple Brains
+
+```python
+import pynlm
+import numpy as np
+
+def run_multiple_brain_experiment(num_brains=3, steps_per_brain=200):
+    """Run multiple independent brain simulations."""
+    
+    results = []
+    
+    for brain_id in range(num_brains):
+        print(f"Running brain {brain_id + 1}/{num_brains}")
+        
+        # Create unique configuration for each brain
+        config = pynlm.createDefaultConfig()
+        
+        # Modify parameters for diversity
+        config.set("brain.neuron_count", 500 + brain_id * 100)
+        config.set("brain.v_thresh", -50.0 - brain_id * 2.0)
+        
+        # Create and initialize brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create agent with all learning features
+        agent = pynlm.createAgentBrain(brain)
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        # Create world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=10 + brain_id, height=10 + brain_id, visionWidth=6, visionHeight=6)
+        world.reset()
+        
+        agent.initialize(world)
+        
+        # Run simulation
+        for step in range(steps_per_brain):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Record results
+        result = {
+            'brain_id': brain_id,
+            'final_firing_rate': brain.getAverageFiringRate(),
+            'total_spikes': brain.getTotalSpikeCount(),
+            'final_curiosity': agent.getCuriosityLevel(),
+            'development_stage': brain.getDevelopmentalStage(),
+            'neurons_firing': brain.getFiringNeuronCount()
+        }
+        
+        results.append(result)
+        print(f"  Final stats: firing_rate={result['final_firing_rate']:.3f}, curiosity={result['final_curiosity']:.3f}")
+    
+    return results
+
+# Run batch experiment
+experiment_results = run_multiple_brain_experiment()
+
+print("\n=== Batch Experiment Results ===")
+for result in experiment_results:
+    print(f"Brain {result['brain_id']}: "
+          f"Firing={result['final_firing_rate']:.3f}, "
+          f"Spikes={result['total_spikes']}, "
+          f"Curiosity={result['final_curiosity']:.3f}, "
+          f"DevStage={result['development_stage']}")
+```
+
 ---
 
 ## Quick Reference

@@ -160,6 +160,12 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("get", &Config::get, py::arg("key"),
+             "Get configuration value by key")
+        .def("get_or", &Config::getOr, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default if not present")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set configuration value")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -170,7 +176,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("__repr__", [](const SensoryInput& input) {
+            return "<SensoryInput: type=" + std::to_string(static_cast<int>(input.getType())) + 
+                   " dims=" + std::to_string(input.getDimensions()) + ">";
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +191,18 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getDataVector", [](Vision& self) {
+            return self.getData();
+        }, "Get vision data as Python list")
+        .def("setDataFromList", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"), "Set vision data from Python list")
+        .def("__repr__", [](const Vision& vision) {
+            return "<Vision: " + std::to_string(vision.getWidth()) + "x" + 
+                   std::to_string(vision.getHeight()) + " " + 
+                   std::to_string(vision.getChannels()) + " channels>";
+        });
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,7 +212,21 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getDataVector", [](Audio& self) {
+            return self.getData();
+        }, "Get audio data as Python list")
+        .def("setDataFromList", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"), "Set audio data from Python list")
+        .def("getSamples", [](Audio& self) {
+            auto data = self.getData();
+            return data;
+        }, "Get audio samples as list")
+        .def("__repr__", [](const Audio& audio) {
+            return "<Audio: " + std::to_string(audio.getSampleRate()) + " Hz, " +
+                   std::to_string(audio.getNumSamples()) + " samples>";
+        });
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -287,7 +322,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("createVisionPercept", [](SimpleWorld& world, int width, int height) {
+            auto percept = std::make_shared<Vision>();
+            percept->setData(std::vector<float>(width * height * 3, 0.0f));
+            return percept;
+        }, py::arg("width"), py::arg("height"), "Create a vision percept for testing")
+        .def("createTouchPercept", [](SimpleWorld& world, size_t size) {
+            auto percept = std::make_shared<InternalSignals>();
+            for (size_t i = 0; i < size; ++i) {
+                percept->addSignal(0.0f);
+            }
+            return percept;
+        }, py::arg("size"), "Create a touch percept for testing")
+        .def("__repr__", [](const SimpleWorld& world) {
+            return "<SimpleWorld: " + std::to_string(world.getWidth()) + "x" +
+                   std::to_string(world.getHeight()) + ">";
+        });
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
