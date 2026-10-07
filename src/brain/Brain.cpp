@@ -511,8 +511,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction system with sensory processing
+        // Predict next sensory state based on current neural activity
+        // This enables anticipatory processing and prediction error signals
+        
+        // Get current sensory representation from neural activity
+        std::vector<float> currentSensoryPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                currentSensoryPattern.push_back(
+                    std::abs(state.membranePotential - state.restingPotential));
+            }
+        }
+        
+        // Create SensoryInput from neural pattern
+        SensoryInput currentInput;
+        currentInput.setData(currentSensoryPattern);
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentInput);
+        
+        // Get prediction error to guide learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update prediction system with actual observation
+        pImpl->predictionSystem->updatePredictions(*predictedState, currentInput);
+        
+        // Use prediction error to modulate learning rates
+        if (predictionError > 0.01f) {
+            // High prediction error indicates need for learning
+            float errorFactor = std::min(predictionError * 2.0f, 1.0f);
+            
+            // Apply error-based neuromodulation
+            if (pImpl->dopamine) {
+                float currentLevel = pImpl->dopamine->getLevel();
+                float newLevel = currentLevel + errorFactor * 0.05f;
+                newLevel = std::min(newLevel, 1.0f);
+                pImpl->dopamine->setLevel(newLevel);
+            }
+            
+            // Reduce current dopamine effect on plasticity to prevent over-learning
+            if (pImpl->dopamine && plasticityMod > 1.0f) {
+                plasticityMod = std::max(1.0f, plasticityMod - errorFactor * 0.2f);
+            }
+        }
+        
+        // Train prediction system periodically
+        static int predictionStepCounter = 0;
+        if (++predictionStepCounter % 100 == 0) {
+            pImpl->predictionSystem->train(currentInput);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +577,78 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Integrate concept formation with sensory and working memory
+        // This enables discovery of recurring patterns from experience
+        
+        // Get current sensory pattern for concept formation
+        std::vector<float> currentPattern;
+        std::vector<float> currentFeatures;
+        
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Extract sensory neural activity pattern
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                float activation = std::abs(state.membranePotential - state.restingPotential);
+                currentPattern.push_back(activation);
+                
+                // Feature extraction from neural properties
+                float feature1 = state.threshold / 10.0f;  // Normalized excitability
+                float feature2 = state.refractoryPeriod / 50.0f;  // Normalized refractory
+                float feature3 = std::abs(state.membranePotential) / 20.0f;  // Normalized potential
+                currentFeatures.push_back(feature1);
+                currentFeatures.push_back(feature2);
+                currentFeatures.push_back(feature3);
+            }
+        }
+        
+        // Get reward signal from neuromodulation
+        float reward = 0.0f;
+        if (pImpl->dopamine) {
+            reward = pImpl->dopamine->getLevel() * 2.0f - 1.0f;  // Scale to [-1, 1]
+        }
+        
+        // Present current experience to concept formation system
+        pImpl->conceptFormation->presentExperience(
+            currentPattern,
+            currentFeatures,
+            reward,
+            currentStep
+        );
+        
+        // Integrate discovered concepts with attention
+        size_t bestConcept = pImpl->conceptFormation->getMatchingConcept(
+            currentPattern, 0.7f);  // Similarity threshold
+        
+        if (bestConcept > 0) {
+            // Concept found - potentially enhance attention to this pattern
+            const auto* concept = pImpl->conceptFormation->getConcept(bestConcept);
+            if (concept) {
+                // Look up category hint to potentially influence attention
+                std::string category = concept->categoryHint;
+                
+                // Enhance attention modulation based on concept category
+                if (pImpl->attention) {
+                    // This would enhance attention based on learned categories
+                    // For now, just track the concept ID
+                    static size_t lastConceptId = 0;
+                    if (lastConceptId != bestConcept) {
+                        lastConceptId = bestConcept;
+                        // Log concept discovery for debugging
+                        NLM_LOG_INFO("ConceptFormation: Discovered concept " + std::to_string(bestConcept) +
+                                    " (category: " + category + ")");
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation system for stability tracking
+        // Note: ConceptFormation doesn't have updateConceptStability method
+        // For now, concept formation maintains its own internal timers
+        static int conceptStepCounter = 0;
+        if (++conceptStepCounter % 500 == 0) {
+            // Periodically clean up unstable concepts (placeholder)
+            // ConceptFormation maintains its own concept cleanup internally
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

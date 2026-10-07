@@ -58,17 +58,42 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Get neural planner
+    NeuralPlanner* getNeuralPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Get concept formation system
+    ConceptFormation* getConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
     
+    // Get prediction system
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    
+    // Get attention system
+    AttentionalSelection* getAttentionSystem() { return brain_ ? brain_->getAttention() : nullptr; }
+    
+    // Cognitive-based action selection with concept guidance
+    MotorCommand decodeWithConcepts(MotorCommand defaultCmd);
+    
+    // Prediction-based action planning
+    MotorCommand decodeWithPredictions(MotorCommand defaultCmd);
+    
+    // Attention-enhanced action selection
+    MotorCommand decodeWithAttention(MotorCommand defaultCmd);
+    
+    // Developmental concept adaptation
+    void adaptConceptsForDevelopment(double timestep);
+    
+    // Enhanced curiosity with cognitive weighting
+    void updateCuriosityWithCognition();
+    
+    // Get current concept-based action preferences
+    const std::vector<float>& getConceptActionPreferences() const { return conceptActionPreferences_; }
+    
+    // Get prediction-based action values
+    const std::vector<float>& getPredictedActionValues() const { return predictedActionValues_; }
+    
+    // Get attention weights for different action categories
+    const std::vector<float>& getAttentionActionWeights() const { return attentionActionWeights_; }
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +137,15 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive integration state
+    std::vector<float> conceptActionPreferences_;
+    std::vector<float> predictedActionValues_;
+    std::vector<float> attentionActionWeights_;
+    size_t lastBestConceptId_;
+    size_t bestActionConceptId_;
+    float cognitiveExplorationBonus_;
+    float conceptAdaptationRate_;
 };
 
 } // namespace nlm

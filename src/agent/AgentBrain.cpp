@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -19,7 +21,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    // Cognitive integration state
+    , lastBestConceptId_(0)
+    , bestActionConceptId_(0)
+    , cognitiveExplorationBonus_(0.0f)
+    , conceptAdaptationRate_(0.01f)
 {
+    // Initialize cognitive action preference vectors (6 actions: forward, backward, turn left, turn right, interact, wait)
+    conceptActionPreferences_.resize(6, 1.0f);  // Equal initial weights
+    predictedActionValues_.resize(6, 0.0f);
+    attentionActionWeights_.resize(6, 1.0f);
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -152,10 +164,34 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Start with basic motor decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+    // Phase 1: Concept-based action selection (highest priority)
+    MotorCommand conceptBased = decodeWithConcepts(decoded);
+    if (conceptBased != MotorCommand::Wait || conceptBased != decoded) {
+        // Concept-based selection overrides basic selection if it found a meaningful action
+        decoded = conceptBased;
+    }
+    
+    // Phase 2: Prediction-based action planning
+    MotorCommand predictionBased = decodeWithPredictions(decoded);
+    if (predictionBased != MotorCommand::Wait) {
+        // Prediction-based selection provides guidance
+        decoded = predictionBased;
+    }
+    
+    // Phase 3: Attention-enhanced action selection
+    MotorCommand attentionBased = decodeWithAttention(decoded);
+    if (attentionBased != MotorCommand::Wait) {
+        // Attention-based selection fine-tunes the action
+        decoded = attentionBased;
+    }
+    
+    // Phase 4: Enhanced curiosity with cognitive weighting
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        // Apply cognitive-enhanced curiosity
+        updateCuriosityWithCognition();
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -282,6 +318,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
+    // Use the non-recursive version of development update
     developmentalAge_ += timestep;
     
     // Simple developmental stages based on age
@@ -311,6 +348,9 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+    
+    // Adapt concepts for development
+    adaptConceptsForDevelopment(timestep);
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -334,6 +374,286 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+// Cognitive-based action selection with concept guidance
+MotorCommand AgentBrain::decodeWithConcepts(MotorCommand defaultCmd) {
+    MotorCommand bestCmd = defaultCmd;
+    float bestScore = 0.0f;
+    
+    // Get concept formation system
+    auto* conceptSystem = getConceptFormation();
+    if (!conceptSystem) return bestCmd;
+    
+    // Get all discovered concepts
+    const auto& concepts = conceptSystem->getConcepts();
+    
+    // If we have concepts, use them to influence action selection
+    if (!concepts.empty()) {
+        // Find the most recently active concept
+        size_t mostRecentConcept = 0;
+        size_t maxObservations = 0;
+        
+        for (const auto& concept : concepts) {
+            if (concept.totalObservations > maxObservations) {
+                maxObservations = concept.totalObservations;
+                mostRecentConcept = concept.id;
+            }
+        }
+        
+        // Map concept category to action preference
+        const auto* concept = conceptSystem->getConcept(mostRecentConcept);
+        if (concept) {
+            // Update concept-based action preferences based on concept category
+            conceptActionPreferences_ = std::vector<float>(6, 1.0f); // Reset weights
+            
+            if (concept->categoryHint == "rewarding") {
+                conceptActionPreferences_[0] = 2.0f;  // Forward
+                conceptActionPreferences_[4] = 1.5f; // Interact
+                bestCmd = MotorCommand::MoveForward;
+                bestScore = 1.5f;
+            } else if (concept->categoryHint == "harmful") {
+                conceptActionPreferences_[5] = 2.0f;  // Wait
+                conceptActionPreferences_[1] = 1.5f;  // Backward
+                bestCmd = MotorCommand::MoveBackward;
+                bestScore = 1.5f;
+            } else if (concept->categoryHint == "neutral") {
+                // Be more cautious with neutral concepts
+                conceptActionPreferences_[5] = 2.0f;  // Wait
+                bestCmd = MotorCommand::Wait;
+                bestScore = 1.0f;
+            }
+            
+            // Store concept for cognitive state tracking
+            lastBestConceptId_ = mostRecentConcept;
+            bestActionConceptId_ = mostRecentConcept;
+            
+            // Update concept adaptation rate based on developmental stage
+            conceptAdaptationRate_ = std::max(0.005f, 0.02f - developmentalAge_ * 0.0001);
+            
+            NLM_LOG_INFO("Concept-guided action selection: Concept " + std::to_string(mostRecentConcept) +
+                        " (category: " + concept->categoryHint + ") -> " + getMotorCommandString(bestCmd));
+        }
+    }
+    
+    return bestCmd;
+}
+
+// Prediction-based action planning
+MotorCommand AgentBrain::decodeWithPredictions(MotorCommand defaultCmd) {
+    MotorCommand bestCmd = defaultCmd;
+    float bestScore = 0.0f;
+    
+    // Get prediction system
+    auto* predictionSystem = getPredictionSystem();
+    if (!predictionSystem) return bestCmd;
+    
+    // Clear previous predicted action values
+    predictedActionValues_.assign(6, 0.0f);
+    
+    // Get prediction error to influence action selection
+    float predictionError = getPredictionError();
+    
+    // Use prediction error to adjust action values
+    // High prediction error = explore more
+    float explorationBias = std::min(predictionError * 2.0f, 1.0f);
+    
+    if (predictionError > 0.1f) {
+        // High prediction error suggests unexpected environment -> explore
+        predictedActionValues_[5] = 1.5f;  // Wait and observe
+        bestCmd = MotorCommand::Wait;
+        bestScore = 1.5f;
+        
+        // Add some exploration to other actions
+        float exploreAmount = explorationBias * 0.5f;
+        predictedActionValues_[0] += exploreAmount;  // Forward
+        predictedActionValues_[2] += exploreAmount;  // Turn left
+        predictedActionValues_[3] += exploreAmount;  // Turn right
+    } else if (predictionError < -0.1f) {
+        // Low prediction error (environment is predictable) -> exploit
+        predictedActionValues_[0] = 2.0f;  // Forward
+        bestCmd = MotorCommand::MoveForward;
+        bestScore = 2.0f;
+        
+        // Still maintain some curiosity for long-term learning
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            predictedActionValues_[5] = 1.0f;  // Wait option
+        }
+    }
+    
+    // Update cognitive exploration bonus based on prediction
+    cognitiveExplorationBonus_ = explorationBias;
+    
+    NLM_LOG_INFO("Prediction-guided action selection: Prediction error = " + std::to_string(predictionError) +
+                " -> " + getMotorCommandString(bestCmd));
+    
+    return bestCmd;
+}
+
+// Attention-enhanced action selection
+MotorCommand AgentBrain::decodeWithAttention(MotorCommand defaultCmd) {
+    MotorCommand bestCmd = defaultCmd;
+    float bestScore = 0.0f;
+    
+    // Get attention system
+    auto* attentionSystem = getAttentionSystem();
+    if (!attentionSystem) return bestCmd;
+    
+    // Clear previous attention weights
+    attentionActionWeights_.assign(6, 1.0f);
+    
+    // Get action selection based on attention mechanism
+    MotorCommand attentionBased = decodeFromMotorNeurons();
+    
+    // Get attention weights based on neural activity patterns
+    if (attentionSystem) {
+        // Use motor neuron activity to compute attention weights
+        auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
+            if (neurons.empty()) return 0.0f;
+            float sum = 0.0f;
+            for (Neuron* n : neurons) {
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
+            return sum / neurons.size();
+        };
+        
+        float forwardAct = calcActivity(motorForward_);
+        float backwardAct = calcActivity(motorBackward_);
+        float leftAct = calcActivity(motorTurnLeft_);
+        float rightAct = calcActivity(motorTurnRight_);
+        float interactAct = calcActivity(motorInteract_);
+        float waitAct = calcActivity(motorWait_);
+        
+        // Apply attention modulation
+        attentionActionWeights_[0] = forwardAct;  // Forward
+        attentionActionWeights_[1] = backwardAct; // Backward
+        attentionActionWeights_[2] = leftAct;    // Turn left
+        attentionActionWeights_[3] = rightAct;   // Turn right
+        attentionActionWeights_[4] = interactAct;// Interact
+        attentionActionWeights_[5] = waitAct;    // Wait
+        
+        // Find best action with attention weights
+        bestCmd = decodeFromMotorNeurons(); // This uses attention weights
+        bestScore = std::max({forwardAct, backwardAct, leftAct, rightAct, interactAct, waitAct});
+    }
+    
+    // Enhanced attention for novel experiences
+    if (noveltyLevel_ > 0.5f) {
+        // High novelty -> enhance attention to exploration
+        attentionActionWeights_[2] *= 1.5f; // Turn left
+        attentionActionWeights_[3] *= 1.5f; // Turn right
+        attentionActionWeights_[5] *= 0.8f; // Wait (less important)
+        
+        // Bias towards new sensory exploration
+        if (getMotorCommandString(bestCmd) == getMotorCommandString(MotorCommand::Wait)) {
+            bestCmd = MotorCommand::MoveForward; // Actively explore
+        }
+    }
+    
+    NLM_LOG_INFO("Attention-guided action selection: Attention weights computed, best = " +
+                getMotorCommandString(bestCmd));
+    
+    return bestCmd;
+}
+
+// Developmental concept adaptation
+void AgentBrain::adaptConceptsForDevelopment(double timestep) {
+    if (!getConceptFormation() || !developmentEnabled_) return;
+    
+    // Update developmental age
+    developmentalAge_ += timestep;
+    
+    // Adapt concepts based on developmental stage
+    if (developmentalAge_ < 120.0) {  // Early development phase
+        // High concept plasticity - concepts can form easily
+        conceptAdaptationRate_ = 0.03f;
+        plasticityModifier_ = 1.0f;
+        
+        // Encourage concept exploration
+        if (curiosityEnabled_) {
+            curiosityLevel_ = std::min(0.9f, curiosityLevel_ + 0.01f);
+        }
+        
+    } else if (developmentalAge_ < 600.0) {  // Mid development
+        // Moderate concept plasticity
+        conceptAdaptationRate_ = 0.01f;
+        plasticityModifier_ = 0.8f;
+        
+    } else {  // Late development (adult)
+        // Low concept plasticity - concepts are stable
+        conceptAdaptationRate_ = 0.005f;
+        plasticityModifier_ = 0.5f;
+        
+        // Some concept refinement possible
+        if (predictionError_ < 0.0f && curiosityLevel_ > 0.5f) {
+            // Positive prediction errors with high curiosity -> refine concepts
+            curiosityLevel_ = std::max(0.1f, curiosityLevel_ - 0.02f);
+        }
+    }
+    
+    // Update concept formation system if needed
+    static int conceptAdaptStepCounter = 0;
+    if (++conceptAdaptStepCounter % 1000 == 0) {
+        // Periodically check concept stability and adapt if needed
+        getConceptFormation()->cleanupUnstableConcepts(conceptAdaptationRate_);
+        
+        // Log developmental stage
+        NLM_LOG_INFO("Development stage: Age = " + std::to_string(developmentalAge_) +
+                    "s, Concepts adapting at rate = " + std::to_string(conceptAdaptationRate_));
+    }
+}
+
+// Enhanced curiosity with cognitive weighting
+void AgentBrain::updateCuriosityWithCognition() {
+    if (!curiosityEnabled_) return;
+    
+    // Base curiosity on novelty (from AgentBrain::processSensoryInput)
+    float baseCuriosity = noveltyLevel_ * 2.0f;
+    
+    // Enhance curiosity with cognitive signals
+    float conceptCuriosity = 0.0f;
+    if (getConceptFormation() && bestActionConceptId_ > 0) {
+        // If we have a recent concept, reduce curiosity slightly (we understand this pattern)
+        const auto* concept = getConceptFormation()->getConcept(bestActionConceptId_);
+        if (concept) {
+            float conceptStability = concept->avgStability;
+            conceptCuriosity = (1.0f - conceptStability) * 0.3f; // Unstable concepts -> more curiosity
+        }
+    }
+    
+    float predictionCuriosity = 0.0f;
+    if (std::abs(predictionError_) > 0.2f) {
+        // High prediction error -> increase curiosity
+        predictionCuriosity = std::min(predictionError_ * 2.0f, 1.0f);
+    }
+    
+    float attentionCuriosity = 0.0f;
+    auto* attentionSystem = getAttentionSystem();
+    if (attentionSystem) {
+        // Attention system provides curiosity signals for novel patterns
+        attentionCuriosity = attentionSystem->getCuriosityLevel() * 0.5f;
+    }
+    
+    // Combine all curiosity sources
+    float totalCuriosity = baseCuriosity + conceptCuriosity + predictionCuriosity + attentionCuriosity;
+    
+    // Apply developmental modulation
+    float developmentalMod = 1.0f;
+    if (developmentalAge_ < 120.0) {
+        developmentalMod = 1.2f; // Early development - more curiosity
+    } else if (developmentalAge_ > 600.0) {
+        developmentalMod = 0.8f; // Late development - less curiosity
+    }
+    
+    curiosityLevel_ = std::clamp(totalCuriosity * developmentalMod, 0.0f, 1.0f);
+    
+    // Log curiosity components
+    NLM_LOG_INFO("Enhanced curiosity calculation: Base=" + std::to_string(baseCuriosity) +
+                " Concept=" + std::to_string(conceptCuriosity) +
+                " Prediction=" + std::to_string(predictionCuriosity) +
+                " Attention=" + std::to_string(attentionCuriosity) +
+                " -> Total=" + std::to_string(curiosityLevel_));
+}
+
+// Reset agent for new episode
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -345,6 +665,12 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset cognitive state
+    lastBestConceptId_ = 0;
+    bestActionConceptId_ = 0;
+    cognitiveExplorationBonus_ = 0.0f;
+    conceptAdaptationRate_ = 0.01f;
 }
 
 } // namespace nlm
