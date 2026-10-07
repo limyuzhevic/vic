@@ -15,16 +15,27 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
 
 namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        NLM (Neural Learning Machine) Python Bindings - Phase 6 Integration
+        --------------------------------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Phase 6 provides integrated access to all brain systems including:
+        - Working memory, episodic memory, and associative memory
+        - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+        - Prediction system and neural planning
+        - Concept formation and attentional selection
+        - Development and maturation systems
+        - Checkpoint save/load and replay functionality
+        - Complete world interaction with agent systems
+
+        Provides classes for Brain, Config, AgentBrain, SimpleWorld, 
+        SensoryInput, and Action, along with Phase 6 integration utilities.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -416,10 +427,81 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Phase 6 integration support
+    py::class_<Phase6Config>(m, "Phase6Config", "Configuration for Phase 6 integration experiment")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &Phase6Config::connectionProbability)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &Phase6Config::checkpointPath)
+        .def("__repr__", [](const Phase6Config& cfg) {
+            return "Phase6Config(maxSteps=" + std::to_string(cfg.maxSteps) +
+                   ", neuronCount=" + std::to_string(cfg.neuronCount) + ")";
+        });
+
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", "Result of Phase 6 integration experiment")
+        .def(py::init<>())
+        .def_readwrite("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readwrite("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readwrite("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readwrite("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readwrite("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readwrite("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readwrite("replayWorks", &Phase6IntegrationResult::replayWorks)
+        .def_readwrite("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readwrite("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readwrite("avgSynapticWeight", &Phase6IntegrationResult::avgSynapticWeight)
+        .def_readwrite("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readwrite("noveltyLevel", &Phase6IntegrationResult::noveltyLevel)
+        .def_readwrite("curiosityLevel", &Phase6IntegrationResult::curiosityLevel)
+        .def_readwrite("dopamineLevel", &Phase6IntegrationResult::dopamineLevel)
+        .def_readwrite("startTime", &Phase6IntegrationResult::startTime)
+        .def_readwrite("endTime", &Phase6IntegrationResult::endTime)
+        .def_readwrite("totalWallClockTime", &Phase6IntegrationResult::totalWallClockTime)
+        .def("__repr__", [](const Phase6IntegrationResult& result) {
+            return "Phase6IntegrationResult(totalReward=" + std::to_string(result.totalReward) +
+                   ", avgFiringRate=" + std::to_string(result.avgFiringRate) + ")";
+        });
+
+    m.def("runPhase6Experiment", [](const Phase6Config& config) -> Phase6IntegrationResult {
+        Phase6IntegratedExperiment experiment;
+        return experiment.run(config);
+    }, py::arg("config"), "Run Phase 6 integration experiment and return results");
+
+    m.def("verifyPhase6Integration", []() -> bool {
+        Phase6IntegratedExperiment experiment;
+        return experiment.verifyIntegration();
+    }, "Verify that all Phase 6 systems are properly integrated");
+
+    m.def("testPhase6MemoryIntegration", []() -> bool {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testMemoryIntegration();
+    }, "Test memory integration");
+
+    m.def("testPhase6NeuromodulationIntegration", []() -> bool {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testNeuromodulationIntegration();
+    }, "Test neuromodulation integration");
+
+    m.def("testPhase6Checkpointing", []() -> bool {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testCheckpointing();
+    }, "Test checkpoint save/load functionality");
+
+    m.def("testPhase6Replay", []() -> bool {
+        Phase6IntegratedExperiment experiment;
+        return experiment.testReplay();
+    }, "Test replay system");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
-} // namespace nlm
+    // Module metadata
+    m.doc() = "NLM (Neural Learning Machine) Python Bindings - Phase 6 Integration";
+}
