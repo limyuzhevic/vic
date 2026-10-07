@@ -165,7 +165,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_INFO("  ERROR: Region 1 not found");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -182,9 +185,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
-    // Run a few steps
+    // Run a few steps with proper time-based stepping
     for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+        brain->step(step * 0.001f, step * 0.001f);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -228,7 +231,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step * 0.001f, step * 0.001f);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
@@ -288,11 +291,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         if (preNeuron && postNeuron) {
             // Pre fires first
             preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            brain->step(trial * 2 * 0.001f, trial * 2 * 0.001f);
             
             // Then post fires
             postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            brain->step((trial * 2 + 1) * 0.001f, (trial * 2 + 1) * 0.001f);
         }
     }
     
@@ -347,12 +350,12 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+        if (arg.substr(0, 8) == "--config=") {
+            // Handle --config=file
+            configFile = arg.substr(8);
+        } else if (arg == "--config" && i + 1 < argc) {
+            // Handle --config file (separate)
+            configFile = argv[++i];
         }
     }
     

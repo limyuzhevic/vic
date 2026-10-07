@@ -1,9 +1,29 @@
-#include "Neuron.hpp"
-#include "../core/Random/Random.hpp"
-#include <cmath>
-#include <algorithm>
-
-namespace nlm {
+// Neuron Implementation
+// =============
+// This file implements the Leaky Integrate-and-Fire (LIF) neuron model
+// which is the core computational unit of the NLM (Neural Learning Machine).
+// 
+// The LIF neuron model:
+// - Integrates incoming currents over time
+// - Leaks potential back to resting state
+// - Fires spikes when threshold is reached
+// - Enters refractory period after spiking
+// - Supports plasticity for learning
+// 
+// Key biological realism features:
+// - Spike-frequency adaptation
+// - Refractory period dynamics
+// - Synaptic conductances
+// - Stochastic parameter initialization
+// 
+// Performance optimizations:
+// - Efficient memory management with pImpl pattern
+// - Inline calculations for LIF integration
+// - Vector-based spike history management
+// 
+// References:
+// - Gerstner et al., "Neuronal Dynamics", 2014
+// - Dayan & Abbott, "Theoretical Neuroscience", 2001
 
 struct Neuron::Impl {
     NeuronId id;
@@ -35,7 +55,21 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
+
+Neuron::Neuron(const Neuron& other) {
+    pImpl = new Impl(*other.pImpl);
+}
+
+Neuron& Neuron::operator=(const Neuron& other) {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = new Impl(*other.pImpl);
+    }
+    return *this;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -193,7 +227,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
+        // Decrement refractory period with bounds checking
+        if (pImpl->state.refractoryRemaining > 0) {
+            --pImpl->state.refractoryRemaining;
+        }
+        
         // During refractory period, clear synaptic input but don't integrate
         pImpl->synapticInput = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
@@ -290,7 +328,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
-    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.refractoryRemaining = 0; // Ensures non-negative value
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     

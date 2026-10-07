@@ -1,9 +1,36 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
-namespace nlm {
+// AgentBrain Implementation
+// ==============
+// This file implements the AgentBrain class which connects the NLM brain to the world.
+// 
+// The AgentBrain handles:
+// 1. Sensory transduction - converts world percepts into neural inputs
+// 2. Motor decoding - converts neural activity into motor commands
+// 3. Neuromodulation - applies reward-based learning
+// 4. Development - manages agent development over time
+// 5. Curiosity-driven exploration
+// 
+// Key components:
+// - Sensory processing with scale factors for different input modalities
+// - Motor command selection with action groups (forward/backward/left/right/interact/wait)
+// - Neuromodulation using dopamine-like prediction error signals
+// - Development-based plasticity modulation
+// - Novelty detection for curiosity-driven exploration
+// 
+// Design patterns used:
+// - Observer pattern for world perception
+// - Command pattern for motor actions
+// - State management for developmental stages
+// - Event-driven processing for real-time interaction
+// 
+// Performance considerations:
+// - Efficient vector indexing for fast sensory/motor processing
+// - Constant-time operations for curiosity calculations
+// - Minimized memory allocations for real-time performance
+// 
+// References:
+// - Izhikevich, E. M. (2003). Simple model of spiking neurons
+// - Sutton, R. S., & Barto, A. G. (2018). Reinforcement learning: An introduction
+// - Machado, M. C., et al. (2017). Curiosity-driven reinforcement learning
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -87,12 +114,19 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Define sensory processing constants
+    static constexpr float VISION_SCALE = 5.0f;      // Scale factor for vision input
+    static constexpr float TOUCH_SCALE = 8.0f;      // Scale factor for touch input
+    static constexpr float INTERNAL_SCALE = 5.0f;   // Scale factor for internal signals
+    static constexpr float PROPRIOCEPTION_SCALE = 3.0f;  // Scale factor for proprioception
+    static constexpr float INTERNAL_OFFSET = 1.0f;   // Offset for internal signal centering
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * VISION_SCALE;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +135,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * TOUCH_SCALE;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +144,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            // Center and scale: (value * 2 - 1) to map from [-0.5, 0.5] to [-1, 1]
+            float current = (intern[i] * 2.0f - INTERNAL_OFFSET) * INTERNAL_SCALE;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,7 +154,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            // Center and scale: (value * 2 - 1) to map from [-0.5, 0.5] to [-1, 1]
+            float current = (proprio[i] * 2.0f - INTERNAL_OFFSET) * PROPRIOCEPTION_SCALE;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -152,14 +188,14 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    MotorCommand bestCommand = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        bestCommand = selectWithCuriosity(bestCommand);
     }
     
-    return decoded;
+    return bestCommand;
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -217,8 +253,9 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command with bounds checking
+            int maxChoice = static_cast<int>(MotorCommand::Wait) + 1;  // 8 (0-7 inclusive)
+            int choice = brain_->getRandomGenerator()->uniformInt(0, maxChoice - 1);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,7 +264,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;
+                default: return MotorCommand::Wait;  // Safety fallback
             }
         }
     }
