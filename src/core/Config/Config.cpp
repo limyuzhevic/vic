@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "../Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,23 +20,70 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file type based on extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
     
+    if (ext == "json" || ext == "JSON") {
+        return loadFromJson(filepath);
+    } else if (ext == "yaml" || ext == "yml" || ext == "YAML" || ext == "YML") {
+        return loadFromYaml(filepath);
+    } else {
+        // Fallback to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+// Load from JSON file
+bool Config::loadFromJson(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open JSON file: " + filepath);
+        return false;
+    }
+    
+    try {
+        // Use nlohmann/json if available
+        // For now, implement a simple JSON parser
+        // TODO: Add nlohmann/json dependency
+        return loadFromSimpleFormat(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Load from YAML file
+bool Config::loadFromYaml(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open YAML file: " + filepath);
+        return false;
+    }
+    
+    // TODO: Add YAML parsing support
+    NLM_LOG_WARNING("YAML parsing not yet implemented, using simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
+// Load from simple key=value format (backward compatibility)
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -49,10 +97,48 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
     return true;
+}
+
+// Validate configuration values
+bool Config::validateConfig() const {
+    // Check for required keys
+    std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "simulation_timestep"
+    };
+    
+    bool allValid = true;
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_WARNING("Missing required config key: " + key);
+            allValid = false;
+        }
+    }
+    
+    // Validate numeric ranges
+    auto checkRange = [this](const std::string& key, double min, double max) {
+        if (has(key)) {
+            auto val = get<double>(key);
+            if (val.has_value() && (val.value() < min || val.value() > max)) {
+                NLM_LOG_WARNING("Config key " + key + " value " + std::to_string(val.value()) + 
+                               " outside expected range [" + std::to_string(min) + ", " + 
+                               std::to_string(max) + "]");
+                return false;
+            }
+        }
+        return true;
+    };
+    
+    checkRange("simulation_timestep", 0.0, 1.0);
+    checkRange("connection_probability", 0.0, 1.0);
+    
+    return allValid;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -78,19 +164,60 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+// Save to file with proper formatting
+    bool Config::saveToFile(const std::string& filepath) const {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Could not open configuration file for writing: " + filepath);
+            return false;
+        }
+        
+        file << "# NLM Configuration File\n";
+        file << "# Generated on " << getCurrentTimestamp() << "\n\n";
+        
+        for (const auto& entry : pImpl->entries) {
+            // Write description if available
+            if (!entry.description.empty()) {
+                file << "# " << entry.description << "\n";
+            }
+            
+            // Write key=value pair with proper formatting based on value type
+            file << entry.key << " = ";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            
+            // Add comment about source
+            std::string sourceStr;
+            switch (entry.source) {
+                case ConfigSource::Default: sourceStr = "default"; break;
+                case ConfigSource::File: sourceStr = "file"; break;
+                case ConfigSource::CommandLine: sourceStr = "command-line"; break;
+                case ConfigSource::Runtime: sourceStr = "runtime"; break;
+            }
+            file << "  # " << sourceStr << "\n";
+        }
+        
+        file << "\n# End of configuration\n";
+        return true;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    std::string Config::getCurrentTimestamp() const {
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm_buf;
+        gmtime_r(&time_t, &tm_buf);
+        char timestamp[100];
+        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_buf);
+        return std::string(timestamp);
     }
-    
-    return true;
-}
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {

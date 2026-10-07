@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Final Integration Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +37,22 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_logger {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Final Integration Tests ===" << std::endl;
+    std::cout << "Testing Final Integration of All Neural Systems:" << std::endl;
+    std::cout << "  - Core utilities and configuration" << std::endl;
+    std::cout << "  - Real neural computation (LIF neurons, synapses)" << std::endl;
+    std::cout << "  - Memory systems (working, episodic, associative)" << std::endl;
+    std::cout << "  - Neuromodulation (dopamine, curiosity, novelty)" << std::endl;
+    std::cout << "  - Prediction and cognition systems" << std::endl;
+    std::cout << "  - Development and plasticity" << std::endl;
+    std::cout << "  - Persistence (checkpoint save/load)" << std::endl;
+    std::cout << "  - Replay and consolidation" << std::endl;
+    std::cout << "  - Enhanced logger with file rotation" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -119,9 +129,20 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Logger tests..." << std::endl;
+    try {
+        test_logger::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "✓ Phase 6 Final Integration Successful!" << std::endl;
+        std::cout << "✓ All neural systems integrated and functional" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;
