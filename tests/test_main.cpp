@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <cassert>
+#include <vector>
+#include <string>
 
 // Forward declarations of test functions
 namespace test_types {
@@ -34,6 +36,10 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+namespace test_comprehensive {
     void runAll();
 }
 
@@ -113,6 +119,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Comprehensive Integration Tests..." << std::endl;
+    try {
+        test_comprehensive::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
