@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// ENHANCED - Phase 6 implementation with comprehensive neuromodulatory effects
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,42 +48,17 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Enhanced neuromodulatory effects
+    float getExcitationModulation() const;
+    float getMemoryConsolidationFactor() const;
+    float getAttentionGain() const;
+    
+    // Apply effects to brain components
+    void applyToNeuron(class Neuron* neuron, TimestepDuration dt);
+    void applyToSynapse(class Synapse* synapse, float predictionError, TimestepDuration dt);
+    void applyToMemory(class NeuralEpisodicMemory* memory, float reward, TimestepDuration dt);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
-
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
-public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
-public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
-class Serotonin : public Neuromodulator {
-public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-} // namespace nlm
