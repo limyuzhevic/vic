@@ -61,14 +61,25 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // Initialize plasticity systems
+    void initPlasticitySystems();
+    
+    // Initialize all integrated systems
+    void initIntegratedSystems();
+    
+    // Create neurons using optimized batch creation
+    void createNeurons(size_t neuronsPerRegion);
+    
+    // Initialize connectivity using efficient matrix operations
+    void initConnectivity(float connectionProbability, float excitatoryWeight, float inhibitoryWeight);
+    
+    // Register spike handlers
+    void registerSpikeHandlers();
+    
+    // ========== BRAIN INITIALIZATION ==========
+    
     // Initialize brain with configuration
     bool initialize();
-    
-    // Main simulation step
-    void step(SimulationStep currentStep);
-    
-    // Simulation time step
-    void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern

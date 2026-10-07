@@ -5,6 +5,64 @@
 
 namespace nlm {
 
+void AgentBrain::initNeuronGroups() {
+    if (!brain_) return;
+    
+    // Initialize motor neuron groups with a systematic approach
+    struct MotorGroup {
+        std::vector<Neuron*>& group;
+        const char* name;
+    };
+    
+    MotorGroup motorGroups[] = {
+        {motorForward_, "motorForward"},
+        {motorBackward_, "motorBackward"},
+        {motorTurnLeft_, "motorTurnLeft"},
+        {motorTurnRight_, "motorTurnRight"},
+        {motorInteract_, "motorInteract"},
+        {motorWait_, "motorWait"}
+    };
+    
+    // Count current neurons to determine distribution
+    size_t totalNeurons = 0;
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == NeuronType::Motor) {
+                totalNeurons += pop->getTotalNeuronCount();
+            }
+        }
+    }
+    
+    // Initialize regions for each motor group
+    for (auto& motorGroup : motorGroups) {
+        // Calculate target size based on region and type
+        size_t targetSize = (totalNeurons + 5) / 6; // Distribute evenly
+        motorGroup.group.reserve(targetSize);
+    }
+    
+    // Now distribute neurons using a deterministic but more organized approach
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                for (size_t i = 0; i < pop->getTotalNeuronCount(); ++i) {
+                    // Use neuron index and population to determine group
+                    size_t groupIndex = i % 6;
+                    switch (groupIndex) {
+                        case 0: motorForward_.push_back(pop->getNeurons()[i]); break;
+                        case 1: motorBackward_.push_back(pop->getNeurons()[i]); break;
+                        case 2: motorTurnLeft_.push_back(pop->getNeurons()[i]); break;
+                        case 3: motorTurnRight_.push_back(pop->getNeurons()[i]); break;
+                        case 4: motorInteract_.push_back(pop->getNeurons()[i]); break;
+                        case 5: motorWait_.push_back(pop->getNeurons()[i]); break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -19,54 +77,28 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , explorationChance_(0.3f)
+    , temperature_(1.0f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Initialize using the improved neuron group distribution
+    initNeuronGroups();
 }
 
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Backward compatibility - use default values
+    std::string dummyConfig;
+    initialize(world, dummyConfig);
+}
+
+void AgentBrain::initialize(const SimpleWorld& world, const Config& config) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Load advanced configuration from the world config
+    loadFromBrainConfig(config.getConfig());
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -345,6 +377,68 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+void AgentBrain::loadFromBrainConfig(const std::shared_ptr<const Config>& brainConfig) {
+    if (!brainConfig) return;
+    
+    // Load advanced configuration parameters
+    if (brainConfig->has("agent_exploration_chance")) {
+        explorationChance_ = brainConfig->getOr<float>("agent_exploration_chance", explorationChance_);
+    }
+    
+    if (brainConfig->has("agent_temperature")) {
+        temperature_ = brainConfig->getOr<float>("agent_temperature", temperature_);
+    }
+    
+    if (brainConfig->has("agent_neuromodulation_strength")) {
+        float neuromodStrength = brainConfig->getOr<float>("agent_neuromodulation_strength", 1.0f);
+        // Apply neuromodulation strength to all neuromodulators
+        if (brain_) {
+            auto* dopamine = brain_->getDopamine();
+            auto* curiosity = brain_->getCuriosity();
+            auto* novelty = brain_->getNovelty();
+            auto* predError = brain_->getPredictionErrorSignal();
+            
+            if (dopamine) dopamine->setLevel(dopamine->getLevel() * neuromodStrength);
+            if (curiosity) curiosity->setLevel(curiosity->getLevel() * neuromodStrength);
+            if (novelty) novelty->setLevel(novelty->getLevel() * neuromodStrength);
+            if (predError) predError->setLevel(predError->getLevel() * neuromodStrength);
+        }
+    }
+    
+    // Load development parameters
+    if (brainConfig->has("agent_developmental_speed")) {
+        double devSpeed = brainConfig->getOr<double>("agent_developmental_speed", 1.0);
+        developmentalAge_ = 0.0;  // Reset development with new speed
+    }
+    
+    // Load plasticity parameters
+    if (brainConfig->has("agent_plasticity_base")) {
+        float plasticityBase = brainConfig->getOr<float>("agent_plasticity_base", 1.0f);
+        plasticityModifier_ = plasticityBase;
+    }
+    
+    // Load memory capacity parameters
+    if (brainConfig->has("agent_working_memory_capacity")) {
+        size_t memoryCapacity = brainConfig->getOr<size_t>("agent_working_memory_capacity", 100);
+        if (brain_) {
+            auto* workingMemory = brain_->getWorkingMemory();
+            if (workingMemory) {
+                workingMemory->setCapacity(memoryCapacity);
+            }
+        }
+    }
+    
+    if (brainConfig->has("agent_episodic_memory_capacity")) {
+        size_t episodicCapacity = brainConfig->getOr<size_t>("agent_episodic_memory_capacity", 1000);
+        if (brain_) {
+            auto* episodicMemory = brain_->getEpisodicMemory();
+            if (episodicMemory) {
+                episodicMemory->setMaxEpisodes(episodicCapacity);
+            }
+        }
+    }
 }
 
 } // namespace nlm

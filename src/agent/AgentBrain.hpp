@@ -16,8 +16,11 @@ public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
+    // Initialize with world and advanced configuration
+    void initialize(const SimpleWorld& world, const Config& config);
+    
+    // Load configuration from Brain's config
+    void loadFromBrainConfig(const std::shared_ptr<const Config>& brainConfig);
     
     // Get sensory input size expected by brain
     size_t getSensoryInputSize() const;
@@ -56,20 +59,42 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void setSensoryNoveltyDecay(float decay) { sensoryNoveltyDecay_ = decay; }
+    void setExplorationChance(float chance) { explorationChance_ = chance; }
+    void setTemperature(float temp) { temperature_ = temp; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    float getSensoryNoveltyDecay() const { return sensoryNoveltyDecay_; }
+    float getExplorationChance() const { return explorationChance_; }
+    float getTemperature() const { return temperature_; }
+    
+    // Get current configuration values
+    float getDopamineLevel() const { return dopamineLevel_; }
+    float getPredictionErrorSignal() const { return predictionError_; }
+    float getExpectedReward() const { return expectedReward_; }
+    float getPlasticityModifier() const { return plasticityModifier_; }
+    
+    // Get neuron group statistics
+    size_t getMotorNeuronCount() const { return motorForward_.size() + motorBackward_.size() + motorTurnLeft_.size() + motorTurnRight_.size() + motorInteract_.size() + motorWait_.size(); }
+    size_t getSensoryNeuronCount() const { return sensoryVision_.size() + sensoryTouch_.size() + sensoryInternal_.size() + sensoryProprioception_.size(); }
+    
+    // Set configuration from Brain config
+    void loadFromBrainConfig(const std::shared_ptr<const Config>& brainConfig);
     
 private:
+    // Initialize neuron groups
+    void initNeuronGroups();
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
