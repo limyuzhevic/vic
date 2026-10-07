@@ -1,10 +1,6 @@
 #pragma once
 
-#include "../agent/AgentBody.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include <memory>
-#include <string>
-#include <vector>
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -53,6 +49,14 @@ public:
     
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
+    
+    // Get sensory percept for agent observation
+    SensoryPercept observe(const Brain* brain) const {
+        // Return current sensory percept (brain's observation of the world)
+        // Note: In NLM architecture, the brain observes the world through its regions
+        // This is a simplified interface for the observation pattern
+        return sensory_;
+    }
     
     // Add object to world
     void addObject(const WorldObject& obj);
