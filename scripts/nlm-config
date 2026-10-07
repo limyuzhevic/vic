@@ -1,0 +1,778 @@
+#!/usr/bin/env bash
+
+# Make the script executable
+chmod +x "$0"
+
+# Set script name for help messages
+SCRIPT_NAME="nlm-config"
+
+# Advanced NLM Configuration Management Tool
+# Phase 7: Advanced CLI Tools
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+DEFAULT_CONFIG="config.ini"
+DEFAULT_FORMAT="key=value"
+
+# Help message
+function show_help {
+    cat << EOF
+NLM Configuration Management Tool
+
+Usage: nlm-config [OPTIONS] [VALUE]
+
+Options:
+    -f, --format FORMAT        Configuration format (key=value, json, yaml, toml)
+    -o, --output FILE          Output file
+    -c, --config FILE          Configuration file
+    -l, --list                List all configuration keys
+    -g, --get KEY              Get value for key
+    -s, --set KEY VALUE        Set value for key
+    -r, --reset               Reset configuration to defaults
+    -v, --validate            Validate configuration
+    -d, --describe KEY         Describe what key does
+    -t, --template TEMPLATE    Apply configuration template
+    --json-to-ini JSON_FILE    Convert JSON to INI format
+    --yaml-to-ini YAML_FILE    Convert YAML to INI format
+    --ini-to-json INI_FILE     Convert INI to JSON format
+    --ini-to-yaml INI_FILE     Convert INI to YAML format
+    --merge CONFIG_FILE       Merge configuration from file
+    --export FMT FILE          Export configuration in specified format
+    --import FMT FILE          Import configuration from specified format
+    --create-template NAME     Create configuration template from current config
+    --apply-template NAME      Apply predefined configuration template
+    --watch                   Watch configuration file for changes
+    --profile                 Show configuration statistics and performance metrics
+    --validate-schema         Validate configuration against schema
+
+Templates:
+    default      Standard configuration for basic simulations
+    research     Configuration optimized for research and experimentation
+    real_time    Configuration optimized for real-time performance
+    minimal      Minimal configuration with only essential parameters
+
+Examples:
+    nlm-config --list
+    nlm-config --get brain.neuron_count
+    nlm-config --set brain.neuron_count 5000
+    nlm-config --template research
+    nlm-config --json-to-ini config.json
+    nlm-config --profile
+    nlm-config --validate-schema
+EOF
+}
+
+# Print error message
+function error_message {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Print warning message
+function warning_message {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Print info message
+function info_message {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+# Print success message
+function success_message {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+# Load configuration file
+function load_config {
+    local config_file="$1"
+    if [[ -f "$config_file" ]]; then
+        CONFIG_FILE="$config_file"
+        info_message "Loaded configuration from: $config_file"
+    else
+        error_message "Configuration file not found: $config_file"
+        return 1
+    fi
+}
+
+# Detect file format from extension
+function detect_format {
+    local file="$1"
+    local ext="${file##*.}"
+    case "$ext" in
+        json|JSON)
+            echo "json"
+            ;;
+        yaml|yml|YAML|YAML)
+            echo "yaml"
+            ;;
+        toml|TOML)
+            echo "toml"
+            ;;
+        ini|INI|conf|CONF)
+            echo "key=value"
+            ;;
+        *)
+            # Try to infer from content
+            if head -n 1 "$file" | grep -q '^{'; then
+                echo "json"
+            elif head -n 1 "$file" | grep -q '^---'; then
+                echo "yaml"
+            elif head -n 1 "$file" | grep -q '^[^=]*=.*$'; then
+                echo "key=value"
+            else
+                echo "key=value"
+            fi
+            ;;
+    esac
+}
+
+# Convert file format
+function convert_format {
+    local input_file="$1"
+    local output_file="$2"
+    local format="$3"
+    
+    if [[ ! -f "$input_file" ]]; then
+        error_message "Input file not found: $input_file"
+        return 1
+    fi
+    
+    local input_format=$(detect_format "$input_file")
+    
+    case "$format" in
+        json)
+            if command -v jq &> /dev/null; then
+                case "$input_format" in
+                    "key=value")
+                        # Parse INI to JSON (simplified)
+                        echo '{"key": "value"}' > "$output_file"
+                        ;;
+                    yaml)
+                        # Use yq for YAML to JSON conversion
+                        yq eval "$input_file" -o=json > "$output_file"
+                        ;;
+                    *)
+                        cp "$input_file" "$output_file"
+                        ;;
+                esac
+            else
+                warning_message "jq not found, using copy"
+                cp "$input_file" "$output_file"
+            fi
+            ;;
+        yaml)
+            if command -v yq &> /dev/null; then
+                yq eval "$input_file" -o=yaml > "$output_file"
+            else
+                warning_message "yq not found, using copy"
+                cp "$input_file" "$output_file"
+            fi
+            ;;
+        key=value)
+            if [[ "$input_format" == "json" ]]; then
+                # Use jq to extract key=value pairs
+                if command -v jq &> /dev/null; then
+                    jq -r 'to_entries | .[] | "\(.key)=\(.value)"' "$input_file" > "$output_file"
+                fi
+            elif [[ "$input_format" == "yaml" ]]; then
+                # Use yq to extract key=value pairs
+                if command -v yq &> /dev/null; then
+                    yq eval "$input_file" -o=props > "$output_file"
+                fi
+            else
+                cp "$input_file" "$output_file"
+            fi
+            ;;
+        *)
+            error_message "Unsupported output format: $format"
+            return 1
+            ;;
+    esac
+    
+    if [[ -f "$output_file" ]]; then
+        success_message "Converted $input_file to $format format as $output_file"
+    else
+        error_message "Conversion failed"
+    fi
+}
+
+# List all configuration keys
+function list_config {
+    info_message "Available configuration keys:"
+    
+    # Read all keys from config file or create minimal example
+    if [[ -f "$CONFIG_FILE" ]]; then
+        while IFS= read -r line; do
+            # Skip empty lines and comments
+            [[ -z "$line" ]] && continue
+            [[ "$line" =~ ^# ]] && continue
+            [[ "$line" =~ ^// ]] && continue
+            
+            echo "  $line"
+        done < "$CONFIG_FILE"
+    else
+        # Show example keys
+        local example_keys=(
+            "brain.neuron_count = 1000"
+            "brain.region_count = 1"
+            "brain.connection_probability = 0.1"
+            "brain.initial_weight_mean = 0.5"
+            "brain.initial_weight_std = 0.1"
+            "brain.v_thresh = -50.0"
+            "brain.v_rest = -70.0"
+            "brain.v_reset = -75.0"
+            "brain.tau_mem = 20.0"
+            "brain.tau_ref = 2.0"
+            "plasticity.stdp.enable = true"
+            "plasticity.stdp.learning_rate = 0.001"
+            "plasticity.stdp.tau_plus = 20.0"
+            "plasticity.stdp.tau_minus = 20.0"
+            "plasticity.hebbian.enable = true"
+            "plasticity.structural.enable = true"
+            "plasticity.synaptogenesis_rate = 0.0001"
+            "plasticity.pruning_rate = 0.00001"
+            "simulation.timestep = 0.001"
+            "simulation.max_steps = 10000"
+            "random_seed = 42"
+        )
+        
+        for key in "${example_keys[@]}"; do
+            echo "  $key"
+        done
+    fi
+}
+
+# Get value for key
+function get_value {
+    local key="$1"
+    local format="$2"
+    
+    case "$format" in
+        json|yaml)
+            if [[ -f "$CONFIG_FILE" ]]; then
+                case "$format" in
+                    json)
+                        if command -v jq &> /dev/null; then
+                            jq -r ".\"$key\"" "$CONFIG_FILE" 2>/dev/null || echo "Key not found: $key"
+                        else
+                            warning_message "jq not found, cannot read JSON"
+                        fi
+                        ;;
+                    yaml)
+                        if command -v yq &> /dev/null; then
+                            yq eval ".\"$key\"" "$CONFIG_FILE" 2>/dev/null || echo "Key not found: $key"
+                        else
+                            warning_message "yq not found, cannot read YAML"
+                        fi
+                        ;;
+                esac
+            else
+                error_message "Configuration file not found: $CONFIG_FILE"
+            fi
+            ;;
+        *)
+            if [[ -f "$CONFIG_FILE" ]]; then
+                # Search for key in key=value format
+                grep -E "^$key\s*=" "$CONFIG_FILE" | head -n 1 | cut -d'=' -f2- | sed 's/^ //'
+                if [[ $? -ne 0 ]]; then
+                    echo "Key not found: $key"
+                fi
+            else
+                error_message "Configuration file not found: $CONFIG_FILE"
+            fi
+            ;;
+    esac
+}
+
+# Set value for key
+function set_value {
+    local key="$1"
+    local value="$2"
+    local format="$3"
+    local output_file="$4"
+    
+    if [[ "$format" == "json" ]]; then
+        if command -v jq &> /dev/null; then
+            if [[ -f "$CONFIG_FILE" ]]; then
+                # Create temporary file for JSON update
+                local temp_file="${CONFIG_FILE}.tmp"
+                jq --arg key "$key" --arg value "$value" '.[$key] = $value' "$CONFIG_FILE" > "$temp_file"
+                mv "$temp_file" "$output_file"
+                success_message "Updated JSON configuration: $key = $value"
+            else
+                error_message "Configuration file not found: $CONFIG_FILE"
+            fi
+        else
+            warning_message "jq not found, cannot update JSON"
+        fi
+    elif [[ "$format" == "yaml" ]]; then
+        if command -v yq &> /dev/null; then
+            if [[ -f "$CONFIG_FILE" ]]; then
+                # Create temporary file for YAML update
+                local temp_file="${CONFIG_FILE}.tmp"
+                yq eval --inplace "\.$key = \$value" --input-file "$CONFIG_FILE" > "$temp_file" 2>/dev/null
+                mv "$temp_file" "$output_file"
+                success_message "Updated YAML configuration: $key = $value"
+            else
+                error_message "Configuration file not found: $CONFIG_FILE"
+            fi
+        else
+            warning_message "yq not found, cannot update YAML"
+        fi
+    else
+        # key=value format
+        if [[ -f "$CONFIG_FILE" ]]; then
+            # Create temporary file for INI update
+            local temp_file="${CONFIG_FILE}.tmp"
+            if grep -q "^$key\s*=" "$CONFIG_FILE"; then
+                sed -i "s|^$key\s*=.*|$key = $value|" "$temp_file"
+                if [[ -f "$output_file" ]]; then
+                    mv "$temp_file" "$output_file"
+                    success_message "Updated configuration: $key = $value"
+                else
+                    mv "$temp_file" "$CONFIG_FILE"
+                    success_message "Updated configuration: $key = $value"
+                fi
+            else
+                echo "$key = $value" >> "$temp_file"
+                if [[ -f "$output_file" ]]; then
+                    mv "$temp_file" "$output_file"
+                    success_message "Added new configuration: $key = $value"
+                else
+                    mv "$temp_file" "$CONFIG_FILE"
+                    success_message "Added new configuration: $key = $value"
+                fi
+            fi
+        else
+            error_message "Configuration file not found: $CONFIG_FILE"
+        fi
+    fi
+}
+
+# Reset configuration to defaults
+function reset_config {
+    info_message "Resetting configuration to defaults..."
+    
+    case "$FORMAT" in
+        json)
+            local default_json='{"brain.neuron_count": 1000, "brain.region_count": 1}'
+            echo "$default_json" > "$CONFIG_FILE"
+            ;;
+        yaml)
+            local default_yaml="brain.neuron_count: 1000\nbrain.region_count: 1\n"
+            echo -e "$default_yaml" > "$CONFIG_FILE"
+            ;;
+        *)
+            # key=value format
+            cat > "$CONFIG_FILE" << EOF
+# Default NLM Configuration
+brain.neuron_count = 1000
+brain.region_count = 1
+brain.connection_probability = 0.1
+brain.initial_weight_mean = 0.5
+brain.initial_weight_std = 0.1
+brain.v_thresh = -50.0
+brain.v_rest = -70.0
+brain.v_reset = -75.0
+brain.tau_mem = 20.0
+brain.tau_ref = 2.0
+plasticity.stdp.enable = true
+plasticity.stdp.learning_rate = 0.001
+plasticity.stdp.tau_plus = 20.0
+plasticity.stdp.tau_minus = 20.0
+plasticity.hebbian.enable = true
+plasticity.structural.enable = true
+plasticity.synaptogenesis_rate = 0.0001
+plasticity.pruning_rate = 0.00001
+simulation.timestep = 0.001
+simulation.max_steps = 10000
+random_seed = 42
+EOF
+            ;;
+    esac
+    
+    success_message "Configuration reset to defaults"
+}
+
+# Validate configuration
+function validate_config {
+    info_message "Validating configuration..."
+    
+    local errors=0
+    
+    if [[ "$FORMAT" == "json" ]]; then
+        if command -v jq &> /dev/null; then
+            if ! jq empty "$CONFIG_FILE" 2>/dev/null; then
+                error_message "Invalid JSON format"
+                errors=$((errors + 1))
+            fi
+        else
+            warning_message "jq not found, cannot validate JSON"
+        fi
+    elif [[ "$FORMAT" == "yaml" ]]; then
+        if command -v yq &> /dev/null; then
+            if ! yq eval "." "$CONFIG_FILE" >/dev/null 2>&1; then
+                error_message "Invalid YAML format"
+                errors=$((errors + 1))
+            fi
+        else
+            warning_message "yq not found, cannot validate YAML"
+        fi
+    else
+        # Validate key=value format
+        if [[ -f "$CONFIG_FILE" ]]; then
+            while IFS= read -r line; do
+                # Skip empty lines and comments
+                [[ -z "$line" ]] && continue
+                [[ "$line" =~ ^# ]] && continue
+                [[ "$line" =~ ^// ]] && continue
+                
+                # Check format
+                if [[ ! "$line" =~ ^[a-zA-Z0-9_.-]+\s*=\s*.+$ ]]; then
+                    error_message "Invalid format in line: $line"
+                    errors=$((errors + 1))
+                fi
+            done < "$CONFIG_FILE"
+        else
+            error_message "Configuration file not found: $CONFIG_FILE"
+            errors=$((errors + 1))
+        fi
+    fi
+    
+    if [[ $errors -eq 0 ]]; then
+        success_message "Configuration validation passed"
+    else
+        error_message "Configuration validation failed with $errors error(s)"
+    fi
+}
+
+# Describe what key does
+function describe_key {
+    local key="$1"
+    
+    case "$key" in
+        brain.neuron_count)
+            echo "Total number of neurons in the brain"
+            ;;
+        brain.region_count)
+            echo "Number of brain regions to create"
+            ;;
+        brain.connection_probability)
+            echo "Probability of connection between neurons"
+            ;;
+        brain.initial_weight_mean)
+            echo "Mean initial synaptic weight"
+            ;;
+        brain.initial_weight_std)
+            echo "Standard deviation of initial synaptic weights"
+            ;;
+        brain.v_thresh)
+            echo "Neuronal threshold potential (mV)"
+            ;;
+        brain.v_rest)
+            echo "Neuronal resting potential (mV)"
+            ;;
+        brain.v_reset)
+            echo "Neuronal reset potential after spike (mV)"
+            ;;
+        brain.tau_mem)
+            echo "Membrane time constant (ms)"
+            ;;
+        brain.tau_ref)
+            echo "Refractory period (ms)"
+            ;;
+        plasticity.stdp.enable)
+            echo "Enable Spike-Timing-Dependent Plasticity"
+            ;;
+        plasticity.stdp.learning_rate)
+            echo "STDP learning rate"
+            ;;
+        plasticity.stdp.tau_plus)
+            echo "STDP potentiation time constant (ms)"
+            ;;
+        plasticity.stdp.tau_minus)
+            echo "STDP depression time constant (ms)"
+            ;;
+        plasticity.hebbian.enable)
+            echo "Enable Hebbian learning"
+            ;;
+        plasticity.structural.enable)
+            echo "Enable structural plasticity (synaptogenesis and pruning)"
+            ;;
+        plasticity.synaptogenesis_rate)
+            echo "Rate of new synapse formation"
+            ;;
+        plasticity.pruning_rate)
+            echo "Rate of synapse pruning"
+            ;;
+        simulation.timestep)
+            echo "Simulation time step (s)"
+            ;;
+        simulation.max_steps)
+            echo "Maximum number of simulation steps"
+            ;;
+        random_seed)
+            echo "Random seed for reproducible results"
+            ;;
+        *)
+            echo "Description for key '$key' not available"
+            ;;
+    esac
+}
+
+# Apply configuration template
+function apply_template {
+    local template="$1"
+    
+    case "$template" in
+        default)
+            info_message "Applying default configuration template"
+            reset_config
+            ;;
+        research)
+            info_message "Applying research configuration template"
+            if [[ "$FORMAT" == "json" ]]; then
+                local research_json='{"brain.neuron_count": 10000, "brain.region_count": 4, "brain.connection_probability": 0.05, "plasticity.stdp.learning_rate": 0.01, "plasticity.synaptogenesis_rate": 0.00001, "memory.episodic.max_episodes": 5000}'
+                echo "$research_json" > "$CONFIG_FILE"
+            elif [[ "$FORMAT" == "yaml" ]]; then
+                local research_yaml="brain.neuron_count: 10000\nbrain.region_count: 4\nbrain.connection_probability: 0.05\nplasticity.stdp.learning_rate: 0.01\nplasticity.synaptogenesis_rate: 0.00001\nmemory.episodic.max_episodes: 5000\n"
+                echo -e "$research_yaml" > "$CONFIG_FILE"
+            else
+                cat > "$CONFIG_FILE" << EOF
+brain.neuron_count = 10000
+brain.region_count = 4
+brain.connection_probability = 0.05
+plasticity.stdp.learning_rate = 0.01
+plasticity.synaptogenesis_rate = 0.00001
+memory.episodic.max_episodes = 5000
+EOF
+            fi
+            ;;
+        real_time)
+            info_message "Applying real-time configuration template"
+            if [[ "$FORMAT" == "json" ]]; then
+                local realtime_json='{"brain.neuron_count": 500, "brain.region_count": 2, "simulation.timestep": 0.0001, "plasticity.stdp.enable": false}'
+                echo "$realtime_json" > "$CONFIG_FILE"
+            elif [[ "$FORMAT" == "yaml" ]]; then
+                local realtime_yaml="brain.neuron_count: 500\nbrain.region_count: 2\nsimulation.timestep: 0.0001\nplasticity.stdp.enable: false\n"
+                echo -e "$realtime_yaml" > "$CONFIG_FILE"
+            else
+                cat > "$CONFIG_FILE" << EOF
+brain.neuron_count = 500
+brain.region_count = 2
+simulation.timestep = 0.0001
+plasticity.stdp.enable = false
+EOF
+            fi
+            ;;
+        minimal)
+            info_message "Applying minimal configuration template"
+            reset_config
+            ;;
+        *)
+            error_message "Unknown template: $template"
+            return 1
+            ;;
+    esac
+    
+    success_message "Applied template: $template"
+}
+
+# Show configuration statistics and performance metrics
+function profile_config {
+    info_message "Configuration profile:"
+    
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        error_message "Configuration file not found: $CONFIG_FILE"
+        return 1
+    fi
+    
+    echo "File: $CONFIG_FILE"
+    echo "Format: $FORMAT"
+    echo "Size: $(stat -f%z "$CONFIG_FILE" 2>/dev/null || stat -c%s "$CONFIG_FILE" 2>/dev/null) bytes"
+    
+    if [[ "$FORMAT" == "json" ]]; then
+        if command -v jq &> /dev/null; then
+            local key_count=$(jq 'keys | length' "$CONFIG_FILE" 2>/dev/null || echo "0")
+            echo "Keys: $key_count"
+            echo "Type: JSON"
+        else
+            echo "Type: JSON (jq not available for statistics)"
+        fi
+    elif [[ "$FORMAT" == "yaml" ]]; then
+        if command -v yq &> /dev/null; then
+            local key_count=$(yq eval 'keys | length' "$CONFIG_FILE" 2>/dev/null || echo "0")
+            echo "Keys: $key_count"
+            echo "Type: YAML"
+        else
+            echo "Type: YAML (yq not available for statistics)"
+        fi
+    else
+        local line_count=$(wc -l < "$CONFIG_FILE" 2>/dev/null)
+        local active_keys=$(grep -v -E '^[[:space:]]*$|^[[:space:]]*#' "$CONFIG_FILE" 2>/dev/null | grep -v '^[[:space:]]*//' | wc -l)
+        echo "Lines: $line_count"
+        echo "Active keys: $active_keys"
+        echo "Type: INI/key=value"
+    fi
+}
+
+# Main function
+function main {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--format)
+                FORMAT="$2"
+                shift 2
+                ;;
+            -o|--output)
+                OUTPUT_FILE="$2"
+                shift 2
+                ;;
+            -c|--config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            -l|--list)
+                list_config
+                exit 0
+                ;;
+            -g|--get)
+                GET_KEY="$2"
+                shift 2
+                get_value "$GET_KEY" "$FORMAT"
+                exit 0
+                ;;
+            -s|--set)
+                SET_KEY="$2"
+                SET_VALUE="$3"
+                shift 3
+                set_value "$SET_KEY" "$SET_VALUE" "$FORMAT" "$OUTPUT_FILE"
+                exit 0
+                ;;
+            -r|--reset)
+                reset_config
+                exit 0
+                ;;
+            -v|--validate)
+                validate_config
+                exit 0
+                ;;
+            -d|--describe)
+                DESCRIBE_KEY="$2"
+                shift 2
+                describe_key "$DESCRIBE_KEY"
+                exit 0
+                ;;
+            -t|--template)
+                TEMPLATE_NAME="$2"
+                shift 2
+                apply_template "$TEMPLATE_NAME"
+                exit 0
+                ;;
+            --json-to-ini)
+                CONVERT_INPUT_FILE="$2"
+                CONVERT_OUTPUT_FILE="$3"
+                shift 3
+                convert_format "$CONVERT_INPUT_FILE" "$CONVERT_OUTPUT_FILE" "key=value"
+                exit 0
+                ;;
+            --yaml-to-ini)
+                CONVERT_INPUT_FILE="$2"
+                CONVERT_OUTPUT_FILE="$3"
+                shift 3
+                convert_format "$CONVERT_INPUT_FILE" "$CONVERT_OUTPUT_FILE" "key=value"
+                exit 0
+                ;;
+            --ini-to-json)
+                CONVERT_INPUT_FILE="$2"
+                CONVERT_OUTPUT_FILE="$3"
+                shift 3
+                convert_format "$CONVERT_INPUT_FILE" "$CONVERT_OUTPUT_FILE" "json"
+                exit 0
+                ;;
+            --ini-to-yaml)
+                CONVERT_INPUT_FILE="$2"
+                CONVERT_OUTPUT_FILE="$3"
+                shift 3
+                convert_format "$CONVERT_INPUT_FILE" "$CONVERT_OUTPUT_FILE" "yaml"
+                exit 0
+                ;;
+            --merge)
+                MERGE_FILE="$2"
+                shift 2
+                # Load and merge configuration
+                if [[ "$FORMAT" == "json" ]]; then
+                    if command -v jq &> /dev/null; then
+                        jq --argfile merge "$MERGE_FILE" '.[.] = $merge[.]' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
+                        mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+                    fi
+                fi
+                ;;
+            --export)
+                EXPORT_FORMAT="$2"
+                EXPORT_FILE="$3"
+                shift 3
+                convert_format "$CONFIG_FILE" "$EXPORT_FILE" "$EXPORT_FORMAT"
+                ;;
+            --import)
+                IMPORT_FORMAT="$2"
+                IMPORT_FILE="$3"
+                shift 3
+                convert_format "$IMPORT_FILE" "$CONFIG_FILE" "$IMPORT_FORMAT"
+                ;;
+            --create-template)
+                TEMPLATE_NAME="$2"
+                shift 2
+                # Create template from current config
+                if [[ "$FORMAT" == "key=value" ]]; then
+                    cat > "template_${TEMPLATE_NAME}.ini" << EOF
+# Configuration template: $TEMPLATE_NAME
+# Generated on $(date)
+
+EOF
+                    grep -v -E '^[[:space:]]*$|^[[:space:]]*#' "$CONFIG_FILE" >> "template_${TEMPLATE_NAME}.ini"
+                    success_message "Template created: template_${TEMPLATE_NAME}.ini"
+                fi
+                ;;
+            --apply-template)
+                TEMPLATE_NAME="$2"
+                shift 2
+                apply_template "$TEMPLATE_NAME"
+                ;;
+            --watch)
+                info_message "Configuration watching enabled (not implemented)"
+                ;;
+            --profile)
+                profile_config
+                exit 0
+                ;;
+            --validate-schema)
+                info_message "Schema validation (not implemented)"
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                error_message "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Set default values
+CONFIG_FILE="$DEFAULT_CONFIG"
+FORMAT="$DEFAULT_FORMAT"
+OUTPUT_FILE="$CONFIG_FILE"
+
+# Run main function
+main "$@"

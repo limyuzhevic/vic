@@ -139,6 +139,12 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Advanced configuration
+add_library(nlm_config_advanced STATIC
+    src/core/Config/AdvancedConfig.cpp
+)
+target_include_directories(nlm_config_advanced PUBLIC src)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
