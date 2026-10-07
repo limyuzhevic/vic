@@ -171,15 +171,13 @@ struct DelayedSpikeEvent {
         , is_excitatory(type == SynapseType::Excitatory) {}
 };
 
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
+// Experimental configuration
+enum class ExperimentMode : uint8_t {
+    Basic,
+    Plasticity,
+    STDP,
+    All
 };
-
-// Generic handle types for efficiency
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 

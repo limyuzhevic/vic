@@ -284,14 +284,359 @@ print("Agent simulation complete!")
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+## Advanced Usage Examples
+
+### Example 5: Using Advanced CLI Features
+
+```python
+import pynlm
+import subprocess
+import sys
+
+# You can run NLM from Python with command-line arguments
+# This example shows how to use the new advanced features
+
+def run_nlm_with_config(config_file=None, neuron_count=5000, timestep=0.01):
+    """Run NLM with custom configuration using command line"""
+    
+    # Build command with advanced options
+    cmd = [
+        sys.executable, "-m", "nlm",
+        "--neuron-count", str(neuron_count),
+        "--timestep", str(timestep),
+        "--experiment-mode", "all",
+        "--verbose"
+    ]
+    
+    if config_file:
+        cmd.extend(["--config", config_file])
+    
+    print(f"Running command: {' '.join(cmd)}")
+    
+    # Run the simulation
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        print("✓ Advanced simulation completed successfully!")
+        print(result.stdout)
+    else:
+        print("✗ Simulation failed:")
+        print(result.stderr)
+
+# Example usage
+run_nlm_with_config(neuron_count=10000, timestep=0.005)
+```
+
+### Example 6: Configuration Validation
+
+```python
+import pynlm
+
+def validate_and_run_simulation():
+    """Validate configuration before running"""
+    
+    # Create brain
+    config = pynlm.createDefaultConfig()
+    
+    # Set some configuration values
+    config.set("brain.neuron_count", 5000)
+    config.set("brain.simulation_timestep", 0.001)
+    config.set("brain.connection_probability", 0.1)
+    
+    # Validate configuration (you can add validation logic here)
+    # For example:
+    neuron_count = config.getOr("brain.neuron_count", 1000)
+    if neuron_count > 50000:
+        print("Warning: Large neuron count may impact performance")
+    
+    timestep = config.getOr("brain.simulation_timestep", 0.001)
+    if timestep > 0.01:
+        print("Warning: Large timestep may cause numerical instability")
+    
+    # Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    print("Configuration validated. Running simulation...")
+    
+    # Run simulation
+    for step in range(100):
+        brain.step(step)
+        
+        if step % 20 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    
+    print("✓ Simulation completed with validated configuration!")
+
+# Use it
+validate_and_run_simulation()
+```
+
+### Example 7: Quick Test Mode
+
+```python
+import pynlm
+
+def run_quick_test():
+    """Run a quick connectivity test to verify the brain works"""
+    
+    print("=== Running Quick Performance Test ===")
+    
+    # Create brain
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    # Get initial state
+    initial_spikes = brain.getTotalSpikeCount()
+    initial_neurons = brain.getTotalNeuronCount()
+    
+    print(f"Initial state: {initial_neurons} neurons, {initial_spikes} spikes")
+    
+    # Inject current to test connectivity
+    for i in range(10):
+        if i < brain.getTotalNeuronCount() / 4:
+            brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 50.0f)
+    
+    # Run a few steps
+    for step in range(50):
+        brain.step(step, step * 0.001)
+    
+    final_spikes = brain.getTotalSpikeCount()
+    spikes_generated = final_spikes - initial_spikes
+    
+    print(f"After 50 steps: {spikes_generated} spikes generated")
+    
+    if spikes_generated > 0:
+        print("✓ Brain connectivity test PASSED!")
+        print("  Spikes are propagating through the network")
+    else:
+        print("✗ Brain connectivity test FAILED!")
+        print("  No spikes generated - check neuron parameters")
+        
+        # Debug: show some neuron parameters
+        for i in range(min(3, int(brain.getTotalNeuronCount() / 10))):
+            # This is a simplified debug - in real usage you'd access neurons differently
+            print(f"  Neuron {i}: potential needs adjustment")
+
+# Run the test
+run_quick_test()
+```
+
+### Example 8: Complete Agent with Advanced Features
+
+```python
+import pynlm
+
+def run_advanced_agent_simulation():
+    """Advanced agent simulation with all features enabled"""
+    
+    print("=== Advanced Agent Simulation ===")
+    
+    # 1. Create and configure brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create world and agent
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=12, visionHeight=12)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # 3. Enable all advanced features
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("Enabled features: Reward modulation, Structural plasticity, Development, Curiosity")
+    
+    # 4. Run simulation with monitoring
+    print("Starting simulation...")
+    
+    for step in range(500):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process in brain
+        agent.processSensoryInput(percept)
+        
+        # Brain thinks
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Execute action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward-based learning
+        reward = 0.0
+        if percept.getInternal():
+            reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Log progress every 50 steps
+        if step % 50 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+    
+    print("✓ Advanced agent simulation completed!")
+    print("The brain learned and adapted throughout the simulation.")
+
+# Run the advanced simulation
+run_advanced_agent_simulation()
+```
+
+---
+
+## Quick Reference
+
+### New Advanced Features
+
+| Feature | Code | Description |
+|---------|------|-------------|
+| Configuration Validation | `config.getOr(key, default)` | Safely retrieve values with defaults |
+| Quick Test Mode | `brain.injectCurrentToNeurons()` | Test brain connectivity quickly |
+| Performance Monitoring | `brain.getFiringNeuronCount()` | Monitor brain activity |
+| Development Tracking | `brain.getDevelopmentalStage()` | Track brain maturity |
+| Curiosity System | `agent.getCuriosityLevel()` | Monitor exploration behavior |
+
+### Error Handling Tips
+
+```python
+# Always validate configuration
+if config.has("brain.neuron_count"):
+    neuron_count = config.getOr("brain.neuron_count", 1000)
+    if neuron_count <= 0:
+        print("Error: Invalid neuron count")
+        return
+
+# Handle brain initialization
+try:
+    brain.initialize()
+except Exception as e:
+    print(f"Failed to initialize brain: {e}")
+    return
+
+# Check simulation results
+if brain.getTotalSpikeCount() == 0:
+    print("Warning: No spikes generated - brain may need input")
+```
+
+---
+
+## Mini Projects - Advanced Version
+
+### Advanced Project 1: Learning Environment
+
+```python
+import pynlm
+
+def run_learning_environment():
+    """Brain learns to navigate and explore a world"""
+    
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=10, visionHeight=10)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all learning capabilities
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableCuriosity(True)
+    
+    # Run exploration
+    for step in range(1000):
+        world.update(0.05)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        if step % 100 == 0:
+            print(f"Exploration step {step}")
+            print(f"  Path length: Agent position tracked")
+            print(f"  Learning: {agent.getCuriosityLevel():.3f}")
+    
+    print("✓ Exploration complete! Brain has learned the environment.")
+
+run_learning_environment()
+```
+
+---
+
+## Getting Help
+
+### Command Line Help
+
+To get help on using NLM's advanced features:
+
+```bash
+./nlm --help
+./nlm --experiment-mode all --verbose
+```
+
+### Python API
+
+For detailed Python API documentation:
+1. Read `HOW_TO_USE.md` for complete examples
+2. Check the source code for specific method details
+3. Try the examples provided in this guide
+
+### Troubleshooting Common Issues
+
+**If the brain isn't learning:**
+- Enable reward modulation: `agent.enableRewardModulation(True)`
+- Make sure the agent is processing sensory input
+- Check that world updates are happening
+
+**If performance is slow:**
+- Reduce neuron count in configuration
+- Use quick test mode first
+- Enable quiet mode to reduce logging
+
+**If spikes aren't propagating:**
+- Check neuron parameters
+- Make sure plasticity is enabled
+- Verify that the brain is properly initialized
 
 ---
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+Now that you're comfortable with the basics:
 
-That's it! You're now ready to use NLM.
+1. **Explore the architecture**: Read `docs/ARCHITECTURE.md` to understand how all the components work together
+2. **Try advanced simulations**: Use the command-line options with experiment modes
+3. **Create your own projects**: Build custom brains for specific tasks
+4. **Contribute**: Help improve the documentation and code!
+
+You're now ready to use NLM at an advanced level!
+
+---
+
+**Need more help?**
+- Check the main `HOW_TO_USE.md` for comprehensive documentation
+- Explore the `docs/` folder for technical details
+- Try the examples in this guide first
+- Experiment with different configuration options
+
+Happy brain simulation! 🧠

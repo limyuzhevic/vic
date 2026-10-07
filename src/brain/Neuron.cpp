@@ -188,7 +188,16 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate timestep to prevent numerical issues
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Invalid timestep: " + std::to_string(dt) + ". Using default 0.001.");
+        dt = 0.001;
+    }
+    if (dt > 1.0) {
+        NLM_LOG_WARNING("Large timestep may cause numerical instability: " + std::to_string(dt));
+    }
+    
     bool fired = false;
     
     // Handle refractory period
@@ -228,8 +237,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential to prevent numerical instability
+    const float MIN_POTENTIAL = -100.0f;
+    const float MAX_POTENTIAL = 50.0f;
+    V = std::clamp(V, MIN_POTENTIAL, MAX_POTENTIAL);
     
     // Check for spike
     if (V >= threshold) {
@@ -249,6 +260,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        
+        // Clamp adaptation variable to prevent overflow
+        if (pImpl->state.adaptationVariable > 10.0f) {
+            pImpl->state.adaptationVariable = 10.0f;
+            NLM_LOG_DEBUG("Adaptation variable clamped to prevent overflow");
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -260,8 +277,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Use standard timestep for compatibility with configuration
+    TimestepDuration dt = 0.001;  // 1ms standard timestep
     stepLIF(currentTime, dt);
 }
 
@@ -272,20 +289,44 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Real random initialization with biological constraints and numerical stability
+    
+    // Membrane potential starts near resting potential with small random variation
+    // Use uniformReal for consistent distribution
+    pImpl->state.membranePotential = pImpl->state.restingPotential + 
+                                     rng.uniformReal(-3.0f, 3.0f);
+    
+    // Clamp to reasonable biological range
+    const float MIN_POTENTIAL = -100.0f;
+    const float MAX_POTENTIAL = 50.0f;
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, 
+                                                 MIN_POTENTIAL, MAX_POTENTIAL);
     
     // Threshold is typically -55mV with small variation
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = std::clamp(pImpl->state.threshold, 
+                                        MIN_POTENTIAL, MAX_POTENTIAL);
     
-    // Resting potential typically -70mV
+    // Resting potential typically -70mV with small variation
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = std::clamp(pImpl->state.restingPotential, 
+                                               MIN_POTENTIAL, MAX_POTENTIAL);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Reset potential is usually close to resting with small positive variation
+    pImpl->state.resetPotential = pImpl->state.restingPotential + 
+                                  rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = std::clamp(pImpl->state.resetPotential, 
+                                             MIN_POTENTIAL, MAX_POTENTIAL);
     
-    // Refractory period: 2-10ms typical
+    // Ensure reset potential is between resting and threshold for biological realism
+    if (pImpl->state.resetPotential < pImpl->state.restingPotential) {
+        pImpl->state.resetPotential = pImpl->state.restingPotential + 0.5f;
+    }
+    if (pImpl->state.resetPotential > pImpl->state.threshold) {
+        pImpl->state.resetPotential = pImpl->state.threshold - 5.0f;
+    }
+    
+    // Refractory period: 2-10ms typical, but with biological constraints
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
     // Initial state
@@ -293,6 +334,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Initialize with reasonable leak conductance
+    pImpl->state.leakConductance = 10.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.leakConductance = std::clamp(pImpl->state.leakConductance, 1.0f, 100.0f);
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;

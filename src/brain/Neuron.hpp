@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // LIF dynamics implemented in stepLIF() - uses fixed 1ms timestep
     void step(Timestamp currentTime);
     
     // Reset to initial state
