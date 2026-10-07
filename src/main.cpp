@@ -18,6 +18,11 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "neuromodulation/Neuromodulator.hpp"
+#include "neuromodulation/Dopamine.hpp"
+#include "neuromodulation/Acetylcholine.hpp"
+#include "neuromodulation/Norepinephrine.hpp"
+#include "neuromodulation/Serotonin.hpp"
 
 #include <iostream>
 #include <memory>
