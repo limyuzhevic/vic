@@ -6,7 +6,7 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Enhanced with reward-modulated learning support
 
 class PlasticityRule {
 public:
@@ -19,6 +19,29 @@ public:
                         const std::vector<Timestamp>& postSpikes,
                         TimestepDuration dt) = 0;
     
+    // Enhanced update with reward-modulated learning support
+    // Many modern plasticity rules (R-STDP, R-Hebbian) incorporate reward signals
+    // to guide learning towards beneficial behaviors
+    virtual void updateWithReward(Synapse* synapse,
+                                  const std::vector<Timestamp>& preSpikes,
+                                  const std::vector<Timestamp>& postSpikes,
+                                  TimestepDuration dt,
+                                  float rewardSignal) {
+        // Default implementation: regular update followed by reward modulation
+        // Subclasses can override for more sophisticated reward integration
+        update(synapse, preSpikes, postSpikes, dt);
+        
+        if (rewardSignal != 0.0f) {
+            // Apply reward modulation if available
+            float currentTrace = synapse->getEligibilityTrace();
+            float rewardModulatedDelta = rewardSignal * currentTrace;
+            applyWeightChange(synapse, rewardModulatedDelta);
+            
+            // Decay eligibility trace
+            synapse->decayEligibilityTrace(0.01f);
+        }
+    }
+    
     // Apply weight change
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
@@ -29,9 +52,36 @@ public:
     bool isEnabled() const;
     void setEnabled(bool enabled);
     
+    // Get current weight for a synapse (useful for debugging)
+    virtual SynapticWeight getCurrentWeight(Synapse* synapse) const {
+        return synapse ? synapse->getWeight() : 0.0f;
+    }
+    
+    // Reset synapse state (clears eligibility traces, spike history, etc.)
+    virtual void reset(Synapse* synapse) {
+        if (synapse) {
+            synapse->clearHistory();
+            synapse->setEligibilityTrace(0.0f);
+        }
+    }
+    
+    // Get plasticity statistics
+    virtual std::string getStatistics() const {
+        return "PlasticityRule statistics not available";
+    }
+
 protected:
     PlasticityRule() : enabled_(true) {}
     
+    // Helper function for common plasticity operations
+    void applyDeltaWithBounds(Synapse* synapse, SynapticWeight delta, 
+                             float minWeight = -1.0f, float maxWeight = 1.0f) {
+        if (!synapse) return;
+        float newWeight = synapse->getWeight() + delta;
+        newWeight = std::clamp(newWeight, minWeight, maxWeight);
+        synapse->setWeight(newWeight);
+    }
+
 private:
     bool enabled_;
 };

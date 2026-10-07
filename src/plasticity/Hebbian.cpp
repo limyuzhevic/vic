@@ -22,44 +22,19 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    // Optimized spike correlation detection
     size_t correlationCount = 0;
+    const float correlationWindow = 100.0f;  // 100ms correlation window
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
+            float dtTime = static_cast<float>(postTime - preTime);
             // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+            if (std::abs(dtTime) < correlationWindow) {
                 ++correlationCount;
             }
         }
@@ -69,9 +44,54 @@ void Hebbian::update(Synapse* synapse,
     // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
-    // Apply with bounds
+    // Apply with bounds and eligibility trace support
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
+        
+        // Update eligibility trace for reward-modulated Hebbian learning
+        float currentTrace = synapse->getEligibilityTrace();
+        synapse->setEligibilityTrace(currentTrace + delta);
+    }
+}
+
+void Hebbian::updateWithEligibilityTrace(Synapse* synapse,
+                                          const std::vector<Timestamp>& preSpikes,
+                                          const std::vector<Timestamp>& postSpikes,
+                                          TimestepDuration dt,
+                                          float rewardSignal) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // First, compute Hebbian delta as in regular update
+    size_t correlationCount = 0;
+    const float correlationWindow = 100.0f;
+    
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            float dtTime = static_cast<float>(postTime - preTime);
+            if (std::abs(dtTime) < correlationWindow) {
+                ++correlationCount;
+            }
+        }
+    }
+    
+    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    
+    // Apply reward-modulated Hebbian learning
+    if (rewardSignal != 0.0f && std::abs(delta) > 1e-6f) {
+        // Reward-modulated Hebbian (R-Hebbian)
+        // Δw = Hebbian_delta * reward_signal * eligibility_trace
+        float eligibilityTrace = synapse->getEligibilityTrace();
+        float rewardModulatedDelta = delta * rewardSignal * eligibilityTrace;
+        applyWeightChange(synapse, rewardModulatedDelta);
+        
+        // Decay eligibility trace
+        synapse->decayEligibilityTrace(0.01f);
+    } else if (std::abs(delta) > 1e-6f) {
+        // Standard Hebbian update
+        applyWeightChange(synapse, delta);
+        synapse->setEligibilityTrace(delta);
     }
 }
 

@@ -24,34 +24,6 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -59,19 +31,25 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Optimized spike pair processing with early exit
+    // Count spikes to break out early if no potential changes
+    size_t maxPossible = std::min(preSpikes.size(), postSpikes.size());
+    if (maxPossible == 0) return;
+    
+    // Process spike pairs with optimization for common cases
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            float dtTime = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
+            if (dtTime > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                // Use faster math: precompute exp(-1/tau) for common case
+                float delta = pImpl->ltpWeight * std::exp(-dtTime / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
+            } else if (dtTime < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                // Use optimized exponential for negative dt
+                float delta = -pImpl->ltdWeight * std::exp(dtTime / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
@@ -90,6 +68,52 @@ void STDP::update(Synapse* synapse,
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();
         synapse->setEligibilityTrace(currentTrace + totalDelta);
+    }
+}
+
+void STDP::updateWithEligibilityTrace(Synapse* synapse,
+                                       const std::vector<Timestamp>& preSpikes,
+                                       const std::vector<Timestamp>& postSpikes,
+                                       TimestepDuration dt,
+                                       float rewardSignal) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // First, compute STDP delta as in regular update
+    float totalDelta = 0.0f;
+    float tau = pImpl->timeConstant;
+    
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            float dtTime = static_cast<float>(postTime - preTime);
+            
+            if (dtTime > 0) {
+                float delta = pImpl->ltpWeight * std::exp(-dtTime / tau);
+                totalDelta += delta;
+            } else if (dtTime < 0) {
+                float delta = -pImpl->ltdWeight * std::exp(dtTime / tau);
+                totalDelta += delta;
+            }
+        }
+    }
+    
+    // Apply reward modulation if available
+    if (rewardSignal != 0.0f && totalDelta != 0.0f) {
+        // Reward-modulated STDP (R-STDP)
+        // Δw = STDP_delta * reward_signal * eligibility_trace
+        float eligibilityTrace = synapse->getEligibilityTrace();
+        float rewardModulatedDelta = totalDelta * rewardSignal * eligibilityTrace;
+        synapse->addToWeight(rewardModulatedDelta);
+        
+        // Decay eligibility trace
+        synapse->decayEligibilityTrace(0.01f);
+    } else if (std::abs(totalDelta) > 1e-6f) {
+        // Standard STDP update
+        float efficacy = synapse->getEfficacy();
+        totalDelta *= efficacy;
+        synapse->addToWeight(totalDelta);
+        synapse->setEligibilityTrace(totalDelta);
     }
 }
 

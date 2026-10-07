@@ -56,12 +56,26 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Log rotation support
+    void setMaxFileSize(size_t maxBytes);
+    size_t getMaxFileSize() const;
+    void rotateLogFile();
+    
+    // Advanced formatting
+    void setFormat(const std::string& format);
+    std::string getFormat() const;
+    
+    // Async logging support
+    void enableAsyncLogging(bool enable);
+    bool isAsyncLoggingEnabled() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatMessage(const LogEntry& entry) const;
 };
 
 // Main Logger class
