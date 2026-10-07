@@ -83,8 +83,8 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    # Enhanced checkpoint system implementation
+    src/performance/checkpoint_system_enhanced.hpp
 )
 
 target_include_directories(nlm_core PUBLIC
