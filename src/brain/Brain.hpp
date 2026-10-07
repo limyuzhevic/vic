@@ -11,23 +11,9 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class NeuralPrediction;
+class ActionConsequencePredictor;
+class PredictionErrorSignal;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -148,10 +134,16 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // ========== ADVANCED PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Neural prediction for temporal sequence learning
+    NeuralPrediction* getNeuralPrediction();
+    
+    // Action-consequence prediction for planning
+    ActionConsequencePredictor* getActionConsequencePredictor();
+    
+    // Prediction error signal for neuromodulation
+    PredictionErrorSignal* getPredictionErrorSignal();
     
     // ========== COGNITION SYSTEMS ==========
     

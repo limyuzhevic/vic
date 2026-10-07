@@ -9,9 +9,22 @@ struct DevelopmentSystem::Impl {
     SimulationStep stageStartStep;
     SimulationStep stepsInCurrentStage;
     double stageAge;  // Age since entering current stage
+    SimulationStep lastMemoryReplayStep;
+    SimulationStep lastPlasticityUpdateStep;
+    double cumulativeNeuromodulationChange;
     
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
+    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0), 
+              lastMemoryReplayStep(0), lastPlasticityUpdateStep(0), cumulativeNeuromodulationChange(0.0) {}
 };
+
+// Forward declarations for development methods
+void developNeurons(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+void developPlasticity(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+void developMemory(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+void developAttention(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+void developNeuromodulation(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+void developPrediction(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+void developCognition(DevelopmentSystem* devSys, Brain* brain, RandomGenerator& rng, TimestepDuration dt);
 
 DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
 
@@ -80,6 +93,15 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
+    
+    // Comprehensive developmental effects
+    developNeurons(brain, rng, dt);
+    developPlasticity(brain, rng, dt);
+    developMemory(brain, rng, dt);
+    developAttention(brain, rng, dt);
+    developNeuromodulation(brain, rng, dt);
+    developPrediction(brain, rng, dt);
+    developCognition(brain, rng, dt);
     
     // Auto-advance stage based on developmental age
     // These thresholds are in simulation seconds

@@ -1,7 +1,11 @@
+// NLM/熙然 - AgentBrain.cpp
+// Enhanced AgentBrain implementation with cognitive integration
+
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace nlm {
 
@@ -74,14 +78,142 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+MotorCommand AgentBrain::decodeMotorCommand() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Try higher-level cognitive systems first
+    MotorCommand plannedCommand = MotorCommand::Wait;
+    
+    // 1. Use NeuralPlanner if available (Phase 4 cognition)
+    if (brain_->getPlanner()) {
+        // Get current sensory state for planning
+        std::vector<float> sensoryState;
+        const auto& vision = previousVision_;
+        const auto& touch = std::vector<float>();  // Would get from world
+        const auto& intern = std::vector<float>();  // Would get from brain
+        const auto& proprio = std::vector<float>();  // Would get from brain
+        
+        // Combine sensory inputs
+        sensoryState.insert(sensoryState.end(), vision.begin(), vision.end());
+        
+        // Use neural planner to get planned action
+        plannedCommand = brain_->getPlanner()->selectAction(sensoryState, brain_->getTotalSpikeCount());
+        
+        // Check if planner wants to act
+        if (plannedCommand != MotorCommand::Wait && brain_->getPlanner()->getPlanningConfidence() > 0.5f) {
+            NLM_LOG_INFO("NeuralPlanner selected action: " + std::to_string(static_cast<int>(plannedCommand)));
+            return plannedCommand;
+        }
+    }
+    
+    // 2. Use Prediction System for action prediction (Phase 6 integration)
+    if (brain_->getPredictionSystem()) {
+        // Get action prediction
+        MotorCommand predictedAction = brain_->getPredictionSystem()->predictNextAction();
+        if (predictedAction != MotorCommand::Wait) {
+            NLM_LOG_INFO("Prediction System predicted action: " + std::to_string(static_cast<int>(predictedAction)));
+            return predictedAction;
+        }
+    }
+    
+    // 3. Use Concept Formation for action selection (Phase 4 cognition)
+    if (brain_->getConceptFormation()) {
+        // Get concepts that might be relevant to current state
+        std::vector<float> sensoryState;
+        const auto& vision = previousVision_;
+        sensoryState.insert(sensoryState.end(), vision.begin(), vision.end());
+        
+        // Get relevant concepts
+        auto concepts = brain_->getConceptFormation()->getRelevantConcepts(sensoryState);
+        if (!concepts.empty()) {
+            // Map concepts to motor actions
+            MotorCommand conceptBasedAction = mapConceptsToActions(concepts);
+            if (conceptBasedAction != MotorCommand::Wait) {
+                NLM_LOG_INFO("ConceptFormation mapped concepts to action: " + std::to_string(static_cast<int>(conceptBasedAction)));
+                return conceptBasedAction;
+            }
+        }
+    }
+    
+    // 4. Use Self-Model for action planning (Phase 4 cognition)
+    if (brain_->getConceptFormation()) {  // Self-model is stored in concept formation system
+        // Get self-model state
+        auto selfModel = brain_->getConceptFormation()->getSelfModel();
+        if (selfModel) {
+            // Use self-model to guide action selection
+            MotorCommand selfModelBasedAction = selfModel->selectAction(previousVision_);
+            if (selfModelBasedAction != MotorCommand::Wait) {
+                NLM_LOG_INFO("SelfModel selected action: " + std::to_string(static_cast<int>(selfModelBasedAction)));
+                return selfModelBasedAction;
+            }
+        }
+    }
+    
+    // 5. Fallback to basic motor neuron selection
+    MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // Apply curiosity-based exploration
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        decoded = selectWithCuriosity(decoded);
+    }
+    
+    return decoded;
 }
 
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+MotorCommand AgentBrain::mapConceptsToActions(const std::vector<float>& concepts) {
+    // Map learned concepts to motor actions
+    // This is a simplified implementation - in a full system this would be learned
+    
+    if (concepts.empty()) return MotorCommand::Wait;
+    
+    // Example concept-to-action mapping (would be learned in real system)
+    // Concept 0-3: movement patterns
+    // Concept 4-7: interaction patterns
+    // Concept 8-11: exploration patterns
+    
+    float highestConcept = 0.0f;
+    for (float concept : concepts) {
+        if (concept > highestConcept) {
+            highestConcept = concept;
+        }
+    }
+    
+    // Map based on highest concept
+    if (highestConcept < 0.25f) {
+        return MotorCommand::Wait;  // Do nothing
+    } else if (highestConcept < 0.5f) {
+        return MotorCommand::MoveForward;  // Basic movement
+    } else if (highestConcept < 0.75f) {
+        return MotorCommand::Interact;  // Interaction
+    } else {
+        return MotorCommand::MoveForward;  // Strong movement
+    }
+}
+
+MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    // Exploration: occasionally choose random action when curiosity is high
+    if (curiosityLevel_ > 0.5f) {
+        // Higher curiosity = more exploration
+        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            // Random motor command
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            switch (choice) {
+                case 0: return MotorCommand::MoveForward;
+                case 1: return MotorCommand::MoveBackward;
+                case 2: return MotorCommand::TurnLeft;
+                case 3: return MotorCommand::TurnRight;
+                case 4: return MotorCommand::LookLeft;
+                case 5: return MotorCommand::LookRight;
+                case 6: return MotorCommand::Interact;
+                default: return MotorCommand::Wait;
+            }
+        }
+    }
+    
+    return defaultCmd;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -149,19 +281,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
-    
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
-    }
-    
-    return decoded;
-}
-
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
@@ -207,32 +326,6 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     return best;
-}
-
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
-    }
-    
-    return defaultCmd;
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

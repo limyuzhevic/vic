@@ -11,7 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -35,6 +35,9 @@ struct Brain::Impl {
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
+    std::unique_ptr<ActionConsequencePredictor> actionConsequencePredictor;
+    std::unique_ptr<PredictionErrorSignal> predictionErrorSignal;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -113,13 +116,19 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+        // Initialize prediction system components
         predictionSystem = std::make_unique<PredictionSystem>();
+        neuralPrediction = std::make_unique<NeuralPrediction>();
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        // Initialize neural prediction with brain reference
+        neuralPrediction->initialize(this);
+        
+        // Initialize action consequence predictor
+        actionConsequencePredictor = std::make_unique<ActionConsequencePredictor>();
+        actionConsequencePredictor->initialize(this);
+        
+        // Initialize prediction error signal
+        predictionErrorSignal = std::make_unique<PredictionErrorSignal>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -511,8 +520,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate with sensory input - convert sensory observations to prediction targets
+        // First, collect current sensory state for prediction
+        std::vector<float> currentSensoryState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = neuron->getState().membranePotential;
+            currentSensoryState.push_back(activation);
+        }
+        
+        // Update neural prediction with current sensory state
+        if (pImpl->neuralPrediction) {
+            pImpl->neuralPrediction->recordSensoryState(currentSensoryState, currentStep);
+        }
+        
+        // Generate prediction for next state using neural prediction system
+        std::vector<float> predictedState;
+        if (pImpl->neuralPrediction) {
+            predictedState = pImpl->neuralPrediction->generatePrediction(currentStep);
+        }
+        
+        // Get current action type for action-consequence learning
+        ActionType currentAction = ActionType::Wait;
+        if (pImpl->actionConsequencePredictor) {
+            pImpl->actionConsequencePredictor->recordAction(currentAction, currentStep);
+        }
+        
+        // Compute prediction error using prediction error signal
+        if (pImpl->predictionErrorSignal) {
+            float predictionError = pImpl->predictionErrorSignal->computeError(predictedState, currentSensoryState);
+            pImpl->predictionErrorSignal->recordError(predictionError, currentStep);
+            
+            // Use prediction error for neuromodulation
+            if (pImpl->dopamine) {
+                float modulation = pImpl->predictionErrorSignal->getModulationSignal();
+                pImpl->dopamine->setPredictionError(modulation);
+            }
+        }
+        
+        // Update neural prediction with actual observation
+        if (pImpl->neuralPrediction) {
+            pImpl->neuralPrediction->updateWithObservation(currentSensoryState, currentStep);
+        }
+        
+        // Update action-consequence predictor with actual outcome
+        if (pImpl->actionConsequencePredictor) {
+            pImpl->actionConsequencePredictor->updatePrediction(currentAction, predictedState, currentSensoryState, 1.0f - predictionError);
+        }
+        
+        // Apply prediction error to working memory
+        if (pImpl->workingMemory && pImpl->predictionErrorSignal) {
+            float error = pImpl->predictionErrorSignal->getModulationSignal();
+            if (error > 0.5f) {  // Only update for significant errors
+                pImpl->workingMemory->strengthenMemory(error);
+            }
+        }
+        
+        // Collect prediction system statistics
+        if (pImpl->neuralPrediction) {
+            pImpl->neuralPrediction->setPredictionConfidence(pImpl->predictionErrorSignal ? pImpl->predictionErrorSignal->getModulationSignal() : 0.5f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -550,7 +616,305 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Get current developmental stage
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        
+        // ========== NEURAL DEVELOPMENT ==========
+        
+        // Update neural excitability based on developmental stage
+        float neuralExcitabilityMod = 1.0f;
+        float neuralThresholdMod = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                // High excitability, low thresholds - easily activated
+                neuralExcitabilityMod = 1.2f;
+                neuralThresholdMod = 0.8f;
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                // Optimizing input sensitivity
+                neuralExcitabilityMod = 1.0f;
+                neuralThresholdMod = 0.9f;
+                break;
+            case DevelopmentalStage::Maturation:
+                // Fine-tuning - balanced reactivity
+                neuralExcitabilityMod = 0.9f;
+                neuralThresholdMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                // Stable, efficient processing
+                neuralExcitabilityMod = 0.8f;
+                neuralThresholdMod = 1.1f;
+                break;
+        }
+        
+        // Apply neural development effects
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Adjust neural excitability
+                    neuron->setMembranePotential(
+                        neuron->getMembranePotential() * neuralExcitabilityMod
+                    );
+                    
+                    // Adjust threshold sensitivity
+                    auto& state = neuron->getState();
+                    state.threshold *= neuralThresholdMod;
+                }
+            }
+        }
+        
+        // ========== PLASTICITY DEVELOPMENT ==========
+        
+        // Development affects plasticity rule parameters
+        float plasticitySensitivityMod = 1.0f;
+        float plasticityStabilityMod = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                // High learning capacity, rapid changes
+                plasticitySensitivityMod = 1.5f;
+                plasticityStabilityMod = 0.7f;
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                // Sensitive to important inputs
+                plasticitySensitivityMod = 1.2f;
+                plasticityStabilityMod = 0.8f;
+                break;
+            case DevelopmentalStage::Maturation:
+                // Refining connections
+                plasticitySensitivityMod = 1.0f;
+                plasticityStabilityMod = 0.9f;
+                break;
+            case DevelopmentalStage::Adult:
+                // Stable, refined connections
+                plasticitySensitivityMod = 0.7f;
+                plasticityStabilityMod = 1.0f;
+                break;
+        }
+        
+        // Apply plasticity development effects
+        if (pImpl->stdp) {
+            // Enhance or reduce STDP learning rates
+            float currentLtp = pImpl->stdp->getLTPWeight();
+            float currentLtd = pImpl->stdp->getLTDWeight();
+            pImpl->stdp->configure(
+                currentLtp * plasticitySensitivityMod,
+                currentLtd * plasticityStabilityMod,
+                pImpl->stdp->getTau()
+            );
+        }
+        
+        if (pImpl->hebbian) {
+            // Enhance or reduce Hebbian learning
+            float currentHebbianRate = pImpl->hebbian->getLearningRate();
+            pImpl->hebbian->configure(currentHebbianRate * plasticitySensitivityMod);
+        }
+        
+        // ========== MEMORY DEVELOPMENT ==========
+        
+        // Development enhances memory systems
+        if (pImpl->workingMemory) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Building memory capacity
+                    pImpl->workingMemory->setCapacity(pImpl->workingMemory->getCapacity() * 1.1f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Strengthening important memories
+                    pImpl->workingMemory->setDecayRate(0.95f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Improving memory efficiency
+                    pImpl->workingMemory->setDecayRate(0.97f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Stable memory performance
+                    pImpl->workingMemory->setDecayRate(0.98f);
+                    break;
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Development affects episodic memory consolidation
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Storing experiences rapidly
+                    pImpl->episodicMemory->setMaxEpisodes(pImpl->episodicMemory->getMaxEpisodes() * 1.2f);
+                    pImpl->episodicMemory->setReplayFrequency(0.1f);  // More frequent replay
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Selecting important memories
+                    pImpl->episodicMemory->setReplayFrequency(0.05f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Efficient replay and consolidation
+                    pImpl->episodicMemory->setReplayFrequency(0.03f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Stable replay patterns
+                    pImpl->episodicMemory->setReplayFrequency(0.02f);
+                    break;
+            }
+        }
+        
+        // ========== ATTENTION DEVELOPMENT ==========
+        
+        // Development improves attentional mechanisms
+        if (pImpl->attention) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Broad attention, processing many inputs
+                    pImpl->attention->setInhibitionStrength(0.3f);
+                    pImpl->attention->setExcitationStrength(2.0f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Starting to filter inputs
+                    pImpl->attention->setInhibitionStrength(0.5f);
+                    pImpl->attention->setExcitationStrength(1.5f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Improving focus
+                    pImpl->attention->setInhibitionStrength(0.7f);
+                    pImpl->attention->setExcitationStrength(1.2f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Refined attention
+                    pImpl->attention->setInhibitionStrength(0.8f);
+                    pImpl->attention->setExcitationStrength(1.0f);
+                    break;
+            }
+        }
+        
+        // ========== NEUROMODULATION DEVELOPMENT ==========
+        
+        // Development affects neuromodulator levels and effects
+        if (pImpl->dopamine) {
+            // Dopamine affects reward learning and motivation
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Building reward sensitivity
+                    pImpl->dopamine->setLevel(0.6f);
+                    pImpl->dopamine->setPlasticityFactor(1.2f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Refining reward associations
+                    pImpl->dopamine->setLevel(0.7f);
+                    pImpl->dopamine->setPlasticityFactor(1.1f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Optimized reward learning
+                    pImpl->dopamine->setLevel(0.8f);
+                    pImpl->dopamine->setPlasticityFactor(1.0f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Stable reward processing
+                    pImpl->dopamine->setLevel(0.9f);
+                    pImpl->dopamine->setPlasticityFactor(0.9f);
+                    break;
+            }
+        }
+        
+        if (pImpl->novelty) {
+            // Novelty detection changes with development
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Exploring more, detecting more novelty
+                    pImpl->novelty->setSensitivity(1.2f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Balancing exploration and exploitation
+                    pImpl->novelty->setSensitivity(1.0f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Focused learning
+                    pImpl->novelty->setSensitivity(0.8f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Stable novelty response
+                    pImpl->novelty->setSensitivity(0.7f);
+                    break;
+            }
+        }
+        
+        // ========== PREDICTION DEVELOPMENT ==========
+        
+        // Development enhances prediction system
+        if (pImpl->predictionErrorSignal) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Building predictive capabilities
+                    pImpl->predictionErrorSignal->setPredictionHorizon(10);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Refining predictions
+                    pImpl->predictionErrorSignal->setPredictionHorizon(15);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Optimized predictions
+                    pImpl->predictionErrorSignal->setPredictionHorizon(20);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Stable prediction accuracy
+                    pImpl->predictionErrorSignal->setPredictionHorizon(25);
+                    break;
+            }
+        }
+        
+        // ========== COGNITION DEVELOPMENT ==========
+        
+        // Development improves cognitive functions
+        if (pImpl->planner) {
+            // Planning capabilities develop over time
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Basic action sequences
+                    pImpl->planner->setPlanningDepth(2);
+                    pImpl->planner->setActionSelectionHeuristic(0.6f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Intermediate complexity
+                    pImpl->planner->setPlanningDepth(3);
+                    pImpl->planner->setActionSelectionHeuristic(0.7f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Sophisticated planning
+                    pImpl->planner->setPlanningDepth(4);
+                    pImpl->planner->setActionSelectionHeuristic(0.8f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Expert planning
+                    pImpl->planner->setPlanningDepth(5);
+                    pImpl->planner->setActionSelectionHeuristic(0.9f);
+                    break;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            // Concept formation improves with development
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // Basic pattern recognition
+                    pImpl->conceptFormation->setPatternThreshold(0.5f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // More sophisticated patterns
+                    pImpl->conceptFormation->setPatternThreshold(0.4f);
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Abstract concept formation
+                    pImpl->conceptFormation->setPatternThreshold(0.3f);
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Expert-level abstraction
+                    pImpl->conceptFormation->setPatternThreshold(0.2f);
+                    break;
+            }
+        }
+        
+        // ========== STRUCTURAL PLASTICITY DEVELOPMENT ==========
+        
+        // Development affects structural connectivity
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -558,7 +922,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    plasticityMod = 1.0f;  // High synaptogenesis
                     break;
                 case DevelopmentalStage::CriticalPeriod:
                     plasticityMod = 0.8f;
@@ -567,7 +931,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     plasticityMod = 0.5f;
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    plasticityMod = 0.2f;  // Stable connectivity
                     break;
             }
             
@@ -757,6 +1121,11 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset prediction systems
+    if (pImpl->predictionSystem) pImpl->predictionSystem->clearHistory();
+    if (pImpl->neuralPrediction) pImpl->neuralPrediction->clearHistory();
+    if (pImpl->actionConsequencePredictor) pImpl->actionConsequencePredictor->clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1069,12 +1438,16 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+ActionConsequencePredictor* Brain::getActionConsequencePredictor() {
+    return pImpl->actionConsequencePredictor.get();
+}
+
+PredictionErrorSignal* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionErrorSignal.get();
 }
 
 void Brain::logStatus() const {
@@ -1097,13 +1470,17 @@ void Brain::logStatus() const {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
-    }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
+}
+
+ActionConsequencePredictor* Brain::getActionConsequencePredictor() {
+    return pImpl->actionConsequencePredictor.get();
+}
+
+PredictionErrorSignal* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionErrorSignal.get();
+}
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
