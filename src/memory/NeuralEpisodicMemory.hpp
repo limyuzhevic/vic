@@ -67,10 +67,14 @@ public:
     void initialize(Brain* brain);
 
     // Store a new experience
-    // The experience is encoded as neural activity and can influence future processing
+        // The experience is encoded as neural activity and can influence future processing
     void storeEpisode(const EpisodicMemoryItem& episode);
-
-    // Retrieve episodes similar to a query pattern
+    
+    // Set maximum number of episodes to store
+    void setMaxEpisodes(size_t max) { maxEpisodes_ = max; }
+    
+    // Get maximum number of episodes
+    size_t getMaxEpisodes() const { return maxEpisodes_; }
     // Returns episodes ordered by relevance
     std::vector<const EpisodicMemoryItem*> retrieveSimilar(const std::vector<float>& sensoryPattern,
                                                            size_t maxResults = 5) const;

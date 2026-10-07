@@ -447,33 +447,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        for (auto& synPtr : region->getSynapses()) {
             // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            if (synPtr->getPlasticityFlags().stdp) {
+                const auto& preSpikes = synPtr->getPreSpikeHistory();
+                const auto& postSpikes = synPtr->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
+                    pImpl->stdp->update(synPtr.get(), preSpikes, postSpikes, pImpl->timestep);
+                    float weight = synPtr->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    synPtr->setWeight(weight);
                 }
             }
             
             // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            if (synPtr->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = synPtr->getPreSpikeHistory();
+                const auto& postSpikes = synPtr->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->hebbian->update(synPtr.get(), preSpikes, postSpikes, pImpl->timestep);
                 }
             }
             
             // Update synapse state
-            syn->step(currentTime);
+            synPtr->step(currentTime);
         }
     }
     
@@ -813,13 +813,13 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            for (const auto& synPtr : region->getSynapses()) {
+                synapseData.sourceNeuron.push_back(synPtr->getSourceNeuron().index());
+                synapseData.destinationNeuron.push_back(synPtr->getDestinationNeuron().index());
+                synapseData.weight.push_back(synPtr->getWeight());
+                synapseData.delay.push_back(synPtr->getDelay());
+                synapseData.synapseType.push_back(static_cast<uint8_t>(synPtr->getType()));
+                synapseData.eligibilityTrace.push_back(synPtr->getEligibilityTrace());
             }
         }
         

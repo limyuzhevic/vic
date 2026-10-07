@@ -54,6 +54,7 @@
 #include "../experiments/Metrics.hpp"
 #include "../experiments/AblationSystem.hpp"
 #include "../experiments/ScalingBenchmark.hpp"
+#include "Brain.hpp"
 #include <vector>
 #include <string>
 #include <memory>

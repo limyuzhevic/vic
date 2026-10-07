@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
+#include "../core/Random/Random.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "Brain.hpp"
 
 namespace nlm {
 
@@ -13,15 +14,15 @@ public:
     ~Novelty();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
     // Get novelty level
     float getLevel() const;
     void setLevel(float level);
     
     // Detect novelty from observation
-    void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
+    void detectNovelty(const Observation& observation, 
+                       const Observation& previousObservation);
     
     // Detect novelty from sensory input pattern
     void detectNovelty(const std::vector<float>& currentPattern,
@@ -36,7 +37,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

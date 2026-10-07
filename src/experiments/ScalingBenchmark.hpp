@@ -38,6 +38,7 @@
 #include <chrono>
 #include <optional>
 #include <filesystem>
+#include "Brain.hpp"
 
 namespace nlm {
 

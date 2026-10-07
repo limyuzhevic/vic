@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "Brain.hpp"
 
 namespace nlm {
 

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
 
@@ -19,6 +21,10 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Increment operators for iterators
+    NeuronId& operator++() { ++value; return *this; }
+    NeuronId operator++(int) { NeuronId temp = *this; ++value; return temp; }
 };
 
 // Synapse identifier
@@ -33,6 +39,10 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Increment operators for iterators
+    SynapseId& operator++() { ++value; return *this; }
+    SynapseId operator++(int) { SynapseId temp = *this; ++value; return temp; }
 };
 
 // Region identifier
@@ -47,6 +57,10 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Increment operators for iterators
+    RegionId& operator++() { ++value; return *this; }
+    RegionId operator++(int) { RegionId temp = *this; ++value; return temp; }
 };
 
 // Population identifier
@@ -182,11 +196,38 @@ enum class FiringState : uint8_t {
 // Generic handle types for efficiency
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
-
 // Invalid ID sentinel
+
 constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+// Hash function specializations for use with std::unordered_map
+namespace std {
+    template<> struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<> struct hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<> struct hash<nlm::RegionId> {
+        size_t operator()(const nlm::RegionId& id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<> struct hash<nlm::PopulationId> {
+        size_t operator()(const nlm::PopulationId& id) const {
+            return hash<uint64_t>{}(id.value);
+        }
+    };
+}
