@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "JSONParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -19,40 +21,35 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Check file extension for format
+        std::string ext = "." + std::filesystem::path(filepath).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        
+        JSONValue jsonData;
+        
+        if (ext == ".json") {
+            jsonData = JSONParser::parseFile(filepath);
+        } else if (ext == ".yaml" || ext == ".yml") {
+            jsonData = JSONParser::parseYAMLFile(filepath);
+        } else {
+            // Default to JSON format
+            jsonData = JSONParser::parseFile(filepath);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        // Convert JSON to Config entries
+        JSONParser::convertToConfig(jsonData, pImpl->entries);
+        
+        // Validate configuration
+        JSONParser::validateConfig(pImpl->entries);
+        
+        NLM_LOG_INFO("Configuration loaded from " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to load configuration from " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,14 +78,65 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Generate JSON configuration
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Convert ConfigValue to JSON representation
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << "\"" << arg[j] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "null";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
     
+    file << "}\n";
+    NLM_LOG_INFO("Configuration saved to " + filepath);
     return true;
 }
 
@@ -200,16 +248,16 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// template std::optional<int> Config::get<int>(const std::string&) const;
+// template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+// template std::optional<double> Config::get<double>(const std::string&) const;
+// template std::optional<bool> Config::get<bool>(const std::string&) const;
+// template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// template int Config::getOr<int>(const std::string&, const int&) const;
+// template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+// template double Config::getOr<double>(const std::string&, const double&) const;
+// template bool Config::getOr<bool>(const std::string&, const bool&) const;
+// template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
