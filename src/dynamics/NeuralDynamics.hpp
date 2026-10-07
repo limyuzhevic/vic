@@ -47,6 +47,9 @@ public:
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
     
+    void setMembraneResistance(float R);
+    float getMembraneResistance() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

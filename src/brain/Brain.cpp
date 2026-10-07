@@ -511,8 +511,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system uses sensory observations to predict future states
+        // This implements predictive coding in the brain
+        
+        // Create a sensory input from the current neural state for prediction
+        // In a real implementation, this would use the sensory neurons' activity
+        // For now, we can use a placeholder or the last known sensory observation
+        
+        // Get current prediction error from the prediction system
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to neuromodulation for learning
+        // Prediction error is a powerful learning signal that helps the brain
+        // update its internal models and adjust behavior
+        if (predictionError > 0.0f) {
+            // High prediction error indicates the brain's model is wrong
+            // Apply neuromodulation to increase learning rate
+            float learningMod = 1.0f + predictionError * 2.0f; // Boost learning by up to 200%
+            
+            // Scale dopamine and other neuromodulators by prediction error
+            if (pImpl->dopamine) {
+                // Dopamine encodes prediction error in reinforcement learning
+                // Higher prediction error = more dopamine = more learning
+                float currentDopamine = pImpl->dopamine->getLevel();
+                float modulatedDopamine = currentDopamine * learningMod;
+                pImpl->dopamine->setLevel(modulatedDopamine);
+            }
+            
+            if (pImpl->curiosity) {
+                // Curiosity modulates exploration based on prediction error
+                // Higher prediction error = more curiosity-driven exploration
+                pImpl->curiosity->setCuriosityLevel(1.0f + predictionError * 0.5f);
+            }
+        }
+        
+        // Also update prediction system with neural activity patterns
+        // This helps the system learn temporal sequences and patterns
+        // We can use working memory or other neural activity summaries
+        SensoryInput neuralActivityInput = createSensoryInputFromNeurons();
+        pImpl->predictionSystem->train(neuralActivityInput);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +565,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This implements concept learning and abstraction from neural patterns
+        
+        // Convert current neural activity to a pattern for concept formation
+        std::vector<float> currentPattern;
+        currentPattern.reserve(1000); // Reserve space for typical pattern size
+        
+        // Sample neural activity from key brain regions
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                // Get average firing rate of each population as a feature
+                float avgActivity = pop->getAverageActivity();
+                currentPattern.push_back(avgActivity);
+            }
+        }
+        
+        // Get concept ID for current neural pattern
+        // This learns if this pattern belongs to an existing concept,
+        // or represents something novel worth forming a new concept
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern,
+            currentPattern, // Use pattern as features for now
+            0.0f, // Neutral reward for concept formation
+            currentStep
+        );
+        
+        // Apply concept information to influence other systems
+        if (conceptId > 0) {
+            // Get the concept prototype for influence
+            auto conceptPrototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+            
+            if (pImpl->attention) {
+                // Concepts influence attention - they bias what sensory input matters
+                pImpl->attention->setConceptInfluences(conceptPrototype);
+            }
+            
+            if (pImpl->predictionSystem) {
+                // Concepts influence prediction - they provide top-down expectations
+                pImpl->predictionSystem->setConceptExpectations(conceptPrototype);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

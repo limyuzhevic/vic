@@ -26,6 +26,15 @@ public:
     // TODO PHASE 2: Implement real reward computation
     float computeReward(const class Observation& observation) const;
     
+    // Apply reward from observation (computes and accumulates)
+    void applyObservation(const class Observation& observation);
+    
+    // Reward statistics
+    float getAverageReward() const;
+    float getMaxReward() const;
+    float getMinReward() const;
+    bool isGoodOutcome(float threshold) const;
+    
     // Reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();

@@ -92,6 +92,8 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+// Template method implementations
+
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),

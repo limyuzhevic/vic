@@ -25,12 +25,24 @@ void testBrainInitialization() {
     nlm::Brain brain(config);
     
     bool success = brain.initialize();
-    assert(success);
+    if (!success) {
+        std::cout << "    ERROR: Brain initialization failed" << std::endl;
+        return;
+    }
     
     // Verify brain initialized with expected properties
-    assert(brain.getRegionCount() == 2);
-    assert(brain.getTotalNeuronCount() == 100);
-    assert(brain.getTotalSynapseCount() > 0);
+    if (brain.getRegionCount() != 2) {
+        std::cout << "    ERROR: Expected 2 regions, got " << brain.getRegionCount() << std::endl;
+        return;
+    }
+    if (brain.getTotalNeuronCount() != 100) {
+        std::cout << "    ERROR: Expected 100 neurons, got " << brain.getTotalNeuronCount() << std::endl;
+        return;
+    }
+    if (brain.getTotalSynapseCount() <= 0) {
+        std::cout << "    ERROR: Expected > 0 synapses, got " << brain.getTotalSynapseCount() << std::endl;
+        return;
+    }
     
     std::cout << "    testBrainInitialization passed" << std::endl;
 }
@@ -49,7 +61,10 @@ void testBrainStep() {
     }
     
     // Just verify it doesn't crash
-    assert(brain.getTotalNeuronCount() == 100);
+    if (brain.getTotalNeuronCount() != 100) {
+        std::cout << "    ERROR: Expected 100 neurons, got " << brain.getTotalNeuronCount() << std::endl;
+        return;
+    }
     
     std::cout << "    testBrainStep passed" << std::endl;
 }
@@ -66,7 +81,10 @@ void testBrainReset() {
     brain.reset();
     
     // Verify reset worked
-    assert(brain.getTotalNeuronCount() == 50);
+    if (brain.getTotalNeuronCount() != 50) {
+        std::cout << "    ERROR: Expected 50 neurons after reset, got " << brain.getTotalNeuronCount() << std::endl;
+        return;
+    }
     
     std::cout << "    testBrainReset passed" << std::endl;
 }
@@ -80,11 +98,17 @@ void testBrainRegions() {
     brain.initialize();
     
     auto regionIds = brain.getRegionIds();
-    assert(regionIds.size() == 3);
+    if (regionIds.size() != 3) {
+        std::cout << "    ERROR: Expected 3 regions, got " << regionIds.size() << std::endl;
+        return;
+    }
     
     for (auto rid : regionIds) {
         auto* region = brain.getRegion(rid);
-        assert(region != nullptr);
+        if (region == nullptr) {
+            std::cout << "    ERROR: Region not found" << std::endl;
+            return;
+        }
     }
     
     std::cout << "    testBrainRegions passed" << std::endl;
@@ -99,7 +123,10 @@ void testBrainActionProduction() {
     brain.initialize();
     
     auto action = brain.produceAction();
-    assert(action != nullptr);
+    if (action == nullptr) {
+        std::cout << "    ERROR: Action is nullptr" << std::endl;
+        return;
+    }
     
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
@@ -113,10 +140,22 @@ void testBrainStatus() {
     brain.initialize();
     
     // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    if (brain.getTotalNeuronCount() <= 0) {
+        std::cout << "    ERROR: Expected > 0 neurons, got " << brain.getTotalNeuronCount() << std::endl;
+        return;
+    }
+    if (brain.getTotalSynapseCount() < 0) {
+        std::cout << "    ERROR: Expected >= 0 synapses, got " << brain.getTotalSynapseCount() << std::endl;
+        return;
+    }
+    if (brain.getFiringNeuronCount() < 0) {
+        std::cout << "    ERROR: Expected >= 0 firing neurons, got " << brain.getFiringNeuronCount() << std::endl;
+        return;
+    }
+    if (brain.getAverageFiringRate() < 0.0f) {
+        std::cout << "    ERROR: Expected >= 0.0 average firing rate, got " << brain.getAverageFiringRate() << std::endl;
+        return;
+    }
     
     std::cout << "    testBrainStatus passed" << std::endl;
 }

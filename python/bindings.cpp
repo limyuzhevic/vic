@@ -6,15 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Reward.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -145,21 +137,183 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             R"pbdoc(Load configuration from a file. Supports JSON (.json), YAML (.yaml/.yml), and simple key=value formats.
+             
+             Args:
+                 filepath: Path to the configuration file
+                 
+             Returns:
+                 True if successful, False otherwise
+                 
+             Raises:
+                 py::error_already_set() if file format is not supported or file cannot be parsed
+             )pbdoc")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+           R"pbdoc(Load configuration from command line arguments.
+           
+           Args:
+               argc: Argument count
+               argv: Argument values
+               
+           Returns:
+               True if successful, False otherwise
+           )pbdoc")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             R"pbdoc(Save configuration to a file. Automatically determines format from file extension.
+             
+             Args:
+                 filepath: Path to save the configuration
+                 
+             Returns:
+                 True if successful, False otherwise
+             )pbdoc")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             R"pbdoc(Check if a configuration key exists.
+             
+             Args:
+                 key: Configuration key to check
+                 
+             Returns:
+                 True if key exists, False otherwise
+             )pbdoc")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             R"pbdoc(Get all configuration keys.
+             
+             Returns:
+                 List of all configuration keys
+             )pbdoc")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) {
+                return val.value();
+            }
+            return std::string(); // Return empty string for missing values
+        }, py::arg("key"),
+             R"pbdoc(Get a configuration value as string.
+             
+             Args:
+                 key: Configuration key
+                 
+             Returns:
+                 String value, or empty string if key doesn't exist or value cannot be converted to string
+             )pbdoc")
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto val = self.get<int64_t>(key);
+            if (val.has_value()) {
+                return val.value();
+            }
+            return int64_t(0); // Return 0 for missing values
+        }, py::arg("key"),
+             R"pbdoc(Get a configuration value as integer.
+             
+             Args:
+                 key: Configuration key
+                 
+             Returns:
+                 Integer value, or 0 if key doesn't exist or value cannot be converted to integer
+             )pbdoc")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val.has_value()) {
+                return val.value();
+            }
+            return 0.0; // Return 0.0 for missing values
+        }, py::arg("key"),
+             R"pbdoc(Get a configuration value as float.
+             
+             Args:
+                 key: Configuration key
+                 
+             Returns:
+                 Float value, or 0.0 if key doesn't exist or value cannot be converted to float
+             )pbdoc")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val.has_value()) {
+                return val.value();
+            }
+            return false; // Return false for missing values
+        }, py::arg("key"),
+             R"pbdoc(Get a configuration value as boolean.
+             
+             Args:
+                 key: Configuration key
+                 
+             Returns:
+                 Boolean value, or false if key doesn't exist or value cannot be converted to boolean
+             )pbdoc")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             R"pbdoc(Set a configuration value.
+             
+             Args:
+                 key: Configuration key
+                 value: Value to set (string, int, float, or bool)
+             )pbdoc")
+        .def("remove", &Config::remove, py::arg("key"),
+             R"pbdoc(Remove a configuration key.
+             
+             Args:
+                 key: Configuration key to remove
+             )pbdoc")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             R"pbdoc(Clear all configuration entries.
+             )pbdoc")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             R"pbdoc(Get a summary string of the configuration.
+             
+             Returns:
+                 Summary string with all configuration entries
+             )pbdoc")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get a configuration value with default fallback.
+             
+             Args:
+                 key: Configuration key
+                 defaultValue: Default value if key doesn't exist
+                 
+             Returns:
+                 Configuration value or default if key doesn't exist
+             )pbdoc")
+        .def("getOrInt", [](Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get a configuration value as integer with default fallback.
+             
+             Args:
+                 key: Configuration key
+                 defaultValue: Default value if key doesn't exist
+                 
+             Returns:
+                 Integer value or default if key doesn't exist
+             )pbdoc")
+        .def("getOrFloat", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get a configuration value as float with default fallback.
+             
+             Args:
+                 key: Configuration key
+                 defaultValue: Default value if key doesn't exist
+                 
+             Returns:
+                 Float value or default if key doesn't exist
+             )pbdoc")
+        .def("getOrBool", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get a configuration value as boolean with default fallback.
+             
+             Args:
+                 key: Configuration key
+                 defaultValue: Default value if key doesn't exist
+                 
+             Returns:
+                 Boolean value or default if key doesn't exist
+             )pbdoc")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -183,15 +337,88 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getHeight", &Vision::getHeight)
         .def("getChannels", &Vision::getChannels);
 
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+    py::class_<Reward>(m, "Reward", R"pbdoc(Reward signal for reinforcement learning)pbdoc")
         .def(py::init<>())
-        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getValue", &Reward::getValue,
+             R"pbdoc(Get current reward value.
+             
+             Returns:
+                 Current reward value
+             )pbdoc")
+        .def("setValue", &Reward::setValue, py::arg("value"),
+             R"pbdoc(Set current reward value.
+             
+             Args:
+                 value: New reward value
+             )pbdoc")
+        .def("add", &Reward::add, py::arg("delta"),
+             R"pbdoc(Add to current reward value.
+             
+             Args:
+                 delta: Amount to add to current reward
+             )pbdoc")
+        .def("reset", &Reward::reset,
+             R"pbdoc(Reset accumulated reward to zero.
+             )pbdoc")
+        .def("applyObservation", &Reward::applyObservation, py::arg("observation"),
+             R"pbdoc(Apply reward from observation (computes and accumulates).
+             
+             Args:
+                 observation: Environment observation to compute reward from
+                 
+             Returns:
+                 Computed reward value
+             )pbdoc")
+        .def("computeReward", [](const Reward& self, const Observation& observation) {
+            return self.computeReward(observation);
+        }, py::arg("observation"),
+             R"pbdoc(Compute reward from observation (does not accumulate).
+             
+             Args:
+                 observation: Environment observation to compute reward from
+                 
+             Returns:
+                 Computed reward value
+             )pbdoc")
+        .def("getAverageReward", &Reward::getAverageReward,
+             R"pbdoc(Get average reward from history.
+             
+             Returns:
+                 Average reward value, or 0.0 if no history
+             )pbdoc")
+        .def("getMaxReward", &Reward::getMaxReward,
+             R"pbdoc(Get maximum reward from history.
+             
+             Returns:
+                 Maximum reward value, or 0.0 if no history
+             )pbdoc")
+        .def("getMinReward", &Reward::getMinReward,
+             R"pbdoc(Get minimum reward from history.
+             
+             Returns:
+                 Minimum reward value, or 0.0 if no history
+             )pbdoc")
+        .def("isGoodOutcome", &Reward::isGoodOutcome, py::arg("threshold"),
+             R"pbdoc(Check if recent rewards indicate a good outcome.
+             
+             Args:
+                 threshold: Threshold for considering outcome good
+                 
+             Returns:
+                 True if average reward exceeds threshold, False otherwise
+             )pbdoc")
+        .def("getHistory", &Reward::getHistory,
+             R"pbdoc(Get reward history.
+             
+             Returns:
+                 List of recent reward values
+             )pbdoc")
+        .def("clearHistory", &Reward::clearHistory,
+             R"pbdoc(Clear reward history.
+             )pbdoc")
+        .def("__repr__", [](const Reward& r) {
+            return "<Reward: value=" + std::to_string(r.getValue()) + ", history_size=" + std::to_string(r.getHistory().size()) + ">";
+        });
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
