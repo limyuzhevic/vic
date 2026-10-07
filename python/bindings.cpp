@@ -144,22 +144,104 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            return self.loadFromFile(filepath, ConfigSource::File);
+        }, py::arg("filepath"), "Load configuration from a JSON file")
+        .def("loadFromJSON", [](Config& self, const std::string& json) {
+            return self.loadFromJSON(json, ConfigSource::File);
+        }, py::arg("json"), "Load configuration from a JSON string")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"), py::arg("pretty") = true,
              "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("has", &Config::has, py::arg("key"), "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys, "Get all configuration keys")
+        .def("getKeysCategory", [](Config& self, const std::string& category) {
+            return self.getKeys(category);
+        }, py::arg("category"), "Get configuration keys by category")
+        .def("getCategories", &Config::getCategories, "Get all configuration categories")
+        .def("getKeys", &Config::getKeys)
+        .def("get", [](const Config& self, const std::string& key) {
+            if constexpr (std::is_same_v<T, int>) {
+                auto val = self.get<int>(key);
+                return val.has_value() ? py::cast(val.value()) : py::none();
+            }
+            // For other types, return generic object
+            py::object result;
+            return result;
+        }, py::arg("key"))
+        .def("getOr", [](const Config& self, const std::string& key, const T& defaultValue) {
+            return self.getOr<T>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"))
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"))
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"))
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"))
+        .def("setNested", [](Config& self, const std::string& key, const std::string& value) {
+            self.setNested(key, value);
+        }, py::arg("key"), py::arg("value"), "Set nested configuration value")
+        .def("getNested", [](const Config& self, const std::string& key) {
+            return self.getNested(key);
+        }, py::arg("key"), "Get nested configuration value")
+        .def("getNestedFloat", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getNestedFloat(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get nested configuration as float")
+        .def("getNestedInt", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getNestedInt(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get nested configuration as int")
+        .def("getNestedBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getNestedBool(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get nested configuration as bool")
+        .def("remove", &Config::remove, py::arg("key"), "Remove configuration key")
+        .def("clear", &Config::clear, "Clear all configuration entries")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
+        .def("validate", &Config::validate, "Validate configuration")
+        .def("getStats", &Config::getStats, "Get configuration statistics")
+        .def("getStatisticsReport", &Config::getStatisticsReport, "Get detailed statistics report")
+        .def("toJSON", &Config::toJSON, "Convert configuration to JSON")
+        .def("toString", &Config::toString, "Convert configuration to string")
+        .def("clone", &Config::clone, "Clone configuration")
+        .def("applyTemplate", [](Config& self, const std::string& name) {
+            return self.applyTemplate(name);
+        }, py::arg("name"), "Apply predefined configuration template")
+        .def("compare", [](const Config& self, const Config& other) {
+            ConfigComparison comparison = self.compare(other);
+            py::dict result;
+            result["differences"] = comparison.differences;
+            result["similarities"] = comparison.similarities;
+            return result;
+        }, py::arg("other"), "Compare with another configuration")
+        .def("merge", [](Config& self, const Config& other) {
+            self.merge(other);
+        }, py::arg("other"), "Merge with another configuration")
+        .def("subset", [](const Config& self, const std::vector<std::string>& keys) {
+            return self.subset(keys);
+        }, py::arg("keys"), "Get subset of configuration with specified keys")
+        .def("filter", [](const Config& self, const std::function<bool(const ConfigEntry&)>& predicate) {
+            return self.filter(predicate);
+        }, py::arg("predicate"), "Filter configuration by predicate")
+        .def("transform", [](const Config& self, const std::function<ConfigValue(const ConfigEntry&)>& transform) {
+            return self.transform(transform);
+        }, py::arg("transform"), "Transform configuration with function")
+        .def("createBackup", [](const Config& self, const std::string& name) {
+            return self.createBackup(name);
+        }, py::arg("name"), "Create backup of configuration")
+        .def("restoreBackup", [](Config& self, const std::string& name) {
+            return self.restoreBackup(name);
+        }, py::arg("name"), "Restore configuration from backup")
+        .def("getHistory", &Config::getHistory, "Get configuration history")
+        .def("addToHistory", &Config::addToHistory, "Add current configuration to history")
+        .def("getAvailableTemplates", &Config::getAvailableTemplates, "Get available configuration templates")
+        .def("getAllTemplates", &Config::getAllTemplates, "Get all configuration templates")
+        .def("getTemplate", [](const Config& self, const std::string& name) {
+            return self.getTemplate(name);
+        }, py::arg("name"), "Get configuration template by name")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -361,44 +443,99 @@ PYBIND11_MODULE(pynlm, m) {
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
+        .def("process_sensory_input", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain (alias: processSensoryInput)")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
+        .def("decode_motor_command", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command (alias: decodeMotorCommand)")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
+        .def("apply_reward_modulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation (alias: applyRewardModulation)")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
+        .def("update_development", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system (alias: updateDevelopment)")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
+        .def("get_developmental_stage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage (alias: getDevelopmentalStage)")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
+        .def("get_neuromodulation_level", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level (alias: getNeuromodulationLevel)")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
              "Get current neuromodulation level")
+        .def("get_curiosity_level", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level (alias: getCuriosityLevel)")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
+        .def("get_novelty_level", &AgentBrain::getNoveltyLevel,
+             "Get novelty level (alias: getNoveltyLevel)")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
+        .def("get_prediction_error", &AgentBrain::getPredictionError,
+             "Get prediction error (alias: getPredictionError)")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
+        .def("get_brain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain (alias: getBrain)")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        .def("enable_reward_modulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"),
+             "Enable/disable reward modulation (alias: enableRewardModulation)")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable/disable reward modulation")
+        .def("enable_structural_plasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"),
+             "Enable/disable structural plasticity (alias: enableStructuralPlasticity)")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable/disable structural plasticity")
+        .def("enable_development", &AgentBrain::enableDevelopment,
+             py::arg("enable"),
+             "Enable/disable development (alias: enableDevelopment)")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"),
+             "Enable/disable development")
+        .def("enable_curiosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"),
+             "Enable/disable curiosity (alias: enableCuriosity)")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"),
+             "Enable/disable curiosity")
+        .def("is_reward_modulation_enabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled (alias: isRewardModulationEnabled)")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("is_structural_plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled (alias: isStructuralPlasticityEnabled)")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("is_development_enabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled (alias: isDevelopmentEnabled)")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("is_curiosity_enabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled (alias: isCuriosityEnabled)")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        .def("__repr__", [](const AgentBrain& agent) {
+            return "<AgentBrain with underlying brain>";
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
