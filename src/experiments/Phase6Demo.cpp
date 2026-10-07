@@ -6,6 +6,7 @@
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/Phase6Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
@@ -54,11 +55,22 @@ int main(int argc, char* argv[]) {
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.setMaxSteps(2000);
+    config.setNeuronCount(500);
+    config.setEnableCheckpointing(true);
+    config.setEnableReplay(true);
+    config.setEnableDevelopment(true);
+    
+    // Create core config from Phase6Config
+    auto coreConfig = config.toCoreConfig();
+    
+    // Load from file if provided
+    if (argc > 1 && std::string(argv[1]) == "--config") {
+        if (argc > 2) {
+            config.loadFromFile(argv[2]);
+            coreConfig = config.toCoreConfig();
+        }
+    }
     
     auto result = experiment.run(config);
     

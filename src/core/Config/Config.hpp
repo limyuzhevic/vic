@@ -94,12 +94,17 @@ public:
     std::string summary() const;
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // JSON parsing
+    bool parseJSON(const std::string& jsonStr);
+    bool parseJSONObject(const std::string& jsonStr, size_t& pos);
+    bool parseArray(const std::string& jsonStr, size_t& pos, ConfigValue& outValue);
+    bool parseString(const std::string& jsonStr, size_t& pos, std::string& outValue);
+    bool parseNumber(const std::string& jsonStr, size_t& pos, ConfigValue& outValue);
+    bool parseNumberAsDouble(const std::string& jsonStr, size_t& pos, double& outValue);
+    bool parseBool(const std::string& jsonStr, size_t& pos, bool& outValue);
+    bool parseNull(const std::string& jsonStr, size_t& pos);
+    bool skipWhitespace(const std::string& jsonStr, size_t& pos);
+    std::string extractString(const std::string& jsonStr, size_t startPos, size_t& endPos);
 };
 
 } // namespace nlm

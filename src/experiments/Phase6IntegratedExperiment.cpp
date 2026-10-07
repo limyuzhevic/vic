@@ -6,6 +6,7 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include "Phase6Config.hpp"
 
 namespace nlm {
 
@@ -13,25 +14,18 @@ Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
-Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
+Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& phase6Config) {
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
-    NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
-                 std::to_string(config.maxSteps) + " steps");
+    NLM_LOG_INFO("Configuration: " + std::to_string(phase6Config.getNeuronCount()) + " neurons, " +
+                 std::to_string(phase6Config.getMaxSteps()) + " steps");
     
-    // Create configuration
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    // Create brain from Phase6Config
+    auto cfg = phase6Config.toCoreConfig();
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -49,8 +43,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
+    agent.enableStructuralPlasticity(phase6Config.getEnableDevelopment());
+    agent.enableDevelopment(phase6Config.getEnableDevelopment());
     agent.enableCuriosity(true);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
@@ -60,7 +54,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
+    for (uint64_t step = 0; step < phase6Config.getMaxSteps(); ++step) {
         // Get observation
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
@@ -84,7 +78,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         agent.applyRewardModulation(reward, 0.0f);
         
         // Update development
-        if (config.enableDevelopment) {
+        if (phase6Config.getEnableDevelopment()) {
             agent.updateDevelopment(0.001);
         }
         
@@ -103,8 +97,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    result.totalReward = totalReward / phase6Config.getMaxSteps();
+    result.avgFiringRate = totalFiringRate / phase6Config.getMaxSteps();
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
@@ -126,16 +120,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
-    if (config.enableCheckpointing) {
+    if (phase6Config.getEnableCheckpointing()) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
+        std::string checkpointPath = phase6Config.getCheckpointPath();
+        if (brain->save(checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
             brain2->initialize();
             
-            if (brain2->load(config.checkpointPath)) {
+            if (brain2->load(checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {
@@ -162,8 +157,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
-    // Create minimal brain
-    auto cfg = std::make_shared<Config>();
+    // Create minimal brain using Phase6Config
+    Phase6Config defaultConfig;
+    auto cfg = defaultConfig.toCoreConfig();
     cfg->set("neuron_count", 100);
     cfg->set("region_count", 1);
     
@@ -249,7 +245,8 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
-    auto cfg = std::make_shared<Config>();
+    Phase6Config defaultConfig;
+    auto cfg = defaultConfig.toCoreConfig();
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
@@ -289,7 +286,8 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
     
-    auto cfg = std::make_shared<Config>();
+    Phase6Config defaultConfig;
+    auto cfg = defaultConfig.toCoreConfig();
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
@@ -319,7 +317,8 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
 bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
-    auto cfg = std::make_shared<Config>();
+    Phase6Config defaultConfig;
+    auto cfg = defaultConfig.toCoreConfig();
     cfg->set("neuron_count", 100);
     
     // Create and initialize brain
@@ -366,7 +365,8 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
 bool Phase6IntegratedExperiment::testReplay() {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
-    auto cfg = std::make_shared<Config>();
+    Phase6Config defaultConfig;
+    auto cfg = defaultConfig.toCoreConfig();
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
