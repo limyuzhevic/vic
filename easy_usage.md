@@ -71,6 +71,100 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: With Learning and Memory
+
+```python
+import pynlm
+import time
+
+def run_advanced_simulation(steps=500):
+    """Advanced simulation with learning and memory systems."""
+    
+    # 1. Create configuration with custom settings
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 500)           # More neurons
+    config.set("brain.synapse_density", 0.15)      # More connections
+    config.set("random_seed", 12345)              # Reproducible results
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable advanced features
+    agent.enableRewardModulation(True)      # Learn from rewards
+    agent.enableCuriosity(True)             # Explore new things
+    agent.enableDevelopment(True)           # Brain matures over time
+    agent.enableStructuralPlasticity(True)  # Grow new connections
+    
+    # 7. Run simulation with learning
+    print(f"Starting advanced simulation for {steps} steps...")
+    start_time = time.time()
+    
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input (brain learns from experience)
+        agent.processSensoryInput(percept)
+        
+        # Brain processes and learns
+        brain.step(step)
+        
+        # Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # Apply action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Check for reward and learn
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+    
+    end_time = time.time()
+    print(f"\nSimulation completed in {end_time - start_time:.2f} seconds!")
+    
+    # Print final statistics
+    print(f"\nFinal Brain Statistics:")
+    print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Total synapses: {brain.getTotalSynapseCount()}")
+    print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+    print(f"  Final developmental stage: {brain.getDevelopmentalStage()}")
+    
+    return brain, agent, world
+
+# Run the advanced simulation
+if __name__ == "__main__":
+    brain, agent, world = run_advanced_simulation(500)
+```
+
 ---
 
 ## Simple Analogy
@@ -252,6 +346,69 @@ for step in range(100):
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
 print("Agent simulation complete!")
+```
+
+### Project 4: Custom Brain Configuration
+
+```python
+import pynlm
+
+# Create brain with custom configuration
+config = pynlm.createDefaultConfig()
+
+# Modify configuration parameters
+config.set("brain.neuron_count", 2000)           # More neurons
+config.set("brain.synapse_density", 0.2)        # Higher connectivity
+config.set("plasticity.stdp.enable", True)      # Enable STDP
+config.set("plasticity.hebbian.enable", True)   # Enable Hebbian learning
+config.set("random_seed", 42)                   # Reproducible results
+
+# Create brain with custom configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Custom brain created with:")
+print(f"  Neurons: {brain.getTotalNeuronCount()}")
+print(f"  Synapses: {brain.getTotalSynapseCount()}")
+print(f"  Configuration: {config.summary()}")
+```
+
+### Project 5: Learning Experiment
+
+```python
+import pynlm
+
+# Create brain for learning experiment
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Enable plasticity systems
+brain.getSTDP()->enable(true, true, false)  # STDP, Hebbian
+brain.getHebbian()->enable(true, true)      # Both forms of Hebbian learning
+
+print("Starting learning experiment...")
+print(f"Initial synapses: {brain.getTotalSynapseCount()}")
+print(f"Initial spike count: {brain.getTotalSpikeCount()}")
+
+# Run learning experiment with input patterns
+for step in range(500):
+    # Inject different input patterns at different times
+    if step % 50 == 0:
+        # Strong input to test response
+        brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 50.0f)
+    elif step % 100 == 0:
+        # Moderate input for maintenance
+        brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 30.0f)
+    
+    brain.step(step)
+    
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons, " +
+              f"{brain.getTotalSpikeCount()} total spikes")
+
+print(f"\nLearning experiment complete!")
+print(f"Final spike count: {brain.getTotalSpikeCount()}")
+print(f"Final average firing rate: {brain.getAverageFiringRate():.2f}")
 ```
 
 ---

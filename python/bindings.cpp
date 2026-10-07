@@ -160,6 +160,51 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Get configuration value - more complex with template
+        .def("get", [](const Config& self, const std::string& key) -> py::object {
+            // Try to get common types first
+            auto intVal = self.getOr<int>(key, std::nullopt);
+            if (intVal) return py::int_(*intVal);
+            
+            auto doubleVal = self.getOr<double>(key, std::nullopt);
+            if (doubleVal) return py::float(*doubleVal);
+            
+            auto stringVal = self.getOr<std::string>(key, std::nullopt);
+            if (stringVal) return py::str(*stringVal);
+            
+            auto boolVal = self.getOr<bool>(key, std::nullopt);
+            if (boolVal) return py::bool_(*boolVal);
+            
+            // If none match, return None
+            return py::none();
+        }, py::arg("key"), "Get configuration value by key")
+        // Set configuration value - helper function for common types
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value to int")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value to double")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value to bool")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"), "Set configuration value to string")
+        // Get-or convenience method
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value or return default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value or return default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value or return default")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value or return default")
+        .def("remove", &Config::remove, py::arg("key"), "Remove configuration key")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
