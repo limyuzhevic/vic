@@ -53,26 +53,6 @@ PYBIND11_MODULE(pynlm, m) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -416,10 +396,249 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.attr("INVALID_NEURON_ID") = INVALID_NEURON_ID.value;
+    m.attr("INVALID_SYNAPSE_ID") = INVALID_SYNAPSE_ID.value;
+    m.attr("INVALID_REGION_ID") = INVALID_REGION_ID.value;
+    m.attr("INVALID_POPULATION_ID") = INVALID_POPULATION_ID.value;
+
+    // Simulation utility functions
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, size_t numSteps, bool verbose = false) {
+        float totalReward = 0.0f;
+        for (size_t step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            auto action = brain->produceAction();
+            if (verbose) {
+                std::cout << "Step " << step << ": " 
+                          << brain->getFiringNeuronCount() << " firing neurons\n";
+            }
+        }
+        return totalReward;
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("verbose") = false,
+        "Run a simple simulation for the specified number of steps");
+
+    m.def("create_demo_brain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1000));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", uint64_t(42));
+        return std::make_shared<Brain>(config);
+    }, "Create a demo brain with standard configuration");
+
+    m.def("create_agent_world_simulation", [](size_t worldWidth = 20, size_t worldHeight = 20,
+                                                size_t visionWidth = 8, size_t visionHeight = 8) {
+        auto brain = create_demo_brain();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldWidth, worldHeight, visionWidth, visionHeight);
+        world->setRandomSeed(42);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("worldWidth") = 20, py::arg("worldHeight") = 20,
+        py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+        "Create a complete agent-world simulation setup");
+
+    // Configuration utilities
+    m.def("create_default_config_with_params", 
+        [](size_t neuronCount, size_t regionCount, float connectionProbability) {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(neuronCount));
+            config->set("region_count", static_cast<int64_t>(regionCount));
+            config->set("connection_probability", connectionProbability);
+            return config;
+        }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 1,
+        py::arg("connectionProbability") = 0.1f,
+        "Create a default configuration with custom parameters");
+
+    m.def("load_config_from_file", &Config::loadFromFile,
+        py::arg("filepath"), "Load configuration from a JSON file");
+
+    // Monitoring and statistics utilities
+    m.def("get_brain_stats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive statistics about the brain");
+
+    m.def("get_agent_metrics", [](std::shared_ptr<AgentBrain> agent) {
+        std::map<std::string, double> metrics;
+        metrics["curiosity_level"] = agent->getCuriosityLevel();
+        metrics["novelty_level"] = agent->getNoveltyLevel();
+        metrics["prediction_error"] = agent->getPredictionError();
+        metrics["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        return metrics;
+    }, py::arg("agent"), "Get metrics about agent brain performance");
+
+    m.def("monitor_simulation", [](std::shared_ptr<Brain> brain, size_t numSteps,
+                                   bool logProgress = true) {
+        std::vector<std::map<std::string, double>> history;
+        for (size_t step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            
+            if (logProgress && step % 100 == 0) {
+                std::cout << "Step " << step << "/" << numSteps 
+                          << ": " << brain->getFiringNeuronCount() 
+                          << " firing neurons\n";
+            }
+            
+            std::map<std::string, double> snapshot;
+            snapshot["step"] = step;
+            snapshot["firing_neurons"] = brain->getFiringNeuronCount();
+            snapshot["active_neurons"] = brain->getActiveNeuronCount();
+            snapshot["average_firing_rate"] = brain->getAverageFiringRate();
+            snapshot["total_spikes"] = brain->getTotalSpikeCount();
+            history.push_back(snapshot);
+        }
+        return history;
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("logProgress") = true,
+        "Monitor brain activity over time and return history");
+
+    // Persistence utilities
+    m.def("save_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+
+    m.def("load_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from file");
+
+    m.def("checkpoint_brain", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (brain->save(filepath)) {
+            return std::make_pair(true, "Checkpoint saved successfully");
+        } else {
+            return std::make_pair(false, "Failed to save checkpoint");
+        }
+    }, py::arg("brain"), py::arg("filepath"), "Create a checkpoint of the brain state");
+
+    // Development utilities
+    m.def("advance_development", [](std::shared_ptr<Brain> brain, double timestep) {
+        auto* agent = dynamic_cast<AgentBrain*>(brain.get());
+        if (agent) {
+            agent->updateDevelopment(timestep);
+            return true;
+        }
+        return false;
+    }, py::arg("brain"), py::arg("timestep"), "Advance brain development by timestep");
+
+    m.def("set_development_stage", [](std::shared_ptr<Brain> brain, 
+                                     nlm::DevelopmentalStage stage) {
+        brain->setDevelopmentalStage(stage);
+    }, py::arg("brain"), py::arg("stage"), "Set the developmental stage of the brain");
+
+    m.def("get_development_info", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> info;
+        info["stage"] = developmentalStageToString(brain->getDevelopmentalStage());
+        info["neuron_count"] = std::to_string(brain->getTotalNeuronCount());
+        info["synapse_count"] = std::to_string(brain->getTotalSynapseCount());
+        return info;
+    }, py::arg("brain"), "Get information about brain development state");
+
+    // Enhanced enum utilities
+    m.def("get_enum_values", []() {
+        py::list values;
+        values.append("NeuronType: Excitatory, Inhibitory, Modulatory, Sensory, Motor, Internal");
+        values.append("SynapseType: Excitatory, Inhibitory, Modulatory, Electrical, GapJunction");
+        values.append("ActionType: MoveForward, MoveBackward, MoveLeft, MoveRight, TurnLeft, TurnRight, Look, LookUp, LookDown, Interact, Eat, Drink, Rest, Wait, Custom");
+        values.append("MotorCommand: MoveForward, MoveBackward, TurnLeft, TurnRight, LookLeft, LookRight, Interact, Wait");
+        values.append("WorldObjectType: Empty, Resource, Hazard, Wall, Marker");
+        values.append("DevelopmentalStage: Initial, CriticalPeriod, Maturation, Adult, Aging");
+        values.append("FiringState: Resting, Active, Refractory, Inhibited");
+        return values;
+    }, "Get all available enum values for reference");
+
+    m.def("get_enum_info", [](const std::string& enumName) {
+        std::map<std::string, std::string> info;
+        if (enumName == "NeuronType") {
+            info["Excitatory"] = "Excitatory neurons that increase firing probability";
+            info["Inhibitory"] = "Inhibitory neurons that decrease firing probability";
+            info["Modulatory"] = "Modulatory neurons that affect plasticity";
+            info["Sensory"] = "Sensory processing neurons";
+            info["Motor"] = "Motor output neurons";
+            info["Internal"] = "Internal regulatory neurons";
+        } else if (enumName == "SynapseType") {
+            info["Excitatory"] = "Excitatory synapses that increase postsynaptic firing";
+            info["Inhibitory"] = "Inhibitory synapses that decrease postsynaptic firing";
+            info["Modulatory"] = "Modulatory synapses that affect plasticity";
+            info["Electrical"] = "Electrical synapses that allow direct ion flow";
+            info["GapJunction"] = "Gap junction synapses for rapid signaling";
+        }
+        return info;
+    }, py::arg("enumName"), "Get detailed information about an enum type");
+
+    // Quick experiment utilities
+    m.def("run_phase3_demo", [](size_t numEpisodes, size_t stepsPerEpisode) {
+        std::cout << "Running Phase 3 demo with " << numEpisodes 
+                  << " episodes of " << stepsPerEpisode << " steps each.\n";
+        // This would call the Phase3Demo implementation
+        // For now, just return a placeholder
+        return std::make_pair(true, "Phase 3 demo completed (placeholder implementation)");
+    }, py::arg("numEpisodes") = 5, py::arg("stepsPerEpisode") = 200,
+        "Run a Phase 3 world interaction demo");
+
+    m.def("run_phase4_demo", [](size_t numTrials) {
+        std::cout << "Running Phase 4 demo with " << numTrials 
+                  << " trials.\n";
+        // This would call the Phase4Demo implementation
+        return std::make_pair(true, "Phase 4 demo completed (placeholder implementation)");
+    }, py::arg("numTrials") = 50, "Run a Phase 4 cognitive experiments demo");
+
+    m.def("run_phase6_integration", [](size_t neuronCount, size_t maxSteps) {
+        std::cout << "Running Phase 6 integration test with " << neuronCount 
+                  << " neurons for " << maxSteps << " steps.\n";
+        // This would call the Phase6Demo implementation
+        return std::make_pair(true, "Phase 6 integration completed (placeholder implementation)");
+    }, py::arg("neuronCount") = 500, py::arg("maxSteps") = 2000,
+        "Run a Phase 6 final integration demo");
+
+    // Python helper functions for common patterns
+    m.def("reset_all", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                        std::shared_ptr<SimpleWorld> world) {
+        if (brain) brain->reset();
+        if (agent) agent->reset();
+        if (world) world->reset();
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+        "Reset brain, agent, and world to initial state");
+
+    m.def("enable_all_features", [](std::shared_ptr<AgentBrain> agent) {
+        if (agent) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+    }, py::arg("agent"), "Enable all learning features in agent brain");
+
+    m.def("get_simulation_summary", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                                       std::shared_ptr<SimpleWorld> world) {
+        std::ostringstream summary;
+        summary << "=== SIMULATION SUMMARY ===\n";
+        if (brain) {
+            summary << "Brain: " << brain->getTotalNeuronCount() << " neurons, "
+                    << brain->getTotalSynapseCount() << " synapses\n";
+            summary << "  Firing: " << brain->getFiringNeuronCount() << " neurons\n";
+            summary << "  Average firing rate: " << brain->getAverageFiringRate() << "\n";
+            summary << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        }
+        if (agent) {
+            summary << "Agent: curiosity=" << agent->getCuriosityLevel() << ", "
+                    << "novelty=" << agent->getNoveltyLevel() << ", "
+                    << "prediction error=" << agent->getPredictionError() << "\n";
+        }
+        if (world) {
+            summary << "World: size=" << world->getWidth() << "x" << world->getHeight() 
+                    << ", time=" << world->getSimulationTime() << "s\n";
+        }
+        return summary.str();
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+        "Get a human-readable summary of the current simulation state");
 }
 
 } // namespace nlm
