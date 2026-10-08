@@ -55,43 +55,67 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports simple key=value format and JSON/YAML when available)
+    // Returns true if file was successfully loaded, false otherwise
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
+    // Supports --key=value and -key value formats
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
+    // Returns true if file was successfully saved, false otherwise
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with type safety
+    // Returns std::nullopt if key doesn't exist or type doesn't match
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
+    // Get value with default fallback
+    // Returns defaultValue if key doesn't exist or type doesn't match
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with source tracking
+    // source indicates where the value came from (Default, File, CommandLine, Runtime)
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Configuration management
+    // Check if a key exists
     bool has(const std::string& key) const;
     
-    // Remove key
+    // Remove a key from configuration
     void remove(const std::string& key);
     
-    // Get all keys
+    // Get all configuration keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
+    // Clear all configuration entries
     void clear();
     
-    // Get configuration summary
+    // Get configuration summary for logging/debugging
     std::string summary() const;
+    
+    // Validate configuration
+    // Returns true if configuration is valid, false otherwise
+    // Can be extended with specific validation rules
+    bool validate() const;
+    
+    // Get configuration value type
+    // Returns string representation of the value type for debugging
+    std::string getValueType(const std::string& key) const;
+    
+    // Check configuration source
+    // Returns the source of a configuration value
+    ConfigSource getSource(const std::string& key) const;
+    
+    // List all configuration keys with their sources
+    std::string listWithSources() const;
     
 private:
     struct Impl;
@@ -100,6 +124,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const ConfigValue& value);
+    static std::string valueToString(const ConfigValue& value);
 };
 
 } // namespace nlm

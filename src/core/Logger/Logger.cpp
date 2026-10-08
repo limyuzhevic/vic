@@ -29,6 +29,12 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Validate log entry
+    if (entry.message.empty()) {
+        NLM_LOG_ERROR("Empty log message at " + entry.file + ":" + std::to_string(entry.line));
+        return;
+    }
+    
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
@@ -36,21 +42,37 @@ void ConsoleLogger::log(const LogEntry& entry) {
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
-    oss << " " << entry.message;
+    // Add file and line info if provided
+    if (!entry.file.empty() && entry.line > 0) {
+        oss << " " << entry.file << ":" << entry.line;
+        if (!entry.function.empty()) {
+            oss << " in " << entry.function;
+        }
+        oss << ": ";
+    } else {
+        oss << " : ";
+    }
+    
+    oss << entry.message;
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with error checking
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if set with enhanced error handling
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Failed to write to log file: " << e.what() << std::endl;
+            pImpl->fileOut.close(); // Close file on error
+        }
     }
 }
 
@@ -71,12 +93,31 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
+    try {
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_ERROR("WARNING: Cannot open log file for writing: " + filepath + ". File output disabled.");
+        } else {
+            NLM_LOG_INFO("Log file output enabled: " + filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("ERROR: Exception opening log file " + filepath + ": " + std::string(e.what()) + ". File output disabled.");
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        NLM_LOG_INFO("Log file output closed.");
     }
 }
 
@@ -131,18 +172,42 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
+    // Validate log level and message
+    if (message.empty()) {
+        NLM_LOG_CRITICAL("CRITICAL: Empty log message at " + file + ":" + std::to_string(line));
+        return;
+    }
+    
+    // Check if this log level is enabled
+    if (!isEnabled(level)) {
+        return;
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Create log entry with validation
     LogEntry entry;
     entry.level = level;
     entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
+    entry.file = file.empty() ? "unknown" : file;
+    entry.line = line > 0 ? line : 0;
+    entry.function = function.empty() ? "unknown" : function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Log to all registered loggers with error handling
+    size_t successCount = 0;
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        try {
+            logger->log(entry);
+            successCount++;
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Exception in logger: " << e.what() << std::endl;
+        }
+    }
+    
+    // Log debugging information for critical messages
+    if (level == LogLevel::Critical) {
+        std::cerr << "CRITICAL LOG: " << message << " at " << entry.file << ":" << entry.line << " in " << entry.function << std::endl;
     }
 }
 

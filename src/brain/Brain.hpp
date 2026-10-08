@@ -61,6 +61,8 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // ========== CORE SIMULATION ==========
+    
     // Initialize brain with configuration
     bool initialize();
     
@@ -80,6 +82,8 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
+    // ========== SYSTEM ACCESS ==========
+    
     // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
@@ -96,6 +100,8 @@ public:
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
+    
+    // ========== SYSTEM MANIPULATION ==========
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
@@ -114,6 +120,8 @@ public:
     
     // Load brain state from file
     bool load(const std::string& filepath);
+    
+    // ========== REGION MANAGEMENT ==========
     
     // Region management
     RegionId addRegion(const std::string& name = "");
@@ -183,6 +191,8 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // ========== UTILITY SYSTEMS ==========
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
