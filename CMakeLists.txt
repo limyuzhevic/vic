@@ -139,12 +139,27 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Advanced commands
+add_library(nlm_advanced STATIC
+    src/advanced/AdvancedBrainCommands.cpp
+    src/advanced/AdvancedInterface.cpp
+    src/advanced/ExperimentSystem.cpp
+)
+target_include_directories(nlm_advanced PUBLIC src/advanced)
+target_link_libraries(nlm_advanced PUBLIC nlm_core nlm_agent nlm_world)
+
+# Advanced demo executable
+add_executable(nlm_advanced_demo
+    src/main.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_advanced)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_advanced nlm_advanced_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

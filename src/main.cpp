@@ -6,6 +6,7 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+// - Advanced commands and analysis capabilities
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +19,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "advanced/AdvancedInterface.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +27,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <functional>
 
 using namespace nlm;
 
