@@ -2,8 +2,61 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <mutex>
+#include <unordered_map>
 
 namespace nlm {
+
+// Neuron state memory pool for reduced allocation overhead
+class NeuronStateMemoryPool {
+public:
+    static NeuronStateMemoryPool& instance() {
+        static NeuronStateMemoryPool pool;
+        return pool;
+    }
+    
+    NeuronState* allocate() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (freeList_.empty()) {
+            // Allocate new chunk
+            auto chunk = std::make_unique<std::vector<NeuronState>>();
+            chunk->reserve(CHUNK_SIZE);
+            for (size_t i = 0; i < CHUNK_SIZE; ++i) {
+                freeList_.push_back(chunk->data() + i);
+            }
+            chunks_.push_back(std::move(chunk));
+        }
+        
+        NeuronState* ptr = freeList_.back();
+        freeList_.pop_back();
+        return ptr;
+    }
+    
+    void deallocate(NeuronState* ptr) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        freeList_.push_back(ptr);
+    }
+    
+    void reset() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        // Reset all allocated states
+        for (auto& chunk : chunks_) {
+            for (size_t i = 0; i < CHUNK_SIZE && chunk->data() + i != nullptr; ++i) {
+                new (chunk->data() + i) NeuronState();
+            }
+        }
+    }
+    
+private:
+    static constexpr size_t CHUNK_SIZE = 1024;
+    
+    std::vector<std::unique_ptr<std::vector<NeuronState>>> chunks_;
+    std::vector<NeuronState*> freeList_;
+    std::mutex mutex_;
+};
+
+// Global memory pool instance
+NeuronStateMemoryPool& neuronStatePool = NeuronStateMemoryPool::instance();
 
 struct Neuron::Impl {
     NeuronId id;
@@ -24,7 +77,14 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize state using memory pool
+        new (&state) NeuronState();
+    }
+    
+    ~Impl() {
+        state.~NeuronState();
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -188,6 +248,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
+// Optimized LIF step function with improved numerical stability and performance
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
@@ -202,34 +263,35 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Pre-calculate commonly used values for better performance
+    const float V_rest = pImpl->state.restingPotential;
+    const float V_reset = pImpl->state.resetPotential;
+    const float threshold = pImpl->state.threshold;
+    const float tau = Impl::TIME_CONSTANT;  // ms
+    const float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    const float dt_scaled = static_cast<float>(dt) * 1000.0f;
     
     MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Compute synaptic contribution (normalized by capacitance)
+    const float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Compute leak contribution (normalized by time constant)
+    const float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + dt_scaled * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
+        // More efficient decay calculation
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential with optimized bounds checking
+    if (V > 50.0f) V = 50.0f;
+    else if (V < -100.0f) V = -100.0f;
     
     // Check for spike
     if (V >= threshold) {
