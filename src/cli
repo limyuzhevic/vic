@@ -1,0 +1,430 @@
+// Copyright (c) 2026 NLM Project
+// Advanced Command Line Interface for NLM
+// Power users and researchers can use this for complex simulations and analysis
+
+#include "cli/AdvancedCLI.hpp"
+#include "core/Config/Config.hpp"
+#include "brain/Brain.hpp"
+#include "agent/AgentBrain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <chrono>
+
+namespace nlm {
+
+AdvancedCLI::AdvancedCLI() : stopRequested_(false) {
+}
+
+AdvancedCLI::~AdvancedCLI() = default;
+
+bool AdvancedCLI::run(int argc, char* argv[]) {
+    // Parse command line arguments
+    parseArgs(argc, argv);
+    
+    if (showHelp_) {
+        printHelp();
+        return true;
+    }
+    
+    if (showVersion_) {
+        printVersion();
+        return true;
+    }
+    
+    try {
+        // Run the appropriate command
+        if (command_ == "demo") {
+            return runDemo();
+        } else if (command_ == "research") {
+            return runResearchSimulation();
+        } else if (command_ == "analyze") {
+            return runAnalysis();
+        } else if (command_ == "batch") {
+            return runBatchSimulation();
+        } else if (command_ == "export") {
+            return runExport();
+        } else {
+            std::cerr << "Error: Unknown command: " << command_ << std::endl;
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void AdvancedCLI::parseArgs(int argc, char* argv[]) {
+    // Simple argument parsing
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp_ = true;
+        } else if (arg == "--version") {
+            showVersion_ = true;
+        } else if (arg == "--command" && i + 1 < argc) {
+            command_ = argv[++i];
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile_ = argv[++i];
+        } else if (arg == "--output" && i + 1 < argc) {
+            outputFile_ = argv[++i];
+        } else if (arg == "--steps" && i + 1 < argc) {
+            steps_ = std::stoi(argv[++i]);
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            neurons_ = std::stoi(argv[++i]);
+        } else if (arg == "--timestep" && i + 1 < argc) {
+            timestep_ = std::stod(argv[++i]);
+        } else if (arg == "--seed" && i + 1 < argc) {
+            seed_ = std::stoull(argv[++i]);
+        } else if (arg == "--enable-reward" && i + 1 < argc) {
+            enableReward_ = (std::string(argv[++i]) == "true");
+        } else if (arg == "--enable-curiosity" && i + 1 < argc) {
+            enableCuriosity_ = (std::string(argv[++i]) == "true");
+        } else if (arg == "--enable-development" && i + 1 < argc) {
+            enableDevelopment_ = (std::string(argv[++i]) == "true");
+        } else if (arg == "--enable-structural" && i + 1 < argc) {
+            enableStructuralPlasticity_ = (std::string(argv[++i]) == "true");
+        } else if (arg == "--world-width" && i + 1 < argc) {
+            worldWidth_ = std::stoi(argv[++i]);
+        } else if (arg == "--world-height" && i + 1 < argc) {
+            worldHeight_ = std::stoi(argv[++i]);
+        } else if (arg == "--world-vision-width" && i + 1 < argc) {
+            worldVisionWidth_ = std::stoi(argv[++i]);
+        } else if (arg == "--world-vision-height" && i + 1 < argc) {
+            worldVisionHeight_ = std::stoi(argv[++i]);
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            checkpointPath_ = argv[++i];
+        } else if (arg == "--logfile" && i + 1 < argc) {
+            logfile_ = argv[++i];
+        } else if (arg == "--loglevel" && i + 1 < argc) {
+            logLevel_ = argv[++i];
+        } else {
+            // Unknown argument
+            std::cerr << "Warning: Unknown argument: " << arg << std::endl;
+        }
+    }
+    
+    // Set default command if not specified
+    if (command_.empty()) {
+        command_ = "demo";
+    }
+}
+
+void AdvancedCLI::printHelp() const {
+    std::cout << "NLM Advanced Command Line Interface\n";
+    std::cout << "====================================\n\n";
+    std::cout << "Commands:\n";
+    std::cout << "  demo          Run a quick demonstration simulation\n";
+    std::cout << "  research      Run a research-grade simulation\n";
+    std::cout << "  analyze       Analyze brain state and connectivity\n";
+    std::cout << "  batch         Run multiple simulations in batch\n";
+    std::cout << "  export        Export brain state to file\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help, -h                  Show this help message\n";
+    std::cout << "  --version                   Show version information\n";
+    std::cout << "  --command CMD               Set the command to run (default: demo)\n";
+    std::cout << "  --config FILE               Load configuration from file\n";
+    std::cout << "  --output FILE               Output results to file\n";
+    std::cout << "  --steps N                   Number of simulation steps\n";
+    std::cout << "  --neurons N                 Number of neurons\n";
+    std::cout << "  --timestep T                Simulation timestep\n";
+    std::cout << "  --seed N                    Random seed\n";
+    std::cout << "  --enable-reward BOOL        Enable reward modulation\n";
+    std::cout << "  --enable-curiosity BOOL     Enable curiosity-driven exploration\n";
+    std::cout << "  --enable-development BOOL   Enable developmental processes\n";
+    std::cout << "  --enable-structural BOOL    Enable structural plasticity\n";
+    std::cout << "  --world-width W             World width\n";
+    std::cout << "  --world-height H            World height\n";
+    std::cout << "  --world-vision-width VW     World vision width\n";
+    std::cout << "  --world-vision-height VH    World vision height\n";
+    std::cout << "  --checkpoint PATH            Checkpoint file path\n";
+    std::cout << "  --logfile FILE              Log output file\n";
+    std::cout << "  --loglevel LEVEL            Log level (debug, info, warning, error)\n\n";
+    std::cout << "Examples:\n";
+    std::cout << "  nlm_cli --command demo --steps 1000 --neurons 500\n";
+    std::cout << "  nlm_cli --command research --enable-reward true --enable-development true\n";
+    std::cout << "  nlm_cli --command analyze --checkpoint my_brain.bin\n\n";
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm\n";
+}
+
+void AdvancedCLI::printVersion() const {
+    std::cout << "NLM Advanced CLI v0.1.0\n";
+    std::cout << "Built for NLM Phase 6 (Final Integration)\n";
+    std::cout << "Copyright (c) 2026 NLM Project\n";
+}
+
+bool AdvancedCLI::runDemo() {
+    std::cout << "=== NLM Advanced CLI Demo ===\n";
+    
+    // Create configuration
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", neurons_);
+    config->set("region_count", 1);
+    config->set("connection_probability", 0.1f);
+    config->set("simulation_timestep", timestep_);
+    config->set("random_seed", seed_);
+    
+    // Enable features based on flags
+    if (enableReward_) {
+        config->set("neuromod.dopamine.enable", true);
+    }
+    if (enableCuriosity_) {
+        config->set("neuromod.curiosity.enable", true);
+    }
+    if (enableDevelopment_) {
+        config->set("development.enabled", true);
+    }
+    if (enableStructuralPlasticity_) {
+        config->set("plasticity.structural.enable", true);
+    }
+    
+    // Create and initialize brain
+    auto brain = std::make_shared<Brain>(config);
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain!" << std::endl;
+        return false;
+    }
+    
+    std::cout << "Brain initialized with " << neurons_ << " neurons" << std::endl;
+    
+    // Run simulation
+    for (int step = 0; step < steps_; ++step) {
+        if (stopRequested_) {
+            std::cout << "Simulation stopped by user request." << std::endl;
+            break;
+        }
+        
+        brain->step(step, step * timestep_);
+        
+        if (step % 100 == 0) {
+            std::cout << "Step " << step << ": " 
+                     << brain->getFiringNeuronCount() << " firing, "
+                     << brain->getTotalSpikeCount() << " total spikes" << std::endl;
+        }
+    }
+    
+    std::cout << "\n=== Demo Complete ===\n";
+    std::cout << "Final stats:" << std::endl;
+    std::cout << "  Neurons: " << brain->getTotalNeuronCount() << std::endl;
+    std::cout << "  Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+    std::cout << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    std::cout << "  Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+    std::cout << "  E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+    
+    return true;
+}
+
+bool AdvancedCLI::runResearchSimulation() {
+    std::cout << "=== NLM Research Simulation ===\n";
+    
+    // Use the Phase 6 integration experiment
+    Phase6IntegratedExperiment experiment;
+    
+    Phase6Config config;
+    config.neuronCount = neurons_;
+    config.maxSteps = steps_;
+    config.enableCheckpointing = !checkpointPath_.empty();
+    config.enableReplay = false;
+    config.enableDevelopment = enableDevelopment_;
+    config.checkpointPath = checkpointPath_;
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    auto result = experiment.run(config);
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+    
+    std::cout << "=== Research Simulation Complete ===\n";
+    std::cout << "Results:" << std::endl;
+    std::cout << "  Total reward: " << result.totalReward << std::endl;
+    std::cout << "  Average firing rate: " << result.avgFiringRate << std::endl;
+    std::cout << "  Episodes stored: " << result.memoryEpisodesStored << std::endl;
+    std::cout << "  Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "  Novelty level: " << result.noveltyLevel << std::endl;
+    std::cout << "  Curiosity level: " << result.curiosityLevel << std::endl;
+    std::cout << "  Total wall time: " << duration.count() << "s" << std::endl;
+    std::cout << "\nIntegration status:" << std::endl;
+    std::cout << "  Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "  Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "  Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "  Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "  Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    
+    return true;
+}
+
+bool AdvancedCLI::runAnalysis() {
+    std::cout << "=== NLM Brain Analysis ===\n";
+    
+    // Load brain from checkpoint or create new one
+    std::shared_ptr<Brain> brain;
+    
+    if (!checkpointPath_.empty()) {
+        auto config = std::make_shared<Config>();
+        brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "Failed to initialize brain for analysis!" << std::endl;
+            return false;
+        }
+        if (!brain->load(checkpointPath_)) {
+            std::cerr << "Failed to load brain from " << checkpointPath_ << std::endl;
+            return false;
+        }
+        std::cout << "Loaded brain from " << checkpointPath_ << std::endl;
+    } else {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neurons_);
+        brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "Failed to initialize brain for analysis!" << std::endl;
+            return false;
+        }
+        std::cout << "Created new brain with " << neurons_ << " neurons" << std::endl;
+    }
+    
+    // Run analysis
+    std::cout << "Analyzing brain connectivity and activity..." << std::endl;
+    
+    // Get comprehensive statistics
+    std::cout << "\n=== Brain Statistics ===" << std::endl;
+    std::cout << "Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+    std::cout << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+    std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+    std::cout << "Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+    std::cout << "E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+    std::cout << "Total spike count: " << brain->getTotalSpikeCount() << std::endl;
+    
+    // Regional analysis
+    auto regions = brain->getRegions();
+    std::cout << "\n=== Regional Analysis ===" << std::endl;
+    for (size_t i = 0; i < regions.size(); ++i) {
+        auto region = regions[i].get();
+        std::cout << "Region " << i << " (ID: " << region->getId() << "):" << std::endl;
+        std::cout << "  Neurons: " << region->getTotalNeuronCount() << std::endl;
+        std::cout << "  Synapses: " << region->getSynapseCount() << std::endl;
+        std::cout << "  Firing rate: " << region->getAverageFiringRate() << std::endl;
+    }
+    
+    // Save analysis results
+    if (!outputFile_.empty()) {
+        std::cout << "Saving analysis to " << outputFile_ << std::endl;
+        // Create a simple analysis file
+        std::ofstream file(outputFile_);
+        if (file.is_open()) {
+            file << "NLM Brain Analysis\n";
+            file << "===================\n\n";
+            file << "Total Neurons: " << brain->getTotalNeuronCount() << "\n";
+            file << "Total Synapses: " << brain->getTotalSynapseCount() << "\n";
+            file << "Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+            file << "Average Firing Rate: " << brain->getAverageFiringRate() << "\n";
+            file << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+            file << "Total Spike Count: " << brain->getTotalSpikeCount() << "\n";
+            file.close();
+        } else {
+            std::cerr << "Failed to write analysis to " << outputFile_ << std::endl;
+        }
+    }
+    
+    std::cout << "\n=== Analysis Complete ===\n";
+    return true;
+}
+
+bool AdvancedCLI::runBatchSimulation() {
+    std::cout << "=== NLM Batch Simulation ===\n";
+    
+    if (steps_ <= 0) {
+        std::cerr << "Error: Number of steps must be positive for batch simulation" << std::endl;
+        return false;
+    }
+    
+    int numBatches = 3;
+    std::cout << "Running " << numBatches << " batch simulations..." << std::endl;
+    
+    for (int batch = 1; batch <= numBatches; ++batch) {
+        std::cout << "\n--- Batch " << batch << " ---" << std::endl;
+        
+        // Modify configuration for each batch
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neurons_);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f * batch);
+        config->set("simulation_timestep", timestep_);
+        config->set("random_seed", seed_ + batch * 1000);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "Failed to initialize brain for batch " << batch << std::endl;
+            continue;
+        }
+        
+        // Run simulation
+        for (int step = 0; step < steps_; ++step) {
+            brain->step(step, step * timestep_);
+            
+            if (step % 500 == 0) {
+                std::cout << "  Step " << step << ": " 
+                         << brain->getFiringNeuronCount() << " firing" << std::endl;
+            }
+        }
+        
+        // Collect results
+        std::cout << "  Batch " << batch << " results:" << std::endl;
+        std::cout << "    Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        std::cout << "    Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "    Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+        
+        // Save checkpoint for this batch
+        std::string batchCheckpoint = checkpointPath_ + "_batch" + std::to_string(batch) + ".bin";
+        if (!brain->save(batchCheckpoint)) {
+            std::cerr << "Warning: Failed to save checkpoint for batch " << batch << std::endl;
+        }
+    }
+    
+    std::cout << "\n=== Batch Simulation Complete ===\n";
+    return true;
+}
+
+bool AdvancedCLI::runExport() {
+    std::cout << "=== NLM Brain Export ===\n";
+    
+    auto config = std::make_shared<Config>();
+    auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain for export!" << std::endl;
+        return false;
+    }
+    
+    // Run a quick simulation to generate interesting brain state
+    for (int step = 0; step < 100; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    // Save brain state
+    if (outputFile_.empty()) {
+        outputFile_ = "nlm_export.bin";
+    }
+    
+    if (brain->save(outputFile_)) {
+        std::cout << "Successfully exported brain state to " << outputFile_ << std::endl;
+        
+        // Also export configuration
+        std::string configFile = outputFile_ + ".cfg";
+        if (config->saveToFile(configFile)) {
+            std::cout << "Configuration saved to " << configFile << std::endl;
+        }
+        
+        return true;
+    } else {
+        std::cerr << "Failed to export brain state to " << outputFile_ << std::endl;
+        return false;
+    }
+}
+
+} // namespace nlm
