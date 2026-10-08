@@ -37,6 +37,10 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_integration {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +117,28 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    // NEW: Run Integration Tests (Phase 6: Final Integration)
+    std::cout << std::endl;
+    std::cout << "=== Phase 6: Integration Tests ===" << std::endl;
+    std::cout << "Testing Complete Brain Integration:" << std::endl;
+    std::cout << "  - Memory Systems (Working, Episodic, Associative)" << std::endl;
+    std::cout << "  - Prediction System Integration" << std::endl;
+    std::cout << "  - Neural Planner Integration" << std::endl;
+    std::cout << "  - Neuromodulation-Memory Connections" << std::endl;
+    std::cout << "  - Development-Cognition Connections" << std::endl;
+    std::cout << "  - Complete Brain Loop Integration" << std::endl;
+    std::cout << "  - Checkpoint and Persistence" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
