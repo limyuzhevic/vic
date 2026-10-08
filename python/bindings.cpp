@@ -29,6 +29,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Neuron ID types
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -73,15 +74,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
+    // Neuron type enumeration
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
+        .value("Excitatory", NeuronType::Excitatory, "Excitatory neurons that promote firing")
+        .value("Inhibitory", NeuronType::Inhibitory, "Inhibitory neurons that suppress firing")
+        .value("Modulatory", NeuronType::Modulatory, "Modulatory neurons that adjust overall activity")
+        .value("Sensory", NeuronType::Sensory, "Sensory neurons that receive external input")
+        .value("Motor", NeuronType::Motor, "Motor neurons that control movement")
+        .value("Internal", NeuronType::Internal, "Internal state neurons for homeostasis")
         .export_values();
 
+    // Synapse type enumeration
     py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
         .value("Excitatory", SynapseType::Excitatory)
         .value("Inhibitory", SynapseType::Inhibitory)
@@ -90,6 +93,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("GapJunction", SynapseType::GapJunction)
         .export_values();
 
+    // Developmental stage enumeration
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
         .value("Initial", DevelopmentalStage::Initial)
         .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
@@ -98,6 +102,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Aging", DevelopmentalStage::Aging)
         .export_values();
 
+    // Firing state enumeration
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
@@ -105,6 +110,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
+    // Action type enumeration
     py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
         .value("MoveForward", ActionType::MoveForward)
         .value("MoveBackward", ActionType::MoveBackward)
@@ -123,17 +129,34 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Custom", ActionType::Custom)
         .export_values();
 
+    // Motor command enumeration with descriptions
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
+        .value("MoveForward", MotorCommand::MoveForward, "Move forward in the world")
+        .value("MoveBackward", MotorCommand::MoveBackward, "Move backward in the world")
+        .value("TurnLeft", MotorCommand::TurnLeft, "Rotate left (turn)")
+        .value("TurnRight", MotorCommand::TurnRight, "Rotate right (turn)")
+        .value("LookLeft", MotorCommand::LookLeft, "Turn head/sensors left")
+        .value("LookRight", MotorCommand::LookRight, "Turn head/sensors right")
+        .value("Interact", MotorCommand::Interact, "Interact with nearby object")
+        .value("Wait", MotorCommand::Wait, "Do nothing (wait)")
         .export_values();
+    
+    // Convenience conversion functions
+    m.def("motorCommandToString", [](MotorCommand cmd) {
+        switch (cmd) {
+            case MotorCommand::MoveForward: return std::string("MoveForward");
+            case MotorCommand::MoveBackward: return std::string("MoveBackward");
+            case MotorCommand::TurnLeft: return std::string("TurnLeft");
+            case MotorCommand::TurnRight: return std::string("TurnRight");
+            case MotorCommand::LookLeft: return std::string("LookLeft");
+            case MotorCommand::LookRight: return std::string("LookRight");
+            case MotorCommand::Interact: return std::string("Interact");
+            case MotorCommand::Wait: return std::string("Wait");
+            default: return std::string("Unknown");
+        }
+    }, py::arg("cmd"), "Convert MotorCommand enum to human-readable string");
 
+    // World object type enumeration
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
@@ -142,6 +165,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Config class
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -164,6 +188,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // Sensory input classes
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +223,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Action class
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -209,6 +235,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getName", &Action::getName)
         .def("clone", &Action::clone);
 
+    // World object class
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
         .def(py::init<float, float, WorldObjectType, float, float>(),
@@ -221,6 +248,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
+    // Agent body class
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
@@ -237,6 +265,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
         .def("reset", &AgentBody::reset);
 
+    // Action result class
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
         .def(py::init<float, bool, std::string>(),
@@ -245,6 +274,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    // Sensory percept class
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -263,6 +293,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // Simple world class
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -289,6 +320,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Brain class
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -353,6 +385,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // AgentBrain class
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,6 +433,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,6 +450,189 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced factory functions for easy setup
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int numSteps) {
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply simple reward based on movement
+            float reward = 0.0f;
+            if (action != MotorCommand::Wait) {
+                reward = 0.1f; // Small positive reward for movement
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1);
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(), agent->getNoveltyLevel());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), "Run a complete simulation episode with automatic agent behavior");
+
+    m.def("validateSimulationConfig", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        std::vector<std::string> warnings;
+        
+        // Check brain configuration
+        if (brain->getTotalNeuronCount() == 0) {
+            warnings.push_back("Brain has no neurons - simulation will be silent");
+        }
+        
+        // Check world configuration
+        if (world->getWidth() == 0 || world->getHeight() == 0) {
+            warnings.push_back("World has zero dimensions - agent will be stuck");
+        }
+        
+        // Check agent configuration
+        if (!agent) {
+            warnings.push_back("Agent not initialized - no motor control");
+        }
+        
+        // Check sensory input size matches world
+        size_t expected_sensory_size = agent ? agent->getSensoryInputSize() : 0;
+        auto percept = world->getSensoryPercept();
+        size_t actual_sensory_size = percept.getAllSignals().size();
+        
+        if (expected_sensory_size > 0 && actual_sensory_size != expected_sensory_size) {
+            warnings.push_back("Sensor input size mismatch - brain expects " + 
+                            std::to_string(expected_sensory_size) + 
+                            " values but world provides " + std::to_string(actual_sensory_size));
+        }
+        
+        return warnings;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), "Validate simulation configuration and return warnings");
+
+    m.def("createCompleteAgentSystem", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        world->configure(20.0, 20.0, 8, 8);
+        world->reset();
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete agent system with brain, world, and agent interface");
+
+    m.def("analyzeBrainStats", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent = nullptr) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["firing_rate"] = brain->getAverageFiringRate();
+        stats["spike_count"] = brain->getTotalSpikeCount();
+        stats["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        if (agent) {
+            stats["curiosity_level"] = agent->getCuriosityLevel();
+            stats["novelty_level"] = agent->getNoveltyLevel();
+            stats["prediction_error"] = agent->getPredictionError();
+            stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        }
+        
+        return stats;
+    }, py::arg("brain"), py::arg("agent") = nullptr, "Analyze brain statistics with optional agent metrics");
+
+    m.def("compareBrains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2, std::shared_ptr<AgentBrain> agent1 = nullptr, std::shared_ptr<AgentBrain> agent2 = nullptr) {
+        py::dict comparison;
+        
+        comparison["neuron_count_match"] = brain1->getTotalNeuronCount() == brain2->getTotalNeuronCount();
+        comparison["synapse_count_match"] = brain1->getTotalSynapseCount() == brain2->getTotalSynapseCount();
+        comparison["firing_rate_diff"] = std::abs(brain1->getAverageFiringRate() - brain2->getAverageFiringRate());
+        comparison["development_stage_match"] = brain1->getDevelopmentalStage() == brain2->getDevelopmentalStage();
+        
+        if (agent1 && agent2) {
+            comparison["curiosity_diff"] = std::abs(agent1->getCuriosityLevel() - agent2->getCuriosityLevel());
+            comparison["novelty_diff"] = std::abs(agent1->getNoveltyLevel() - agent2->getNoveltyLevel());
+            comparison["prediction_error_diff"] = std::abs(agent1->getPredictionError() - agent2->getPredictionError());
+        }
+        
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"), py::arg("agent1") = nullptr, py::arg("agent2") = nullptr, "Compare two brain states and return metrics");
+
+    m.def("getConstants", []() {
+        py::dict constants;
+        constants["MAX_VISION_SIZE"] = 256;  // 16x16 vision grid
+        constants["MAX_MOTOR_COMMANDS"] = 6;  // 6 basic actions
+        constants["DEFAULT_TIMESTEP"] = 0.1;
+        constants["DEFAULT_WORLD_SIZE"] = 20.0f;
+        constants["NEURON_SCALE_FACTOR"] = 0.8f;  // Neural scaling
+        constants["SYNAPSIS_SCALE_FACTOR"] = 0.3f; // Synaptic scaling
+        constants["DEVELOPMENT_DURATION"] = 900.0;  // 15 minutes in steps
+        constants["MAX_REWARD_MAGNITUDE"] = 10.0f;
+        constants["MIN_REWARD_MAGNITUDE"] = -10.0f;
+        return constants;
+    }, "Get useful system constants for configuration");
+
+    m.def("createDefaultConfigWithBrain", []() {
+        auto config = std::make_shared<Config>();
+        // Set sensible defaults for a standard brain
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("brain.v_thresh", -50.0f);
+        config->set("brain.v_rest", -70.0f);
+        config->set("brain.tau_mem", 20.0f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        return config;
+    }, "Create a default configuration with sensible brain parameters");
+
+    // Simple wrapper functions
+    m.def("runSimpleSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int steps) {
+        agent->initialize(*world);
+        agent->enableCuriosity(true);
+        
+        for (int i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), "Run a simple simulation with agent");
+
+    m.def("validateConfiguration", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        std::vector<std::string> errors;
+        
+        if (!brain) errors.push_back("Brain is null");
+        if (!world) errors.push_back("World is null");
+        if (!agent) errors.push_back("Agent is null");
+        
+        if (brain && brain->getTotalNeuronCount() == 0) {
+            errors.push_back("Brain has no neurons configured");
+        }
+        
+        if (world && (world->getWidth() == 0 || world->getHeight() == 0)) {
+            errors.push_back("World has invalid dimensions");
+        }
+        
+        if (agent) {
+            auto percept = world->getSensoryPercept();
+            size_t expected_size = agent->getSensoryInputSize();
+            size_t actual_size = percept.getAllSignals().size();
+            if (expected_size != actual_size) {
+                errors.push_back("Sensor input size mismatch");
+            }
+        }
+        
+        return errors;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), "Validate configuration and return any errors");
+
+    // Attribute access for invalid IDs
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
