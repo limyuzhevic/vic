@@ -366,25 +366,82 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 with validation
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
+
+    // STDP parameters with validation
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
+
+    // Structural plasticity parameters with validation
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Validate and clamp configuration parameters
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    float connProb = config->getOr<float>("connection_probability", 0.15f);
+    float stdpLtp = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    float stdpLtd = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    
+    // Parameter validation and correction
+    if (timestep <= 0.0 || timestep > 1.0) {
+        NLM_LOG_WARNING("Invalid simulation_timestep " + std::to_string(timestep) + ", using default 0.001s");
+        config->set("simulation_timestep", 0.001, ConfigSource::Override);
+    }
+    
+    if (neuronCount <= 0 || neuronCount > 1000000) {
+        NLM_LOG_WARNING("Invalid neuron_count " + std::to_string(neuronCount) + ", using default 500");
+        config->set("neuron_count", 500, ConfigSource::Override);
+    }
+    
+    if (regionCount <= 0 || regionCount > 100) {
+        NLM_LOG_WARNING("Invalid region_count " + std::to_string(regionCount) + ", using default 1");
+        config->set("region_count", 1, ConfigSource::Override);
+    }
+    
+    if (connProb < 0.0f || connProb > 1.0f) {
+        NLM_LOG_WARNING("Invalid connection_probability " + std::to_string(connProb) + ", using default 0.15f");
+        config->set("connection_probability", 0.15f, ConfigSource::Override);
+    }
+    
+    if (stdpLtp < 0.0f || stdpLtp > 1.0f) {
+        NLM_LOG_WARNING("Invalid stdp_ltp_weight " + std::to_string(stdpLtp) + ", using default 0.02f");
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Override);
+    }
+    
+    if (stdpLtd < 0.0f || stdpLtd > 1.0f) {
+        NLM_LOG_WARNING("Invalid stdp_ltd_weight " + std::to_string(stdpLtd) + ", using default 0.015f");
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Override);
+    }
+    
+    // Log configuration summary with validation
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    float connProb = config->getOr<float>("connection_probability", 0.15f);
+    float stdpLtp = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    float stdpLtd = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    float stdpTau = config->getOr<float>("stdp_tau", 20.0f);
+    float synaptogenesis = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruning = config->getOr<float>("pruning_rate", 0.00001f);
+    
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(timestep) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(neuronCount));
+    NLM_LOG_INFO("  region_count: " + std::to_string(regionCount));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(connProb));
+    NLM_LOG_INFO("  stdp parameters: A+=" + std::to_string(stdpLtp) + " A-=" + std::to_string(stdpLtd) + " τ=" + std::to_string(stdpTau) + "ms");
+    NLM_LOG_INFO("  structural plasticity: synaptogenesis=" + std::to_string(synaptogenesis) + " pruning=" + std::to_string(pruning));
+    NLM_LOG_INFO("");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));

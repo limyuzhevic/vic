@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 3: Implement proper JSON/YAML parser
+    // For now, use enhanced key=value format with better error handling
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,18 +28,33 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    size_t errorEntries = 0;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        try {
+            // Parse enhanced key=value pairs with type inference
+            size_t pos = line.find('=');
+            if (pos == std::string::npos) {
+                // Log malformed line but continue
+                continue;
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty() || value.empty()) {
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -48,34 +63,110 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Type inference based on value content
+            ConfigValue configValue;
+            bool parsedSuccessfully = false;
+            
+            // Try integer parsing
+            try {
+                size_t posEnd;
+                long long intVal = std::stoll(value, &posEnd);
+                if (posEnd == value.size()) {
+                    configValue = intVal;
+                    parsedSuccessfully = true;
+                }
+            } catch (...) {}
+            
+            // Try floating point parsing
+            if (!parsedSuccessfully) {
+                try {
+                    size_t posEnd;
+                    double floatVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        configValue = floatVal;
+                        parsedSuccessfully = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try boolean parsing
+            if (!parsedSuccessfully) {
+                std::string lowerValue = toLower(value);
+                if (lowerValue == "true" || lowerValue == "yes" || lowerValue == "1") {
+                    configValue = true;
+                    parsedSuccessfully = true;
+                } else if (lowerValue == "false" || lowerValue == "no" || lowerValue == "0") {
+                    configValue = false;
+                    parsedSuccessfully = true;
+                }
+            }
+            
+            // Default to string if other types fail
+            if (!parsedSuccessfully) {
+                configValue = value;
+                parsedSuccessfully = true;
+            }
+            
+            if (parsedSuccessfully) {
+                // Add with proper source tracking
+                set(key, configValue, ConfigSource::File);
+                validEntries++;
+            } else {
+                errorEntries++;
+            }
+            
+        } catch (const std::exception& e) {
+            errorEntries++;
+            // Continue processing other lines instead of failing entirely
         }
     }
     
-    return true;
+    // Log loading statistics
+    if (errorEntries > 0) {
+        NLM_LOG_WARNING("Config file " + filepath + ": " + 
+                       std::to_string(validEntries) + " valid entries, " +
+                       std::to_string(errorEntries) + " errors (line " + 
+                       std::to_string(lineNumber) + ")");
+    }
+    
+    return validEntries > 0; // Consider loading successful if at least one valid entry
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        try {
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    NLM_LOG_WARNING("Invalid command line argument format: " + arg);
+                    success = false;
+                }
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            } else if (arg[0] == '-') {
+                NLM_LOG_WARNING("Command line argument missing value: " + arg);
+                success = false;
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error processing command line argument " + arg + ": " + e.what());
+            success = false;
         }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
