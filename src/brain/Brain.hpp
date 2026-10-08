@@ -29,6 +29,9 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Action system forward declaration for brain
+class Action;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;

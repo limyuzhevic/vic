@@ -75,6 +75,10 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Planning state
+    ActionType plannedAction;  // Last planned action
+    float planningConfidence;  // Current planning confidence
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +96,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , plannedAction(ActionType::Wait)
+        , planningConfidence(0.5f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -510,9 +516,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Create sensory input representation from current state
+        // This represents what the brain is currently perceiving
+        SensoryInput currentSensoryState;
+        
+        // Extract sensory neuron activities as the current sensory state
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            currentSensoryState.addData(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        
+        // Use prediction system to predict next state
+        std::unique_ptr<SensoryInput> predictedState = pImpl->predictionSystem->predictNextState(currentSensoryState);
+        
+        // Update predictions based on actual sensory input
+        // This simulates the brain's prediction error learning
+        pImpl->predictionSystem->updatePredictions(*predictedState, currentSensoryState);
+        
+        // Get prediction error
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate learning/plasticity
+        // Higher prediction error should increase learning rate
+        if (predictionError > 0.1f) {  // Significant prediction error
+            // Increase plasticity factor temporarily
+            float plasticityBoost = 1.0f + predictionError * 2.0f;
+            
+            // Apply to all synapses
+            for (auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    // Increase synaptic weight change based on prediction error
+                    float currentWeight = syn->getWeight();
+                    float weightChange = (currentWeight > 0 ? 1.0f : -1.0f) * predictionError * 0.001f;
+                    syn->setWeight(currentWeight + weightChange);
+                }
+            }
+            
+            // Update dopamine with prediction error
+            if (pImpl->dopamine) {
+                float currentDopamine = pImpl->dopamine->getLevel();
+                pImpl->dopamine->setLevel(currentDopamine + predictionError * 0.1f);
+            }
+        }
+        
+        // Train prediction model with current observation
+        pImpl->predictionSystem->train(currentSensoryState);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +574,122 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 9.5: Update neural planner ==========
+    if (pImpl->planner && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        // Get current state representation for planning
+        std::vector<float> currentState;
+        
+        // Include working memory activations
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuron : memoryNeurons) {
+                currentState.push_back(pImpl->workingMemory->getNeuronActivation(neuron));
+            }
+        }
+        
+        // Include sensory novelty as state
+        if (pImpl->novelty) {
+            currentState.push_back(pImpl->novelty->getLevel());
+        }
+        
+        // Get target goal from prediction system if available
+        float targetReward = 0.5f; // Default moderate target
+        if (pImpl->dopamine) {
+            targetReward = std::clamp(pImpl->dopamine->getLevel() * 0.1f + 0.5f, 0.0f, 1.0f);
+        }
+        
+        // Plan action using neural planner
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Store planned action for action selection
+        pImpl->plannedAction = plannedAction;
+        
+        // Update planning statistics
+        pImpl->planningConfidence = pImpl->planner->getPlanningConfidence();
+    }
+    
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->sensoryNeurons.empty()) {
+        // Extract current neural activity pattern
+        std::vector<float> currentPattern;
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            currentPattern.push_back(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        
+        // Extract sensory features from world
+        std::vector<float> sensoryFeatures;
+        if (pImpl->workingMemory) {
+            for (const auto& activation : pImpl->workingMemory->retrieve()) {
+                sensoryFeatures.push_back(activation);
+            }
+        }
+        
+        // Get current reward from neuromodulation
+        float currentReward = 0.0f;
+        if (pImpl->dopamine) {
+            currentReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, 
+            sensoryFeatures, 
+            currentReward, 
+            pImpl->currentStep
+        );
+        
+        // Get matching concept for current state
+        size_t matchingConceptId = pImpl->conceptFormation->getMatchingConcept(currentPattern);
+        
+        // Use concept to modulate attention and processing
+        if (conceptId > 0) {
+            // Get concept stability
+            float conceptStability = pImpl->conceptFormation->getConceptStability(conceptId);
+            
+            // Higher stability concepts get more attention
+            if (conceptStability > 0.5f) {
+                // Apply concept-based attention to relevant neural populations
+                if (pImpl->attention) {
+                    // Use concept prototype to guide attention
+                    std::vector<float> conceptPrototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                    
+                    // Find neurons whose activation matches concept
+                    for (Neuron* neuron : pImpl->sensoryNeurons) {
+                        float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                        for (float prototypeActivation : conceptPrototype) {
+                            if (std::abs(activation - prototypeActivation) < 0.3f) {
+                                // This neuron matches concept, give it boost
+                                neuron->injectCurrent(0.1f * conceptStability);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Use concept to influence planning
+            if (pImpl->planner && matchingConceptId > 0) {
+                // Update planner with concept information
+                std::vector<float> matchingPattern = pImpl->conceptFormation->getConceptPrototype(matchingConceptId);
+                
+                // Set planner's current goal based on concept
+                pImpl->planner->setCurrentGoal(matchingPattern);
+                
+                // Update planner's action quality based on concept stability
+                float conceptStability = pImpl->conceptFormation->getConceptStability(matchingConceptId);
+                if (conceptStability > 0.7f) {
+                    // High stability concepts indicate reliable action patterns
+                    for (const auto& c : matchingPattern) {
+                        if (c > 0.5f) {
+                            // This suggests positive action, increase its quality
+                            // We'll increase the quality of actions that correspond to concept activations
+                            // For now, just increase overall planning confidence
+                            pImpl->planningConfidence += 0.1f * (conceptStability - 0.5f);
+                            pImpl->planningConfidence = std::clamp(pImpl->planningConfidence, 0.0f, 1.0f);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
