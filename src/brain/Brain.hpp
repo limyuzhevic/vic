@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -62,7 +63,7 @@ public:
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration
-    bool initialize();
+    [[nodiscard]] bool initialize();
     
     // Main simulation step
     void step(SimulationStep currentStep);
@@ -81,21 +82,21 @@ public:
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    [[nodiscard]] SpikeSystem* getSpikeSystem() noexcept;
+    [[nodiscard]] const SpikeSystem* getSpikeSystem() const noexcept;
     
     // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    [[nodiscard]] STDP* getSTDP() noexcept;
+    [[nodiscard]] Hebbian* getHebbian() noexcept;
+    [[nodiscard]] StructuralPlasticity* getStructuralPlasticity() noexcept;
     
     // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    [[nodiscard]] float getExcitationInhibitionRatio() const noexcept;
+    [[nodiscard]] size_t getTotalSpikeCount() const noexcept;
+    [[nodiscard]] size_t getPendingSpikeEventCount() const noexcept;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    [[nodiscard]] std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
@@ -107,23 +108,23 @@ public:
     void develop();
     
     // Reset brain state
-    void reset();
+    void reset() noexcept;
     
     // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    [[nodiscard]] bool save(const std::string& filepath) const;
     
     // Load brain state from file
-    bool load(const std::string& filepath);
+    [[nodiscard]] bool load(const std::string& filepath);
     
     // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
+    [[nodiscard]] RegionId addRegion(const std::string& name = "");
+    [[nodiscard]] NeuralRegion* getRegion(RegionId id) noexcept;
+    [[nodiscard]] const NeuralRegion* getRegion(RegionId id) const noexcept;
+    [[nodiscard]] size_t getRegionCount() const noexcept;
+    [[nodiscard]] std::vector<RegionId> getRegionIds() const;
     
     // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    [[nodiscard]] const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const noexcept;
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
@@ -131,71 +132,122 @@ public:
     void removeInterRegionConnection(RegionId source, RegionId target);
     
     // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    [[nodiscard]] size_t getTotalNeuronCount() const noexcept;
+    [[nodiscard]] size_t getTotalSynapseCount() const noexcept;
+    [[nodiscard]] size_t getActiveNeuronCount() const noexcept;
+    [[nodiscard]] size_t getFiringNeuronCount() const noexcept;
+    [[nodiscard]] float getAverageFiringRate() const noexcept;
     
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    [[nodiscard]] NeuralWorkingMemory* getWorkingMemory() noexcept;
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    [[nodiscard]] NeuralEpisodicMemory* getEpisodicMemory() noexcept;
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    [[nodiscard]] NeuralAssociativeMemory* getAssociativeMemory() noexcept;
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    [[nodiscard]] PredictionSystem* getPredictionSystem() noexcept;
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    [[nodiscard]] NeuralPlanner* getPlanner() noexcept;
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    [[nodiscard]] ConceptFormation* getConceptFormation() noexcept;
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    [[nodiscard]] AttentionalSelection* getAttention() noexcept;
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Development system
+    [[nodiscard]] DevelopmentSystem* getDevelopmentSystem() noexcept;
+    
+    // Developmental stage
+    [[nodiscard]] DevelopmentalStage getDevelopmentalStage() const noexcept;
+    void setDevelopmentalStage(DevelopmentalStage stage) noexcept;
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    [[nodiscard]] Dopamine* getDopamine() noexcept;
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    [[nodiscard]] Curiosity* getCuriosity() noexcept;
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    [[nodiscard]] Novelty* getNovelty() noexcept;
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    [[nodiscard]] PredictionError* getPredictionErrorSignal() noexcept;
     
     // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    [[nodiscard]] std::shared_ptr<const Config> getConfig() const noexcept;
     
     // Get random generator
-    RandomGenerator* getRandomGenerator();
+    [[nodiscard]] RandomGenerator* getRandomGenerator() noexcept;
     
     // Logging
     void logStatus() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
+
+// Forward declaration needed for Pimpl implementation
+namespace nlm {
+    struct Brain::Impl {
+        std::shared_ptr<Config> config;
+        std::unique_ptr<RandomGenerator> randomGenerator;
+        std::unique_ptr<SimulationClock> simulationClock;
+        std::unique_ptr<Logger> logger;
+        std::vector<std::unique_ptr<NeuralRegion>> regions;
+        std::vector<InterRegionConnection> interRegionConnections;
+        
+        std::unique_ptr<SpikeSystem> spikeSystem;
+        std::unique_ptr<STDP> stdp;
+        std::unique_ptr<Hepbian> hebbian;
+        std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+        
+        // Memory systems
+        std::unique_ptr<NeuralWorkingMemory> workingMemory;
+        std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+        std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+        
+        // Prediction system
+        std::unique_ptr<PredictionSystem> predictionSystem;
+        
+        // Cognition systems
+        std::unique_ptr<NeuralPlanner> planner;
+        std::unique_ptr<ConceptFormation> conceptFormation;
+        std::unique_ptr<AttentionalSelection> attentionalSelection;
+        
+        // Development system
+        std::unique_ptr<DevelopmentSystem> developmentSystem;
+        DevelopmentalStage developmentalStage;
+        
+        // Neuromodulation systems
+        std::unique_ptr<Dopamine> dopamine;
+        std::unique_ptr<Curiosity> curiosity;
+        std::unique_ptr<Novelty> novelty;
+        std::unique_ptr<PredictionError> predictionError;
+        
+        Impl() noexcept : developmentalStage(DevelopmentalStage::Phase2) {}
+        
+        // Move constructor
+        Impl(Impl&& other) noexcept = default;
+        
+        // Disable copy
+        Impl(const Impl&) = delete;
+        Impl& operator=(const Impl&) = delete;
+    };
+}

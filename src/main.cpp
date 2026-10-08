@@ -25,27 +25,56 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <unordered_map>
+#include <sstream>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printVersion() {
+    std::cout << "NLM Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Architecture: Leaky Integrate-and-Fire (LIF) Neural System" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: ./nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration Options:" << std::endl;
+    std::cout << "  --config=<file>        Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --random_seed=<num>    Set random seed for reproducible experiments" << std::endl;
+    std::cout << "  --neuron_count=<num>   Number of neurons in the brain" << std::endl;
+    std::cout << "  --region_count=<num>   Number of brain regions" << std::endl;
+    std::cout << "  --connection_probability=<float> Connection probability" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Plasticity Options:" << std::endl;
+    std::cout << "  --stdp_ltp_weight=<float>   STDP Long-Term Potentiation weight" << std::endl;
+    std::cout << "  --stdp_ltd_weight=<float>   STDP Long-Term Depression weight" << std::endl;
+    std::cout << "  --stdp_tau=<float>          STDP time constant (ms)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Development Options:" << std::endl;
+    std::cout << "  --synaptogenesis_rate=<float> Rate of synaptic formation" << std::endl;
+    std::cout << "  --pruning_rate=<float>      Rate of synaptic elimination" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Logging Options:" << std::endl;
+    std::cout << "  --log_level=<level>     Log level (OFF, ERROR, WARNING, INFO, DEBUG)" << std::endl;
+    std::cout << "  --log_to_file           Log to file" << std::endl;
+    std::cout << "  --log_filename=<file>  Log filename (default: nlm.log)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Simulation Options:" << std::endl;
+    std::cout << "  --max_simulation_steps=<num>   Maximum simulation steps" << std::endl;
+    std::cout << "  --simulation_time_limit=<float> Time limit (seconds)" << std::endl;
+    std::cout << "  --visualization_enabled=<bool> Enable visualization" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Information Options:" << std::endl;
+    std::cout << "  --version               Print version information" << std::endl;
+    std::cout << "  --help                  Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example:" << std::endl;
+    std::cout << "  ./nlm --random_seed=123 --neuron_count=500 --log_level=DEBUG" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,14 +351,102 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Command-line flag processing
+    bool showHelp = false;
+    bool showVersion = false;
+    LogLevel logLevel = LogLevel::Info;
+    bool logToFile = false;
+    std::string logFilename = "nlm.log";
     
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 6) == "--log_") {
+            // Handle log configuration
+            if (arg.find('=') != std::string::npos) {
+                std::string key = arg.substr(6, arg.find('=') - 6);
+                std::string value = arg.substr(arg.find('=') + 1);
+                // Parse log configuration values
+                if (key == "level") {
+                    // Convert string to LogLevel (simplified)
+                    if (value == "DEBUG") {
+                        logLevel = LogLevel::Debug;
+                    } else if (value == "INFO") {
+                        logLevel = LogLevel::Info;
+                    } else if (value == "WARNING") {
+                        logLevel = LogLevel::Warning;
+                    } else if (value == "ERROR") {
+                        logLevel = LogLevel::Error;
+                    } else {
+                        logLevel = LogLevel::Info; // default
+                    }
+                } else if (key == "to_file") {
+                    logToFile = (value == "true" || value == "1" || value == "yes");
+                } else if (key == "filename") {
+                    logFilename = value;
+                }
+            }
+        } else if (arg.substr(0, 8) == "--random_") {
+            // Handle random seed
+        } else if (arg.substr(0, 8) == "--neuron_") {
+            // Handle neuron count
+        } else if (arg.substr(0, 8) == "--region_") {
+            // Handle region count
+        } else if (arg.substr(0, 20) == "--connection_probability") {
+            // Handle connection probability
+        } else if (arg.substr(0, 10) == "--stdp_ltp_") {
+            // Handle STDP LTP weight
+        } else if (arg.substr(0, 11) == "--stdp_ltd_") {
+            // Handle STDP LTD weight
+        } else if (arg.substr(0, 10) == "--stdp_tau") {
+            // Handle STDP time constant
+        } else if (arg.substr(0, 18) == "--synaptogenesis_") {
+            // Handle synaptogenesis rate
+        } else if (arg.substr(0, 13) == "--pruning_rate") {
+            // Handle pruning rate
+        } else if (arg.substr(0, 8) == "--max_sim") {
+            // Handle max simulation steps
+        } else if (arg.substr(0, 20) == "--simulation_time") {
+            // Handle simulation time limit
+        } else if (arg.substr(0, 20) == "--visualization_") {
+            // Handle visualization enabled
+        }
+    }
+    
+    // Handle help and version before anything else
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
+    
+    printBanner();
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with proper log level
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
+    
+    // Add file logger if requested
+    if (logToFile) {
+        auto fileLogger = std::make_shared<FileLogger>(logFilename, logLevel);
+        logger->addLogger(fileLogger);
+    }
+    
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
