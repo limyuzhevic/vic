@@ -58,6 +58,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+    ../src/enhanced_demo.cpp
 )
 
 set(NLM_AGENT_SOURCES
@@ -99,4 +100,12 @@ install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Enhanced demo executable as part of Python bindings for convenience
+add_executable(nlm_enhanced_demo ${NLM_SOURCE_DIR}/enhanced_demo.cpp)
+target_link_libraries(nlm_enhanced_demo PUBLIC nlm_core nlm_agent nlm_world)
+target_compile_features(nlm_enhanced_demo PRIVATE cxx_std_20)
+install(TARGETS nlm_enhanced_demo
+    RUNTIME DESTINATION bin
 )

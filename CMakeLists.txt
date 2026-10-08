@@ -139,6 +139,13 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Enhanced demo executable (new improved version)
+add_executable(nlm_enhanced_demo
+    src/enhanced_demo.cpp
+)
+target_link_libraries(nlm_enhanced_demo PUBLIC nlm_core nlm_agent nlm_world)
+target_compile_features(nlm_enhanced_demo PRIVATE cxx_std_20)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
