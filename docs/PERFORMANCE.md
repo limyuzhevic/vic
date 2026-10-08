@@ -102,41 +102,93 @@ VectorizedSTDP: Batch plasticity updates
 - Vectorized weight calculations
 - Reduced memory access
 
-## Benchmarking
+## Enhanced Benchmarking
 
-### Standard Benchmarks
+### New NLM Benchmarking Infrastructure
 
-| Scale | Neurons | Synapses | Target Steps/sec |
-|-------|---------|----------|-----------------|
-| Micro | 1,000 | ~10,000 | 10,000+ |
-| Small | 10,000 | ~100,000 | 5,000+ |
-| Medium | 100,000 | ~1,000,000 | 1,000+ |
-| Large | 1,000,000 | ~10,000,000 | 100+ |
+Phase 5 introduces a comprehensive benchmarking framework with the following enhancements:
 
-### Performance Metrics
+#### 1. New CLI Benchmark Commands
 
-**Simulation Performance**:
-- Neurons per second: Total neurons / wall-clock time
-- Spikes per second: Total spikes / wall-clock time
-- Real-time factor: simulated_time / wall_clock_time
+```bash
+# Neuron scaling benchmarks
+nlm benchmark neuron --steps=1000 100 500 1000 2000 5000
 
-**Memory Usage**:
-- Neuron memory: sizeof(NeuronState) × neuron_count
-- Synapse memory: sizeof(SynapseRecord) × synapse_count
-- Event queue memory: Queue capacity × event_size
+# Connectivity benchmarks
+nlm benchmark connectivity
 
-### Measurement Commands
+# Plasticity benchmarks
+nlm benchmark plasticity
+
+# Memory system benchmarks
+nlm benchmark memory
+
+# Comprehensive benchmarks
+nlm benchmark comprehensive
+
+# Individual benchmarks
+nlm benchmark neuron 1000
+nlm benchmark connectivity
+nlm benchmark plasticity
+nlm benchmark memory
+```
+
+#### 2. New C++ Benchmark Tool
+
+```bash
+# Standalone benchmark executable
+./benchmark --neuron 100 500 1000 2000 5000
+./benchmark connectivity
+./benchmark plasticity
+./benchmark memory
+./benchmark comprehensive
+```
+
+#### 3. Performance Metrics
+
+**Enhanced Metrics Collection**:
+- **Simulation Performance**: Steps/sec, neurons/sec, spikes/sec
+- **Memory Efficiency**: Peak memory usage, allocation efficiency
+- **Network Performance**: Connectivity utilization, plasticity effectiveness
+- **System Integration**: Memory system performance, event queue efficiency
+
+**Benchmark Reports**:
+- Comparative analysis across different network sizes
+- Scalability analysis (neurons vs. performance)
+- Plasticity effectiveness measurements
+- Memory usage profiling
+
+### Performance Testing Commands
 
 ```bash
 # Build with performance flags
+mkdir build
+cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON ..
 make -j$(nproc)
 
-# Run benchmark
-./build/nlm --benchmark --neurons=10000 --steps=10000
+# Run neuron scaling benchmarks
+./benchmark neuron 100 500 1000 2000 5000
 
-# Run scaling experiment
-./build/nlm --scaling-benchmark
+# Run connectivity benchmark
+./benchmark connectivity
+
+# Run plasticity benchmark
+./benchmark plasticity
+
+# Run memory benchmark
+./benchmark memory
+
+# Run comprehensive benchmark
+./benchmark comprehensive
+
+# Build and run CLI benchmarks
+make pynlm-cli
+cd ..
+./cli/build/nlm benchmark neuron 1000
+./cli/build/nlm benchmark connectivity
+./cli/build/nlm benchmark plasticity
+./cli/build/nlm benchmark memory
 ```
 
 ## Scaling Results
@@ -145,26 +197,115 @@ make -j$(nproc)
 
 ```
 Scale    Neurons    Synapses    Memory    Steps/sec
-──────────────────────────────────────────────────
+─────────────────────────────────────────────────
 10k      10,000     ~100,000    ~10 MB    5,000+
 100k     100,000    ~1,000,000  ~100 MB   1,000+
 1M       1,000,000  ~10,000,000 ~1 GB     100+
 ```
 
-### Scaling Behavior
+### Enhanced Scaling Analysis
 
-**Ideal scaling**: Double neurons → Half performance per neuron
-**Actual scaling**: Depends on:
-- Memory bandwidth saturation
-- Cache miss rates
-- Synchronization overhead
-- Event queue contention
+**New Scaling Tests Added**:
+
+1. **Neuron Scaling Tests**:
+   - Tested: 100, 500, 1000, 2000, 5000 neurons
+   - Purpose: Measure scaling efficiency and memory usage
+   - Analysis: Identify bottlenecks at different scales
+
+2. **Connectivity Benchmark**:
+   - Tests: 1000 neurons, 2 regions, 15% connectivity
+   - Purpose: Validate sparse connectivity implementation
+   - Analysis: Measure event queue efficiency
+
+3. **Plasticity Benchmark**:
+   - Tests: 500 neurons with full plasticity enabled
+   - Purpose: Measure plasticity effectiveness and performance
+   - Analysis: Synaptic weight change efficiency
+
+4. **Memory Benchmark**:
+   - Tests: 1000 neurons with integrated memory systems
+   - Purpose: Validate memory system integration
+   - Analysis: Memory usage and performance
+
+### Performance Monitoring
+
+#### Runtime Performance Metrics
+
+**New Monitoring Features**:
+
+1. **Real-time Performance Monitoring**:
+   - Step duration tracking
+   - Operations per second (OPS)
+   - Memory usage monitoring
+   - Spike generation rate
+
+2. **Performance Logging**:
+   - Step-by-step progress reporting
+   - Performance counters
+   - Memory usage statistics
+   - Event queue statistics
+
+3. **Export Capabilities**:
+   - JSON export of performance data
+   - CSV export for external analysis
+   - PDF report generation
+   - Web-based dashboards
+
+## Python API Enhancements
+
+### Enhanced Python Bindings
+
+The NLM Python bindings have been enhanced with the following improvements:
+
+#### 1. New Python CLI Tool
+
+```python
+# CLI Interface
+nlm --help                    # Show all commands
+nlm create --neurons=500      # Create brain
+nlm run --steps=2000          # Run simulation
+nlm benchmark neuron 1000     # Run benchmark
+nlm experiment plasticity     # Run plasticity experiment
+nlm export results.json       # Export results
+```
+
+#### 2. New Python Classes
+
+```python
+# Enhanced Python API
+brain = create_brain(config)
+brain.initialize()
+
+# Performance monitoring
+brain.logPerformanceMetrics(step, time, duration)
+
+# Benchmarking
+brain.exportPerformanceData("benchmark.json")
+
+# Experiment control
+brain.createExperiment("plasticity", steps=5000)
+```
+
+#### 3. Type Hints and Documentation
+
+- Full type hints for all Python bindings
+- Comprehensive docstrings
+- Interactive help system
+- IDE support with autocompletion
+
+#### 4. New CLI Features
+
+- Command history
+- Auto-completion
+- Colorized output
+- Progress indicators
+- Configuration management
 
 ## Performance Optimization Guidelines
 
 ### DO
 
-1. **Profile first**: Use perf/valgrind before optimizing
+1. **Profile first**: Use new benchmarking tools before optimizing
 2. **Measure impact**: Compare before/after benchmarks
 3. **Maintain correctness**: Verify numerical results
 4. **Document tradeoffs**: Note speed vs. precision costs
@@ -193,18 +334,24 @@ Scale    Neurons    Synapses    Memory    Steps/sec
 - Memory bandwidth: Limits update throughput
 - NUMA topology: Affects multi-socket scaling
 
-### GPU (Future)
+### New Hardware Testing
 
-Potential GPU targets:
-- Large-scale neuron updates
-- Synaptic plasticity
-- Event processing
-- Population statistics
+**Additional Hardware Considerations**:
 
-Not GPU candidates:
-- Small networks (< 10k neurons)
-- Sparse irregular updates
-- Complex branching logic
+1. **CPU Architecture Testing**:
+   - Single vs. multi-core performance
+   - Cache hierarchy impact
+   - Vector instruction set utilization
+
+2. **Memory Hierarchy Testing**:
+   - L1/L2 cache effects
+   - Main memory bandwidth limits
+   - NUMA performance analysis
+
+3. **I/O Performance**:
+   - File system impact
+   - Network performance for distributed computing
+   - Storage requirements for large-scale simulations
 
 ## Future Optimizations
 
@@ -215,3 +362,67 @@ Phase 6 and beyond may include:
 3. **FPGA acceleration**: Custom neural accelerators
 4. **Approximate computing**: Trading precision for speed
 5. **Adaptive load balancing**: Dynamic work distribution
+
+## Integration Testing
+
+### Performance Validation Suite
+
+**New Testing Infrastructure**:
+
+1. **Automated Performance Testing**:
+   - Scheduled benchmark runs
+   - Performance regression detection
+   - Cross-platform consistency
+
+2. **Integration Testing**:
+   - Python-C++ interface performance
+   - Memory system integration
+   - Benchmark accuracy validation
+
+3. **Continuous Integration**:
+   - Performance regression detection
+   - Automated benchmark reporting
+   - Performance threshold enforcement
+
+## Performance Monitoring Integration
+
+### Real-time Performance Dashboard
+
+**New Monitoring Features**:
+
+1. **Web-based Dashboard**:
+   - Real-time performance metrics
+   - Historical performance analysis
+   - Benchmark comparison
+   - Resource utilization monitoring
+
+2. **API Performance Monitoring**:
+   - Python API response times
+   - C++ performance metrics
+   - System resource usage
+   - Event processing statistics
+
+3. **Alert System**:
+   - Performance threshold alerts
+   - Resource usage warnings
+   - Benchmark completion notifications
+
+## Conclusion
+
+The Phase 5 performance infrastructure represents a significant enhancement to the NLM framework, providing:
+
+1. **Comprehensive Benchmarking**: Extensive performance testing capabilities
+2. **Real-time Monitoring**: Performance metrics and analysis
+3. **Python API Enhancements**: Better user experience and performance tracking
+4. **Hardware Optimization**: Scalable performance across different architectures
+5. **Integration Testing**: Automated performance validation
+
+These improvements enable researchers and developers to:
+
+- Accurately measure NLM performance
+- Identify bottlenecks and optimization opportunities
+- Validate scaling behavior
+- Make informed decisions about hardware and software optimizations
+- Monitor performance in production environments
+
+The enhanced performance infrastructure positions NLM for large-scale neural simulation applications while maintaining correctness and usability.
