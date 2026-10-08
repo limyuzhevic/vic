@@ -187,13 +187,60 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
     // Logging
     void logStatus() const;
     
 private:
+    // ========== STEP HELPERS ==========
+    
+    // Step 1: Process pending delayed spike events
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 2: Update all neuron membrane potentials (LIF dynamics)
+    void updateNeuronDynamics(Timestamp currentTime);
+    
+    // Step 3: Detect spikes and schedule events
+    void detectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 4: Update working memory
+    void updateWorkingMemory();
+    
+    // Step 5: Apply neuromodulation effects
+    void applyNeuromodulation();
+    
+    // Step 6: Apply plasticity rules
+    void applyPlasticityRules(Timestamp currentTime);
+    
+    // Step 7: Update episodic memory
+    void updateEpisodicMemory(SimulationStep currentStep);
+    
+    // Step 8: Update prediction system
+    void updatePredictionSystem();
+    
+    // Step 9: Update attention system
+    void updateAttentionSystem();
+    
+    // Step 10: Update concept formation
+    void updateConceptFormation();
+    
+    // Step 11: Apply structural plasticity
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    
+    // Step 12: Replay important memories
+    void replayMemories(SimulationStep currentStep);
+    
+    // Step 13: Apply development effects
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    
+    // Step 14: Periodic memory consolidation
+    void consolidateMemories(SimulationStep currentStep);
+    
+    // Step 15: Checkpoint management
+    void updateCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 16: Collect statistics
+    void collectStatistics() const;
+    
     struct Impl;
     Impl* pImpl;
 };
