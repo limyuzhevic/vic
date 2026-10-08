@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
 
@@ -53,6 +54,10 @@ public:
     // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
     
 private:
     struct Impl;
@@ -63,24 +68,58 @@ private:
 // PLACEHOLDER - Phase 2
 class AntiHebbianRule : public PlasticityRule {
 public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
 // PLACEHOLDER - Phase 2
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setSlidingThreshold(float threshold);
+    float getSlidingThreshold() const;
+    void setThresholdAdaptation(float adaptation);
+    float getThresholdAdaptation() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

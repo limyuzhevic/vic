@@ -3,16 +3,16 @@ requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "pynlm"
+name = "pynlm-cli"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Command-line utilities for NLM brain simulation control and monitoring"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "brain", "cli", "control", "monitoring"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -23,35 +23,41 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+dependencies = [
+    "pynlm",
+    "click>=8.0",
+    "click-prompt>=0.1.0",
+    "numpy>=1.20",
+    "pandas>=1.0",
+    "matplotlib>=3.0; extra == 'plotting'",
+    "networkx>=2.0; extra == 'visualization'",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-asyncio>=0.21",
 ]
+plotting = ["matplotlib>=3.0"]
+visualization = ["networkx>=2.0"]
+all = ["matplotlib>=3.0", "networkx>=2.0"]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
-]
+[project.scripts]
+nlm-cli = "nlm_cli.__main__:main"
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+[project.entry-points.console_scripts]
+nlm-control = "nlm_cli.simulation:main"
+nlm-state = "nlm_cli.brain_state:main"
+nlm-plasticity = "nlm_cli.plasticity:main"
+nlm-neuromod = "nlm_cli.neuromodulation:main"
+nlm-analysis = "nlm_cli.analysis:main"

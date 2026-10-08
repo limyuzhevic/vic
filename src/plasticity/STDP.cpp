@@ -1,5 +1,5 @@
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -24,37 +24,35 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
+    
+    // Real STDP implementation based on spike-timing correlation
+    // 
+    // Mathematical formulation:
+    // For each pre-post spike pair with timing difference Δt = t_post - t_pre:
+    // 
+    // If Δt > 0 (pre before post): POTENTIATION
+    //   Δw = A+ * exp(-Δt / τ+)
+    //   
+    // If Δt < 0 (post before pre): DEPRESSION
+    //   Δw = A- * exp(Δt / τ-)
+    // 
+    // Where:
+    //   A+ = ltpWeight (potentiation amplitude)
+    //   A- = ltdWeight (depression amplitude)  
+    //   τ+ = τ- = timeConstant (STDP time window)
+    // 
+    // Biological inspiration:
+    //   - Reflects NMDA receptor-mediated calcium signaling
+    //   - Pre-before-post activates NMDA receptors when postsynaptic spikes
+    //   - Post-before-pre causes backpropagating action potentials
+    // 
+    // Limitations:
+    //   - Simplified pairwise rule (doesn't capture triplet interactions)
+    //   - Assumes single exponential window (more complex in biology)
+    //   - Doesn't account for synaptic eligibility traces
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;

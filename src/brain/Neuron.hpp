@@ -82,9 +82,14 @@ public:
     void setRefractoryPeriod(uint32_t steps);
     void decrementRefractory();
     
-    // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
+    // Adaptation variable for spike-frequency adaptation
+    float getAdaptationVariable() const;
+    float& getAdaptationVariable();
+    void setAdaptationVariable(float variable);
+    
+    // Membrane time constant (characteristic time scale of LIF dynamics)
+    float getMembraneTimeConstant() const;
+    float& getMembraneTimeConstant();
     
     // LIF neuron parameters
     void setLeakConductance(MembranePotential conductance);
@@ -133,9 +138,9 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
+    // Update neuron for one simulation step with configurable timestep
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    void step(Timestamp currentTime, TimestepDuration dt = 0.001);
     
     // Reset to initial state
     void reset();
