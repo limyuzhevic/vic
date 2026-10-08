@@ -219,17 +219,21 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
+    // ============================================================================
+    // TEMPORAL DYNAMICS: Time scaling factor (1ms timestep converted to seconds)
+    // ============================================================================
+    
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(dt) * NeuronConstants::TIME_SCALE_FACTOR * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * NeuronConstants::ADAPTATION_DECAY_RATE;
+        pImpl->state.adaptationVariable *= NeuronConstants::ADAPTATION_DECAY_FACTOR;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, NeuronConstants::MIN_MEMBRANE_POTENTIAL, NeuronConstants::MAX_MEMBRANE_POTENTIAL);
     
     // Check for spike
     if (V >= threshold) {
@@ -248,7 +252,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptationVariable += NeuronConstants::ADAPTATION_INCREMENT;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -261,7 +265,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    TimestepDuration dt = NeuronConstants::DEFAULT_TIMESTEP;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
@@ -286,13 +290,13 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(NeuronConstants::MIN_REFACTORY_PERIOD, NeuronConstants::MAX_REFACTORY_PERIOD));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.lastSpikeTime = NeuronConstants::LAST_SPIKE_TIME_SENTINEL;
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
