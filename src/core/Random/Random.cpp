@@ -1,5 +1,6 @@
 #include "Random.hpp"
 #include <stdexcept>
+#include <limits>
 
 namespace nlm {
 
