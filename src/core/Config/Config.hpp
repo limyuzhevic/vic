@@ -5,11 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigManager;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -71,15 +73,22 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with type safety
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, std::vector<int> value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, std::vector<double> value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, std::vector<std::string> value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Check existence and type
     bool has(const std::string& key) const;
+    
+    // Get the type of a config value
+    std::string getValueType(const std::string& key) const;
     
     // Remove key
     void remove(const std::string& key);
@@ -90,8 +99,14 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+    // Get configuration summary with more details
     std::string summary() const;
+    
+    // Export config to string for debugging
+    std::string exportToString() const;
+    
+    // Import config from string
+    bool importFromString(const std::string& content);
     
 private:
     struct Impl;
@@ -100,6 +115,20 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isComment(const std::string& line);
+    static std::pair<std::string, std::string> parseKeyValue(const std::string& line);
+    
+    // Convert string to appropriate type
+    template<typename T>
+    static T convertStringToType(const std::string& value);
+    
+    // Convert value to string representation
+    static std::string convertValueToString(const ConfigValue& value);
+    
+    // Validate value type
+    static bool isValidType(const ConfigValue& value, const std::type_info& typeInfo) const;
+    
+    friend class ConfigManager;
 };
 
 } // namespace nlm

@@ -85,6 +85,10 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Advanced CLI
+    src/cli/AdvancedCLI.cpp
+    # Performance profiling
+    src/profiling/PerformanceProfiler.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -119,7 +123,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm

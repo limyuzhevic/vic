@@ -49,56 +49,45 @@ void printBanner() {
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+class LearningExperiment {
+    std::shared_ptr<Brain> brain_;
+    uint64_t seed_;
+    size_t initialSynapseCount_;
+    std::vector<float> initialWeights_;
+    std::vector<float> finalWeights_;
+    std::vector<NeuronId> mostActiveNeurons_;
     
+public:
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain_(b), seed_(s), initialSynapseCount_(0) {}
     
     void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+        initialSynapseCount_ = brain_->getTotalSynapseCount();
+        initialWeights_.clear();
         
         // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        if (auto* region = brain_->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                initialWeights_.push_back(syn->getWeight());
             }
         }
         
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
+        logInitialState();
     }
     
     void recordFinalState() {
-        finalWeights.clear();
+        finalWeights_.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        if (auto* region = brain_->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                finalWeights_.push_back(syn->getWeight());
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons_ = brain_->getSpikeSystem()->getMostActiveNeurons(10);
         
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
+        logFinalState();
     }
     
     void computeStatistics() {
@@ -106,45 +95,24 @@ struct LearningExperiment {
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
         
-        if (initialWeights.empty() || finalWeights.empty()) {
+        if (initialWeights_.empty() || finalWeights_.empty()) {
             NLM_LOG_INFO("ERROR: No weights recorded");
             return;
         }
         
         // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        float initialMean = calculateMean(initialWeights_);
+        float finalMean = calculateMean(finalWeights_);
         
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        logWeightStatistics(initialMean, finalMean, initialWeights_.size(), finalWeights_.size());
         
         // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
+        size_t strengthened = 0, weakened = 0, unchanged = 0;
+        size_t minSize = std::min(initialWeights_.size(), finalWeights_.size());
+        std::tie(strengthened, weakened, unchanged) = countWeightChanges(initialWeights_, finalWeights_);
         
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
+        logSynapticChanges(strengthened, weakened, unchanged);
+        logSpikeActivity();
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
@@ -156,6 +124,71 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+    }
+    
+private:
+    // Helper functions for better modularity
+    void logInitialState() {
+        NLM_LOG_INFO("Initial state recorded:");
+        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount_));
+        if (!initialWeights_.empty()) {
+            float mean = calculateMean(initialWeights_);
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        }
+    }
+    
+    void logFinalState() {
+        NLM_LOG_INFO("Final state recorded:");
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain_->getTotalSpikeCount()));
+        if (!finalWeights_.empty()) {
+            float mean = calculateMean(finalWeights_);
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        }
+    }
+    
+    float calculateMean(const std::vector<float>& weights) const {
+        if (weights.empty()) return 0.0f;
+        float sum = std::accumulate(weights.begin(), weights.end(), 0.0f);
+        return sum / weights.size();
+    }
+    
+    void logWeightStatistics(float initialMean, float finalMean, 
+                           size_t initialSize, size_t finalSize) {
+        NLM_LOG_INFO("Weight Statistics:");
+        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
+        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
+        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+    }
+    
+    std::tuple<size_t, size_t, size_t> countWeightChanges(
+        const std::vector<float>& initial, 
+        const std::vector<float>& final) {
+        size_t strengthened = 0, weakened = 0, unchanged = 0;
+        size_t minSize = std::min(initial.size(), final.size());
+        
+        for (size_t i = 0; i < minSize; ++i) {
+            float delta = final[i] - initial[i];
+            if (delta > 0.01f) ++strengthened;
+            else if (delta < -0.01f) ++weakened;
+            else ++unchanged;
+        }
+        
+        return {strengthened, weakened, unchanged};
+    }
+    
+    void logSynapticChanges(size_t strengthened, size_t weakened, size_t unchanged) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Synaptic Changes:");
+        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
+        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
+        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+    }
+    
+    void logSpikeActivity() {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Spike Activity:");
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain_->getTotalSpikeCount()));
+        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons_.size()));
     }
 };
 
