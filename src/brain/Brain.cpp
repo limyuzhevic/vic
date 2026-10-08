@@ -56,6 +56,12 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Phase 2 enhancements: Additional plasticity rules
+    std::unique_ptr<RewardModulatedSTDP> rewardModulatedSTDP;
+    std::unique_ptr<TripletSTDP> tripletSTDP;
+    std::unique_ptr<AntiHebbianRule> antiHebbianRule;
+    std::unique_ptr<BCMRule> bcmRule;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -106,29 +112,63 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Initialize additional plasticity rules (Phase 2 enhancements)
+        rewardModulatedSTDP = std::make_unique<RewardModulatedSTDP>();
+        tripletSTDP = std::make_unique<TripletSTDP>();
+        antiHebbianRule = std::make_unique<AntiHebbianRule>();
+        bcmRule = std::make_unique<BCMRule>();
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        // Configure reward-modulated STDP
+        rewardModulatedSTDP->setLearningRate(0.001f);
+        rewardModulatedSTDP->setModulationStrength(1.0f);
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        // Configure triplet STDP
+        tripletSTDP->setLTPWeight(0.005f);
+        tripletSTDP->setLTDWeight(0.012f);
+        tripletSTDP->setTimeConstant(20.0f);
+        tripletSTDP->setA1(0.002f);
+        tripletSTDP->setA2(0.001f);
+        tripletSTDP->setB1(0.01f);
+        tripletSTDP->setB2(0.012f);
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        // Configure anti-Hebbian rule
+        antiHebbianRule->setLearningRate(0.005f);
+        antiHebbianRule->setDepressionFactor(1.0f);
         
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+        // Configure BCM rule
+        bcmRule->setLearningRate(0.002f);
+        bcmRule->setThreshold(0.5f);
+        bcmRule->setThetaMinus(0.1f);
+        bcmRule->setThetaPlus(2.0f);
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Initialize additional plasticity rules (Phase 2 enhancements)
+        rewardModulatedSTDP = std::make_unique<RewardModulatedSTDP>();
+        tripletSTDP = std::make_unique<TripletSTDP>();
+        antiHebbianRule = std::make_unique<AntiHebbianRule>();
+        bcmRule = std::make_unique<BCMRule>();
+        
+        // Configure reward-modulated STDP
+        rewardModulatedSTDP->setLearningRate(0.001f);
+        rewardModulatedSTDP->setModulationStrength(1.0f);
+        
+        // Configure triplet STDP
+        tripletSTDP->setLTPWeight(0.005f);
+        tripletSTDP->setLTDWeight(0.012f);
+        tripletSTDP->setTimeConstant(20.0f);
+        tripletSTDP->setA1(0.002f);
+        tripletSTDP->setA2(0.001f);
+        tripletSTDP->setB1(0.01f);
+        tripletSTDP->setB2(0.012f);
+        
+        // Configure anti-Hebbian rule
+        antiHebbianRule->setLearningRate(0.005f);
+        antiHebbianRule->setDepressionFactor(1.0f);
+        
+        // Configure BCM rule
+        bcmRule->setLearningRate(0.002f);
+        bcmRule->setThreshold(0.5f);
+        bcmRule->setThetaMinus(0.1f);
+        bcmRule->setThetaPlus(2.0f);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -658,6 +698,22 @@ Hebbian* Brain::getHebbian() {
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
     return pImpl->structuralPlasticity.get();
+}
+
+RewardModulatedSTDP* Brain::getRewardModulatedSTDP() {
+    return pImpl->rewardModulatedSTDP.get();
+}
+
+TripletSTDP* Brain::getTripletSTDP() {
+    return pImpl->tripletSTDP.get();
+}
+
+AntiHebbianRule* Brain::getAntiHebbianRule() {
+    return pImpl->antiHebbianRule.get();
+}
+
+BCMRule* Brain::getBCMRule() {
+    return pImpl->bcmRule.get();
 }
 
 float Brain::getExcitationInhibitionRatio() const {

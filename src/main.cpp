@@ -382,6 +382,29 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Reward-modulated STDP parameters
+    config->set("reward_modulated_learning_rate", 0.001f, ConfigSource::Default);
+    config->set("reward_modulation_strength", 1.0f, ConfigSource::Default);
+    
+    // Triplet STDP parameters
+    config->set("triplet_ltp_weight", 0.005f, ConfigSource::Default);
+    config->set("triplet_ltd_weight", 0.012f, ConfigSource::Default);
+    config->set("triplet_time_constant", 20.0f, ConfigSource::Default);
+    config->set("triplet_a1", 0.002f, ConfigSource::Default);
+    config->set("triplet_a2", 0.001f, ConfigSource::Default);
+    config->set("triplet_b1", 0.01f, ConfigSource::Default);
+    config->set("triplet_b2", 0.012f, ConfigSource::Default);
+    
+    // Anti-Hebbian parameters
+    config->set("antihebbian_learning_rate", 0.005f, ConfigSource::Default);
+    config->set("antihebbian_depression_factor", 1.0f, ConfigSource::Default);
+    
+    // BCM rule parameters
+    config->set("bc_learning_rate", 0.002f, ConfigSource::Default);
+    config->set("bc_threshold", 0.5f, ConfigSource::Default);
+    config->set("bc_threshold_minus", 0.1f, ConfigSource::Default);
+    config->set("bc_threshold_plus", 2.0f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,6 +413,14 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Plasticity Settings:");
+    NLM_LOG_INFO("  reward_modulated_learning_rate: " + std::to_string(config->getOr<float>("reward_modulated_learning_rate", 0.001f)));
+    NLM_LOG_INFO("  reward_modulation_strength: " + std::to_string(config->getOr<float>("reward_modulation_strength", 1.0f)));
+    NLM_LOG_INFO("  triplet_ltp_weight: " + std::to_string(config->getOr<float>("triplet_ltp_weight", 0.005f)));
+    NLM_LOG_INFO("  triplet_b2: " + std::to_string(config->getOr<float>("triplet_b2", 0.012f)));
+    NLM_LOG_INFO("  antihebbian_learning_rate: " + std::to_string(config->getOr<float>("antihebbian_learning_rate", 0.005f)));
+    NLM_LOG_INFO("  bc_learning_rate: " + std::to_string(config->getOr<float>("bc_learning_rate", 0.002f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

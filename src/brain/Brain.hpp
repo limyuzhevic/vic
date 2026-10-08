@@ -6,6 +6,10 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/RewardModulatedSTDP.hpp"
+#include "../plasticity/TripletSTDP.hpp"
+#include "../plasticity/AntiHebbianRule.hpp"
+#include "../plasticity/BCMRule.hpp"
 #include <memory>
 #include <string>
 
@@ -88,6 +92,10 @@ public:
     STDP* getSTDP();
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
+    RewardModulatedSTDP* getRewardModulatedSTDP();
+    TripletSTDP* getTripletSTDP();
+    AntiHebbianRule* getAntiHebbianRule();
+    BCMRule* getBCMRule();
     
     // Statistics
     float getExcitationInhibitionRatio() const;
