@@ -55,8 +55,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, falls back to simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file (helper method)
+    bool loadFromJSONFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -100,6 +103,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    void parseJSONToConfig(const nlohmann::json& jsonData, const std::string& prefix, ConfigSource source);
 };
 
 } // namespace nlm

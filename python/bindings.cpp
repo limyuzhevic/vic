@@ -144,14 +144,73 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            bool success = self.loadFromFile(filepath);
+            if (!success) {
+                py::print("Warning: Failed to load configuration from '{}'. "
+                         "The file may be in an unsupported format or contain errors.", filepath);
+            }
+            return success;
+        }, py::arg("filepath"),
+             "Load configuration from a file (JSON format preferred, falls back to simple key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+        .def("loadFromJSON", [](Config& self, const std::string& jsonStr) {
+#if NLM_HAS_JSON
+            try {
+                auto jsonData = nlohmann::json::parse(jsonStr);
+                self.clear();
+                self.parseJSONToConfig(jsonData, "", ConfigSource::File);
+                return true;
+            } catch (const std::exception& e) {
+                py::print("Error parsing JSON: {}", e.what());
+                return false;
+            }
+#else
+            py::print("Error: JSON parsing not available (nlohmann/json not found)");
+            return false;
+#endif
+        }, py::arg("jsonStr"),
+           "Load configuration from a JSON string")
+        .def("getOr", [](Config& self, const std::string& key, const py::object& defaultValue) {
+            // Handle different Python types
+            if (defaultValue.is_none()) {
+                return self.getOr<std::string>(key, "");
+            } else if (py::isinstance(defaultValue, py::int_())) {
+                return self.getOr<int>(key, defaultValue.cast<int>());
+            } else if (py::isinstance(defaultValue, py::float_())) {
+                return self.getOr<double>(key, defaultValue.cast<double>());
+            } else if (py::isinstance(defaultValue, py::bool_())) {
+                return self.getOr<bool>(key, defaultValue.cast<bool>());
+            } else {
+                return self.getOr<std::string>(key, defaultValue.cast<std::string>());
+            }
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value with default, supports Python type inference")
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            // Handle different Python types for convenience
+            if (py::isinstance(value, py::int_())) {
+                self.set(key, value.cast<int>(), ConfigSource::Runtime);
+            } else if (py::isinstance(value, py::float_())) {
+                self.set(key, value.cast<double>(), ConfigSource::Runtime);
+            } else if (py::isinstance(value, py::bool_())) {
+                self.set(key, value.cast<bool>(), ConfigSource::Runtime);
+            } else if (py::isinstance(value, py::list())) {
+                // Convert Python list to appropriate vector type
+                py::list pyList = value.cast<py::list>();
+                std::vector<double> doubleList;
+                doubleList.reserve(pyList.size());
+                for (size_t i = 0; i < pyList.size(); ++i) {
+                    doubleList.push_back(pyList[i].cast<double>());
+                }
+                self.set(key, doubleList, ConfigSource::Runtime);
+            } else {
+                self.set(key, value.cast<std::string>(), ConfigSource::Runtime);
+            }
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value with Python type convenience")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -420,6 +479,207 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Helper function for creating default configuration
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set some useful defaults
+        config->set("neuron_count", 1000, ConfigSource::Runtime);
+        config->set("region_count", 2, ConfigSource::Runtime);
+        config->set("connection_probability", 0.1, ConfigSource::Runtime);
+        config->set("simulation_timestep", 0.001, ConfigSource::Runtime);
+        return config;
+    }, "Create a default configuration with sensible settings");
+
+    // Helper function for loading configuration from JSON string
+    m.def("loadConfigFromJSON", [](const std::string& jsonStr) -> std::shared_ptr<Config> {
+#if NLM_HAS_JSON
+        try {
+            auto jsonData = nlohmann::json::parse(jsonStr);
+            auto config = std::make_shared<Config>();
+            config->clear();
+            config->parseJSONToConfig(jsonData, "", ConfigSource::File);
+            return config;
+        } catch (const std::exception& e) {
+            throw py::value_error(std::string("Error parsing JSON: ") + e.what());
+        }
+#else
+        throw py::value_error("Error: JSON parsing not available (nlohmann/json not found)");
+#endif
+    }, py::arg("jsonStr"),
+        "Load configuration from a JSON string (convenience function)");
+
+    // Helper function for creating configuration from Python dict
+    m.def("createConfigFromDict", [](const py::dict& dict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        for (auto item : dict) {
+            std::string key = item.first.cast<std::string>();
+            py::object value = item.second;
+            
+            // Convert Python types to appropriate C++ types
+            if (py::isinstance(value, py::int_())) {
+                config->set(key, value.cast<int64_t>(), ConfigSource::Runtime);
+            } else if (py::isinstance(value, py::float_())) {
+                config->set(key, value.cast<double>(), ConfigSource::Runtime);
+            } else if (py::isinstance(value, py::bool_())) {
+                config->set(key, value.cast<bool>(), ConfigSource::Runtime);
+            } else if (py::isinstance(value, py::list())) {
+                // Convert Python list to vector
+                std::vector<double> vec;
+                py::list pyList = value.cast<py::list>();
+                vec.reserve(pyList.size());
+                for (size_t i = 0; i < pyList.size(); ++i) {
+                    vec.push_back(pyList[i].cast<double>());
+                }
+                config->set(key, vec, ConfigSource::Runtime);
+            } else {
+                config->set(key, value.cast<std::string>(), ConfigSource::Runtime);
+            }
+        }
+        
+        return config;
+    }, py::arg("dict"),
+        "Create configuration from Python dictionary (convenience function)");
+
+    // Helper function for validating configuration
+    m.def("validateConfig", [](const Config& config) -> py::dict {
+        py::dict results;
+        
+        // Check for required keys
+        std::vector<std::string> requiredKeys = {
+            "neuron_count",
+            "region_count", 
+            "connection_probability",
+            "simulation_timestep"
+        };
+        
+        int validCount = 0;
+        for (const auto& key : requiredKeys) {
+            if (config.has(key)) {
+                results[key.c_str()] = true;
+                validCount++;
+            } else {
+                results[key.c_str()] = false;
+            }
+        }
+        
+        results["valid_percentage"] = (double)validCount / requiredKeys.size() * 100.0;
+        results["total_keys"] = config.getKeys().size();
+        
+        return results;
+    }, py::arg("config"),
+        "Validate configuration and return validation results");
+
+    // Helper function for configuration analysis
+    m.def("analyzeConfig", [](const Config& config) -> py::dict {
+        py::dict analysis;
+        
+        auto keys = config.getKeys();
+        analysis["key_count"] = keys.size();
+        
+        // Try to get value types
+        py::dict typeCounts;
+        int intCount = 0, floatCount = 0, stringCount = 0, boolCount = 0, vectorCount = 0;
+        
+        // Check some sample keys to estimate types
+        int sampleCount = std::min<size_t>(10, keys.size());
+        for (size_t i = 0; i < sampleCount; ++i) {
+            auto value = config.get<std::string>(keys[i]);
+            if (value) {
+                // Try to infer type from string content
+                try {
+                    // Try int
+                    size_t pos;
+                    int intVal = std::stoi(*value, &pos);
+                    if (pos == value->size()) intCount++;
+                    else {
+                        // Try double
+                        double floatVal = std::stod(*value, &pos);
+                        if (pos == value->size()) floatCount++;
+                        else if (*value == "true" || *value == "false") boolCount++;
+                        else stringCount++;
+                    }
+                } catch (...) {
+                    // If conversion fails, it's a string
+                    stringCount++;
+                }
+            }
+        }
+        
+        typeCounts["int"] = intCount;
+        typeCounts["float"] = floatCount;
+        typeCounts["string"] = stringCount;
+        typeCounts["bool"] = boolCount;
+        typeCounts["vector"] = vectorCount;
+        
+        analysis["estimated_types"] = typeCounts;
+        
+        // Get configuration summary
+        std::string summary = config.summary();
+        analysis["summary"] = summary.substr(0, std::min<size_t>(200, summary.size()));
+        
+        return analysis;
+    }, py::arg("config"),
+        "Analyze configuration and return statistics");
+
+    // Helper function for converting config to Python dict
+    m.def("configToDict", [](const Config& config) -> py::dict {
+        py::dict result;
+        auto keys = config.getKeys();
+        
+        for (const auto& key : keys) {
+            // Try to get value as appropriate Python type
+            auto strValue = config.get<std::string>(key);
+            if (strValue) {
+                // Try to convert to more specific type if possible
+                try {
+                    // Try int
+                    size_t pos;
+                    int intVal = std::stoi(*strValue, &pos);
+                    if (pos == strValue->size()) {
+                        result[key.c_str()] = intVal;
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    // Try float
+                    size_t pos;
+                    double floatVal = std::stod(*strValue, &pos);
+                    if (pos == strValue->size()) {
+                        result[key.c_str()] = floatVal;
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    // Try bool
+                    if (*strValue == "true") {
+                        result[key.c_str()] = true;
+                        continue;
+                    } else if (*strValue == "false") {
+                        result[key.c_str()] = false;
+                        continue;
+                    }
+                } catch (...) {}
+                
+                // Default to string
+                result[key.c_str()] = *strValue;
+            }
+        }
+        
+        return result;
+    }, py::arg("config"),
+        "Convert configuration to Python dictionary");
+
+    // Helper function for creating configuration from file
+    m.def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"),
+        "Create configuration from file (convenience function)");
 }
 
 } // namespace nlm

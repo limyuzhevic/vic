@@ -1,0 +1,37 @@
+// Test JSON configuration file for NLM
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_tau": 20.0,
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001,
+    "working_memory_capacity": 100,
+    "episodic_memory_max_episodes": 1000,
+    "reward_modulation_enabled": true,
+    "curiosity_enabled": true,
+    "development_enabled": true,
+    "structural_plasticity_enabled": true,
+    "environment_width": 20,
+    "environment_height": 20,
+    "vision_width": 16,
+    "vision_height": 16,
+    "max_energy": 100.0,
+    "energy_decay_rate": 0.01,
+    "checkpoint_dir": "./checkpoints",
+    "replay_interval": 100,
+    "consolidation_interval": 1000,
+    "complex_parameters": {
+        "learning_rates": [0.01, 0.02, 0.03],
+        "weights": [1.0, -0.5, 2.0],
+        "tags": ["critical", "high", "low"],
+        "nested_config": {
+            "inner_setting": 42,
+            "enabled": true
+        }
+    }
+}

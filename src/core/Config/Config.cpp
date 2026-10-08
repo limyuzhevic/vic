@@ -4,6 +4,35 @@
 #include <algorithm>
 #include <filesystem>
 
+// Try to include nlohmann/json if available, otherwise provide a fallback
+#if defined(__has_include) && __has_include(<nlohmann/json.hpp>)
+    #include <nlohmann/json.hpp>
+    #define NLM_HAS_JSON 1
+#else
+    #define NLM_HAS_JSON 0
+    namespace nlohmann {
+        class json {
+        public:
+            json() = default;
+            json(const std::string&) { }
+            bool is_object() const { return false; }
+            bool is_array() const { return false; }
+            bool is_number_integer() const { return false; }
+            bool is_number_float() const { return false; }
+            bool is_boolean() const { return false; }
+            bool is_string() const { return false; }
+            std::string dump() const { return ""; }
+            class iterator { };
+            iterator begin() const { return iterator(); }
+            iterator end() const { return iterator(); }
+            const std::string& key() const { static std::string empty; return empty; }
+            const std::string& get() const { static std::string empty; return empty; }
+            template<typename T> T get() const { return T(); }
+            template<typename T> bool is() const { return false; }
+        };
+    }
+#endif
+
 namespace nlm {
 
 struct Config::Impl {
@@ -19,9 +48,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parsing first (preferred format)
+    if (loadFromJSONFile(filepath)) {
+        return true;
+    }
     
+    // Fall back to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,8 +75,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
                 value = value.substr(1, value.size() - 2);
             }
             
@@ -55,7 +87,70 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+bool Config::loadFromJSONFile(const std::string& filepath) {
+#if NLM_HAS_JSON
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Recursively parse JSON and set configuration values
+        parseJSONToConfig(jsonData, "", ConfigSource::File);
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Not a valid JSON file, fall back to simple format
+        return false;
+    }
+#else
+    // nlohmann/json not available, skip JSON parsing
+    return false;
+#endif
+}
+
+void Config::parseJSONToConfig(const nlohmann::json& jsonData, const std::string& prefix, ConfigSource source) {
+    for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+        std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+        
+        if (it->is_object()) {
+            // Nested object - recursively parse
+            parseJSONToConfig(*it, key, source);
+        } else if (it->is_array()) {
+            // Store array as vector
+            set(key, *it, source);
+        } else {
+            // Scalar value - store directly
+            set(key, *it, source);
+        }
+    }
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -126,8 +221,56 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_object()) {
+        // Convert nested object to string representation
+        set(key, value.dump(), source);
+    } else if (value.is_array()) {
+        // Convert array to appropriate vector type
+        if (!value.empty()) {
+            // Try to infer array type from first element
+            const auto& firstElement = value[0];
+            if (firstElement.is_number_integer()) {
+                std::vector<int> intArray;
+                intArray.reserve(value.size());
+                for (const auto& elem : value) {
+                    intArray.push_back(elem.get<int>());
+                }
+                set(key, intArray, source);
+            } else if (firstElement.is_number_float()) {
+                std::vector<double> doubleArray;
+                doubleArray.reserve(value.size());
+                for (const auto& elem : value) {
+                    doubleArray.push_back(elem.get<double>());
+                }
+                set(key, doubleArray, source);
+            } else if (firstElement.is_string()) {
+                std::vector<std::string> stringArray;
+                stringArray.reserve(value.size());
+                for (const auto& elem : value) {
+                    stringArray.push_back(elem.get<std::string>());
+                }
+                set(key, stringArray, source);
+            } else {
+                // Default to string representation
+                set(key, value.dump(), source);
+            }
+        } else {
+            // Empty array - store as empty vector of strings
+            set(key, std::vector<std::string>(), source);
+        }
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else {
+        // For null or other types, store as empty string
+        set(key, std::string(), source);
+    }
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
