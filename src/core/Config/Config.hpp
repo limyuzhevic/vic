@@ -31,16 +31,10 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+// File format detection
+enum class detected_file_format {
+    Simple,
+    JSON
 };
 
 // Main configuration class
