@@ -139,6 +139,29 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Python bindings support
+if(PYBIND11_FOUND)
+    # Create Python module
+    pybind11_add_module(pynlm
+        python/bindings.cpp
+    )
+    
+    target_include_directories(pynlm PRIVATE python)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    
+    set_target_properties(pynlm PROPERTIES
+        OUTPUT_NAME "pynlm"
+        CXX_STANDARD 20
+    )
+    
+    # Install Python module
+    install(TARGETS pynlm
+        LIBRARY DESTINATION lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages
+    )
+else()
+    message(WARNING "Pybind11 not found - Python bindings will not be built")
+endif()
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
