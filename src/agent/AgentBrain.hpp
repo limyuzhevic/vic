@@ -2,6 +2,8 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AdvancedAgent.hpp"
+#include "AdvancedAgentBrain.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -58,7 +60,44 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // Advanced command interface
+    CommandResult executeCommand(const std::string& commandLine);
+    CommandResult executeComplexAction(ComplexAction action);
+    
+    // Script management
+    bool loadScript(const std::string& filename);
+    bool executeScript(const std::string& scriptName);
+    bool scheduleScript(const std::string& scriptName, double delay = 0.0);
+    
+    // Command history and completion
+    void addToHistory(const std::string& command);
+    std::vector<std::string> getCommandHistory(size_t limit = 10) const;
+    std::vector<std::string> getCommandCompletions(const std::string& partial) const;
+    
+    // Command registration
+    void registerCommand(const std::string& name, std::unique_ptr<Command> command);
+    bool hasCommand(const std::string& name) const;
+    
+    // State management
+    void saveState(const std::string& filename) const;
+    bool loadState(const std::string& filename);
+    
     // Configuration
+    void setVerbose(bool verbose) { verbose_ = verbose; }
+    void setMaxHistorySize(size_t size) { maxHistorySize_ = size; }
+    
+    // Script variables and context
+    void setVariable(const std::string& name, float value);
+    float getVariable(const std::string& name) const;
+    bool hasVariable(const std::string& name) const;
+    
+    void setContextVariable(const std::string& name, const std::string& value);
+    std::string getContextVariable(const std::string& name) const;
+    
+    // Advanced agent brain access
+    std::shared_ptr<AdvancedAgentBrain> getAdvancedAgentBrain() const { return advancedAgentBrain_; }
+    
+    // Configuration flags
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -77,6 +116,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<AdvancedAgentBrain> advancedAgentBrain_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -108,10 +148,16 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool verbose_;
+    size_t maxHistorySize_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Scripting and advanced features
+    bool explorationMode_;
+    bool learningMode_;
 };
 
 } // namespace nlm

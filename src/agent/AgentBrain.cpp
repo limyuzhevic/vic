@@ -5,8 +5,16 @@
 
 namespace nlm {
 
+#include "AgentBrain.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+
+namespace nlm {
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , advancedAgentBrain_(std::make_shared<AdvancedAgentBrain>(brain))
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -18,8 +26,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
+    , verbose_(false)
+    , maxHistorySize_(100)
+    , explorationMode_(false)
+    , learningMode_(false)
+    , sensoryNoveltyDecay_(0.99f) {
+    
+    // Initialize advanced agent brain with this agent
+    advancedAgentBrain_->getAgent()->advancedAgentBrain_ = advancedAgentBrain_;
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {

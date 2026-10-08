@@ -96,9 +96,26 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/AdvancedAgent.cpp
+    src/agent/ErrorHandling.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+# Advanced agent brain system (enhanced command interface)
+add_library(nlm_advanced_agent STATIC
+    src/agent/AdvancedAgentBrain.cpp
+)
+target_include_directories(nlm_advanced_agent PUBLIC src)
+target_link_libraries(nlm_advanced_agent PUBLIC nlm_agent)
+
+# Core configuration system
+add_library(nlm_config STATIC
+    src/core/Config/Config.cpp
+    src/core/Config/Config.tpp
+)
+target_include_directories(nlm_config PUBLIC src)
+target_link_libraries(nlm_config PUBLIC nlm_core)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
@@ -125,7 +142,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,12 +156,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Visualization demo executable
+add_executable(nlm_visualization_demo
+    src/agent/VisualizationDemo.cpp
+)
+target_link_libraries(nlm_visualization_demo PUBLIC nlm_advanced_agent nlm_config nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_advanced_agent nlm_config nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_visualization_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
