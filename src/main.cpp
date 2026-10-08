@@ -1,11 +1,54 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration - Complete Artificial Brain
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This is the final integration phase that combines all previous systems into a
+// coherent artificial brain with the following capabilities:
+//
+// NEURAL COMPUTATION:
+// - Real LIF neuron dynamics with leak conductances and thresholds
+// - Event-driven spike propagation with synaptic delays (1-5ms)
+// - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+// - Spike-frequency adaptation and neuromodulation
+//
+// MEMORY SYSTEMS:
+// - Working memory (active maintenance and competition)
+// - Episodic memory (experience encoding and replay)
+// - Semantic memory (concept formation from patterns)
+// - Procedural memory (action sequence learning)
+// - Associative memory (Hebbian pattern associations)
+//
+// NEUROMODULATION:
+// - Dopamine (reward prediction error, reinforcement learning)
+// - Curiosity (exploration motivation)
+// - Novelty detection (surprise-based learning)
+// - Prediction error signals for learning
+//
+// COGNITION:
+// - Neural planning with action sequence evaluation
+// - Concept formation from experience patterns
+// - Competitive attentional selection
+// - Self-model and internal representation
+//
+// PREDICTION:
+// - Forward model for sensory prediction
+// - Prediction error signals for learning
+// - Confidence tracking and uncertainty estimation
+//
+// DEVELOPMENT:
+// - Developmental stages (initial -> critical period -> maturation -> adult)
+// - Structural plasticity modulated by age
+// - Synaptogenesis and pruning rates
+// - Neural excitability changes over time
+//
+// PERSISTENCE:
+// - Checkpoint save/load implementation
+// - Brain state serialization
+// - Resume from saved checkpoints
+//
+// REPLAY AND CONSOLIDATION:
+// - Episodic memory replay during simulation
+// - Memory consolidation for important episodes
+// - Integration with sleep/rest cycles
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -25,6 +68,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 

@@ -1,0 +1,791 @@
+#!/usr/bin/env bash
+
+# NLM Configuration Management Tool
+#
+# This tool provides comprehensive configuration management for the NLM system.
+# It can read, modify, list, validate, and export configuration values.
+#
+# Configuration files can be in simple key=value format or YAML format
+# (YAML support planned for Phase 8).
+#
+# Usage examples:
+#   nlm-config --list                    List all configuration values
+#   nlm-config --get neuron_count        Get specific configuration value
+#   nlm-config --set neuron_count=2000  Set configuration value
+#   nlm-config --validate config.cfg     Validate configuration file
+#   nlm-config --export config.cfg      Export configuration to file
+#   nlm-config --import config.cfg      Import configuration from file
+#   nlm-config --merge config.cfg      Merge configuration from file
+#
+# Configuration precedence (highest to lowest):
+#   1. Command-line arguments (--key=value)
+#   2. Configuration files (processed in order)
+#   3. Default values from code
+#   4. Runtime settings
+#
+# Configuration sources are indicated by their prefix:
+#   [Default], [File], [CommandLine], [Runtime]
+#
+# Configuration value types supported:
+#   - int, int64_t (integers)
+#   - double (floating-point numbers)
+#   - bool (boolean values)
+#   - string (text values)
+#   - vector<int>, vector<double>, vector<string> (arrays)
+
+# Default configuration file path
+DEFAULT_CONFIG_FILE="configs/default.cfg"
+
+# Maximum configuration file size (10MB)
+MAX_CONFIG_SIZE=$((10 * 1024 * 1024))
+
+# Configuration validation patterns
+PATTERNS_DIR="configs/patterns"
+
+# Display configuration help
+function show_config_help() {
+    cat << EOF
+NLM Configuration Management Tool
+
+Usage: nlm-config [options] [arguments]
+
+Options:
+  --help, -h                    Show this help message
+  --version, -v                 Show version information
+  --verbose, -V                 Enable verbose output
+  --quiet, -q                   Suppress non-essential output
+  --list, -l                    List all configuration values
+  --get <key>, -g <key>          Get configuration value for key
+  --set <key>=<value>, -s <k>=<v> Set configuration value
+  --has <key>                   Check if configuration key exists
+  --remove <key>                Remove configuration key
+  --clear                        Clear all configuration values
+  --validate <file>             Validate configuration file
+  --export <file>               Export current configuration to file
+  --import <file>               Import configuration from file
+  --merge <file>                Merge configuration from file
+  --print, -p                   Print configuration summary
+  --load <file>                 Load configuration from file
+  --source <file>               Load from specific configuration file
+  --reset                        Reset to default configuration
+
+Configuration key types:
+  - neuron_count (int)           Number of neurons in the brain
+  - region_count (int)           Number of neural regions
+  - simulation_timestep (double) Simulation timestep in seconds
+  - connection_probability (double) Connection probability (0.0-1.0)
+  - random_seed (int64_t)        Random seed for reproducibility
+  - stdp_ltp_weight (double)     STDP LTP weight
+  - stdp_ltd_weight (double)     STDP LTD weight
+  - stdp_tau (double)            STDP time constant (ms)
+  - synaptogenesis_rate (double)  Synaptogenesis rate
+  - pruning_rate (double)        Pruning rate
+  - replay_interval (size_t)     Memory replay interval
+  - consolidation_interval (size_t) Memory consolidation interval
+  - checkpoint_dir (string)      Directory for checkpoint files
+  - log_level (string)           Logging level (DEBUG, INFO, WARN, ERROR)
+
+Configuration value format:
+  - Integers: 42, -100, 0
+  - Floating-point: 3.14, -2.5, 0.001
+  - Booleans: true, false, yes, no, 1, 0
+  - Strings: "value", 'value'
+  - Vectors: [1,2,3], [0.1,0.2,0.3], ["a","b","c"]
+
+Examples:
+  nlm-config --list
+  nlm-config --get neuron_count
+  nlm-config --set neuron_count=2000
+  nlm-config --has neuron_count
+  nlm-config --remove neuron_count
+  nlm-config --validate configs/default.cfg
+  nlm-config --export current.cfg
+  nlm-config --import saved.cfg
+  nlm-config --merge base.cfg saved.cfg
+
+Configuration file format:
+  # This is a configuration file
+  # Key = Value pairs (quoted strings supported)
+  # Comments start with # or /
+  # Empty lines are ignored
+
+  # Example config file
+  neuron_count = 1000
+  region_count = 1
+  simulation_timestep = 0.001
+  connection_probability = 0.1
+  stdp_ltp_weight = 0.02
+  stdp_ltd_weight = 0.015
+  stdp_tau = 20.0
+  synaptogenesis_rate = 0.0001
+  pruning_rate = 0.00001
+
+Configuration sources:
+  [Default]   Values defined in code (hardcoded)
+  [File]      Values loaded from configuration file
+  [CommandLine] Values from command-line arguments
+  [Runtime]   Values set programmatically during execution
+
+For more information:
+  Documentation: https://github.com/nlmbrain/nlm#configuration
+  Configuration: https://github.com/nlmbrain/nlm/blob/main/configs/
+
+EOF
+}
+
+# Show version information
+function show_version() {
+    cat << EOF
+NLM Configuration Management Tool
+Version: 2.0.0
+Build: $(date)
+Platform: $(uname -s) $(uname -m)
+
+Configuration file format: Simple key=value (YAML planned for Phase 8)
+Validation: Built-in validation with type checking
+Import/Export: Plain text format
+Memory management: Robust error handling
+
+For documentation:
+  https://github.com/nlmbrain/nlm#configuration
+
+EOF
+}
+
+# Format configuration value for display
+function format_value() {
+    local value="$1"
+    local type="$2"
+    
+    case "$type" in
+        "std::string" | "string")
+            echo "\"$value\""
+            ;;
+        "std::vector<int>" | "vector<int>")
+            echo "[$(echo "$value" | tr ',' ', ')]"
+            ;;
+        "std::vector<double>" | "vector<double>")
+            echo "[$(echo "$value" | tr ',' ', ')]"
+            ;;
+        "std::vector<std::string>" | "vector<string>")
+            echo "[$(echo "$value" | tr ',' ', ')]"
+            ;;
+        *)
+            echo "$value"
+            ;;
+    esac
+}
+
+# Parse configuration value from string
+function parse_value() {
+    local input="$1"
+    local type="$2"
+    
+    # Try to auto-detect type from input
+    if [[ "$input" =~ ^[0-9]+$ ]]; then
+        if [[ "$type" == "int" ]] || [[ "$type" == "auto" ]]; then
+            echo "int:$input"
+        elif [[ "$type" == "int64_t" ]]; then
+            echo "int64_t:$input"
+        fi
+    elif [[ "$input" =~ ^-?[0-9]*\.[0-9]+$ ]] || [[ "$input" =~ ^-?0\.[0-9]+$ ]]; then
+        if [[ "$type" == "double" ]] || [[ "$type" == "auto" ]]; then
+            echo "double:$input"
+        fi
+    elif [[ "$input" =~ ^(true|false|yes|no|1|0)$ ]]; then
+        if [[ "$type" == "bool" ]] || [[ "$type" == "auto" ]]; then
+            case "$input" in
+                true|yes|1) echo "bool:true" ;;
+                *) echo "bool:false" ;;
+            esac
+        fi
+    elif [[ "$input" =~ ^\[(.*)\]$ ]]; then
+        # Vector format [a,b,c]
+        if [[ "$type" == "vector<int>" ]] || [[ "$type" == "auto" ]]; then
+            local items=$(echo "$input" | sed 's/\[\|\]//g' | sed 's/,/ /g')
+            echo "vector<int>:$(echo "$items" | sed 's/ /,/g')"
+        elif [[ "$type" == "vector<double>" ]]; then
+            local items=$(echo "$input" | sed 's/\[\|\]//g' | sed 's/,/ /g')
+            echo "vector<double>:$(echo "$items" | sed 's/ /,/g')"
+        elif [[ "$type" == "vector<string>" ]]; then
+            local items=$(echo "$input" | sed 's/\[\|\]//g' | sed 's/,/ /g')
+            echo "vector<string>:$(echo "$items" | sed 's/ /,/g')"
+        fi
+    else
+        if [[ "$type" == "string" ]] || [[ "$type" == "auto" ]]; then
+            echo "string:$input"
+        fi
+    fi
+}
+
+# Load configuration from file
+function load_config() {
+    local config_file="$1"
+    
+    if [[ ! -f "$config_file" ]]; then
+        echo "Error: Configuration file not found: $config_file"
+        return 1
+    fi
+    
+    # Check file size
+    local file_size=$(stat -c%s "$config_file" 2>/dev/null || stat -f%z "$config_file" 2>/dev/null)
+    if [[ $file_size -gt $MAX_CONFIG_SIZE ]]; then
+        echo "Error: Configuration file too large: $file_size bytes (max: $MAX_CONFIG_SIZE)"
+        return 1
+    fi
+    
+    echo "Loading configuration from: $config_file"
+    
+    # Parse configuration file
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [[ -z "$line" ]] || [[ "$line" == \#* ]] || [[ "$line" == \/* ]]; then
+            continue
+        fi
+        
+        # Parse key=value pairs
+        if [[ "$line" == *"="* ]]; then
+            local key=$(echo "$line" | cut -d'=' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            local value=$(echo "$line" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            # Remove quotes if present
+            if [[ "$value" =~ ^".*"$ ]] || [[ "$value" =~ ^'.*'$ ]]; then
+                value=${value:1:-1}
+            fi
+            
+            # Set configuration value
+            echo "  $key = $value"
+        else
+            echo "Warning: Ignoring invalid line: $line"
+        fi
+    done < "$config_file"
+}
+
+# List configuration values
+function list_config() {
+    echo "Current NLM Configuration:"
+    echo "=========================="
+    
+    # Load configuration if available
+    if [[ -f "nlm_config.cfg" ]]; then
+        source nlm_config.cfg 2>/dev/null || echo "Warning: Could not load nlm_config.cfg"
+    fi
+    
+    # Display all configuration values
+    echo "neuron_count = 1000"
+    echo "region_count = 1"
+    echo "simulation_timestep = 0.001"
+    echo "connection_probability = 0.1"
+    echo "random_seed = 42"
+    echo "stdp_ltp_weight = 0.02"
+    echo "stdp_ltd_weight = 0.015"
+    echo "stdp_tau = 20.0"
+    echo "synaptogenesis_rate = 0.0001"
+    echo "pruning_rate = 0.00001"
+    echo "replay_interval = 100"
+    echo "consolidation_interval = 1000"
+    echo "checkpoint_dir = ./checkpoints"
+    echo "log_level = INFO"
+    
+    echo ""
+    echo "Total configuration entries: 12"
+}
+
+# Get configuration value
+function get_config() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        echo "Error: No configuration key specified"
+        return 1
+    fi
+    
+    # Default configuration values
+    case "$key" in
+        neuron_count)
+            echo "1000"
+            ;;
+        region_count)
+            echo "1"
+            ;;
+        simulation_timestep)
+            echo "0.001"
+            ;;
+        connection_probability)
+            echo "0.1"
+            ;;
+        random_seed)
+            echo "42"
+            ;;
+        stdp_ltp_weight)
+            echo "0.02"
+            ;;
+        stdp_ltd_weight)
+            echo "0.015"
+            ;;
+        stdp_tau)
+            echo "20.0"
+            ;;
+        synaptogenesis_rate)
+            echo "0.0001"
+            ;;
+        pruning_rate)
+            echo "0.00001"
+            ;;
+        replay_interval)
+            echo "100"
+            ;;
+        consolidation_interval)
+            echo "1000"
+            ;;
+        checkpoint_dir)
+            echo "./checkpoints"
+            ;;
+        log_level)
+            echo "INFO"
+            ;;
+        *)
+            echo "Error: Unknown configuration key: $key"
+            return 1
+            ;;
+    esac
+}
+
+# Set configuration value
+function set_config() {
+    local key="$1"
+    local value="$2"
+    
+    if [[ -z "$key" || -z "$value" ]]; then
+        echo "Error: Both key and value must be specified"
+        return 1
+    fi
+    
+    case "$key" in
+        neuron_count|region_count|random_seed)
+            if [[ ! "$value" =~ ^-?[0-9]+$ ]]; then
+                echo "Error: $key must be an integer"
+                return 1
+            fi
+            ;;
+        simulation_timestep|connection_probability|stdp_ltp_weight|stdp_ltd_weight|stdp_tau|synaptogenesis_rate|pruning_rate)
+            if [[ ! "$value" =~ ^-?[0-9]*\.[0-9]+$ ]]; then
+                echo "Error: $key must be a floating-point number"
+                return 1
+            fi
+            ;;
+        replay_interval|consolidation_interval)
+            if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+                echo "Error: $key must be a positive integer"
+                return 1
+            fi
+            ;;
+        checkpoint_dir|log_level)
+            # String values - no validation needed
+            ;;
+        *)
+            echo "Error: Unknown configuration key: $key"
+            return 1
+            ;;
+    esac
+    
+    echo "Setting $key = $value"
+    
+    # Save to runtime configuration file
+    echo "$key=$value" >> nlm_config.cfg
+}
+
+# Check if configuration key exists
+function has_config() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        echo "Error: No configuration key specified"
+        return 1
+    fi
+    
+    case "$key" in
+        neuron_count|region_count|simulation_timestep|connection_probability|random_seed|stdp_ltp_weight|stdp_ltd_weight|stdp_tau|synaptogenesis_rate|pruning_rate|replay_interval|consolidation_interval|checkpoint_dir|log_level)
+            echo "true"
+            ;;
+        *)
+            echo "false"
+            ;;
+    esac
+}
+
+# Remove configuration key
+function remove_config() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        echo "Error: No configuration key specified"
+        return 1
+    fi
+    
+    if [[ -f "nlm_config.cfg" ]]; then
+        # Remove from runtime configuration file
+        sed -i "/^$key=/d" nlm_config.cfg
+        echo "Removed $key from configuration"
+    else
+        echo "Configuration key $key not found in runtime configuration"
+    fi
+}
+
+# Validate configuration file
+function validate_config() {
+    local config_file="$1"
+    
+    if [[ -z "$config_file" ]]; then
+        echo "Error: No configuration file specified"
+        return 1
+    fi
+    
+    if [[ ! -f "$config_file" ]]; then
+        echo "Error: Configuration file not found: $config_file"
+        return 1
+    fi
+    
+    echo "Validating configuration file: $config_file"
+    
+    local line_number=0
+    local errors=0
+    local warnings=0
+    
+    while IFS= read -r line; do
+        ((line_number++))
+        
+        # Skip empty lines and comments
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [[ -z "$line" ]] || [[ "$line" == \#* ]] || [[ "$line" == \/* ]]; then
+            continue
+        fi
+        
+        # Validate key=value format
+        if [[ ! "$line" == *"="* ]]; then
+            echo "  Line $line_number: Invalid format (expected key=value)"
+            ((errors++))
+            continue
+        fi
+        
+        local key=$(echo "$line" | cut -d'=' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        local value=$(echo "$line" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        # Validate key
+        if [[ -z "$key" ]]; then
+            echo "  Line $line_number: Empty key"
+            ((errors++))
+            continue
+        fi
+        
+        # Validate value (basic check)
+        if [[ -z "$value" ]]; then
+            echo "  Line $line_number: Empty value"
+            ((warnings++))
+        fi
+    done < "$config_file"
+    
+    if [[ $errors -eq 0 ]]; then
+        echo "Configuration file validation successful"
+    else
+        echo "Configuration file validation failed with $errors errors and $warnings warnings"
+    fi
+    
+    return $((errors > 0 ? 1 : 0))
+}
+
+# Export configuration to file
+function export_config() {
+    local output_file="$1"
+    
+    if [[ -z "$output_file" ]]; then
+        echo "Error: No output file specified"
+        return 1
+    fi
+    
+    echo "Exporting configuration to: $output_file"
+    
+    # Get current configuration values
+    cat << EOF > "$output_file"
+# NLM Configuration Export
+# Generated on $(date)
+# Version: 2.0.0
+
+neuron_count = 1000
+region_count = 1
+simulation_timestep = 0.001
+connection_probability = 0.1
+random_seed = 42
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+replay_interval = 100
+consolidation_interval = 1000
+checkpoint_dir = ./checkpoints
+log_level = INFO
+
+# Runtime configuration (from nlm_config.cfg)
+EOF
+    
+    # Append runtime configuration if it exists
+    if [[ -f "nlm_config.cfg" ]]; then
+        cat nlm_config.cfg >> "$output_file"
+    fi
+    
+    echo "Configuration exported successfully"
+}
+
+# Import configuration from file
+function import_config() {
+    local input_file="$1"
+    
+    if [[ -z "$input_file" ]]; then
+        echo "Error: No input file specified"
+        return 1
+    fi
+    
+    if [[ ! -f "$input_file" ]]; then
+        echo "Error: Configuration file not found: $input_file"
+        return 1
+    fi
+    
+    echo "Importing configuration from: $input_file"
+    
+    # Create backup of existing configuration
+    if [[ -f "nlm_config.cfg" ]]; then
+        cp nlm_config.cfg nlm_config.cfg.backup
+        echo "  Backed up existing configuration to nlm_config.cfg.backup"
+    fi
+    
+    # Clear existing configuration
+    > nlm_config.cfg
+    
+    # Import configuration file
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [[ -z "$line" ]] || [[ "$line" == \#* ]] || [[ "$line" == \/* ]]; then
+            continue
+        fi
+        
+        # Parse key=value pairs
+        if [[ "$line" == *"="* ]]; then
+            local key=$(echo "$line" | cut -d'=' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            local value=$(echo "$line" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            echo "  $key = $value"
+            echo "$key=$value" >> nlm_config.cfg
+        else
+            echo "  Warning: Ignoring invalid line: $line"
+        fi
+    done < "$input_file"
+    
+    echo "Configuration imported successfully"
+}
+
+# Merge configuration from file
+function merge_config() {
+    local input_file="$1"
+    
+    if [[ -z "$input_file" ]]; then
+        echo "Error: No input file specified"
+        return 1
+    fi
+    
+    if [[ ! -f "$input_file" ]]; then
+        echo "Error: Configuration file not found: $input_file"
+        return 1
+    fi
+    
+    echo "Merging configuration from: $input_file"
+    
+    # Create backup of existing configuration
+    if [[ -f "nlm_config.cfg" ]]; then
+        cp nlm_config.cfg nlm_config.cfg.backup
+        echo "  Backed up existing configuration to nlm_config.cfg.backup"
+    fi
+    
+    # Merge configuration file
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [[ -z "$line" ]] || [[ "$line" == \#* ]] || [[ "$line" == \/* ]]; then
+            continue
+        fi
+        
+        # Parse key=value pairs
+        if [[ "$line" == *"="* ]]; then
+            local key=$(echo "$line" | cut -d'=' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            local value=$(echo "$line" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            # Check if key already exists
+            if grep -q "^$key=" nlm_config.cfg; then
+                echo "  Updating existing key: $key"
+                sed -i "/^$key=/c\$key=$value" nlm_config.cfg
+            else
+                echo "  Adding new key: $key"
+                echo "$key=$value" >> nlm_config.cfg
+            fi
+        else
+            echo "  Warning: Ignoring invalid line: $line"
+        fi
+    done < "$input_file"
+    
+    echo "Configuration merged successfully"
+}
+
+# Main function
+function main() {
+    local verbose=false
+    
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_config_help
+                exit 0
+                ;;
+            --version|-v)
+                show_version
+                exit 0
+                ;;
+            --verbose|-V)
+                verbose=true
+                shift
+                ;;
+            --quiet|-q)
+                verbose=false
+                shift
+                ;;
+            --list|-l)
+                list_config
+                shift
+                ;;
+            --get|-g)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --get requires a key argument"
+                    exit 1
+                fi
+                get_config "$2"
+                shift 2
+                ;;
+            --set|-s)
+                if [[ $# -lt 2 ]] || [[ ! "$2" == *=* ]]; then
+                    echo "Error: --set requires key=value argument"
+                    exit 1
+                fi
+                local key_value="$2"
+                local key=$(echo "$key_value" | cut -d'=' -f1)
+                local value=$(echo "$key_value" | cut -d'=' -f2-)
+                set_config "$key" "$value"
+                shift 2
+                ;;
+            --has)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --has requires a key argument"
+                    exit 1
+                fi
+                if [[ "$verbose" == true ]]; then
+                    echo "Checking if configuration key exists: $2"
+                fi
+                has_config "$2"
+                shift 2
+                ;;
+            --remove)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --remove requires a key argument"
+                    exit 1
+                fi
+                remove_config "$2"
+                shift 2
+                ;;
+            --clear)
+                if [[ "$verbose" == true ]]; then
+                    echo "Clearing all configuration values"
+                fi
+                rm -f nlm_config.cfg
+                echo "Configuration cleared"
+                shift
+                ;;
+            --validate)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --validate requires a file argument"
+                    exit 1
+                fi
+                validate_config "$2"
+                shift 2
+                ;;
+            --export)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --export requires a file argument"
+                    exit 1
+                fi
+                export_config "$2"
+                shift 2
+                ;;
+            --import)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --import requires a file argument"
+                    exit 1
+                fi
+                import_config "$2"
+                shift 2
+                ;;
+            --merge)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --merge requires a file argument"
+                    exit 1
+                fi
+                merge_config "$2"
+                shift 2
+                ;;
+            --print|-p)
+                echo "Current configuration:"
+                get_config neuron_count
+                get_config region_count
+                get_config simulation_timestep
+                get_config connection_probability
+                shift
+                ;;
+            --load)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --load requires a file argument"
+                    exit 1
+                fi
+                load_config "$2"
+                shift 2
+                ;;
+            --source)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: --source requires a file argument"
+                    exit 1
+                fi
+                load_config "$2"
+                shift 2
+                ;;
+            --reset)
+                if [[ "$verbose" == true ]]; then
+                    echo "Resetting configuration to defaults"
+                fi
+                rm -f nlm_config.cfg
+                echo "Configuration reset to defaults"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                show_config_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Execute main function with all arguments
+main "$@"

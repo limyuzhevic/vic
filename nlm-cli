@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+
+# NLM Command-Line Interface (CLI) Tools
+#
+# This file provides common CLI tools for the NLM (熙然) neural learning machine.
+# These tools are designed to be used from the command line to interact with,
+# configure, and analyze NLM simulations.
+#
+# Usage:
+#   nlm-cli --help                    # Show main help
+#   nlm-config --help                 # Show config management help
+#   nlm-checkpoint --help             # Show checkpoint management help
+#   nlm-validate --help              # Show validation help
+#   nlm-profile --help                # Show profiling help
+#   nlm-experiments --help            # Show experiment help
+#
+# Each subcommand provides its own help and usage information.
+#
+# Dependencies:
+#   - gcc/g++ compiler
+#   - CMake build system
+#   - NLM library (libnlm_core.a, libnlm_agent.a, libnlm_world.a)
+#   - Standard C/C++ libraries
+#
+# Build instructions:
+#   1. Run: mkdir build && cd build
+#   2. Run: cmake .. -DCMAKE_BUILD_TYPE=Release
+#   3. Run: make -j4
+#
+# All tools are built as separate executables and placed in the build/bin directory.
+
+# Define project version and configuration
+NLM_VERSION="1.0.0"
+NLM_DESCRIPTION="Neural Learning Machine (熙然) - Experimental Artificial Developmental Brain"
+NLM_AUTHOR="NLM Research Project"
+NLM_LICENSE="MIT"
+
+# Tool version information
+NLM_CONFIG_VERSION="2.0.0"
+NLM_CHECKPOINT_VERSION="1.0.0"
+NLM_VALIDATE_VERSION="1.5.0"
+NLM_PROFILE_VERSION="1.0.0"
+NLM_EXPERIMENTS_VERSION="1.0.0"
+
+# Display main help
+function show_main_help() {
+    cat << EOF
+$NLM_DESCRIPTION
+
+Version: $NLM_VERSION
+
+Usage: nlm-cli <command> [options]
+
+Available commands:
+
+  config     Configuration management and manipulation
+  checkpoint Checkpoint operations (save, load, list, manage)
+  validate   Validate configuration files and brain states
+  profile    Performance profiling and analysis
+  experiments Manage NLM experiments and simulations
+  demo      Run NLM demonstrations and examples
+  help       Show help information for a specific command
+
+Common options:
+  --help             Show help for a command
+  --version          Show version information
+  --verbose          Enable verbose output
+  --quiet            Suppress non-essential output
+
+For help with a specific command, use:
+  nlm-cli <command> --help
+
+Examples:
+  nlm-cli config list                    List all configuration values
+  nlm-cli checkpoint save brain.ncl         Save brain state to file
+  nlm-cli validate brain.ncl              Validate brain checkpoint
+  nlm-cli profile --duration 60           Profile simulation for 60 seconds
+  nlm-cli experiments run phase6          Run Phase 6 integration demo
+
+Configuration:
+  Default config file: configs/default.cfg
+  Checkpoint directory: ./checkpoints
+  Log file: ./nlm.log
+
+Report issues and request features:
+  Visit: https://github.com/nlmbrain/nlm
+  Issues: https://github.com/nlmbrain/nlm/issues
+  Discussions: https://github.com/nlmbrain/nlm/discussions
+
+EOF
+}
+
+# Show version information
+function show_version() {
+    cat << EOF
+$NLM_DESCRIPTION
+
+Version: $NLM_VERSION
+Build: $(date)
+Platform: $(uname -s) $(uname -m)
+Compiler: $(g++ --version | head -n1)
+
+Configuration:
+  Version: $NLM_CONFIG_VERSION
+  Checkpoint: $NLM_CHECKPOINT_VERSION
+  Validation: $NLM_VALIDATE_VERSION
+  Profile: $NLM_PROFILE_VERSION
+  Experiments: $NLM_EXPERIMENTS_VERSION
+
+Components:
+  Core neural engine: Phase 6 - Final Integration
+  Memory systems: Working, episodic, semantic, procedural
+  Neuromodulation: Dopamine, curiosity, novelty, prediction error
+  Development: 4-stage developmental trajectory
+  Plasticity: STDP, Hebbian, structural
+
+For more information:
+  Documentation: https://github.com/nlmbrain/nlm#readme
+  Examples: https://github.com/nlmbrain/nlm/tree/main/examples
+EOF
+}
+
+# Main entry point
+function main() {
+    local command="${1:-}"
+    
+    case "$command" in
+        help|--help|-h)
+            show_main_help
+            ;;
+        version|--version|-v)
+            show_version
+            ;;
+        config)
+            shift
+            exec nlm-config "$@"
+            ;;
+        checkpoint)
+            shift
+            exec nlm-checkpoint "$@"
+            ;;
+        validate)
+            shift
+            exec nlm-validate "$@"
+            ;;
+        profile)
+            shift
+            exec nlm-profile "$@"
+            ;;
+        experiments)
+            shift
+            exec nlm-experiments "$@"
+            ;;
+        demo)
+            shift
+            exec ./nlm_phase6_demo "$@"
+            ;;
+        *)
+            echo "Unknown command: $command"
+            echo "Use 'nlm-cli help' for available commands."
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"
