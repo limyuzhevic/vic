@@ -6,6 +6,12 @@
 #include <variant>
 #include <optional>
 
+// JSON support
+#include <nlohmann/json.hpp>
+
+// YAML support
+#include <yaml-cpp/yaml.h>
+
 namespace nlm {
 
 // Forward declarations
@@ -55,14 +61,26 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, falls back to key=value)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlString);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON string
+    std::string saveToJSON() const;
+    
+    // Save to YAML string
+    std::string saveToYAML() const;
     
     // Get values
     template<typename T>
@@ -93,6 +111,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration merge
+    void merge(const Config& other);
+    
+    // Environment variable substitution
+    void substituteEnvironmentVariables();
+    
+    // Configuration schema support
+    void setSchema(const nlohmann::json& schema);
+    bool validateAgainstSchema() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +132,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string normalizeKey(const std::string& key);
+    
+    // JSON/YAML parsing helpers
+    static void parseJSONToConfig(const nlohmann::json& json, std::vector<ConfigEntry>& entries);
+    static nlohmann::json configToJSON(const std::vector<ConfigEntry>& entries);
+    static void parseYAMLToConfig(const YAML::Node& yaml, std::vector<ConfigEntry>& entries);
+    static YAML::Node configToYAML(const std::vector<ConfigEntry>& entries);
+    
+    // String conversion helpers
+    static std::string configValueToString(const ConfigValue& value);
+    static ConfigValue stringToConfigValue(const std::string& str);
 };
 
 } // namespace nlm
