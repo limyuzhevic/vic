@@ -55,6 +55,13 @@ public:
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
+    // Validation and error handling methods
+    static bool isValidId(NeuronId id);
+    static bool isValidType(NeuronType type);
+    static bool isValidState(const NeuronState& state);
+    bool validateState() const;
+    bool validateParameters() const;
+    
     // Identity
     NeuronId getId() const;
     
@@ -142,6 +149,15 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Error handling methods
+    std::string getLastError() const;
+    void clearError();
+    bool hasError() const;
+    
+    // Validation methods for simulation
+    bool isHealthy() const;
+    bool isWithinBounds() const;
     
 private:
     struct Impl;
