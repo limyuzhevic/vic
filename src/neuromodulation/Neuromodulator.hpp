@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Real neuromodulation affects plasticity, attention, arousal, and learning
 
 class Neuromodulator {
 public:
@@ -21,7 +21,6 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +31,6 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -53,37 +51,75 @@ private:
     Impl* pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
-public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
-public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Serotonin: Aversion and behavioral inhibition
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Aversion signaling
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
+    void signalAversion(float stimulus);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
+
+// Norepinephrine: Arousal and attention modulation
+class Norepinephrine : public Neuromodulator {
+public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getArousalModifier() const;
+    float getAttentionBias() const;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal signaling
+    void signalNovelty(float novelty);
+    void signalStress(float stress);
+    void signalReward(float reward);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Acetylcholine: Attention and memory modulation
+class Acetylcholine : public Neuromodulator {
+public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getMemoryModulator() const;
+    float getAttentionGain() const;
+    float getCorticalActivator() const;
+    void update(TimestepDuration dt) override;
+    
+    // Attention and memory signaling
+    void signalNovelty(float novelty);
+    void signalAttention(float focus);
+    void signalMemory(float memoryLoad);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+} // namespace nlm
 
 } // namespace nlm

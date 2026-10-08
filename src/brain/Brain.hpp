@@ -11,23 +11,30 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    // Forward declarations
+    class Config;
+    class RandomGenerator;
+    class SimulationClock;
+    class Logger;
+    class NeuralWorkingMemory;
+    class NeuralEpisodicMemory;
+    class NeuralAssociativeMemory;
+    class PredictionSystem;
+    class NeuralPlanner;
+    class ConceptFormation;
+    class AttentionalSelection;
+    class DevelopmentSystem;
+    class Dopamine;
+    class Serotonin;
+    class Norepinephrine;
+    class Acetylcholine;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
+    class SelfModel;
+    class SocialLearning;
+    class SpatialRepresentation;
+    class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,6 +171,18 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Self-model for body awareness and action prediction
+    SelfModel* getSelfModel();
+    
+    // Social learning from observing other agents
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation of environment
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relations (learning sequences and patterns)
+    TemporalRelation* getTemporalRelation();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -174,6 +193,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Serotonin - aversion and behavioral inhibition
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and attention
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -193,9 +221,22 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== CHECKPOINT SYSTEM ==========
+    
+    // Helper methods for checkpoint manager
+    bool saveNeuronsToCheckpoint(NeuronCheckpointData& data);
+    bool saveSynapsesToCheckpoint(SynapseCheckpointData& data);
+    
 private:
     struct Impl;
     Impl* pImpl;
-};
+}
 
-} // namespace nlm
+// For backward compatibility
+inline bool Brain::save(const std::string& filepath) const {
+    return pImpl->checkpointManager ? pImpl->checkpointManager->saveImmediately(filepath) : false;
+}
+
+inline bool Brain::load(const std::string& filepath) {
+    return pImpl->checkpointManager ? pImpl->checkpointManager->load(filepath) : false;
+}

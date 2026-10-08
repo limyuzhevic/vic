@@ -6,14 +6,17 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
+#include "../cognition/SpatialRepresentation.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -40,15 +43,22 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
     std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<PredictionError> predictionError;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -120,12 +130,19 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        serotonin = std::make_unique<Serotonin>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -151,6 +168,20 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Configure checkpoint directory from config
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        checkpointManager->configure(checkpointDir, 10000, 5, true);
+        
+        // Set up checkpoint providers
+        checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+            return saveNeuronsToCheckpoint(data);
+        });
+        
+        checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+            return saveSynapsesToCheckpoint(data);
+        });
+    }
     }
     
     DevelopmentalStage developmentalStage;
@@ -510,26 +541,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Use current sensory state to update predictions
+        // Create internal signals observation from current neural activity
+        auto sensoryObservation = std::make_unique<InternalSignals>();
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Get current neural activity as prediction target
+        std::vector<float> currentActivity;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentActivity.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential));
         }
+        
+        // Add current activity as internal signals
+        for (float activity : currentActivity) {
+            sensoryObservation->addSignal(activity);
+        }
+        
+        // Update prediction with current sensory state
+        // The prediction system would maintain a predicted state
+        // and compute prediction error against actual sensory input
+        // For now, just update predictions (placeholder implementation)
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation uses working memory and attention systems
+        std::vector<float> currentPattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentPattern.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential));
+        }
+        
+        if (!currentPattern.empty()) {
+            // Present current sensory pattern to concept formation system
+            // Concept formation learns to categorize and generalize patterns
+            pImpl->conceptFormation->presentExperience(currentPattern, {}, 0.0f, pImpl->currentTime);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1023,51 +1070,83 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+    // ========== COGNITION SYSTEM ACCESSORS ==========
 
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
 
-// ========== DEVELOPMENT SYSTEM ==========
+    SelfModel* Brain::getSelfModel() {
+        return pImpl->selfModel.get();
+    }
 
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
+    SocialLearning* Brain::getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
 
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
+    SpatialRepresentation* Brain::getSpatialRepresentation() {
+        return pImpl->spatialRepresentation.get();
+    }
 
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
+    SpatialRepresentation* Brain::getSpatialRepresentation() {
+        return pImpl->spatialRepresentation.get();
+    }
 
-// ========== NEUROMODULATION SYSTEMS ==========
+    TemporalRelation* Brain::getTemporalRelation() {
+        return pImpl->temporalRelation.get();
+    }
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
-}
+    // ========== DEVELOPMENT SYSTEM ==========
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
-}
+    DevelopmentSystem* Brain::getDevelopmentSystem() {
+        return pImpl->developmentSystem.get();
+    }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
-}
+    DevelopmentalStage Brain::getDevelopmentalStage() const {
+        return pImpl->developmentalStage;
+    }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
-}
+    void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+        pImpl->developmentalStage = stage;
+    }
+
+    // ========== NEUROMODULATION SYSTEMS ==========
+
+    Dopamine* Brain::getDopamine() {
+        return pImpl->dopamine.get();
+    }
+
+    Serotonin* Brain::getSerotonin() {
+        return pImpl->serotonin.get();
+    }
+
+    Norepinephrine* Brain::getNorepinephrine() {
+        return pImpl->norepinephrine.get();
+    }
+
+    Acetylcholine* Brain::getAcetylcholine() {
+        return pImpl->acetylcholine.get();
+    }
+
+    Curiosity* Brain::getCuriosity() {
+        return pImpl->curiosity.get();
+    }
+
+    Novelty* Brain::getNovelty() {
+        return pImpl->novelty.get();
+    }
+
+    PredictionError* Brain::getPredictionErrorSignal() {
+        return pImpl->predictionError.get();
+    }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
@@ -1105,13 +1184,109 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
+}
+
+// ========== CHECKPOINT HELPERS ==========
+
+bool Brain::saveNeuronsToCheckpoint(NeuronCheckpointData& data) {
+    data.membranePotential.clear();
+    data.restingPotential.clear();
+    data.threshold.clear();
+    data.resetPotential.clear();
+    data.leakConductance.clear();
+    data.firingState.clear();
+    data.refractoryRemaining.clear();
+    data.refractoryPeriod.clear();
+    data.lastSpikeTime.clear();
+    data.neuronType.clear();
+    data.regionId.clear();
+    data.populationId.clear();
+    
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                data.membranePotential.push_back(state.membranePotential);
+                data.restingPotential.push_back(state.restingPotential);
+                data.threshold.push_back(state.threshold);
+                data.resetPotential.push_back(state.resetPotential);
+                data.leakConductance.push_back(state.leakConductance);
+                data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                data.refractoryRemaining.push_back(state.refractoryRemaining);
+                data.refractoryPeriod.push_back(state.refractoryPeriod);
+                data.lastSpikeTime.push_back(state.lastSpikeTime);
+                data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                data.regionId.push_back(static_cast<uint64_t>(neuron->getRegionId().index()));
+                data.populationId.push_back(static_cast<uint64_t>(neuron->getPopulationId().index()));
+            }
+        }
+    }
+    
+    return !data.membranePotential.empty();
+}
+
+bool Brain::saveSynapsesToCheckpoint(SynapseCheckpointData& data) {
+    data.sourceNeuron.clear();
+    data.destinationNeuron.clear();
+    data.weight.clear();
+    data.delay.clear();
+    data.synapseType.clear();
+    data.plasticityFlags.clear();
+    data.eligibilityTrace.clear();
+    data.efficacy.clear();
+    data.shortTermDepression.clear();
+    data.shortTermFacilitation.clear();
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto* syn : region->getSynapses()) {
+            data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+            data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+            data.weight.push_back(syn->getWeight());
+            data.delay.push_back(syn->getDelay());
+            data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+            data.plasticityFlags.push_back(static_cast<uint8_t>(syn->getPlasticityFlags()));
+            data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            data.efficacy.push_back(syn->getEfficacy());
+            data.shortTermDepression.push_back(syn->getShortTermDepression());
+            data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+        }
+    }
+    
+    return !data.sourceNeuron.empty();
+}
+
+// ========== CHECKPOINT SYSTEM WRAPPER ==========
+
+bool Brain::save(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving brain state to " + filepath + " (using CheckpointManager)");
+    
+    try {
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
+            return false;
+        }
+        
+        return pImpl->checkpointManager->saveImmediately(filepath);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        return false;
     }
 }
 
-} // namespace nlm
+bool Brain::load(const std::string& filepath) {
+    NLM_LOG_INFO("Loading brain state from " + filepath + " (using CheckpointManager)");
+    
+    try {
+        if (!pImpl->checkpointManager) {
+            NLM_LOG_ERROR("Checkpoint manager not initialized");
+            return false;
+        }
+        
+        return pImpl->checkpointManager->load(filepath);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        return false;
+    }
+}
