@@ -300,3 +300,15 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
 }
 
 } // namespace nlm
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput + pImpl->totalCurrent;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}

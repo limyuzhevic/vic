@@ -289,7 +289,31 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    // Enhanced Brain class with advanced functionality
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+        Central neural simulation brain class with advanced capabilities.
+        
+        The Brain class implements real spiking neural computation with event-driven
+        dynamics and integrated memory, prediction, cognition, and neuromodulation systems.
+        
+        Key features:
+        - Leaky Integrate-and-Fire (LIF) neuron dynamics
+        - Event-driven spike propagation with synaptic delays
+        - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation for reward, curiosity, and novelty detection
+        - Prediction and planning systems
+        - Cognitive functions (concept formation, attention)
+        - Developmental stages affecting plasticity
+        - Checkpoint save/load for persistence
+        - Performance monitoring and statistics
+        
+        The brain operates as a closed-loop system:
+        1. WORLD -> SENSORY INPUT -> NEURAL PROCESSING
+        2. INTERNAL STATE (memory, attention) -> MEMORY/PREDICTION
+        3. MOTIVATION/NEUROMODULATION -> ACTION SELECTION
+        4. MOTOR OUTPUT -> WORLD CONSEQUENCE -> REINFORCEMENT/ERROR
+        )pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -342,6 +366,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -350,8 +376,263 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             "Get random generator")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Access to integrated systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             "Get novelty detection system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             "Get prediction error signal");
+
+    // Enhanced AgentBrain class with advanced interfaces
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(
+        Agent brain interface connecting NLM brain to world with advanced capabilities.
+        
+        The AgentBrain class provides a high-level interface for controlling the neural
+        brain in interaction with an environment. It integrates sensory processing,
+        motor control, and neuromodulation for adaptive behavior.
+        
+        Features:
+        - Sensory input processing and injection
+        - Motor command decoding from neural activity
+        - Reward-based neuromodulation
+        - Development system integration
+        - Curiosity-driven exploration
+        - Novelty detection and processing
+        - Prediction error signaling
+        - Subsystem enable/disable for modular control
+        - Performance monitoring and statistics
+        
+        Typical usage:
+        1. Create brain and agent interface
+        2. Configure and initialize world
+        3. Enable desired subsystems (reward, curiosity, etc.)
+        4. Run simulation loop with sensory processing
+        5. Apply neuromodulation based on rewards
+        6. Monitor agent behavior and adjust
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        // Subsystem control
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Enhanced SimpleWorld class with advanced features
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(
+        Enhanced 2D world simulation environment for NLM agents.
+        
+        The SimpleWorld class provides a flexible simulation environment for testing
+        and training NLM agents. It includes realistic physical dynamics, sensory
+        processing, and object interaction capabilities.
+        
+        Key features:
+        - 2D grid-based world with configurable dimensions
+        - Realistic physics simulation (movement, collision, energy)
+        - Comprehensive sensory processing (vision, touch, proprioception)
+        - Object management (resources, hazards, walls, markers)
+        - Agent body state and dynamics tracking
+        - Energy decay and resource consumption
+        - Random seed control for reproducible simulations
+        - Action result tracking and reward calculation
+        
+        World features:
+        - Vision: Camera-like perception with configurable FOV
+        - Touch: Proximity-based interaction detection
+        - Internal: Internal state signals (energy, health, age)
+        - Proprioception: Body position and movement sensing
+        - Audio: Sound signal processing (future enhancement)
+        
+        Object types:
+        - Empty: Passable, no interaction
+        - Resource: Consumable, provides energy
+        - Hazard: Damaging, reduces health
+        - Wall: Blocking, prevents movement
+        - Marker: Special purpose, agent-dependent
+        )pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure,
+             py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions and sensory capabilities")
+        .def("reset", &SimpleWorld::reset,
+             "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart,
+             py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world simulation timestep")
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to world")
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal,
+             "Get sensory percept data")
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world")
+        .def("removeObject", &SimpleWorld::removeObject,
+             py::arg("x"), py::arg("y"),
+             "Remove object from world")
+        .def("isValidPosition", &SimpleWorld::isValidPosition,
+             py::arg("x"), py::arg("y"),
+             "Check if position is valid")
+        .def("getWidth", &SimpleWorld::getWidth)
+        .def("getHeight", &SimpleWorld::getHeight)
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
+    // Convenience factory functions
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Apply default configuration for Phase 6 integration
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("simulation.timestep", 0.001f, ConfigSource::Default);
+        return config;
+    }, "Create a default configuration optimized for Phase 6 integration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Utility functions and constants
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced utility functions
+    m.def("createIntegratedBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.08f, ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.0015f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.2f, ConfigSource::Default);
+        config->set("simulation.timestep", 0.001f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a fully integrated Phase 6 brain with default parameters");
+
+    m.def("runPhase6Demo", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
+        std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Regions: " << brain->getRegionCount() << std::endl;
+        
+        for (int step = 0; step < 100; ++step) {
+            brain->step(step);
+            if (step % 20 == 0) {
+                std::cout << "Step " << step << ": " 
+                          << brain->getFiringNeuronCount() << " firing neurons, "
+                          << brain->getAverageFiringRate() << " Hz average rate" << std::endl;
+            }
+        }
+        
+        std::cout << "=== Phase 6 Demo Complete ===" << std::endl;
+    }, "Run a Phase 6 integration demonstration");
+}
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

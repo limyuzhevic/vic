@@ -212,4 +212,232 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// Configuration validation and helper methods
+
+namespace nlm {
+
+// Validate configuration key
+bool Config::validateKey(const std::string& key) const {
+    if (key.empty()) {
+        NLM_LOG_ERROR("Configuration key cannot be empty");
+        return false;
+    }
+    
+    // Check for invalid characters
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            NLM_LOG_ERROR("Configuration key \"" + key + "\" contains invalid characters");
+            return false;
+        }
+    }
+    
+    // Check for reserved keywords
+    static const std::vector<std::string> reservedKeywords = {
+        "null", "true", "false", "and", "or", "not", "if", "else", "for", "while"
+    };
+    
+    std::string lowerKey = toLower(key);
+    if (std::find(reservedKeywords.begin(), reservedKeywords.end(), lowerKey) != reservedKeywords.end()) {
+        NLM_LOG_ERROR("Configuration key \"" + key + "\" is a reserved keyword");
+        return false;
+    }
+    
+    return true;
+}
+
+// Validate configuration value based on expected type
+bool Config::validateValue(const std::string& key, const ConfigValue& value, ConfigSource source) const {
+    if (value.index() == 0) { // std::string
+        const std::string& strValue = std::get<std::string>(value);
+        if (strValue.empty() && key.find("count") != std::string::npos) {
+            NLM_LOG_WARNING("Configuration \"" + key + "\" has empty string value (may cause issues)");
+        }
+    } else if (value.index() == 3) { // bool
+        const bool& boolValue = std::get<bool>(value);
+        if (!boolValue && key.find("enable") != std::string::npos) {
+            NLM_LOG_WARNING("Configuration \"" + key + "\" is disabled (may affect functionality)");
+        }
+    } else if (value.index() == 2) { // double
+        const double& doubleValue = std::get<double>(value);
+        if (doubleValue < 0.0 && (key.find("rate") != std::string::npos || key.find("ratio") != std::string::npos)) {
+            NLM_LOG_WARNING("Configuration \"" + key + "\" has negative value (may indicate configuration error)");
+        }
+    }
+    
+    return true;
+}
+
+// Check for required configuration keys
+std::vector<std::string> Config::validateRequiredKeys(const std::vector<std::string>& requiredKeys) const {
+    std::vector<std::string> missingKeys;
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            missingKeys.push_back(key);
+        }
+    }
+    
+    if (!missingKeys.empty()) {
+        std::ostringstream oss;
+        oss << "Missing required configuration keys: ";
+        for (size_t i = 0; i < missingKeys.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << missingKeys[i];
+        }
+        NLM_LOG_ERROR(oss.str());
+    }
+    
+    return missingKeys;
+}
+
+// Get descriptive error message for configuration key
+std::string Config::getKeyDescription(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        return it->description;
+    }
+    
+    return "Unknown configuration key: " + key;
+}
+
+// Export configuration to JSON format (Phase 3 enhancement)
+std::string Config::exportToJSON() const {
+    std::ostringstream oss;
+    oss << "{\n";
+    
+    bool first = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!first) oss << ",\n";
+        first = false;
+        
+        oss << "  \"" << entry.key << "\": ";
+        
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                         std::is_same_v<T, double>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            }
+        }, entry.value);
+    }
+    
+    oss << "\n}";
+    return oss.str();
+}
+
+// Import configuration from JSON format (Phase 3 enhancement)
+bool Config::importFromJSON(const std::string& json) {
+    try {
+        // Simple JSON parser for key-value pairs
+        // This is a simplified implementation for Phase 3
+        // In Phase 4, this would use a proper JSON library
+        
+        std::istringstream iss(json);
+        std::string line;
+        
+        while (std::getline(iss, line)) {
+            // Skip whitespace and comments
+            line = trim(line);
+            if (line.empty() || line.find("//") == 0 || line.find("#") == 0) {
+                continue;
+            }
+            
+            // Parse "key": "value" or "key": value format
+            size_t colonPos = line.find(':');
+            if (colonPos == std::string::npos) {
+                continue;
+            }
+            
+            std::string key = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
+            
+            // Remove quotes from key
+            if (key.size() >= 2 && key.front() == '"' && key.back() == '"') {
+                key = key.substr(1, key.size() - 2);
+            }
+            
+            // Remove quotes from value if present
+            if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Try to parse value based on type
+            bool parsed = false;
+            
+            // Try boolean
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::File);
+                parsed = true;
+            }
+            // Try integer
+            else if (std::all_of(value.begin(), value.end(), ::isdigit)) {
+                try {
+                    set(key, std::stoll(value), ConfigSource::File);
+                    parsed = true;
+                } catch (...) {
+                    // Fall through to string
+                }
+            }
+            // Try floating point
+            else {
+                size_t dotPos = value.find('.');
+                if (dotPos != std::string::npos && std::all_of(value.begin(), value.begin() + dotPos, ::isdigit) &&
+                    std::all_of(value.begin() + dotPos + 1, value.end(), ::isdigit)) {
+                    try {
+                        set(key, std::stod(value), ConfigSource::File);
+                        parsed = true;
+                    } catch (...) {
+                        // Fall through to string
+                    }
+                }
+            }
+            
+            if (!parsed) {
+                // Fall back to string
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error importing JSON configuration: ") + e.what());
+        return false;
+    }
+}
+
+// Validate configuration consistency
+bool Config::validateConsistency() const {
+    bool isValid = true;
+    
+    // Check for common configuration patterns
+    if (has("brain.neuron_count") && has("brain.connection_probability")) {
+        int64_t neuronCount = getOr<int64_t>("brain.neuron_count", 0);
+        double connectionProb = getOr<double>("brain.connection_probability", 0.0);
+        
+        if (neuronCount <= 0 && connectionProb > 0.0) {
+            NLM_LOG_ERROR("brain.neuron_count (" + std::to_string(neuronCount) + ") must be positive when connection_probability is set");
+            isValid = false;
+        }
+    }
+    
+    if (has("plasticity.stdp.enable") && has("plasticity.stdp.learning_rate")) {
+        bool stdpEnabled = getOr<bool>("plasticity.stdp.enable", false);
+        double stdpLearningRate = getOr<double>("plasticity.stdp.learning_rate", 0.0);
+        
+        if (stdpEnabled && stdpLearningRate <= 0.0) {
+            NLM_LOG_ERROR("plasticity.stdp.learning_rate must be positive when STDP is enabled");
+            isValid = false;
+        }
+    }
+    
+    return isValid;
+}
+
 } // namespace nlm
