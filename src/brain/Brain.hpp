@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/PlasticityRule.hpp"
 #include <memory>
 #include <string>
 
@@ -28,6 +29,60 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Acetylcholine;
+class Endorphins;
+class Norepinephrine;
+
+// Neuromodulation integration configuration
+struct NeuromodulationIntegrationConfig {
+    // Neuromodulator activation flags
+    bool dopamineEnabled;
+    bool curiosityEnabled;
+    bool noveltyEnabled;
+    bool predictionErrorEnabled;
+    bool serotoninEnabled;
+    bool acetylcholineEnabled;
+    bool endorphinsEnabled;
+    bool norepinephrineEnabled;
+    
+    // Integration weights
+    float neuromodulationToPlasticityWeight;
+    float neuromodulationToMemoryWeight;
+    float neuromodulationToAttentionWeight;
+    float neuromodulationToMotivationWeight;
+    
+    // Cross-modulator interaction weights
+    float neuromodulatorInteractionStrength;
+    
+    // Learning system integration
+    float rewardPredictionErrorIntegration;
+    float curiosityExplorationIntegration;
+    float noveltyPatternMemoryIntegration;
+    
+    NeuromodulationIntegrationConfig() {
+        // Default configuration
+        dopamineEnabled = true;
+        curiosityEnabled = true;
+        noveltyEnabled = true;
+        predictionErrorEnabled = true;
+        serotoninEnabled = true;
+        acetylcholineEnabled = true;
+        endorphinsEnabled = true;
+        norepinephrineEnabled = true;
+        
+        neuromodulationToPlasticityWeight = 0.8f;
+        neuromodulationToMemoryWeight = 0.6f;
+        neuromodulationToAttentionWeight = 0.7f;
+        neuromodulationToMotivationWeight = 0.7f;
+        
+        neuromodulatorInteractionStrength = 0.5f;
+        
+        rewardPredictionErrorIntegration = 0.8f;
+        curiosityExplorationIntegration = 0.7f;
+        noveltyPatternMemoryIntegration = 0.6f;
+    }
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -46,7 +101,7 @@ struct InterRegionConnection {
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// and integrated memory, prediction, cognition, and advanced neuromodulation systems
 
 class Brain {
 public:
@@ -88,6 +143,7 @@ public:
     STDP* getSTDP();
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
+    PlasticityRule* getAdvancedPlasticityRule();
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -100,8 +156,14 @@ public:
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
+    // Apply neuromodulation to system
+    void applyAdvancedNeuromodulation();
+    
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
+    
+    // Update neuromodulation integration
+    void updateNeuromodulationIntegration();
     
     // Apply developmental changes (called automatically in step)
     void develop();
@@ -172,17 +234,21 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // Advanced neuromodulation systems
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    Serotonin* getSerotonin();
+    Acetylcholine* getAcetylcholine();
+    Endorphins* getEndorphins();
+    Norepinephrine* getNorepinephrine();
+    
+    // Get neuromodulation integration configuration
+    NeuromodulationIntegrationConfig getNeuromodulationIntegrationConfig() const;
+    
+    // Set neuromodulation integration configuration
+    void setNeuromodulationIntegrationConfig(const NeuromodulationIntegrationConfig& config);
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
@@ -192,6 +258,21 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Calculate system-wide neuromodulation factors
+    float calculateGlobalNeuromodulationFactor() const;
+    
+    // Apply neuromodulation to specific brain systems
+    void applyNeuromodulationToPlasticity();
+    void applyNeuromodulationToMemory();
+    void applyNeuromodulationToAttention();
+    void applyNeuromodulationToMotivation();
+    
+    // Update neuromodulator interactions
+    void updateNeuromodulatorInteractions();
+    
+    // Get neuromodulator state for advanced users
+    std::string getNeuromodulatorStates() const;
     
 private:
     struct Impl;

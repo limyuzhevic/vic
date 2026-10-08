@@ -239,6 +239,9 @@ struct VectorizedStats {
 // Inline SIMD implementations
 
 inline float VectorizedSTDP::calculateDeltaW(float dt) {
+    if (tau_plus == 0.0f) return 0.0f;
+    if (tau_minus == 0.0f) return 0.0f;
+    
     if (dt > 0.0f) {
         // Pre before post: LTP
         return A_plus * std::exp(-dt / tau_plus);
@@ -301,12 +304,22 @@ template<typename VArray, typename IArray, typename RArray, typename FArray>
 size_t VectorizedLIF::update(VArray& V_inout, const IArray& I, 
                               RArray& refractoryRemaining,
                               FArray& fired, size_t count) {
+    // Safety checks
+    if (count == 0) return 0;
+    if (tau <= 0.0f) return 0;  // Invalid tau
+    if (C <= 0.0f) return 0;  // Invalid capacitance
+    
     size_t numFired = 0;
     
-    // Pre-compute constants
-    float leakCoeff = dt / tau;  // (dt * 1000) factor handled in caller
+    // Pre-compute constants with overflow protection
+    float leakCoeff = dt / tau;
     float inputCoeff = dt / C;
     float expLeak = std::exp(-dt / tau);
+    
+    // Safety check for potential overflow
+    if (std::isinf(leakCoeff) || std::isinf(inputCoeff) || std::isinf(expLeak)) {
+        return 0;  // Overflow detected
+    }
     
 #if defined(NLM_SIMD_AVX512)
     __m512 vmRest = _mm512_set1_ps(V_rest);
@@ -318,15 +331,22 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     size_t i = 0;
     size_t vectorSize = count - (count % 16);
     
+    // Bounds checking for SIMD loop
+    if (vectorSize > count) vectorSize = count;
+    
     for (; i < vectorSize; i += 16) {
-        // Load membrane potentials
+        // Check bounds before accessing arrays
+        if (i + 16 > count) break;
+        
+        // Load membrane potentials with bounds checking
         __m512 vV = _mm512_loadu_ps(&V_inout[i]);
         __m512 vI = _mm512_loadu_ps(&I[i]);
         
-        // Load refractory counters as float
-        alignas(64) float refractoryFloat[16];
+        // Create properly aligned temporary array for refractory values
+        alignas(SIMDUtils::alignment()) float refractoryFloat[16];
         for (int j = 0; j < 16; ++j) {
-            refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
+            size_t idx = i + j;
+            refractoryFloat[j] = (idx < count) ? static_cast<float>(refractoryRemaining[idx]) : 0.0f;
         }
         __m512 vRefractory = _mm512_load_ps(refractoryFloat);
         
@@ -358,40 +378,69 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         // Store updated values
         _mm512_storeu_ps(&V_inout[i], vV);
         
-        // Update refractory counters
-        alignas(64) float refractoryOut[16];
+        // Create aligned temporary array for output
+        alignas(SIMDUtils::alignment()) float refractoryOut[16];
         _mm512_store_ps(refractoryOut, vRefractory);
         for (int j = 0; j < 16; ++j) {
-            refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
+            size_t idx = i + j;
+            if (idx < count) {
+                refractoryRemaining[idx] = static_cast<uint32_t>(refractoryOut[j]);
+            }
         }
         
-        // Record fired neurons
-        alignas(64) uint32_t firedMask[16];
+        // Create aligned temporary array for fired neurons
+        alignas(SIMDUtils::alignment()) uint32_t firedMask[16];
         _mm512_storeu_si512(firedMask, _mm512_castps_si32(maskSpike));
         for (int j = 0; j < 16; ++j) {
-            if (firedMask[j] & 0x80000000) {
-                fired[i + j] = 1;
-                ++numFired;
-            } else {
-                fired[i + j] = 0;
+            size_t idx = i + j;
+            if (idx < count) {
+                if (firedMask[j] & 0x80000000) {
+                    fired[idx] = 1;
+                    ++numFired;
+                } else {
+                    fired[idx] = 0;
+                }
             }
         }
     }
     
-    // Handle remaining elements
+    // Handle remaining elements with safety checks
     for (; i < count; ++i) {
         if (refractoryRemaining[i] > 0) {
             refractoryRemaining[i]--;
+            if (refractoryRemaining[i] > static_cast<uint32_t>(refractoryDecay)) {
+                refractoryRemaining[i] = static_cast<uint32_t>(refractoryDecay);
+            }
             V_inout[i] = V_rest;
             fired[i] = 0;
         } else {
-            float leak = (V_rest - V_inout[i]) / tau;
+            // Check for potential overflow before computation
+            float V_val = V_inout[i];
+            if (std::isinf(V_val)) {
+                V_inout[i] = V_rest;  // Reset to safe value
+                fired[i] = 0;
+                continue;
+            }
+            
+            float leak = (V_rest - V_val) / tau;
             float input = I[i] / C;
+            
+            // Overflow protection
+            if (std::isinf(leak) || std::isinf(input)) {
+                V_inout[i] = V_rest;
+                fired[i] = 0;
+                continue;
+            }
+            
             V_inout[i] += dt * 1000.0f * (leak + input);
             
+            // Bounds checking on result
             if (V_inout[i] >= V_threshold) {
                 V_inout[i] = V_reset;
-                refractoryRemaining[i] = static_cast<uint32_t>(refractoryDecay);
+                // Overflow protection on refractory period
+                uint32_t refPeriod = static_cast<uint32_t>(refractoryDecay);
+                if (refPeriod > 65535) refPeriod = 65535;  // Prevent overflow
+                refractoryRemaining[i] = refPeriod;
                 fired[i] = 1;
                 ++numFired;
             } else {
@@ -410,29 +459,33 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     size_t i = 0;
     size_t vectorSize = count - (count % 8);
     
+    // Bounds checking for SIMD loop
+    if (vectorSize > count) vectorSize = count;
+    
     for (; i < vectorSize; i += 8) {
+        // Check bounds before accessing arrays
+        if (i + 8 > count) break;
+        
+        // Load membrane potentials with bounds checking
         __m256 vV = _mm256_loadu_ps(&V_inout[i]);
         __m256 vI = _mm256_loadu_ps(&I[i]);
         
-        // Refractory handling
+        // Use aligned memory for temporary arrays
         alignas(32) float refractoryFloat[8];
         for (int j = 0; j < 8; ++j) {
-            refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
+            size_t idx = i + j;
+            refractoryFloat[j] = (idx < count) ? static_cast<float>(refractoryRemaining[idx]) : 0.0f;
         }
         __m256 vRefractory = _mm256_load_ps(refractoryFloat);
         __m256 maskRefractory = _mm256_cmp_ps(vRefractory, _mm256_setzero_ps(), _CMP_GT_OQ);
         
-        // LIF update
         __m256 vLeak = _mm256_mul_ps(_mm256_sub_ps(vmRest, vV), vLeakCoeff);
         __m256 vInput = _mm256_mul_ps(vI, vInputCoeff);
         __m256 vUpdate = _mm256_mul_ps(_mm256_add_ps(vLeak, vInput), _mm256_set1_ps(1000.0f));
         vV = _mm256_add_ps(vV, vUpdate);
         vV = _mm256_blend_ps(vV, vmRest, maskRefractory);
         
-        // Spike detection
         __m256 maskSpike = _mm256_cmp_ps(vV, vmThresh, _CMP_GE_OQ);
-        
-        // Reset and decay
         vV = _mm256_blend_ps(vV, vmReset, maskSpike);
         vRefractory = _mm256_sub_ps(vRefractory, _mm256_set1_ps(1.0f));
         
@@ -441,14 +494,20 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         alignas(32) float refractoryOut[8];
         _mm256_store_ps(refractoryOut, vRefractory);
         for (int j = 0; j < 8; ++j) {
-            refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
+            size_t idx = i + j;
+            if (idx < count) {
+                refractoryRemaining[idx] = static_cast<uint32_t>(refractoryOut[j]);
+            }
         }
         
         alignas(32) uint32_t firedMask[8];
         _mm256_storeu_si256(firedMask, _mm256_castps_si32(maskSpike));
         for (int j = 0; j < 8; ++j) {
-            fired[i + j] = (firedMask[j] & 0x80000000) ? 1 : 0;
-            if (fired[i + j]) ++numFired;
+            size_t idx = i + j;
+            if (idx < count) {
+                fired[idx] = (firedMask[j] & 0x80000000) ? 1 : 0;
+                if (fired[idx]) ++numFired;
+            }
         }
     }
     

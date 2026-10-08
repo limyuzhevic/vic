@@ -24,6 +24,7 @@
 #include <atomic>
 #include <array>
 #include <optional>
+#include <limits>
 
 namespace nlm {
 
@@ -49,8 +50,9 @@ public:
      * Create a memory pool
      * @param blockSize Number of objects per memory block
      * @param initialBlocks Number of blocks to pre-allocate
+     * @param maxBlocks Maximum number of blocks (0 = unlimited)
      */
-    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4);
+    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4, size_t maxBlocks = 0);
     
     ~MemoryPool();
     
@@ -61,6 +63,7 @@ public:
     /**
      * Allocate an object from the pool
      * Lock-free operation
+     * @return Pointer to allocated object or nullptr if pool is full
      */
     T* allocate();
     
@@ -95,6 +98,24 @@ public:
      */
     void reserve(size_t count);
     
+    /**
+     * Get maximum number of blocks
+     */
+    size_t maxBlocks() const { return maxBlocks_; }
+    
+    /**
+     * Check if pool has reached capacity
+     */
+    bool full() const { 
+        if (maxBlocks_ == 0) return false; // Unlimited
+        return blocks_.size() >= maxBlocks_; 
+    }
+    
+    /**
+     * Get current number of blocks
+     */
+    size_t blockCount() const { return blocks_.size(); }
+    
 private:
     // Memory block containing objects
     struct Block {
@@ -109,13 +130,16 @@ private:
     };
     
     // Add a new block to the pool
-    void addBlock();
+    bool addBlock();
     
     // Slab size for each object (rounded up to alignment)
     size_t slabSize_;
     
     // Number of objects per block
     size_t blockSize_;
+    
+    // Maximum number of blocks (0 = unlimited)
+    size_t maxBlocks_;
     
     // Head of free list (lock-free)
     std::atomic<MemPoolNode*> freeList_;
@@ -145,9 +169,10 @@ MemoryPool<T>::Block::Block(size_t objectSize, size_t count)
 }
 
 template<typename T>
-MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
+MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks, size_t maxBlocks)
     : slabSize_(sizeof(T))
     , blockSize_(blockSize)
+    , maxBlocks_(maxBlocks)
     , freeList_(nullptr)
     , currentBlock_(nullptr)
     , currentIndex_(0)
@@ -162,7 +187,9 @@ MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
     
     // Pre-allocate initial blocks
     for (size_t i = 0; i < initialBlocks; ++i) {
-        addBlock();
+        if (!addBlock()) {
+            break;  // Failed to add block
+        }
     }
 }
 
@@ -172,7 +199,12 @@ MemoryPool<T>::~MemoryPool() {
 }
 
 template<typename T>
-void MemoryPool<T>::addBlock() {
+bool MemoryPool<T>::addBlock() {
+    // Check if we've reached maximum capacity
+    if (maxBlocks_ > 0 && blocks_.size() >= maxBlocks_) {
+        return false;  // Pool is at capacity
+    }
+    
     auto block = std::make_unique<Block>(slabSize_, blockSize_);
     
     // Chain existing blocks
@@ -191,14 +223,24 @@ void MemoryPool<T>::addBlock() {
         MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
         node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
         freeList_.store(node, std::memory_order_relaxed);
+        
+        // Add to available count with overflow protection
         availableCount_.fetch_add(1, std::memory_order_relaxed);
     }
     
+    // Add block to blocks list
     blocks_.push_back(std::move(block));
+    
+    return true;
 }
 
 template<typename T>
 T* MemoryPool<T>::allocate() {
+    // Check if pool is at capacity (when maxBlocks is set)
+    if (maxBlocks_ > 0 && blocks_.size() >= maxBlocks_) {
+        return nullptr;  // Pool is full
+    }
+    
     // Try to get from free list first (lock-free pop)
     MemPoolNode* node = freeList_.load(std::memory_order_acquire);
     
@@ -207,6 +249,13 @@ T* MemoryPool<T>::allocate() {
         if (freeList_.compare_exchange_weak(node, next, 
                                              std::memory_order_release, 
                                              std::memory_order_relaxed)) {
+            // Overflow protection for allocatedCount_
+            size_t currentAllocated = allocatedCount_.load(std::memory_order_relaxed);
+            if (currentAllocated == std::numeric_limits<size_t>::max()) {
+                // Decrement available count back for the overflow case
+                availableCount_.fetch_sub(1, std::memory_order_relaxed);
+                return nullptr;  // Overflow protection
+            }
             allocatedCount_.fetch_add(1, std::memory_order_relaxed);
             availableCount_.fetch_sub(1, std::memory_order_relaxed);
             return reinterpret_cast<T*>(node);
@@ -214,11 +263,13 @@ T* MemoryPool<T>::allocate() {
         // node was updated by CAS, reload next
     }
     
-    // Free list empty, add a new block
-    addBlock();
+    // Free list empty, add a new block if not at capacity
+    if (addBlock()) {
+        // Try again
+        return allocate();
+    }
     
-    // Try again
-    return allocate();
+    return nullptr;  // Failed to add block (pool at capacity)
 }
 
 template<typename T>
@@ -235,8 +286,12 @@ void MemoryPool<T>::deallocate(T* obj) {
                                              std::memory_order_release,
                                              std::memory_order_relaxed));
     
-    allocatedCount_.fetch_sub(1, std::memory_order_relaxed);
-    availableCount_.fetch_add(1, std::memory_order_relaxed);
+    // Overflow protection for allocatedCount_ and availableCount_
+    size_t currentAllocated = allocatedCount_.load(std::memory_order_relaxed);
+    if (currentAllocated > 0) {
+        allocatedCount_.fetch_sub(1, std::memory_order_relaxed);
+        availableCount_.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 template<typename T>
@@ -250,8 +305,20 @@ size_t MemoryPool<T>::memoryUsage() const {
 
 template<typename T>
 void MemoryPool<T>::reserve(size_t count) {
+    if (count == 0) return;  // Nothing to do
+    
+    // Check pool capacity limits
+    if (maxBlocks_ > 0) {
+        size_t maxAvailable = maxBlocks_ * blockSize_ - availableCount_.load(std::memory_order_relaxed);
+        if (count > maxAvailable) {
+            count = maxAvailable;  // Cap to remaining capacity
+        }
+    }
+    
     while (availableCount_.load(std::memory_order_relaxed) < count) {
-        addBlock();
+        if (!addBlock()) {
+            break;  // Failed to add block (pool at capacity)
+        }
     }
 }
 

@@ -33,6 +33,7 @@ namespace nlm {
 constexpr size_t SPIKE_QUEUE_CAPACITY = 16384;  // Must be power of 2
 constexpr size_t DELAYED_SPIKE_BUCKETS = 1024;  // Number of time buckets
 constexpr size_t MAX_DELAY_STEPS = 100;  // Maximum synaptic delay in steps
+constexpr size_t MAX_PRIORITY_EVENTS = 4096;  // Maximum events in priority queue
 
 /**
  * SpikeEvent with minimal data for queue processing
@@ -189,6 +190,11 @@ private:
         }
         
         bool push(const QueuedSpikeEvent& event) {
+            // Validate event data for safety
+            if (std::isnan(event.weight) || std::isinf(event.weight)) {
+                return false;  // Invalid event data
+            }
+            
             if (count.load(std::memory_order_relaxed) >= BUCKET_CAPACITY) {
                 return false;
             }
@@ -277,7 +283,17 @@ public:
      * Get count
      */
     size_t size() const { return events_.size(); }
-
+    
+    /**
+     * Check if queue is at capacity
+     */
+    bool full() const { return events_.size() >= MAX_PRIORITY_EVENTS; }
+    
+    /**
+     * Get maximum events
+     */
+    size_t maxEvents() const { return MAX_PRIORITY_EVENTS; }
+    
 private:
     std::vector<PriorityEvent> events_;
 };
@@ -298,6 +314,11 @@ inline SpikeRingBuffer::SpikeRingBuffer(size_t capacity)
 inline SpikeRingBuffer::~SpikeRingBuffer() = default;
 
 inline bool SpikeRingBuffer::push(const QueuedSpikeEvent& event) {
+    // Validate event data for safety
+    if (std::isnan(event.weight) || std::isinf(event.weight)) {
+        return false;  // Invalid event data
+    }
+    
     size_t tail = tail_.load(std::memory_order_relaxed);
     size_t nextTail = (tail + 1) & mask_;
     
@@ -360,10 +381,19 @@ inline void DelayedSpikeQueue::schedule(uint64_t sourceNeuron, uint64_t destNeur
                                         bool isExcitatory, uint64_t deliveryStep) {
     if (deliveryStep < currentStep_) return;  // Already due, skip
     
+    // Validate event data for safety
+    if (std::isnan(weight) || std::isinf(weight)) {
+        return;  // Invalid event data
+    }
+    
+    // Validate neuron IDs
+    if (sourceNeuron == 0 || destNeuron == 0) return;  // Invalid neuron IDs
+    
     size_t bucketIdx = (deliveryStep % numBuckets_);
     QueuedSpikeEvent event(sourceNeuron, destNeuron, synapseId, weight, isExcitatory);
     
     if (buckets_[bucketIdx].push(event)) {
+        // Overflow protection for pendingCounts_
         pendingCounts_[bucketIdx].fetch_add(1, std::memory_order_relaxed);
     }
 }

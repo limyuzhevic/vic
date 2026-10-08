@@ -1,4 +1,7 @@
 #include "Experiment.hpp"
+#include <algorithm>
+#include <sstream>
+#include <memory>
 
 namespace nlm {
 
@@ -12,7 +15,8 @@ struct Experiment::Impl {
     SimulationStep endStep;
     std::vector<std::string> notes;
     
-    Impl() : seed(0), startStep(0), endStep(0) {}
+    // NEW: Plugin system
+    std::unique_ptr<PluginManager> pluginManager;
 };
 
 Experiment::Experiment() : pImpl(new Impl) {}
@@ -135,6 +139,131 @@ void Experiment::addNote(const std::string& note) {
 
 const std::vector<std::string>& Experiment::getNotes() const {
     return pImpl->notes;
+}
+
+// EXTENSIBILITY IMPLEMENTATION
+void Experiment::setPluginManager(std::unique_ptr<PluginManager> manager) {
+    pImpl->pluginManager = std::move(manager);
+    if (pImpl->pluginManager) {
+        pImpl->pluginManager->setCurrentExperiment(*this);
+    }
+}
+
+Experiment::PluginManager* Experiment::getPluginManager() const {
+    return pImpl->pluginManager.get();
+}
+
+void Experiment::registerPluginFactory(std::unique_ptr<PluginFactory> factory) {
+    if (pImpl->pluginManager) {
+        pImpl->pluginManager->registerPluginFactory(std::move(factory));
+    }
+}
+
+std::unique_ptr<Experiment::ExperimentPlugin> Experiment::createPlugin(
+    const std::string& type,
+    const std::vector<float>& parameters) {
+    if (pImpl->pluginManager) {
+        return pImpl->pluginManager->createPlugin(type, parameters);
+    }
+    return nullptr;
+}
+
+std::vector<Experiment::ExperimentPlugin*> Experiment::getPlugins() const {
+    if (pImpl->pluginManager) {
+        return pImpl->pluginManager->getPlugins();
+    }
+    return std::vector<Experiment::ExperimentPlugin*>();
+}
+
+bool Experiment::setPluginActive(const std::string& pluginName, bool active) {
+    if (pImpl->pluginManager) {
+        return pImpl->pluginManager->setPluginActive(pluginName, active);
+    }
+    return false;
+}
+
+bool Experiment::removePlugin(const std::string& pluginName) {
+    if (pImpl->pluginManager) {
+        return pImpl->pluginManager->removePlugin(pluginName);
+    }
+    return false;
+}
+
+bool Experiment::loadPluginsFromFile(const std::string& filepath) {
+    if (pImpl->pluginManager) {
+        // This would require a specific PluginLoader implementation
+        // For now, return false as it depends on the implementation
+        return false;
+    }
+    return false;
+}
+
+bool Experiment::loadPluginsFromDirectory(const std::string& directory) {
+    if (pImpl->pluginManager) {
+        // This would require a specific PluginLoader implementation
+        // For now, return false as it depends on the implementation
+        return false;
+    }
+    return false;
+}
+
+void Experiment::processPlugins() {
+    if (pImpl->pluginManager) {
+        // Process all active plugins
+        auto plugins = pImpl->pluginManager->getPlugins();
+        for (auto* plugin : plugins) {
+            if (plugin->isActive()) {
+                plugin->process();
+            }
+        }
+    }
+}
+
+std::string Experiment::analyzeResults() const {
+    std::stringstream ss;
+    ss << "Experiment Analysis:" << std::endl;
+    ss << "Name: " << pImpl->name << std::endl;
+    ss << "Metrics: " << pImpl->metrics.size() << std::endl;
+    ss << "Steps: " << pImpl->stepData.size() << std::endl;
+    return ss.str();
+}
+
+bool Experiment::exportData(const std::string& filepath) const {
+    // Basic export implementation
+    std::ofstream file(filepath);
+    if (!file) {
+        return false;
+    }
+    
+    file << "Experiment: " << pImpl->name << std::endl;
+    file << "Seed: " << pImpl->seed << std::endl;
+    file << "Configuration:" << std::endl;
+    for (const auto& pair : pImpl->config) {
+        file << "  " << pair.first << " = " << pair.second << std::endl;
+    }
+    file << "Metrics:" << std::endl;
+    for (const auto& pair : pImpl->metrics) {
+        file << "  " << pair.first << " = " << pair.second << std::endl;
+    }
+    
+    return true;
+}
+
+bool Experiment::compareWith(const Experiment& other) const {
+    // Basic comparison implementation
+    return (pImpl->name == other.pImpl->name) && (pImpl->seed == other.pImpl->seed);
+}
+
+std::string Experiment::getSummary() const {
+    std::stringstream ss;
+    ss << "Experiment Summary:" << std::endl;
+    ss << "Name: " << pImpl->name << std::endl;
+    ss << "Seed: " << pImpl->seed << std::endl;
+    ss << "Configuration entries: " << pImpl->config.size() << std::endl;
+    ss << "Metric entries: " << pImpl->metrics.size() << std::endl;
+    ss << "Step entries: " << pImpl->stepData.size() << std::endl;
+    ss << "Notes: " << pImpl->notes.size() << std::endl;
+    return ss.str();
 }
 
 } // namespace nlm
