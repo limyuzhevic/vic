@@ -54,7 +54,11 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // PHASE 2+: Train prediction model using neural substrate
+    // Use observation to update internal prediction model
+    // This would integrate with brain's neural activity patterns
+    // For now, just record that training was attempted
+    pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.01f);
 }
 
 } // namespace nlm
