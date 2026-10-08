@@ -764,6 +764,18 @@ void Brain::reset() {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    // Input validation
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Save failed: Empty filepath provided");
+        return false;
+    }
+    
+    // Check for null pImpl
+    if (!pImpl) {
+        NLM_LOG_ERROR("Save failed: Brain not properly initialized");
+        return false;
+    }
+    
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
@@ -789,8 +801,20 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Save failed: Null region encountered");
+                return false;
+            }
             for (const auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_ERROR("Save failed: Null population encountered");
+                    return false;
+                }
                 for (const auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Save failed: Null neuron encountered");
+                        return false;
+                    }
                     const auto& state = neuron->getState();
                     neuronData.membranePotential.push_back(state.membranePotential);
                     neuronData.restingPotential.push_back(state.restingPotential);
@@ -813,7 +837,15 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Save failed: Null region encountered while writing synapses");
+                return false;
+            }
             for (const auto* syn : region->getSynapses()) {
+                if (!syn) {
+                    NLM_LOG_ERROR("Save failed: Null synapse encountered");
+                    return false;
+                }
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());
@@ -846,6 +878,18 @@ bool Brain::save(const std::string& filepath) const {
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
+    // Input validation
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Load failed: Empty filepath provided");
+        return false;
+    }
+    
+    // Check for null pImpl
+    if (!pImpl) {
+        NLM_LOG_ERROR("Load failed: Brain not properly initialized");
+        return false;
+    }
+    
     try {
         CheckpointReader reader;
         if (!reader.open(filepath)) {
@@ -858,6 +902,9 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Clear existing state
+        reset();
+        
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
@@ -868,8 +915,20 @@ bool Brain::load(const std::string& filepath) {
         // Apply neuron states
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Load failed: Null region encountered");
+                return false;
+            }
             for (auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_ERROR("Load failed: Null population encountered");
+                    return false;
+                }
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Load failed: Null neuron encountered");
+                        return false;
+                    }
                     if (idx < neuronData.membranePotential.size()) {
                         neuron->setMembranePotential(neuronData.membranePotential[idx]);
                         neuron->setRestingPotential(neuronData.restingPotential[idx]);
@@ -881,6 +940,12 @@ bool Brain::load(const std::string& filepath) {
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                        }
+                        if (idx < neuronData.refractoryRemaining.size()) {
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
+                        }
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
                         }
                     }
                     idx++;
@@ -1111,6 +1176,41 @@ void Brain::logStatus() const {
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+    
+    // Performance and statistics
+    NLM_LOG_INFO("=== Performance Statistics ===");
+    NLM_LOG_INFO("Simulation time: " + std::to_string(pImpl->currentTime) + "s");
+    NLM_LOG_INFO("Simulation steps: " + std::to_string(pImpl->currentStep));
+    NLM_LOG_INFO("Total processing time: " + std::to_string(pImpl->totalWallClockTime) + "s");
+    NLM_LOG_INFO("Steps per second: " + std::to_string(pImpl->currentStep / std::max(pImpl->totalWallClockTime, 0.001)));
+    NLM_LOG_INFO("Total memory usage: " + std::to_string(pImpl->memoryUsage) + " bytes");
+    NLM_LOG_INFO("Neural activity intensity: " + std::to_string(getNeuralActivityIntensity()));
+    
+    // Health indicators
+    NLM_LOG_INFO("=== System Health ===");
+    bool allSystemsHealthy = true;
+    
+    if (!pImpl->workingMemory || pImpl->workingMemory->getActiveTraces() < getTotalNeuronCount() / 1000) {
+        NLM_LOG_WARN("Working memory may be underutilizing capacity");
+        allSystemsHealthy = false;
+    }
+    
+    if (!pImpl->episodicMemory || pImpl->episodicMemory->getEpisodeCount() < pImpl->currentStep / 100) {
+        NLM_LOG_WARN("Episodic memory storage may be below expected rate");
+        allSystemsHealthy = false;
+    }
+    
+    float firingRate = getAverageFiringRate();
+    if (firingRate < 0.01 || firingRate > 10.0) {
+        NLM_LOG_WARN("Firing rate out of normal range: " + std::to_string(firingRate));
+        allSystemsHealthy = false;
+    }
+    
+    if (allSystemsHealthy) {
+        NLM_LOG_INFO("✓ All systems operating within normal parameters");
+    } else {
+        NLM_LOG_WARN("⚠ System health indicators suggest potential optimization opportunities");
     }
 }
 

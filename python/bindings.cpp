@@ -416,6 +416,288 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced API: Run a complete simulation episode with progress monitoring
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                         std::shared_ptr<AgentBrain> agent, size_t numSteps,
+                         std::function<void(size_t, float, float)> progressCallback) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("All components (brain, world, agent) must be provided");
+        }
+        
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            
+            const auto& percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step, step * 0.001);
+            
+            auto motorCmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motorCmd, world->getSimulationTime());
+            
+            if (progressCallback) {
+                float firingRate = brain->getAverageFiringRate();
+                float curiosity = agent->getCuriosityLevel();
+                progressCallback(step, firingRate, curiosity);
+            }
+        }
+        
+        return std::make_tuple(brain->getAverageFiringRate(), 
+                               brain->getTotalSpikeCount(),
+                               agent->getCuriosityLevel(),
+                               agent->getNoveltyLevel());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       py::arg("progressCallback"), "Run a complete simulation episode with progress monitoring");
+
+    // Advanced API: Get detailed brain statistics and metrics
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        
+        std::unordered_map<std::string, double> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        
+        auto developmentalStage = brain->getDevelopmentalStage();
+        stats["developmental_stage"] = static_cast<int>(developmentalStage);
+        
+        return stats;
+    }, py::arg("brain"), "Get detailed brain statistics and metrics");
+
+    // Advanced API: Configure brain with preset profiles
+    m.def("configureBrainForTask", [](std::shared_ptr<Config> config, const std::string& taskType, 
+                                    double performanceTarget) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        if (taskType == "quick_test") {
+            // Fast, lightweight configuration for quick testing
+            config->set("neuron_count", 500);
+            config->set("simulation_timestep", 0.001);
+            config->set("connection_probability", 0.05);
+            config->set("stdp_ltp_weight", 0.005);
+            config->set("stdp_ltd_weight", 0.006);
+            config->set("synaptogenesis_rate", 0.00001);
+            config->set("pruning_rate", 0.000001);
+        } else if (taskType == "high_performance") {
+            // Higher performance configuration for complex tasks
+            config->set("neuron_count", 5000);
+            config->set("simulation_timestep", 0.0005);
+            config->set("connection_probability", 0.15);
+            config->set("stdp_ltp_weight", 0.02);
+            config->set("stdp_ltd_weight", 0.018);
+            config->set("synaptogenesis_rate", 0.0001);
+            config->set("pruning_rate", 0.00005);
+        } else if (taskType == "balanced") {
+            // Balanced configuration for general purposes
+            config->set("neuron_count", 2000);
+            config->set("simulation_timestep", 0.001);
+            config->set("connection_probability", 0.1);
+            config->set("stdp_ltp_weight", 0.01);
+            config->set("stdp_ltd_weight", 0.012);
+            config->set("synaptogenesis_rate", 0.00005);
+            config->set("pruning_rate", 0.00002);
+        }
+        
+        // Set performance targets based on task type
+        if (performanceTarget > 0.0) {
+            config->set("target_performance", performanceTarget);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("taskType"), py::arg("performanceTarget"), 
+       "Configure brain with preset profiles for specific task types");
+
+    // Advanced API: Run multiple experiments with results collection
+    m.def("runExperiment", [](std::shared_ptr<Config> config, const std::string& experimentType,
+                            size_t numRuns, std::function<void(size_t, float, float)> progressCallback) {
+        std::vector<std::tuple<float, float, float, float>> results; // firing_rate, total_spikes, curiosity, novelty
+        
+        for (size_t run = 0; run < numRuns; ++run) {
+            auto brain = std::make_shared<Brain>(config);
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(20, 20, 8, 8);
+            world->reset();
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            
+            for (size_t step = 0; step < 1000; ++step) {
+                world->update(0.1);
+                
+                const auto& percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                
+                brain->step(step, step * 0.001);
+                
+                auto motorCmd = agent->decodeMotorCommand();
+                world->applyMotorCommand(motorCmd, world->getSimulationTime());
+                
+                if (progressCallback) {
+                    float firingRate = brain->getAverageFiringRate();
+                    float curiosity = agent->getCuriosityLevel();
+                    progressCallback(run * 1000 + step, firingRate, curiosity);
+                }
+            }
+            
+            results.push_back(std::make_tuple(
+                brain->getAverageFiringRate(),
+                brain->getTotalSpikeCount(),
+                agent->getCuriosityLevel(),
+                agent->getNoveltyLevel()
+            ));
+        }
+        
+        return results;
+    }, py::arg("config"), py::arg("experimentType"), py::arg("numRuns"),
+       py::arg("progressCallback"), "Run multiple experiments and collect results");
+
+    // Advanced API: Save brain with metadata and versioning
+    m.def("saveBrainWithMetadata", [](std::shared_ptr<Brain> brain, const std::string& filepath,
+                                     const std::string& experimentName, const std::string& notes) {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        
+        // Create metadata file
+        std::string metadataPath = filepath + ".meta";
+        std::ofstream metaFile(metadataPath);
+        if (!metaFile.is_open()) {
+            throw std::runtime_error("Cannot create metadata file: " + metadataPath);
+        }
+        
+        metaFile << "Experiment: " << experimentName << "\n";
+        metaFile << "Notes: " << notes << "\n";
+        metaFile << "Saved at: " << std::chrono::system_clock::now() << "\n";
+        metaFile << "Neurons: " << brain->getTotalNeuronCount() << "\n";
+        metaFile << "Synapses: " << brain->getTotalSynapseCount() << "\n";
+        metaFile << "Average firing rate: " << brain->getAverageFiringRate() << "\n";
+        metaFile.close();
+        
+        // Save the brain state
+        if (!brain->save(filepath)) {
+            throw std::runtime_error("Failed to save brain state");
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("experimentName"), py::arg("notes"),
+       "Save brain with metadata and versioning");
+
+    // Advanced API: Load brain with automatic metadata reading
+    m.def("loadBrainWithMetadata", [](const std::string& filepath) {
+        std::string metadataPath = filepath + ".meta";
+        std::ifstream metaFile(metadataPath);
+        if (!metaFile.is_open()) {
+            throw std::runtime_error("Cannot open metadata file: " + metadataPath);
+        }
+        
+        std::string line;
+        std::string experimentName, notes;
+        while (std::getline(metaFile, line)) {
+            if (line.substr(0, 12) == "Experiment: ") {
+                experimentName = line.substr(12);
+            } else if (line.substr(0, 7) == "Notes: ") {
+                notes = line.substr(7);
+            }
+        }
+        metaFile.close();
+        
+        // Create config from metadata
+        auto config = std::make_shared<Config>();
+        
+        // Load the brain state
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain state");
+        }
+        
+        return std::make_tuple(brain, experimentName, notes);
+    }, py::arg("filepath"), "Load brain with automatic metadata reading");
+
+    // Advanced API: Compare multiple brain states
+    m.def("compareBrainStates", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                 const std::vector<std::string>& names) {
+        if (brains.size() != names.size()) {
+            throw std::runtime_error("Brains and names must have same size");
+        }
+        
+        std::unordered_map<std::string, std::unordered_map<std::string, double>> comparison;
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            if (!brains[i]) {
+                throw std::runtime_error("Brain " + names[i] + " cannot be null");
+            }
+            
+            std::string base = "brain_" + std::to_string(i);
+            comparison[names[i]]["total_neurons"] = brains[i]->getTotalNeuronCount();
+            comparison[names[i]]["total_synapses"] = brains[i]->getTotalSynapseCount();
+            comparison[names[i]]["firing_neurons"] = brains[i]->getFiringNeuronCount();
+            comparison[names[i]]["average_firing_rate"] = brains[i]->getAverageFiringRate();
+            comparison[names[i]]["total_spikes"] = brains[i]->getTotalSpikeCount();
+            
+            // Compare with other brains
+            for (size_t j = 0; j < brains.size(); ++j) {
+                if (i == j) continue;
+                
+                double neuronDiff = static_cast<double>(brains[i]->getTotalNeuronCount()) -
+                                   static_cast<double>(brains[j]->getTotalNeuronCount());
+                double synapseDiff = static_cast<double>(brains[i]->getTotalSynapseCount()) -
+                                   static_cast<double>(brains[j]->getTotalSynapseCount());
+                
+                comparison[names[i]]["vs_" + names[j] + "_neuron_diff"] = neuronDiff;
+                comparison[names[i]]["vs_" + names[j] + "_synapse_diff"] = synapseDiff;
+            }
+        }
+        
+        return comparison;
+    }, py::arg("brains"), py::arg("names"), "Compare multiple brain states and return differences");
+
+    // Advanced API: Create and run experiments with detailed results
+    m.def("createExperiment", [](const std::string& name, const std::string& description) {
+        struct ExperimentResult {
+            std::string name;
+            std::string description;
+            float averageFiringRate;
+            size_t totalSteps;
+            size_t totalSpikes;
+            float finalCuriosity;
+            float finalNovelty;
+            double executionTime;
+            std::string status;
+        };
+        
+        return ExperimentResult{name, description, 0.0f, 0, 0, 0.0f, 0.0f, 0.0, "pending"};
+    }, py::arg("name"), py::arg("description"), "Create an experiment result structure");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

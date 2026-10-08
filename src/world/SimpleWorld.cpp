@@ -121,6 +121,12 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
     
+    // Input validation
+    if (std::isnan(currentTime) || currentTime < 0.0) {
+        std::cerr << "SimpleWorld::applyMotorCommand: Invalid currentTime " << currentTime << std::endl;
+        return ActionResult(0.0f, false, "invalid_time");
+    }
+    
     // Only allow one action per step
     if (currentTime - agent_.lastActionTime < 0.1) {
         return ActionResult(0.0f, false, "too soon");
@@ -219,11 +225,23 @@ ActionResult SimpleWorld::interact() {
     result.reward = 0.0f;
     result.success = false;
     
+    // Input validation
+    if (std::isnan(width_) || std::isnan(height_) || width_ <= 0 || height_ <= 0) {
+        std::cerr << "SimpleWorld::interact: Invalid world dimensions" << std::endl;
+        return result;
+    }
+    
     // Check for objects in interaction range
     const float interactRange = 1.0f;
     
     for (auto& obj : objects_) {
         if (!obj.active) continue;
+        
+        // Validate object position
+        if (std::isnan(obj.x) || std::isnan(obj.y) || std::isnan(obj.radius)) {
+            std::cerr << "SimpleWorld::interact: Invalid object data" << std::endl;
+            continue;
+        }
         
         float dx = obj.x - agent_.x;
         float dy = obj.y - agent_.y;
@@ -299,6 +317,12 @@ void SimpleWorld::removeObject(float x, float y) {
 }
 
 void SimpleWorld::generateVision() {
+    // Input validation
+    if (width_ <= 0.0f || height_ <= 0.0f || visionWidth_ == 0 || visionHeight_ == 0) {
+        std::cerr << "SimpleWorld::generateVision: Invalid configuration" << std::endl;
+        return;
+    }
+    
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     
@@ -393,10 +417,21 @@ void SimpleWorld::generateVision() {
 }
 
 void SimpleWorld::checkCollisions() {
+    // Validate agent position before collision check
+    if (std::isnan(agent_.x) || std::isnan(agent_.y) || 
+        agent_.x < 0.0f || agent_.x >= width_ || 
+        agent_.y < 0.0f || agent_.y >= height_) {
+        std::cerr << "SimpleWorld::checkCollisions: Invalid agent position" << std::endl;
+        return;
+    }
+    
     // Passive collision check (for damage when moving into objects)
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
+        
+        // Clamp health to valid range
+        if (agent_.health < 0.0f) agent_.health = 0.0f;
     }
 }
 
