@@ -23,6 +23,14 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
+// For nested object support
+struct NestedConfigObject {
+    std::map<std::string, ConfigValue> properties;
+};
+
+// Type definition for nested objects (when implemented)
+using NestedConfigObjectType = NestedConfigObject;
+
 // Configuration source
 enum class ConfigSource {
     Default,
@@ -100,6 +108,31 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format helpers
+    void loadFromJSON(const nlohmann::json& j);
+    void loadFromYAML(const YAML::Node& yamlNode);
+    void setFromJSONValue(const std::string& key, const nlohmann::json& value);
+    void setFromYAMLNode(const std::string& key, const YAML::Node& node);
+    void setFromJSONArray(const std::string& key, const nlohmann::json& array);
+    void setFromYAMLSequence(const std::string& key, const YAML::Node& sequence);
+    void setFromString(const std::string& key, const std::string& valueStr);
+    
+    // Serialization helpers
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    nlohmann::json serializeValue(const ConfigValue& value);
+    YAML::Node serializeValueToYAML(const ConfigValue& value);
+    std::string serializeSimpleValue(const ConfigValue& value);
+    
+    // Vector type helpers
+    void setVector(const std::string& key, const std::vector<int64_t>& value, ConfigSource source);
+    void setVector(const std::string& key, const std::vector<double>& value, ConfigSource source);
+    void setVector(const std::string& key, const std::vector<std::string>& value, ConfigSource source);
+    
+    std::optional<std::vector<int64_t>> getVector(const std::string& key) const;
+    std::optional<std::vector<double>> getVector(const std::string& key) const;
+    std::optional<std::vector<std::string>> getVector(const std::string& key) const;
 };
 
 } // namespace nlm

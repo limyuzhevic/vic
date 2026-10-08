@@ -137,61 +137,135 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ========== ENHANCED BRAIN STATISTICS ==========
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Synaptic statistics
+    float getSynapticDensity() const;
+    float getAverageSynapticWeight() const;
+    float getConnectionProbability() const;
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Regional statistics
+    struct RegionalStats {
+        RegionId regionId;
+        std::string regionName;
+        size_t neuronCount;
+        size_t synapseCount;
+        size_t activeNeuronCount;
+        size_t firingNeuronCount;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        float averageSynapticWeight;
+        float synapticDensity;
+        
+        RegionalStats(RegionId id = RegionId(), const std::string& name = "")
+            : regionId(id), regionName(name), neuronCount(0), synapseCount(0),
+              activeNeuronCount(0), firingNeuronCount(0), averageFiringRate(0.0f),
+              excitationInhibitionRatio(1.0f), averageSynapticWeight(0.0f),
+              synapticDensity(0.0f) {}
+    };
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    std::vector<RegionalStats> getRegionalStats() const;
     
-    // ========== PREDICTION SYSTEM ==========
+    // Firing statistics
+    struct FiringStats {
+        size_t totalSpikeCount;
+        size_t firingNeuronCount;
+        float averageFiringRate;
+        float maximumFiringRate;
+        float minimumFiringRate;
+        float firingRateStdDev;
+        float firingRateSkew;
+        float firingRateKurtosis;
+        
+        FiringStats()
+            : totalSpikeCount(0), firingNeuronCount(0), averageFiringRate(0.0f),
+              maximumFiringRate(0.0f), minimumFiringRate(0.0f), firingRateStdDev(0.0f),
+              firingRateSkew(0.0f), firingRateKurtosis(0.0f) {}
+    };
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    FiringStats getFiringStatistics() const;
     
-    // ========== COGNITION SYSTEMS ==========
+    // Neural population statistics
+    struct PopulationStats {
+        PopulationId populationId;
+        RegionId regionId;
+        size_t neuronCount;
+        NeuronType neuronType;
+        size_t activeNeuronCount;
+        size_t firingNeuronCount;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        
+        PopulationStats(PopulationId pid = PopulationId(), NeuronType type = NeuronType::Internal)
+            : populationId(pid), regionId(), neuronCount(0), neuronType(type),
+              activeNeuronCount(0), firingNeuronCount(0), averageFiringRate(0.0f),
+              excitationInhibitionRatio(1.0f) {}
+    };
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    std::vector<PopulationStats> getNeuralPopulationStats() const;
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Network metrics
+    float getCriticalityIndex() const;
+    float getNetworkEfficiency() const;
+    float getSynchronizationMetrics() const;
+    float getControlFlowMetrics() const;
+    float getInformationProcessingRate() const;
+    float getEnergyConsumption() const;
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // ========== STATISTICS ACCESS ==========
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // System performance metrics
+    float getSystemUptime() const;  // Simulation time since initialization
+    size_t getMemoryUsage() const;   // Approximate memory usage in bytes
+    float getMemoryUtilization() const;  // Memory usage as percentage of capacity
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Developmental metrics
+    float getDevelopmentalPlasticity() const;
+    float getCriticalPeriodProgress() const;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Network topology metrics
+    size_t getInterRegionalConnectionCount() const;
+    float getInterRegionalConnectivity() const;
+    float getClusteringCoefficient() const;
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Temporal dynamics metrics
+    float getTemporalCoherence() const;
+    float getBurstingRate() const;
+    size_t getSpikeTemporalPrecision() const;
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // ========== PLURALISM ACCESS ==========
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+    // Neural regions and populations access
+    size_t getRegionPopulationCount(RegionId regionId) const;
+    size_t getTotalConnectionsFromNeuron(NeuronId neuronId) const;
+    size_t getTotalConnectionsToNeuron(NeuronId neuronId) const;
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Circuit analysis
+    float getCircuitExcitability(RegionId regionId) const;
+    float getCircuitInhibition(RegionId regionId) const;
+    std::vector<NeuronId> getDominantNeurons(RegionId regionId, size_t count) const;
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Network motifs
+    size_t getFeedForwardLoopCount() const;
+    size_t getFeedbackLoopCount() const;
+    size_t getRecurrentLoopCount() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // ========== METRICS FOR SIMULATION ANALYSIS ==========
     
-    // Logging
-    void logStatus() const;
+    // Learning metrics
+    float getLearningProgress() const;
+    float getMemoryRetention() const;
+    float getPredictionAccuracy() const;
+    
+    // Stability metrics
+    float getSystemStability() const;
+    float getOscillationFrequency() const;
+    float getAlphaPower() const;
+    
+    // Performance metrics
+    float getTaskPerformanceScore() const;
+    float getCognitiveLoad() const;
+    float getDecisionConfidence() const;
     
 private:
     struct Impl;

@@ -21,6 +21,9 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Find nlohmann/json library for JSON parsing
+find_package(nlohmann_json 3.11.0 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -91,6 +94,9 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Link nlohmann_json and yaml-cpp
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json yaml-cpp)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

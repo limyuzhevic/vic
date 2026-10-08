@@ -21,11 +21,17 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Real neuromodulation scales plasticity based on neuromodulator concentration
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    // Update neuromodulator state based on time and inputs
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Get neuromodulator's effect on learning rate
+    virtual float getLearningModulation() const = 0;
+    
+    // Get neuromodulator's effect on exploration
+    virtual float getExplorationModulation() const = 0;
     
 protected:
     Neuromodulator() = default;

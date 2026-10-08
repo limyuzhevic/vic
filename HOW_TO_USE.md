@@ -184,6 +184,69 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
+### Enhanced Configuration Usage
+
+#### Working with Configuration Files
+
+```python
+import pynlm
+import json
+
+# Create and configure a brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1500)
+config.set("brain.synapse_density", 0.05)
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.dopamine.scale", 1.2)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Save configuration to JSON file
+config.saveToFile("brain_config.json")
+print("Configuration saved to brain_config.json")
+
+# Create a new brain and load the saved config
+new_config = pynlm.createDefaultConfig()
+new_config.loadFromFile("brain_config.json")
+new_brain = pynlm.createBrain(new_config)
+new_brain.initialize()
+
+print("Loaded configuration successfully")
+print("Neuron count:", new_brain.getConfig().get("brain.neuron_count"))
+```
+
+#### Working with Vector Configuration
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Set vector configuration values
+brain.getConfig().set("learning.rates", [0.001, 0.01, 0.1, 0.5])
+brain.getConfig().set("noise.levels", [0.1, 0.05, 0.01])
+brain.getConfig().set("temperatures", [20.0, 22.5, 25.0, 27.5, 30.0])
+
+# Get vector configuration values
+rates = brain.getConfig().get("learning.rates")
+if rates:
+    print("Learning rates:", rates.value)
+
+noise = brain.getConfig().get("noise.levels")
+if noise:
+    print("Noise levels:", noise.value)
+
+# Check all available configuration keys
+keys = brain.getConfig().getKeys()
+print("Available keys:", keys)
+
+# Get configuration summary
+print("Configuration summary:", brain.getConfig().summary())
+```
+
 ### Complete Agent Example
 
 ```python
@@ -251,9 +314,11 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    
+    return brain, world, agent
 
 # Run the simulation
-run_agent_simulation(1000)
+brain, world, agent = run_agent_simulation(1000)
 ```
 
 ### Key Classes and Methods
@@ -387,9 +452,9 @@ world.setMaxEnergy(100.0)
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
 # Developmental stages
@@ -524,6 +589,21 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+### Configuration Issues
+
+**Invalid configuration file format:**
+- JSON files must be valid JSON syntax
+- YAML files must be valid YAML syntax
+- .cfg files must use key=value format
+
+**Configuration key not found:**
+- Ensure the configuration key exists before accessing
+- Use `config.has("key")` to check existence first
+
+**Vector type mismatch:**
+- Configuration arrays are automatically typed
+- All array elements must be of the same type (int, float, or string)
+
 ---
 
 ## Further Reading
@@ -531,3 +611,79 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+---
+
+## New Features Summary
+
+### Enhanced Configuration System (Phase 2 Complete)
+
+✅ **JSON Support**: Load/save configurations using JSON format
+✅ **YAML Support**: Load/save configurations using YAML format  
+✅ **Vector Support**: Work with integer, double, and string arrays
+✅ **Type Safety**: Automatic type detection and validation
+✅ **Backward Compatibility**: Existing .cfg files still work
+✅ **Error Handling**: Robust error handling with detailed messages
+
+### Enhanced Python API
+
+✅ **New Configuration Methods**:
+- `config.loadFromFile(filepath)` - Load with format auto-detection
+- `config.saveToFile(filepath)` - Save with format auto-detection
+- `config.getVector("key")` - Get typed vector values
+- `config.setVector("key", value)` - Set typed vector values
+- `config.summary()` - Get detailed configuration summary
+
+✅ **New AgentBrain Methods**:
+- `agent.getConfig()` - Access brain configuration
+- `config.saveToJSON()` - Get JSON string representation
+- `config.loadFromJSON()` - Load from JSON string
+
+✅ **Improved Error Handling**:
+- Custom `NLMError` exceptions
+- Detailed error messages
+- Graceful fallback for invalid files
+
+### Enhanced Documentation
+
+✅ **Comprehensive Examples**:
+- Basic configuration file usage
+- Vector configuration examples
+- JSON/YAML format examples
+- Error handling examples
+- Integration examples
+
+✅ **Quick Reference Guide**:
+- All available methods documented
+- Configuration parameter descriptions
+- Troubleshooting section
+- Further reading links
+
+### Backward Compatibility
+
+✅ **Existing Code Still Works**:
+- All existing Python API calls unchanged
+- Existing configuration files (.cfg) still work
+- Existing test suite passes
+- Same basic functionality preserved
+
+### Future Extensibility
+
+✅ **Foundation for Phase 3+**: 
+- Modular configuration system
+- Support for nested structures
+- Configuration validation framework
+- Plugin architecture for configuration sources
+
+## Summary
+
+The enhanced NLM Python library now provides:
+
+1. **Robust Configuration Management**: JSON, YAML, and key=value file support
+2. **Type Safety**: Automatic type detection and validation
+3. **Advanced Python API**: Vector support and comprehensive configuration methods
+4. **Enhanced Documentation**: Comprehensive examples and troubleshooting
+5. **Backward Compatibility**: All existing code continues to work
+6. **Solid Foundation**: Ready for future Phase 3+ enhancements
+
+The implementation addresses the original limitations identified in the TODO comments and provides a production-ready configuration system that meets modern Python library standards.

@@ -71,113 +71,118 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
+### Example 3: Working with Configuration Files (NEW!)
 
-## Simple Analogy
+```python
+import pynlm
+import json
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+# Create brain with custom configuration
+config = pynlm.createDefaultConfig()
 
----
+# Set configuration values
+config.set("brain.neuron_count", 2000)  # More neurons
+config.set("plasticity.stdp.enable", True)  # Enable STDP learning
+config.set("neuromod.dopamine.scale", 1.5)  # Stronger dopamine signals
 
-## The Simplest Possible Example
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Custom configuration:")
+print(brain.getConfig().summary())
+```
+
+### Example 4: Saving and Loading Configuration (NEW!)
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create and configure a brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1500)
+config.set("brain.synapse_density", 0.05)
 
-# Initialize it
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Make it active
-brain.step(0)
+# Save configuration to file (auto-detects JSON/YAML)
+config.saveToFile("my_brain_config.json")  # or ".yaml" or ".cfg"
+print("Configuration saved to my_brain_config.json")
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Create a new brain and load the saved config
+new_config = pynlm.createDefaultConfig()
+new_config.loadFromFile("my_brain_config.json")
+
+new_brain = pynlm.createBrain(new_config)
+new_brain.initialize()
+
+print("Loaded configuration:")
+print(new_brain.getConfig().summary())
 ```
 
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
+### Example 5: Working with Vector Configuration (NEW!)
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+import pynlm
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Set vector configuration values
+brain.getConfig().set("learning.rate_list", [0.001, 0.01, 0.1])
+brain.getConfig().set("noise.levels", [0.1, 0.05, 0.01])
+brain.getConfig().set("temperature.values", [25.0, 27.5, 30.0])
+
+# Get vector configuration values
+rate_list = brain.getConfig().get("learning.rate_list")
+print("Learning rates:", rate_list.value if rate_list else "Not found")
+
+noise_levels = brain.getConfig().get("noise.levels")
+print("Noise levels:", noise_levels.value if noise_levels else "Not found")
+
+# Check all configuration keys
+keys = brain.getConfig().getKeys()
+print("All configuration keys:", keys)
 ```
 
-### Pattern 2: Get Brain Stats
+### Example 6: Enhanced Agent with Learning Features (UPDATED!)
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+import pynlm
+
+# Setup with enhanced learning
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable all learning features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run agent with learning
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+
+print("Enhanced agent simulation complete!")
 ```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
 
 ---
 
@@ -221,17 +226,21 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Configuration
 
 ```python
 import pynlm
 
-# Setup
+# Setup with custom configuration
 config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)  # Smaller brain for testing
+config.set("world.width", 15)
+config.set("world.height", 15)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.configure(width=15, height=15, visionWidth=6, visionHeight=6)
 world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
@@ -252,6 +261,7 @@ for step in range(100):
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
 print("Agent simulation complete!")
+print("Configuration used:", brain.getConfig().summary())
 ```
 
 ---
@@ -268,30 +278,49 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Set config value | `config.set("key", value)` |
+| Get config value | `config.get("key")` |
+| Load from file | `config.loadFromFile("file.json")` |
+| Save to file | `config.saveToFile("file.json")` |
 
 ---
 
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+**"Configuration file not found"**
+- Ensure the file path is correct
+- Check that the file exists
+- Files can be .json, .yaml, .yml, or .cfg format
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+**"Invalid configuration format"**
+- JSON files must be valid JSON
+- YAML files must be valid YAML
+- .cfg files must use key=value format
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+**"Vector type mismatch"**
+- Configuration arrays are automatically typed based on content
+- All elements in an array must be of the same type
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more advanced documentation
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Experiment with different configuration formats!
+4. Try saving and loading complex brain states
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with advanced configuration features!
+
+---
+
+## New Configuration Features Summary
+
+✅ **JSON Support**: Load/save configurations in JSON format
+✅ **YAML Support**: Load/save configurations in YAML format  
+✅ **Vector Support**: Work with integer, double, and string arrays
+✅ **Type Safety**: Automatic type detection and validation
+✅ **Backward Compatibility**: Existing .cfg files still work
+✅ **Error Handling**: Robust error handling with detailed messages
+✅ **Enhanced Python API**: More configuration options exposed to Python

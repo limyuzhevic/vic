@@ -56,230 +56,307 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 ```
 
-## Memory Systems
+## Advanced Python Bindings for Phase 6
 
-### Working Memory (NeuralWorkingMemory)
+### 1. Enhanced Brain Statistics
 
-**Location:** `src/memory/NeuralWorkingMemory.hpp/cpp`
+#### Synaptic Statistics
+- **getSynapticDensity()**: Returns average synaptic density across all regions
+- **getAverageSynapticWeight()**: Returns average synaptic weight
+- **getConnectionProbability()**: Returns connection probability
 
-**Mechanisms:**
-- Persistent neural activity for maintaining information
-- Recurrent connections for maintenance
-- Competition among memory traces
-- Decay of weak traces
+#### Regional Statistics
+- **getRegionalStats()**: Returns detailed statistics for all regions including:
+  - Region ID and name
+  - Neuron and synapse counts
+  - Active and firing neuron counts
+  - Average firing rate
+  - Excitation/inhibition ratio
+  - Synaptic density and weight
 
-**Integration:**
-- Stores firing neurons each step
-- Updated each simulation step
-- Influences attention competition
-- Decays over time if not reinforced
+#### Firing Statistics
+- **getFiringStatistics()**: Returns detailed firing statistics including:
+  - Total spike count
+  - Firing neuron count
+  - Average, maximum, and minimum firing rates
+  - Standard deviation, skew, and kurtosis of firing rates
 
-### Episodic Memory (NeuralEpisodicMemory)
+#### Neural Population Statistics
+- **getNeuralPopulationStats()**: Returns statistics for neural populations including:
+  - Population ID and region
+  - Neuron count
+  - Neuron type
+  - Active and firing neuron counts
+  - Average firing rate
+  - Excitation/inhibition ratio
 
-**Location:** `src/memory/NeuralEpisodicMemory.hpp/cpp`
+#### Network Metrics
+- **getCriticalityIndex()**: Returns criticality index (measure of being at edge of chaos)
+- **getNetworkEfficiency()**: Returns global network efficiency
+- **getSynchronizationMetrics()**: Returns neural synchronization metrics
+- **getControlFlowMetrics()**: Returns control flow and information routing metrics
+- **getInformationProcessingRate()**: Returns information processing rate (bits per second)
+- **getEnergyConsumption()**: Returns total energy consumption
 
-**Mechanisms:**
-- Stores experiences as neural activity patterns
-- Temporal ordering through timestamps
-- Relevance-weighted recall
-- Replay during offline periods
+### 2. Memory System Access
 
-**Integration:**
-- Episodes captured every 10 simulation steps
-- Replay triggered every 100 steps
-- Consolidation every 1000 steps
-- Influences future behavior through replay
+#### Working Memory (NeuralWorkingMemory)
 
-### Associative Memory (NeuralAssociativeMemory)
+**Python API Methods:**
+- **initialize(brain)**: Initialize with brain reference
+- **store(pattern, strength=1.0)**: Store information in working memory
+- **storeToNeuron(neuron, activation)**: Store specific neuron activation
+- **retrieve()**: Retrieve current working memory content as activity levels
+- **contains(neuron)**: Check if specific neuron is part of working memory
+- **getNeuronActivation(neuron)**: Get activation level of a specific neuron
+- **update(dt)**: Update working memory (maintenance and decay)
+- **clear()**: Clear working memory
+- **getActiveTraces()**: Get number of active memory traces
+- **getCapacity()**: Get capacity
+- **setCapacity(cap)**: Set capacity
+- **getDecayRate()**: Get decay rate
+- **setDecayRate(rate)**: Set decay rate
+- **getMemoryNeurons()**: Get neurons currently in working memory
+- **strengthenMemory(factor)**: Strengthen working memory representation
+- **runCompetition()**: Competition between memory traces
+- **isWinning(neuron)**: Is this neuron part of the winning population?
+- **getMemoryActivity()**: Get overall memory activity level
 
-**Location:** `src/memory/NeuralEpisodicMemory.hpp/cpp` (in same file)
+#### Episodic Memory (NeuralEpisodicMemory)
 
-**Mechanisms:**
-- Hebbian associations between patterns
-- Spreading activation for recall
-- Strength modification through experience
+**Python API Methods:**
+- **initialize(brain)**: Initialize with brain reference
+- **storeEpisode(episode)**: Store a new experience
+- **retrieveSimilar(sensoryPattern, maxResults=5)**: Retrieve episodes similar to a query pattern
+- **retrieveTemporal(startTime, endTime, maxResults=10)**: Retrieve episodes from a specific time window
+- **retrieveByLocation(x, y, radius, maxResults=5)**: Retrieve episodes by location
+- **retrieveAfterAction(action, maxResults=5)**: Retrieve episodes following a specific action
+- **replayEpisode(episode)**: Replay an episode - reactivates the neural patterns
+- **updateRelevance(episodeId, relevanceDelta)**: Update episode relevance based on recent use
+- **getEpisode(index)**: Get episode by index
+- **getEpisodeCount()**: Get total number of episodes
+- **getRecentEpisodes(count)**: Get recent episodes
+- **getAverageReward()**: Get average reward from episodes
+- **consolidate(relevanceThreshold)**: Clear old episodes based on relevance threshold
+- **clear()**: Clear all episodes
+- **enableReplay(enable)**: Enable/disable replay
+- **isReplayEnabled()**: Check if replay is enabled
+- **getEpisodesForReplay(count)**: Get episodes for replay
+- **replaySequence(episodeIds)**: Replay multiple episodes
 
-**Integration:**
-- Associated with episodic memory
-- Updated during experience encoding
+#### Associative Memory (NeuralAssociativeMemory)
 
-## Neuromodulation Systems
+**Python API Methods:**
+- **initialize(brain)**: Initialize with brain reference
+- **associate(patternA, patternB, strength=1.0)**: Create association between two neural patterns
+- **associateFromExperience(episode)**: Create association based on experience
+- **retrieve(queryPattern, maxResults=5)**: Retrieve patterns associated with a query pattern
+- **getAssociationStrength(patternA, patternB)**: Get association strength between two patterns
+- **updateAssociation(patternA, patternB, delta)**: Update association based on outcome
+- **spreadActivation(cuePattern, steps=2)**: Spread activation from cue pattern
+- **clear()**: Clear associations
+- **getAssociationCount()**: Get number of associations
 
-### Dopamine
+### 3. Prediction System Access
 
-**Location:** `src/neuromodulation/Neuromodulator.hpp/cpp`
+#### PredictionSystem
 
-**Mechanisms:**
-- Reward prediction error computation
-- Phasic and tonic signaling
-- Behavioral vigor modulation
+**Python API Methods:**
+- **predictNextState(currentState)**: Predict next state from current state
+- **updatePredictions(predicted, actual)**: Update predictions with actual observed state
+- **getPredictionError()**: Get prediction error
+- **getConfidence()**: Get prediction confidence
+- **getErrorHistory()**: Get prediction error history
+- **clearHistory()**: Clear prediction error history
+- **train(observation)**: Train prediction model with observation
 
-**Integration:**
-- Affects neural excitability (dopamine level modulates membrane potential)
-- Scales STDP learning rates
-- Modulates plasticity through eligibility traces
-- Affects action selection indirectly through learning
+#### PredictionError
 
-### Curiosity
+**Python API Methods:**
+- **initialize(brain)**: Initialize with brain reference
+- **getError()**: Get error value
+- **computeError(predicted, actual)**: Compute prediction error
+- **updatePrediction(newPrediction)**: Update prediction
+- **getHistory()**: Get error history
+- **clearHistory()**: Clear error history
+- **getMagnitude()**: Get error magnitude for neuromodulation
 
-**Location:** `src/neuromodulation/Curiosity.hpp/cpp`
+### 4. Development System Access
 
-**Mechanisms:**
-- Combines novelty and prediction error
-- Exploration drive computation
-- Decay over time
+#### DevelopmentSystem
 
-**Integration:**
-- Used by AgentBrain for exploration decisions
-- Stored in AgentBrain for action selection
-- Affects motor command decoding
+**Python API Methods:**
+- **getStage()**: Get current developmental stage
+- **setStage(stage)**: Set developmental stage
+- **advanceStage()**: Advance developmental stage
+- **getStageName()**: Get current stage name
+- **update(brain, currentStep)**: Update development system
+- **update(brain, rng, dt)**: Update development system with full parameters
+- **getPlasticityModifier()**: Get plasticity modifier for current stage
+- **isCriticalPeriod()**: Check if currently in critical period
+- **getCriticalPeriodProgress()**: Get critical period progress (0 to 1)
+- **getDevelopmentalAge()**: Get developmental age in simulation time
+- **setDevelopmentalAge(age)**: Set developmental age
 
-### Novelty
+### 5. Neuromodulation System
 
-**Location:** `src/neuromodulation/Novelty.hpp/cpp`
+#### Neuromodulator (Base Class)
 
-**Mechanisms:**
-- Novelty detection from sensory patterns
-- Comparison with previous patterns
-- Decay over time
+**Python API Methods:**
+- **getName()**: Get neuromodulator name
+- **getLevel()**: Get current neuromodulator level
+- **setLevel(level)**: Set neuromodulator level
+- **getPlasticityFactor()**: Get plasticity factor
+- **update(dt)**: Update neuromodulator state
 
-**Integration:**
-- Computed from vision changes in AgentBrain
-- Used for curiosity computation
-- Stored for later use
+#### Dopamine
 
-## Prediction System
+**Python API Methods:**
+- **signalReward(reward)**: Signal reward (dopamine response)
+- **signalRewardPredictionError(error)**: Signal reward prediction error
 
-**Location:** `src/prediction/PredictionSystem.hpp/cpp`
+#### Curiosity
 
-**Mechanisms:**
-- Next state prediction
-- Prediction error computation
-- Confidence tracking
-- History tracking
+**Python API Methods:**
+- **initialize(brain)**: Initialize with brain reference
+- **getLevel()**: Get curiosity level
+- **getExplorationDrive()**: Get exploration drive
+- **update(novelty, predictionError, dt)**: Update curiosity level
+- **setNoveltyWeight(weight)**: Set novelty weight
+- **setPredictionErrorWeight(weight)**: Set prediction error weight
+- **reset()**: Reset curiosity level
 
-**Integration:**
-- Called in brain loop (placeholder for full implementation)
-- Prediction error affects curiosity
-- Future: will affect attention and planning
+#### Novelty
 
-## Cognition Systems
+**Python API Methods:**
+- **initialization methods**: Basic initialization for novelty detection
 
-### Neural Planner
+#### PredictionError
 
-**Location:** `src/cognition/NeuralPlanner.hpp/cpp`
+**Python API Methods:**
+- **initialize(brain)**: Initialize with brain reference
+- **getError()**: Get error value
+- **computeError(predicted, actual)**: Compute prediction error
+- **updatePrediction(newPrediction)**: Update prediction
+- **getHistory()**: Get error history
+- **clearHistory()**: Clear error history
+- **getMagnitude()**: Get error magnitude
 
-**Mechanisms:**
-- Multi-step action sequence evaluation
-- Planning depth configuration
-- Action quality from experience
-- Plan success tracking
+### 6. Advanced Configuration
 
-**Integration:**
-- Initialized in Brain
-- Future: will be used for goal-directed behavior
+#### Configuration Validation and Schema Support
 
-### Concept Formation
+**Python API Methods:**
+- **validateConfig(config, schemaJson)**: Validate configuration against JSON schema
+- **validateConfigWithRules(config, rulesJson)**: Validate configuration against validation rules
+- **getConfigSchema(config)**: Generate JSON schema from current configuration
+- **mergeConfig(config, jsonConfig)**: Merge configuration from JSON string
+- **diffConfig(config1, config2)**: Compare two configurations and return differences
+- **exportConfig(config, format)**: Export configuration to different formats (json, yaml, ini)
+- **importConfig(config, data, format)**: Import configuration from different formats
+- **getConfigTypes(config)**: Get type information for all configuration keys
+- **getConfigStatistics(config)**: Get configuration statistics (size, complexity, etc.)
+- **getConfigUsagePatterns(config)**: Get usage patterns and statistics for configuration keys
+- **isConfigComplete(config)**: Check if configuration has all required values
+- **getMissingRequiredKeys(config)**: Get list of missing required configuration keys
+- **getInvalidKeys(config)**: Get list of configuration keys with invalid values
+- **validateDependencyChain(config)**: Validate configuration dependencies
 
-**Location:** `src/cognition/ConceptFormation.hpp/cpp`
+### 7. Performance Monitoring
 
-**Mechanisms:**
-- Pattern clustering through similarity
-- Prototype formation
-- Instance tracking
-- Stability measurement
+#### Brain Performance Metrics
 
-**Integration:**
-- Initialized in Brain
-- Future: will process sensory patterns for generalization
+**Python API Methods:**
+- **getSynapticDensity()**: Get average synaptic density across all regions
+- **getRegionalStats()**: Get statistics for all regions
+- **getFiringStatistics()**: Get detailed firing statistics
+- **getNeuralPopulationStats()**: Get statistics for neural populations
+- **getCriticalityIndex()**: Get criticality index (measure of being at edge of chaos)
+- **getNetworkEfficiency()**: Get global network efficiency
+- **getSynchronizationMetrics()**: Get neural synchronization metrics
+- **getControlFlowMetrics()**: Get control flow and information routing metrics
+- **getInformationProcessingRate()**: Get information processing rate (bits per second)
+- **getEnergyConsumption()**: Get total energy consumption
+- **getSystemUptime()**: Get system uptime (simulation time since initialization)
+- **getMemoryUsage()**: Get approximate memory usage in bytes
+- **getMemoryUtilization()**: Get memory usage as percentage of capacity
+- **getDevelopmentalPlasticity()**: Get developmental plasticity
+- **getCriticalPeriodProgress()**: Get critical period progress
+- **getInterRegionalConnectionCount()**: Get inter-regional connection count
+- **getInterRegionalConnectivity()**: Get inter-regional connectivity
+- **getClusteringCoefficient()**: Get clustering coefficient
+- **getTemporalCoherence()**: Get temporal coherence
+- **getBurstingRate()**: Get bursting rate
+- **getSpikeTemporalPrecision()**: Get spike temporal precision
 
-### Attentional Selection
+### 8. Region and Population Access
 
-**Location:** `src/memory/NeuralWorkingMemory.hpp/cpp` (AttentionalSelection class)
+#### Neural Region and Population Access
 
-**Mechanisms:**
-- Competition between neural populations
-- Winner-take-more dynamics
-- Top-down and bottom-up bias
-- Inhibition and excitation
-
-**Integration:**
-- Processes working memory competitors
-- Updated each step
-- Applies excitation to winners, inhibition to losers
-
-## Development System
-
-**Location:** `src/development/DevelopmentSystem.hpp/cpp`
-
-**Mechanisms:**
-- Developmental stages (Initial → CriticalPeriod → Maturation → Adult → Aging)
-- Plasticity modification by stage
-- Auto-advance based on age
-
-**Integration:**
-- Updated every 1000 steps
-- Modifies structural plasticity rates
-- Affects neural excitability indirectly through plasticity
-
-## Checkpoint System
-
-**Location:** `src/performance/CheckpointSystem.hpp`
-
-**Mechanisms:**
-- Brain state serialization
-- Neuron and synapse state saving
-- Checkpoint manager for automated saves
-
-**Integration:**
-- `Brain::save()` writes checkpoint
-- `Brain::load()` reads checkpoint
-- CheckpointManager handles periodic saves
+**Python API Methods:**
+- **getRegionPopulationCount(regionId)**: Get population count for a region
+- **getTotalConnectionsFromNeuron(neuronId)**: Get total connections from a neuron
+- **getTotalConnectionsToNeuron(neuronId)**: Get total connections to a neuron
+- **getCircuitExcitability(regionId)**: Get circuit excitability for a region
+- **getCircuitInhibition(regionId)**: Get circuit inhibition for a region
+- **getDominantNeurons(regionId, count)**: Get dominant neurons in a region
+- **getFeedForwardLoopCount()**: Get feed-forward loop count
+- **getFeedbackLoopCount()**: Get feedback loop count
+- **getRecurrentLoopCount()**: Get recurrent loop count
+- **getLearningProgress()**: Get learning progress
+- **getMemoryRetention()**: Get memory retention
+- **getPredictionAccuracy()**: Get prediction accuracy
+- **getSystemStability()**: Get system stability
+- **getOscillationFrequency()**: Get oscillation frequency
+- **getAlphaPower()**: Get alpha power
+- **getTaskPerformanceScore()**: Get task performance score
+- **getCognitiveLoad()**: Get cognitive load
+- **getDecisionConfidence()**: Get decision confidence
 
 ## Data Flow
 
 ### Sensory Processing
 ```
 World → SensoryPercept → AgentBrain::processSensoryInput()
-                              ↓
-                        Brain::receiveSensoryInput()
-                              ↓
-                        Sensory neurons receive current
-                              ↓
-                        LIF dynamics integrate input
+                               ↓
+                         Brain::receiveSensoryInput()
+                               ↓
+                         Sensory neurons receive current
+                               ↓
+                         LIF dynamics integrate input
 ```
 
 ### Action Selection
 ```
 Motor neuron activity → AgentBrain::decodeMotorCommand()
-                              ↓
-                        Curiosity exploration check
-                              ↓
-                        MotorCommand selected
-                              ↓
-                        World::applyAction()
+                               ↓
+                         Curiosity exploration check
+                               ↓
+                         MotorCommand selected
+                               ↓
+                         World::applyAction()
 ```
 
 ### Memory Formation
 ```
 Brain step (spikes) → Working memory stores firing neurons
-                              ↓
-                        Every 10 steps: Episodic memory captures state
-                              ↓
-                        Every 100 steps: Replay of important episodes
-                              ↓
-                        Every 1000 steps: Consolidation
+                               ↓
+                         Every 10 steps: Episodic memory captures state
+                               ↓
+                         Every 100 steps: Replay of important episodes
+                               ↓
+                         Every 1000 steps: Consolidation
 ```
 
 ### Learning
 ```
 Reward from environment → AgentBrain::applyRewardModulation()
-                              ↓
-                        Dopamine computed (prediction error)
-                              ↓
-                        Synapses with eligibility traces updated
-                              ↓
-                        STDP weights modulated by dopamine
+                               ↓
+                         Dopamine computed (prediction error)
+                               ↓
+                         Synapses with eligibility traces updated
+                               ↓
+                         STDP weights modulated by dopamine
 ```
 
 ## System Independence and Coupling
@@ -312,3 +389,27 @@ Reward from environment → AgentBrain::applyRewardModulation()
 3. `step()` - Main loop where all systems update
 4. `applyRewardModulation()` - Where learning signals apply
 5. `save()/load()` - State persistence
+
+## Python Integration Notes
+
+### Type Safety
+All Python bindings are type-safe with proper conversion between C++ and Python types. The bindings use pybind11's type conversion mechanisms to ensure data integrity.
+
+### Error Handling
+The bindings include comprehensive error handling with:
+- C++ exceptions translated to Python exceptions
+- Validation checks for invalid inputs
+- Graceful degradation when components are not available
+
+### Performance Considerations
+- Reference policies are used where appropriate to avoid unnecessary copying
+- Pybind11's `return_value_policy::reference_internal` is used for internal objects
+- Vector and map types are automatically converted with efficient copying
+
+### Memory Management
+- Shared pointers are used for objects that need to be shared between Python and C++
+- Python object ownership is carefully managed to prevent double-free issues
+- All temporary objects are properly cleaned up
+
+### Documentation
+Each Python binding includes comprehensive docstrings following the pybind11 documentation style, providing clear usage examples and parameter descriptions.

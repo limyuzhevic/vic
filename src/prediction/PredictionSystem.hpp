@@ -15,11 +15,13 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    
+    // Calculate prediction error between predicted and actual observations
+    float calculatePredictionError(const SensoryInput& predicted, const SensoryInput& actual) const;
     
     // Get prediction error
     float getPredictionError() const;

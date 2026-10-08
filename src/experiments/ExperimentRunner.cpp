@@ -113,8 +113,58 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Create results structure for all experiments
+    nlohmann::json results;
+    results["experiments"] = nlohmann::json::array();
+    
+    for (const auto& experiment : pImpl->experiments) {
+        nlohmann::json expData;
+        expData["name"] = experiment->getName();
+        expData["seed"] = experiment->getSeed();
+        expData["startStep"] = experiment->getStartStep();
+        expData["endStep"] = experiment->getEndStep();
+        
+        // Add step data
+        nlohmann::json steps = nlohmann::json::array();
+        for (const auto& step : experiment->getStepData()) {
+            nlohmann::json stepData;
+            stepData["step"] = step.step;
+            stepData["neuronCount"] = step.neuronCount;
+            stepData["synapseCount"] = step.synapseCount;
+            stepData["firingCount"] = step.firingCount;
+            stepData["avgFiringRate"] = step.avgFiringRate;
+            steps.push_back(stepData);
+        }
+        expData["steps"] = steps;
+        
+        // Add metrics
+        nlohmann::json metrics = nlohmann::json::array();
+        for (const auto& metric : experiment->getMetrics()) {
+            nlohmann::json metricData;
+            metricData["name"] = metric.first;
+            metricData["value"] = metric.second;
+            metrics.push_back(metricData);
+        }
+        expData["metrics"] = metrics;
+        
+        // Add notes
+        nlohmann::json notes = nlohmann::json::array();
+        for (const auto& note : experiment->getNotes()) {
+            notes.push_back(note);
+        }
+        expData["notes"] = notes;
+        
+        results["experiments"].push_back(expData);
+    }
+    
+    // Write results to file
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << results.dump(2);
+    return true;
 }
 
 } // namespace nlm
