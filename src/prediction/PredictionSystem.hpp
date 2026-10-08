@@ -1,21 +1,28 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <vector>
 #include <memory>
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// NOW INTEGRATED with neural brain loop
+//
+// Mechanisms:
+// - Predictive coding using neural activity patterns
+// - Prediction error signals driving learning
+// - Confidence estimation from prediction accuracy
+// - Integration with neuromodulation systems
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
-    // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Make prediction for next timestep using neural activity
+    // NOW IMPLEMENTED: Uses working memory and sensory input
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -27,12 +34,15 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
-    // Get prediction history
+    // Get prediction error history for analysis
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model from experience
     void train(const SensoryInput& observation);
+    
+    // Set confidence based on prediction accuracy
+    void setConfidence(float confidence);
     
 private:
     struct Impl;

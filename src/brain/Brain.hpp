@@ -95,7 +95,12 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
+    // Uses neural planner when available, otherwise falls back to simple motor selection
     std::unique_ptr<class Action> produceAction();
+    
+    // Produce motor/action output from motor neurons only (fallback method)
+    // Used when neural planner is not available
+    std::unique_ptr<Action> produceActionFromMotorNeurons();
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);

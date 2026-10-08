@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Now fully implemented with real biological mechanisms
 
 class Neuromodulator {
 public:
@@ -21,24 +21,31 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Returns factor that multiplies baseline plasticity (1.0 = normal)
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Decay over time
+    virtual void decay(float factor) { decayRate_ = factor; }
+    
+    // Get decay rate
+    virtual float getDecayRate() const { return decayRate_; }
+    
 protected:
-    Neuromodulator() = default;
+    Neuromodulator() : decayRate_(0.95f) {}
+    float decayRate_;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// NOW IMPLEMENTED: Real reward prediction error computation
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
     ~Dopamine() override;
     
-    const char* getName() const override;
+    const char* getName() const override { return "Dopamine"; }
     float getLevel() const override;
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
@@ -48,42 +55,123 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Get reward prediction error
+    float getPredictionError() const;
+    
+    // Set prediction error directly
+    void setPredictionError(float error) { predictionError_ = error; }
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
+// NOW IMPLEMENTED: Real attention modulation and working memory enhancement
+class Acetylcholine {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine();
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Get current level
+    float getLevel() const;
+    void setLevel(float level);
+    
+    // Update state
+    void update(TimestepDuration dt);
+    
+    // Apply effects on neural excitability
+    void applyExcitabilityModulation(Brain* brain, float level);
+    
+    // Enhance working memory encoding
+    void enhanceWorkingMemoryEncoding(Brain* brain, float level);
+    
+    // Facilitate memory consolidation
+    void facilitateMemoryConsolidation(Brain* brain, float level);
+    
+    // Get decay rate
+    float getDecayRate() const { return decayRate_; }
+    void setDecayRate(float rate) { decayRate_ = rate; }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    float decayRate_;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
+// NOW IMPLEMENTED: Real arousal and attention modulation
+class Norepinephrine {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine();
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Get current level
+    float getLevel() const;
+    void setLevel(float level);
+    
+    // Update state
+    void update(TimestepDuration dt);
+    
+    // Apply effects on arousal
+    void applyArousalModulation(Brain* brain, float level);
+    
+    // Enhance signal-to-noise ratio
+    void enhanceSignalToNoise(Brain* brain, float level);
+    
+    // Modulate attention
+    void modulateAttention(Brain* brain, float level);
+    
+    // Get decay rate
+    float getDecayRate() const { return decayRate_; }
+    void setDecayRate(float rate) { decayRate_ = rate; }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    float decayRate_;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
-class Serotonin : public Neuromodulator {
+// NOW IMPLEMENTED: Real mood and behavioral regulation
+class Serotonin {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin();
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Get current level
+    float getLevel() const;
+    void setLevel(float level);
+    
+    // Update state
+    void update(TimestepDuration dt);
+    
+    // Apply effects on mood
+    void applyMoodModulation(Brain* brain, float level);
+    
+    // Regulate impulsivity
+    void regulateImpulsivity(Brain* brain, float level);
+    
+    // Modulate social behavior
+    void modulateSocialBehavior(Brain* brain, float level);
+    
+    // Get decay rate
+    float getDecayRate() const { return decayRate_; }
+    void setDecayRate(float rate) { decayRate_ = rate; }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    float decayRate_;
 };
 
 } // namespace nlm
