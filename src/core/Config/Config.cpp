@@ -56,6 +56,9 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Enhanced command line argument parsing with better validation
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,17 +68,50 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Config: Empty key in command line argument: " + arg);
+                    success = false;
+                    continue;
+                }
+                
+                // Validate value
+                if (value.empty()) {
+                    NLM_LOG_WARNING("Config: Empty value for key " + key + " in command line");
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Config: Invalid command line argument format (no '='): " + arg);
+                success = false;
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Config: Empty key in command line argument: -" + arg.substr(1));
+                success = false;
+                continue;
+            }
+            
+            // Validate value
+            if (value.empty()) {
+                NLM_LOG_WARNING("Config: Empty value for key " + key + " in command line");
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_LOG_WARNING("Config: Invalid command line argument: " + arg);
+            success = false;
         }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -94,24 +130,32 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Safe get with error logging
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        NLM_LOG_DEBUG("Config: Key not found: " + key);
         return std::nullopt;
     }
     
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        NLM_LOG_ERROR("Config: Type mismatch for key " + key + " (expected " + typeid(T).name() + ")");
         return std::nullopt;
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
+    // Safe get with default, logging if key is missing
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (!val.has_value()) {
+        NLM_LOG_DEBUG("Config: Key not found, using default for " + key);
+        return defaultValue;
+    }
+    return val.value();
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

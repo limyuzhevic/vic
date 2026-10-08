@@ -258,43 +258,49 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
+    // Configure neuromodulation systems
+    pImpl->dopamine->setBaselineLevel(config->getOr<float>("dopamine_baseline", 0.0f));
+    pImpl->curiosity->setExplorationBonus(1.0f);
+    pImpl->novelty->setSensitivity(0.5f);
     
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
-            }
-        }
-    });
+    // Configure prediction system
+    pImpl->predictionSystem->setPredictionWindow(10.0f);
+    pImpl->predictionSystem->setErrorThreshold(0.1f);
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Configure attention system
+    pImpl->attention->setInhibitionStrength(0.5f);
+    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setCompetitionThreshold(0.3f);
+    
+    // Configure working memory capacity based on brain size
+    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    pImpl->workingMemory->setCapacity(std::max<size_t>(100, neuronCount / 10));
+    
+    // Configure episodic memory capacity
+    pImpl->episodicMemory->setMaxEpisodes(std::max<size_t>(1000, neuronCount / 2));
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    // Log system integration status
+    NLM_LOG_INFO("Memory integration: Working=" + std::to_string(pImpl->workingMemory != nullptr) +
+                 ", Episodic=" + std::to_string(pImpl->episodicMemory != nullptr) +
+                 ", Associative=" + std::to_string(pImpl->associativeMemory != nullptr));
+    NLM_LOG_INFO("Cognition integration: Planner=" + std::to_string(pImpl->planner != nullptr) +
+                 ", ConceptFormation=" + std::to_string(pImpl->conceptFormation != nullptr) +
+                 ", Attention=" + std::to_string(pImpl->attention != nullptr));
+    NLM_LOG_INFO("Prediction integration: PredictionSystem=" + std::to_string(pImpl->predictionSystem != nullptr));
+    NLM_LOG_INFO("Development integration: DevelopmentSystem=" + std::to_string(pImpl->developmentSystem != nullptr));
+    NLM_LOG_INFO("Neuromodulation integration: Dopamine=" + std::to_string(pImpl->dopamine != nullptr) +
+                 ", Curiosity=" + std::to_string(pImpl->curiosity != nullptr) +
+                 ", Novelty=" + std::to_string(pImpl->novelty != nullptr) +
+                 ", PredictionError=" + std::to_string(pImpl->predictionError != nullptr));
     
     return true;
 }
