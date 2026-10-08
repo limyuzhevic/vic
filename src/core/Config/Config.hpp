@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <chrono>
 
 namespace nlm {
 
@@ -43,7 +46,25 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Type for configuration validation function
+using ValidationFunction = std::function<bool(const ConfigValue&)>;
+
+// Configuration schema entry
+struct ConfigSchema {
+    std::string key;
+    std::string type;
+    bool required = false;
+    ConfigValue defaultValue;
+    ValidationFunction validator;
+    std::string description;
+    std::vector<std::string> allowedValues;
+    
+    ConfigSchema() : required(false) {}
+    ConfigSchema(const std::string& k, const std::string& t, const std::string& desc = "")
+        : key(k), type(t), required(false), description(desc) {}
+};
+
+// Main configuration class with enhanced features
 class Config {
 public:
     Config();
@@ -55,28 +76,36 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Enhanced file loading with JSON support
+    bool loadFromFile(const std::string& filepath, bool validate = true);
+    bool loadFromJSON(const std::string& jsonStr, bool validate = true);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from command line arguments with enhanced parsing
+    bool loadFromArgs(int argc, char** argv, const std::map<std::string, std::string>& flags = {});
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Save to file in various formats
+    bool saveToFile(const std::string& filepath, const std::string& format = "text") const;
+    std::string saveToJSON() const;
     
-    // Get values
+    // Get values with type safety
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with source tracking
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration validation and schema management
+    bool validateSchema(const std::vector<ConfigSchema>& schema) const;
+    void addSchema(const ConfigSchema& schema);
+    void clearSchema();
+    std::vector<std::string> getValidationErrors() const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -93,6 +122,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration statistics and metadata
+    size_t getEntryCount() const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    std::chrono::system_clock::time_point getLastModified() const;
+    void setLastModified(const std::chrono::system_clock::time_point& time);
+    
+    // Configuration version management
+    void setVersion(const std::string& version);
+    std::string getVersion() const;
+    bool isVersionCompatible(const std::string& requiredVersion) const;
+    
+    // File path resolution and backup
+    void setWorkingDirectory(const std::string& directory);
+    std::string getWorkingDirectory() const;
+    bool saveWithBackup(const std::string& filepath, const std::string& format = "text") const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +145,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidType(const ConfigValue& value, const std::string& typeName);
+    static bool validateAgainstSchema(const ConfigEntry& entry, const ConfigSchema& schema);
 };
 
 } // namespace nlm

@@ -228,8 +228,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential to prevent instability but preserve reset value
+    // Only clamp if not currently in refractory period after a spike
+    if (pImpl->state.refractoryRemaining == 0) {
+        V = std::clamp(V, -100.0f, 50.0f);
+    }
     
     // Check for spike
     if (V >= threshold) {
