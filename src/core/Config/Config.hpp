@@ -58,6 +58,9 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file
+    bool loadFromJSONFile(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -90,8 +93,39 @@ public:
     // Clear all
     void clear();
     
+    // Check existence
+    bool has(const std::string& key) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Clear all
+    void clear();
+    
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation and validation
+    bool validate() const;
+    std::string validateAndGetErrors() const;
+    bool hasRequiredKeys(const std::vector<std::string>& requiredKeys) const;
+    std::string getValidationError(const std::string& key) const;
+    
+    // Error handling
+    static std::string lastError;
+    static void setLastError(const std::string& error);
+    static std::string getLastError();
+    static void clearLastError();
+    
+    // Configuration schema validation
+    void addValidationRule(const std::string& key, 
+                          std::function<bool(const ConfigValue&)> validator,
+                          const std::string& errorMessage);
+    
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
     
 private:
     struct Impl;
@@ -100,6 +134,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    bool parseJSON(const std::string& jsonContent);
+    bool parseJSONString(std::string::iterator& it, const std::string::iterator& end, std::string& out);
+    bool parseJSONValue(std::string::iterator& it, const std::string::iterator& end, std::string& out, const std::string& jsonContent);
+    void convertAndSetValue(const std::string& key, const std::string& valueStr);
+    void skipWhitespace(std::string::iterator& it, const std::string::iterator& end);
 };
-
-} // namespace nlm

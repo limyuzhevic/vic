@@ -28,11 +28,35 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    if (!pImpl) {
+        Config::setLastError("Failed to allocate memory for Neuron");
+        throw std::bad_alloc();
+    }
+    
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
+    
+    // Initialize with default values
+    pImpl->state.membranePotential = pImpl->state.restingPotential;
+    pImpl->state.threshold = -55.0f;
+    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.refractoryPeriod = 10;
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.firingRate = 0.0f;
+    pImpl->state.leakConductance = 0.1f;
+    pImpl->state.restingPotential = -70.0f;
+    pImpl->state.resetPotential = -65.0f;
+    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.lastSpikeTime = -1.0f;
+    
+    pImpl->spikeHistory.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
+    pImpl->plasticityFlags = PlasticityFlags();
 }
 
 Neuron::~Neuron() = default;
@@ -213,14 +237,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Convert tau from milliseconds to seconds for unit consistency with dt
+    float tauSeconds = tau * 0.001f;
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution - now in consistent time units (seconds)
+    float leakContribution = (V_rest - V) / tauSeconds;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Note: Removed incorrect dt * 1000.0f multiplication
+    V = V + static_cast<float>(dt) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {

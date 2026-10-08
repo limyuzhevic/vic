@@ -48,6 +48,11 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    if (!pImpl) {
+        Config::setLastError("Failed to allocate memory for Synapse");
+        throw std::bad_alloc();
+    }
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -192,17 +197,47 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    if (!pImpl) {
+        Config::setLastError("Synapse is in invalid state (null implementation)");
+        return;
+    }
+    
+    // Validate parameters
+    if (currentTime < 0.0f) {
+        Config::setLastError("Negative current time in Synapse::step: " + std::to_string(currentTime));
+        currentTime = 0.0f;
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    TimestepDuration dt = 0.001;  // 1ms timestep - used for consistency
+    
+    // Convert time constants from ms to seconds for unit consistency
+    float tauFacilitationSeconds = Impl::STP_FACILITATION_TAU * 0.001f;
+    float tauDepressionSeconds = Impl::STP_DEPRESSION_TAU * 0.001f;
+    
+    // Validate time constants
+    if (std::isnan(tauFacilitationSeconds) || tauFacilitationSeconds <= 0.0f) {
+        Config::setLastError("Invalid STP_FACILITATION_TAU constant: " + std::to_string(Impl::STP_FACILITATION_TAU));
+        tauFacilitationSeconds = 0.1f;
+    }
+    
+    if (std::isnan(tauDepressionSeconds) || tauDepressionSeconds <= 0.0f) {
+        Config::setLastError("Invalid STP_DEPRESSION_TAU constant: " + std::to_string(Impl::STP_DEPRESSION_TAU));
+        tauDepressionSeconds = 0.2f;
+    }
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        if (std::isnan(timeSincePre)) {
+            Config::setLastError("Invalid timeSincePre calculation");
+            timeSincePre = 0.0f;
+        }
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / tauFacilitationSeconds);
     }
     
     // Decay short-term depression
@@ -212,13 +247,18 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / tauDepressionSeconds));
     }
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
+    // Validate and clamp weight bounds
+    if (std::isnan(pImpl->weight)) {
+        Config::setLastError("Invalid synapse weight");
+        pImpl->weight = 0.0f;
+    }
+    
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
