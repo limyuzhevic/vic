@@ -90,8 +90,16 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static void skipWhitespace(const std::string& str, size_t& pos);
+    static std::string escapeString(const std::string& str);
+    static bool parseSimpleJSON(const std::string& json, Config* config);
+    static bool parseSimpleYAML(const std::string& yaml, Config* config);
+    
+    // Config loading helpers
+    bool loadFromFile(const std::string& filepath) override;
     
 private:
     struct Impl;
@@ -100,6 +108,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static void skipWhitespace(const std::string& str, size_t& pos);
+    static std::string escapeString(const std::string& str);
+    static bool parseSimpleJSON(const std::string& json, Config* config);
+    static bool parseSimpleYAML(const std::string& yaml, Config* config);
 };
 
 } // namespace nlm

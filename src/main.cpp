@@ -28,24 +28,32 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printHelp() {
+    std::cout << "NLM — 熙然" << std::endl;
+    std::cout << "Neural Learning Machine - Phase 2" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --version               Show version information" << std::endl;
+    std::cout << "  --config FILE, -c FILE   Load configuration from FILE" << std::endl;
+    std::cout << "  --create-template FILE   Create a template configuration file" << std::endl;
+    std::cout << "  --simulation STEPS      Run for specific number of steps" << std::endl;
+    std::cout << "  --seed VALUE            Set random seed" << std::endl;
+    std::cout << "  --verbose, -v           Enable verbose logging" << std::endl;
+    std::cout << "  --quiet, -q             Suppress output" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration File Formats:" << std::endl;
+    std::cout << "  - JSON ({"key": value, ...})" << std::endl;
+    std::cout << "  - YAML (key: value)" << std::endl;
+    std::cout << "  - Plain text (key = value)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --config myconfig.json" << std::endl;
+    std::cout << "  nlm --config config.yaml --seed 12345" << std::endl;
+    std::cout << "  nlm --create-template mytemplate.json" << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -343,17 +351,56 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Command line options
+    bool verbose = false;
+    bool quiet = false;
+    SimulationStep customStepCount = 0;  // 0 means use config value
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--template") {
+            configTemplate = "config.json";
+        } else if (arg == "--create-template") {
+            // Create a template configuration file
+            std::cout << "Creating template configuration: " << configTemplate << std::endl;
+            if (config->saveToFile(configTemplate)) {
+                NLM_LOG_INFO("Template configuration saved successfully!");
+            } else {
+                NLM_LOG_ERROR("Failed to create template configuration!");
+            }
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM Neural Learning Machine v0.1.0 - Phase 2" << std::endl;
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+            consoleLogger->setLevel(LogLevel::Debug);
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+            consoleLogger->setLevel(LogLevel::Error);
+        } else if (arg == "--simulation") {
+            if (i + 1 < argc) {
+                customStepCount = static_cast<SimulationStep>(std::stoull(argv[++i]));
+            }
+        } else if (arg == "--seed") {
+            if (i + 1 < argc) {
+                uint64_t seed = std::stoull(argv[++i]);
+                config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+            }
         }
+    }
+    
+    if (helpRequested) {
+        printHelp();
+        return 0;
     }
     
     // Load config from file (ignore if not found)
