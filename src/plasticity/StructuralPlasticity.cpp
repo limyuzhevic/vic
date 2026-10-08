@@ -1,6 +1,7 @@
 #include "StructuralPlasticity.hpp"
 #include "../../brain/Brain.hpp"
 #include "../../brain/NeuralRegion.hpp"
+#include "../../core/Constants.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -19,7 +20,7 @@ struct StructuralPlasticity::Impl {
     size_t totalSynapsesCreated;
     size_t totalSynapsesPruned;
     
-    Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
+    Impl() : synaptogenesisRate(nlm::Constants::SYNAPTOGENESIS_RATE), pruningRate(nlm::Constants::PRUNING_RATE),
              minWeightThreshold(0.05f), activityThreshold(0.001f),
              maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
              useActivityDependency(true),

@@ -1,5 +1,6 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/Constants.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -10,7 +11,7 @@ struct Hebbian::Impl {
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
+    Impl() : learningRate(nlm::Constants::HEBBIAN_LEARNING_RATE), maxWeight(nlm::Constants::MAX_WEIGHT), minWeight(nlm::Constants::MIN_WEIGHT),
              covarianceThreshold(0.0f) {}
 };
 

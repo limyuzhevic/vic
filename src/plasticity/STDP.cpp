@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/Constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -12,8 +13,8 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    Impl() : ltpWeight(nlm::Constants::STDP_LTP_WEIGHT), ltdWeight(nlm::Constants::STDP_LTD_WEIGHT), timeConstant(nlm::Constants::STDP_TIME_CONSTANT),
+             minWeight(nlm::Constants::MIN_WEIGHT), maxWeight(nlm::Constants::MAX_WEIGHT) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}

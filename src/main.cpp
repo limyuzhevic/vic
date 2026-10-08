@@ -7,24 +7,15 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "core/Constants.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+// Helper function to reset and reinitialize brain
+void resetBrain(std::shared_ptr<Brain> brain) {
+    if (brain) {
+        brain->reset();
+        brain->initialize();
+    }
+}
 
 using namespace nlm;
 
@@ -367,20 +358,20 @@ int main(int argc, char** argv) {
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(nlm::Constants::CONFIG_RANDOM_SEED), ConfigSource::Default);
+    config->set("simulation_timestep", nlm::Constants::TIME_STEP, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(nlm::Constants::CONFIG_NEURON_COUNT), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(nlm::Constants::CONFIG_REGION_COUNT), ConfigSource::Default);
+    config->set("connection_probability", nlm::Constants::CONFIG_CONNECTION_PROBABILITY, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", nlm::Constants::STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", nlm::Constants::STDP_LTD_WEIGHT, ConfigSource::Default);
+    config->set("stdp_tau", nlm::Constants::STDP_TIME_CONSTANT, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", nlm::Constants::SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    config->set("pruning_rate", nlm::Constants::PRUNING_RATE, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -393,7 +384,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    double timestep = config->getOr<double>("simulation_timestep", nlm::Constants::TIME_STEP);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
@@ -404,6 +395,7 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Check configuration and system resources.");
         return 1;
     }
     
@@ -413,15 +405,13 @@ int main(int argc, char** argv) {
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    resetBrain(brain);
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
+    resetBrain(brain);
     runStdpVerification(brain);
     
     // Final brain status

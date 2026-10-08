@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "../core/Constants.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -18,7 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+    , sensoryNoveltyDecay_(nlm::Constants::NOVELTY_DECAY_RATE)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -144,8 +145,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        curiosityLevel_ = noveltyLevel_ * nlm::Constants::CURIOSITY_WEIGHT_NOVELTY + std::abs(predictionError_) * nlm::Constants::CURIOSITY_WEIGHT_PREDICTION;
+        curiosityLevel_ = std::clamp(curiosityLevel_, nlm::Constants::CURIOSITY_CLAMP_MIN, nlm::Constants::CURIOSITY_CLAMP_MAX);
     }
 }
 
