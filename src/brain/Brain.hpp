@@ -29,6 +29,9 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Enhanced working memory integration
+class EnhancedWorkingMemoryIntegration;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
