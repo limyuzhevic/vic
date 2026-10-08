@@ -124,29 +124,30 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    // Novelty detection: Compare with previous vision
+    if (!previousVision_.empty() && !vision.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        size_t minSize = std::min(previousVision_.size(), vision.size());
+        for (size_t i = 0; i < minSize; ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
+        // Normalize and decay
+        noveltyLevel_ = totalDiff / static_cast<float>(minSize);
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
-        previousVision_ = vision;
+        // Apply novelty to neural excitability (sensory neurons become more excitable)
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i] && noveltyLevel_ > 0.1f) {
+                float noveltyCurrent = noveltyLevel_ * 10.0f;
+                sensoryVision_[i]->injectCurrent(noveltyCurrent);
+            }
+        }
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    // Update previous vision for next comparison
+    previousVision_ = vision;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {

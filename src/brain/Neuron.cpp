@@ -188,7 +188,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period

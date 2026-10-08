@@ -29,28 +29,37 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Format message
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
+    // Add timestamp with milliseconds
+    auto timePoint = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
+    oss << std::put_time(std::localtime(&timePoint), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count();
     oss << " " << entry.message;
+    
+    // Add file/line info if provided
+    if (!entry.file.empty() && entry.line > 0) {
+        oss << " (" << entry.file << ":" << entry.line << ")";
+    }
     
     std::string output = oss.str();
     
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
+    // Console output with thread safety
+    std::cout << output << "\n";
+    std::cout.flush();
     
-    // File output if set
+    // File output with error handling
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            std::cerr << "Logger file error: " << e.what() << std::endl;
+        }
     }
 }
 
