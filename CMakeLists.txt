@@ -1,3 +1,6 @@
+# CMakeLists.txt - Consolidated Build Configuration
+# All C++ libraries and Python bindings built from a single CMakeLists file
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -21,7 +24,7 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library - all NLM components
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -121,6 +124,22 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Python bindings (if Python is available)
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 CONFIG REQUIRED)
+
+# Python-specific source files (only for bindings)
+pybind11_add_module(pynlm python/bindings.cpp)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/python)
+
+# Apply same compiler options as core
+if(MSVC)
+    target_compile_options(pynlm PRIVATE /permissive- /W4)
+else()
+    target_compile_options(pynlm PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -148,4 +167,21 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# High-level convenience functions for Python
+pybind11_add_module(nlm_highlevel python/HighLevelFunctions.cpp)
+target_link_libraries(nlm_highlevel PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_highlevel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+if(MSVC)
+    target_compile_options(nlm_highlevel PRIVATE /permissive- /W4)
+else()
+    target_compile_options(nlm_highlevel PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+install(TARGETS nlm_highlevel
+    LIBRARY DESTINATION nlm
+    ARCHIVE DESTINATION nlm
+    RUNTIME DESTINATION nlm
 )

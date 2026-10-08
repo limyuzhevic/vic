@@ -1,5 +1,8 @@
 #include "Random.hpp"
 #include <stdexcept>
+#include <algorithm>
+#include <numeric>
+#include <limits>
 
 namespace nlm {
 
@@ -7,24 +10,21 @@ struct RandomGenerator::Impl {
     std::mt19937_64 gen;
     uint64_t currentSeed;
     
-    Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
+    explicit Impl(uint64_t seed) noexcept : gen(seed), currentSeed(seed) {}
 };
 
-RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
+RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(std::make_unique<Impl>(seed)) {}
 
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
+RandomGenerator::RandomGenerator() : pImpl(std::make_unique<Impl>(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -118,9 +118,9 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
-    for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
-    }
+    std::generate(bytes, bytes + size, [this]() {
+        return static_cast<uint8_t>(uniformInt(0, 255));
+    });
 }
 
 std::mt19937_64& RandomGenerator::engine() {

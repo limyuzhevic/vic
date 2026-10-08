@@ -93,6 +93,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling
+    void validate() const;
+    
+    // Configuration presets and utilities
+    static std::shared_ptr<Config> createPresetConfig(const std::string& presetName);
+    static std::vector<std::string> getAvailablePresets();
+    static std::shared_ptr<Config> createDefaultConfig();
+    static std::shared_ptr<Config> createSimpleConfig();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

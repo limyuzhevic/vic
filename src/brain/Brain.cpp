@@ -243,7 +243,13 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
+    pImpl->predictionSystem->setPredictionHorizon(10);  // Predict next 10 steps
+    pImpl->predictionSystem->enableMultiStepPrediction(true);
+    
+    // Initialize remaining prediction subsystems
+    pImpl->predictionSystem->getNeuralPrediction()->initialize(this);
+    pImpl->predictionSystem->getActionConsequencePredictor()->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
