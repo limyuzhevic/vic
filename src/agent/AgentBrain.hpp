@@ -69,12 +69,39 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Configuration parameters
+    void setVisionScale(float scale) { visionScale_ = scale; }
+    void setTouchScale(float scale) { touchScale_ = scale; }
+    void setInternalScale(float scale) { internalScale_ = scale; }
+    void setProprioceptionScale(float scale) { proprioceptionScale_ = scale; }
+    void setActivityThreshold(float threshold) { activityThreshold_ = threshold; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExplorationChance(float chance) { explorationChance_ = chance; }
+    
+    float getVisionScale() const { return visionScale_; }
+    float getTouchScale() const { return touchScale_; }
+    float getInternalScale() const { return internalScale_; }
+    float getProprioceptionScale() const { return proprioceptionScale_; }
+    float getActivityThreshold() const { return activityThreshold_; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExplorationChance() const { return explorationChance_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper functions for initialization and processing
+    void distributeNeuronsToGroups();
+    size_t getMotorGroupIndex() const;
+    size_t getSensoryGroupIndex() const;
+    float calculateNeuronActivity(const std::vector<Neuron*>& neurons) const;
+    void computeNovelty(const std::vector<float>& vision);
+    void updateCuriosityLevel();
+    MotorCommand findBestMotorCommand(float forwardAct, float backwardAct, float leftAct, 
+                                      float rightAct, float interactAct, float waitAct) const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +139,16 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configuration parameters
+    float visionScale_;
+    float touchScale_;
+    float internalScale_;
+    float proprioceptionScale_;
+    float activityThreshold_;
+    float curiosityThreshold_;
+    float explorationChance_;
+};
 };
 
 } // namespace nlm
