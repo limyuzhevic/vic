@@ -1,98 +1,106 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+/*
+ * NLM (熙然) - Neural Learning Machine Brain Implementation
+ * Phase 6: Integrated Artificial Brain with Complete Systems
+ * 
+ * This file implements the central Brain class that coordinates all neural systems
+ * including memory, prediction, cognition, and neuromodulation. It represents a
+ * complete artificial brain capable of learning, adaptation, and intelligent behavior.
+ * 
+ * The brain operates as a closed-loop system:
+ * WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE → MEMORY/PREDICTION
+ * → MOTIVATION/NEUROMODULATION → ACTION SELECTION → MOTOR OUTPUT → WORLD CONSEQUENCE
+ * → REWARD/SURPRISE/ERROR → PLASTICITY → MODIFIED BRAIN → CHANGED FUTURE BEHAVIOR
+ * 
+ * Key Features:
+ * - Real spiking neural computation with LIF neurons and event-driven dynamics
+ * - Complete memory systems: working, episodic, and associative memory
+ * - Integrated prediction system for sensory anticipation
+ * - Full cognitive capabilities: planning, concept formation, attention
+ * - Advanced neuromodulation: dopamine, curiosity, novelty, prediction error
+ * - Developmental stages affecting plasticity and behavior
+ * - Checkpoint save/load for persistence
+ * - Replay and consolidation mechanisms
+ * 
+ * Integration Philosophy:
+ * All systems are interconnected and influence each other through shared state
+ * Neuromodulators affect neural excitability, plasticity, and learning rates
+ * Memory systems provide context for prediction and decision-making
+ * Development shapes the brain's architecture over time
+ */
 
 namespace nlm {
 
+/**
+ * Implementation details for the Brain class using the Pimpl idiom.
+ * This class contains all the internal state and implementation details of the brain,
+ * keeping the header file clean and allowing for easier modifications.
+ */
 struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
+    std::shared_ptr<Config> config;                           ///< Configuration parameters
+    std::unique_ptr<RandomGenerator> rng;                     ///< Random number generator for stochastic processes
+    std::vector<std::unique_ptr<NeuralRegion>> regions;        ///< Neural regions (cortex areas, brain regions)
+    std::vector<InterRegionConnection> interRegionConnections;///< Long-range connections between regions
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<NeuralWorkingMemory> workingMemory;        ///< Working memory - temporary active information
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;      ///< Episodic memory - personal experiences and events
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory; ///< Associative memory - pattern associations and concepts
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<PredictionSystem> predictionSystem;       ///< Predictive coding and forward models
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<NeuralPlanner> planner;                    ///< Action planning and decision making
+    std::unique_ptr<ConceptFormation> conceptFormation;        ///< Abstract concept and category learning
+    std::unique_ptr<AttentionalSelection> attention;           ///< attentional selection and focus control
     
     // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    std::unique_ptr<DevelopmentSystem> developmentSystem;      ///< Developmental stages and maturation processes
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Dopamine> dopamine;                       ///< Reward prediction error and reinforcement learning
+    std::unique_ptr<Curiosity> curiosity;                     ///< Exploration motivation and novelty seeking
+    std::unique_ptr<PredictionError> predictionError;         ///< Prediction errors and learning signals
+    std::unique_ptr<Novelty> novelty;                         ///< Novelty detection and surprise signals
     
     // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    std::unique_ptr<SpikeSystem> spikeSystem;                  ///< Event-driven spike propagation system
+    std::unique_ptr<STDP> stdp;                                ///< Spike-Timing-Dependent Plasticity
+    std::unique_ptr<Hebbian> hebbian;                          ///< Hebbian learning (fire together, wire together)
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity; ///< Structural changes (synaptogenesis, pruning)
     
     // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
+    TimestepDuration timestep;                                ///< Time step duration in seconds
+    SimulationStep currentStep;                               ///< Current simulation step count
+    Timestamp currentTime;                                    ///< Current simulation time in seconds
     
     // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
+    size_t totalSpikesThisStep;                               ///< Total spikes generated in current step
+    size_t totalSpikesTotal;                                  ///< Cumulative spike count since initialization
     
     // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    std::vector<Neuron*> sensoryNeurons;                       ///< Neurons that receive sensory input
+    std::vector<Neuron*> motorNeurons;                        ///< Neurons that produce motor output
     
     // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    bool isResting;                                           ///< Whether the brain is in resting/sleep state
+    size_t stepsSinceLastEpisode;                              ///< Steps since last episodic memory storage
+    size_t replayInterval;                                    ///< Memory replay interval (steps)
+    size_t consolidationInterval;                             ///< Memory consolidation interval (steps)
     
     // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    std::unique_ptr<CheckpointManager> checkpointManager;      ///< Persistent storage and checkpoint management
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
+    /**
+     * Constructor initializes all brain components and systems.
+     * This sets up the complete integrated artificial brain architecture.
+     * 
+     * @param cfg Configuration parameters for brain initialization
+     */
+    Impl(std::shared_ptr<Config> cfg) : config(cfg), rng(nullptr), developmentalStage(DevelopmentalStage::Initial),
+                                       nextRegionId(1), timestep(0.001), currentStep(0), currentTime(0.0),
+                                       totalSpikesThisStep(0), totalSpikesTotal(0), isResting(false),
+                                       stepsSinceLastEpisode(0), replayInterval(100), consolidationInterval(1000) {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {

@@ -1,0 +1,63 @@
+{
+    "tasksVersion": "2017-02-01",
+    "tasks": [
+        {
+            "label": "Build All",
+            "type": "shell",
+            "command": "./${workspaceFolder}/build.sh",
+            "problemMatcher": "$gcc",
+            "group": "build",
+            "detail": "Build all NLM targets"
+        },
+        {
+            "label": "Build with CMake",
+            "type": "shell",
+            "command": "mkdir -p build && cd build && cmake .. && make -j$(nproc)",
+            "problemMatcher": "$gcc",
+            "group": "build",
+            "detail": "Build using CMake"
+        },
+        {
+            "label": "Run NLM Demo",
+            "type": "shell",
+            "command": "./${workspaceFolder}/build/nlm",
+            "problemMatcher": [],
+            "group": "test",
+            "detail": "Run NLM demo program"
+        },
+        {
+            "label": "Run NLM Benchmark",
+            "type": "shell",
+            "command": "./${workspaceFolder}/build/benchmark",
+            "problemMatcher": [],
+            "group": "test",
+            "detail": "Run NLM benchmark program"
+        },
+        {
+            "label": "Run NLM CLI",
+            "type": "shell",
+            "command": "./${workspaceFolder}/build/nlm_cli",
+            "problemMatcher": [],
+            "group": "test",
+            "detail": "Run NLM CLI program"
+        },
+        {
+            "label": "Clean Build",
+            "type": "shell",
+            "command": "rm -rf build && mkdir build",
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Clean build directory"
+        },
+        {
+            "label": "Install Dependencies",
+            "type": "shell",
+            "command": "./${workspaceFolder}/install_deps.sh",
+            "problemMatcher": [],
+            "detail": "Install NLM dependencies"
+        }
+    ],
+    "problemMatcher": [],
+    "viewerSortOrder": "default",
+    "enablePreviewOnTaskErrors": true
+}

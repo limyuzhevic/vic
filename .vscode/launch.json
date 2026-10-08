@@ -1,0 +1,81 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "NLM Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": {},
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "${command:which gdb}",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "NLM Benchmark Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/benchmark",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": {},
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "${command:which gdb}",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "NLM CLI Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nlm_cli",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": {},
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "${command:which gdb}",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Attach to NLM Process",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/build/nlm",
+            "pid": "${command:pidof nlm}",
+            "cwd": "${workspaceFolder}",
+            "environment": {},
+            "externalConsole": false,
+            "MIMode": "gdb"
+        }
+    ]
+}
