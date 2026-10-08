@@ -8,6 +8,10 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <functional>
+#include <optional>
+#include <variant>
 
 namespace nlm {
 
@@ -28,6 +32,31 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Neuromodulator;
+class SensoryInput;
+class Action;
+class SensoryPercept;
+
+// Custom exceptions for better error handling
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ValidationError : public std::runtime_error {
+public:
+    explicit ValidationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class FileNotFoundError : public std::runtime_error {
+public:
+    explicit FileNotFoundError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class SimulationError : public std::runtime_error {
+public:
+    explicit SimulationError(const std::string& message) : std::runtime_error(message) {}
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -72,7 +101,7 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -94,11 +123,11 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Produce motor/action output based on neural activity
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -150,52 +179,99 @@ public:
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
+    // Prediction system for temporal sequence learning
     PredictionSystem* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+    // Cognitive processing systems
     NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
+    // Development and plasticity management
     DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // Neuromodulator access methods
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
+    PredictionError* getPredictionError();
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // ========== EVENT HANDLERS ==========
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Event callback registration
+    void registerSpikeHandler(std::function<void(NeuronId, Timestamp)> handler);
+    void registerLearningEventHandler(std::function<void(const std::string&)> handler);
+    void registerDevelopmentEventHandler(std::function<void(DevelopmentalStage)> handler);
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // ========== UTILITY METHODS ==========
     
-    // Logging
-    void logStatus() const;
+    // Statistical methods
+    float getStandardDeviation() const;
+    float getMaximumFiringRate() const;
+    float getMinimumFiringRate() const;
     
+    // Configuration helpers
+    void configureDefault();
+    void configureForLearning();
+    void configureForDevelopment();
+    void configureForMemory();
+    
+    // State validation
+    bool validateState() const;
+    std::string getValidationErrors() const;
+    
+    // Performance monitoring
+    double getExecutionTime() const;
+    size_t getMemoryUsage() const;
+    
+    // ========== OBSERVATION AND DEBUGGING ==========
+    
+    // Get neural activity patterns
+    std::vector<float> getNeuralActivityPattern() const;
+    std::vector<float> getRegionActivity(RegionId regionId) const;
+    
+    // Get population statistics
+    float getPopulationAverageFiringRate(PopulationId populationId) const;
+    float getPopulationStandardDeviation(PopulationId populationId) const;
+    
+    // ========== CLONING AND COPYING ==========
+    
+    // Create a copy of the brain
+    std::unique_ptr<Brain> clone() const;
+    
+    // Create a snapshot for later restoration
+    std::unique_ptr<Brain> createSnapshot() const;
+    
+    // Restore from snapshot
+    void restoreSnapshot(const Brain& snapshot);
+    
+    // ========== INTERNAL STATE ==========
+    
+    // Get current simulation state
+    SimulationStep getCurrentStep() const;
+    Timestamp getCurrentTime() const;
+    
+    // Check if brain is initialized
+    bool isInitialized() const;
+    
+    // Get current developmental stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    
+    // Check if brain is in resting state
+    bool isResting() const;
+    
+    // Get time since last activity
+    double getTimeSinceLastEpisode() const;
+
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -25,9 +25,50 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides Python APIs for creating and simulating neural networks
+        with integrated memory, prediction, cognition, and neuromodulation systems.
+        
+        Usage examples:
+            import pynlm
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            for step in range(100):
+                brain.step(step)
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom exceptions for better error handling
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
+    
+    // Create custom NLM-specific exceptions
+    py::register_exception<pynlm::ConfigError>(m, "ConfigError", PyExc_ValueError);
+    py::register_exception<pynlm::ValidationError>(m, "ValidationError", PyExc_ValueError);
+    py::register_exception<pynlm::FileNotFoundError>(m, "FileNotFoundError", PyExc_FileNotFoundError);
+    py::register_exception<pynlm::SimulationError>(m, "SimulationError", PyExc_RuntimeError);
+    
+    // Add module-level constants and functions
+    m.def("__version__", []() { return "0.1.0"; });
+    
+    // Create convenience factory functions
+    m.def("createDefaultConfigWith", [](const std::vector<std::pair<std::string, std::string>>& defaults) {
+        auto config = std::make_shared<nlm::Config>();
+        for (const auto& pair : defaults) {
+            config->set(pair.first, pair.second);
+        }
+        return config;
+    }, py::arg("defaults"), "Create a default config with predefined values");
+    
+    // Quick start simulation helper
+    m.def("run_quick_simulation", [](int steps) {
+        auto config = std::make_shared<nlm::Config>();
+        auto brain = std::make_shared<nlm::Brain>(config);
+        brain->initialize();
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("steps"), "Run a quick simulation and return spike count");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -142,27 +183,49 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Custom exception types (assuming they exist in the codebase)
+    py::class_<nlm::ConfigError>(m, "ConfigError", R"pbdoc(Configuration error)pbdoc")
+        .def(py::init<const std::string&>(), py::arg("message"));
+    
+    py::class_<nlm::ValidationError>(m, "ValidationError", R"pbdoc(Validation error)pbdoc")
+        .def(py::init<const std::string&>(), py::arg("message"));
+    
+    py::class_<nlm::FileNotFoundError>(m, "FileNotFoundError", R"pbdoc(File not found error)pbdoc")
+        .def(py::init<const std::string&>(), py::arg("message"));
+    
+    py::class_<nlm::SimulationError>(m, "SimulationError", R"pbdoc(Simulation error)pbdoc")
+        .def(py::init<const std::string&>(), py::arg("message"));
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("loadFromFile", [](nlm::Config& self, const std::string& filepath) {
+            if (!self.loadFromFile(filepath)) {
+                throw nlm::FileNotFoundError("Failed to load config from file: " + filepath);
+            }
+            return true;
+        }, py::arg("filepath"), "Load configuration from a JSON file")
+        .def("loadFromArgs", [](nlm::Config& self, int argc, char** argv) {
+            if (!self.loadFromArgs(argc, argv)) {
+                throw nlm::ConfigError("Failed to load configuration from command line arguments");
+            }
+            return true;
+        }, py::arg("argc"), py::arg("argv"), "Load configuration from command line arguments")
+        .def("saveToFile", [](const nlm::Config& self, const std::string& filepath) {
+            if (!self.saveToFile(filepath)) {
+                throw nlm::ConfigError("Failed to save configuration to file: " + filepath);
+            }
+            return true;
+        }, py::arg("filepath"), "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"), "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys, "Get all configuration keys")
+        .def("clear", &Config::clear, "Clear all configuration entries")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Context manager support
+        .def("__enter__", [](Config& self) { return self; })
+        .def("__exit__", [](Config&, const py::object&) { return true; });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

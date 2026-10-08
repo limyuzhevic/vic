@@ -6,8 +6,35 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
+#include <functional>
+#include <optional>
+#include <variant>
 
 namespace nlm {
+
+// Forward declarations
+class Brain;
+class SimpleWorld;
+class SensoryPercept;
+class SensoryInput;
+class Action;
+
+// Custom exceptions for AgentBrain
+class AgentBrainError : public std::runtime_error {
+public:
+    explicit AgentBrainError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class InitializationError : public AgentBrainError {
+public:
+    explicit InitializationError(const std::string& message) : AgentBrainError(message) {}
+};
+
+class ProcessingError : public AgentBrainError {
+public:
+    explicit ProcessingError(const std::string& message) : AgentBrainError(message) {}
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -16,8 +43,19 @@ public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
+    
     // Initialize with world
-    void initialize(const SimpleWorld& world);
+    bool initialize(const SimpleWorld& world);
+    
+    // Context manager support
+    AgentBrain& operator()();  // Begin operation chain
+    bool commit();  // Complete operations
+    void rollback();  // Undo operations
     
     // Get sensory input size expected by brain
     size_t getSensoryInputSize() const;
@@ -26,7 +64,7 @@ public:
     size_t getMotorOutputSize() const;
     
     // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
+    bool processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
@@ -56,25 +94,94 @@ public:
     void reset();
     
     // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    Brain* getBrain() const { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Get agent body state
+    const AgentBody& getAgentBody() const;
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Configuration with validation
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
+    bool isRewardModulationEnabled() const;
+    bool isStructuralPlasticityEnabled() const;
+    bool isDevelopmentEnabled() const;
+    bool isCuriosityEnabled() const;
+    
+    // Advanced configuration methods
+    void setPlasticityModifier(float modifier);
+    void setSensoryNoveltyDecay(float decay);
+    void setMotorCommandSelectionStrategy(const std::string& strategy);
+    
+    // Get current configuration values
+    float getPlasticityModifier() const;
+    float getSensoryNoveltyDecay() const;
+    std::string getMotorCommandSelectionStrategy() const;
+    
+    // Status and validation
+    bool isInitialized() const;
+    bool validateState() const;
+    std::string getValidationErrors() const;
+    
+    // Statistical methods
+    float getAverageFiringRate() const;
+    float getStandardDeviation() const;
+    size_t getActiveNeuronCount() const;
+    
+    // Advanced processing methods
+    // Batch process multiple sensory inputs
+    size_t processSensoryBatch(const std::vector<SensoryPercept>& percepts);
+    
+    // Adaptive learning methods
+    void adjustLearningRate(float factor);
+    void adjustExplorationFactor(float factor);
+    
+    // Debugging and monitoring
+    std::vector<float> getNeuronActivityPattern() const;
+    std::vector<float> getMotorNeuronsActivity() const;
+    std::vector<float> getSensoryNeuronsActivity() const;
+    
+    // Configuration import/export
+    bool saveConfiguration(const std::string& filepath) const;
+    bool loadConfiguration(const std::string& filepath);
+    
+    // Event callbacks
+    void registerStateChangeCallback(std::function<void()> callback);
+    void registerLearningEventCallback(std::function<void(float)> callback);
+    void registerRewardCallback(std::function<void(float)> callback);
+    
+    // Comparison operators for Python
+    bool operator==(const AgentBrain& other) const;
+    bool operator!=(const AgentBrain& other) const;
+    
+    // String representation
+    std::string toString() const;
+    std::string getConfigSummary() const;
+    
+    // Context manager implementation
+    class Context {
+    public:
+        Context(AgentBrain& agent) : agent_(agent) {}
+        ~Context() { agent_.commit(); }
+    private:
+        AgentBrain& agent_;
+    };
+    
+    Context withContext() { return Context(*this); }
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Internal helper methods
+    void validateConfiguration() const;
+    void validateInput(const SensoryPercept& percept) const;
+    void updateNeuromodulationState();
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +219,17 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // State tracking
+    bool initialized_;
+    std::vector<std::function<void()>> stateChangeCallbacks_;
+    std::vector<std::function<void(float)>> learningEventCallbacks_;
+    std::vector<std::function<void(float)>> rewardCallbacks_;
+    
+    // Operation mode for context manager
+    enum class OperationMode { Normal, Transaction };
+    OperationMode operationMode_;
+    bool transactionCommitted_;
 };
 
 } // namespace nlm
