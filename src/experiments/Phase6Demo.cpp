@@ -54,11 +54,13 @@ int main(int argc, char* argv[]) {
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = 500;  // NOTE: No validation of config values
+    config.maxSteps = 2000;  // NOTE: No validation of config values
     config.enableCheckpointing = true;
-    config.enableReplay = true;
+    config.enableReplay = true;  // NOTE: This flag is never used in the run() function
     config.enableDevelopment = true;
+    
+    // NOTE: Missing checkpointPath validation and setting
     
     auto result = experiment.run(config);
     

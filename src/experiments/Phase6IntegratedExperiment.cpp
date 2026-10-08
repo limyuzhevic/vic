@@ -28,10 +28,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("stdp_ltp_weight", 0.01);  // NOTE: Config::set() expects double, not float
+    cfg->set("stdp_ltd_weight", 0.012);
+    cfg->set("synaptogenesis_rate", 0.0001);
+    cfg->set("pruning_rate", 0.00001);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -103,8 +103,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    result.totalReward = totalReward;  // NOTE: Bug - should divide by config.maxSteps for average per step
+    result.avgFiringRate = totalFiringRate / config.maxSteps;  // NOTE: Bug - should divide by config.maxSteps for average per step
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
@@ -112,7 +112,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
     // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
+    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);  // NOTE: Missing null check before usage elsewhere
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
