@@ -690,6 +690,84 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
+    // Advanced action selection using neural planning
+    // First try NeuralPlanner if available
+    if (pImpl->planner) {
+        // Gather current state information for planning
+        std::vector<float> currentState;
+        
+        // Get working memory content as part of the state
+        if (pImpl->workingMemory) {
+            auto& wm = *pImpl->workingMemory;
+            // Sample up to 16 memory activations
+            size_t samples = std::min<size_t>(16, wm.getMemoryNeurons().size());
+            for (size_t i = 0; i < samples; ++i) {
+                currentState.push_back(wm.getNeuronActivation(wm.getMemoryNeurons()[i]));
+            }
+            // Pad to expected size
+            while (currentState.size() < 16) {
+                currentState.push_back(0.0f);
+            }
+        } else {
+            currentState.resize(16, 0.0f);
+        }
+        
+        // Get current neuromodulation level as part of state
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        currentState[0] = reward; // First element is reward
+        
+        // Get attention allocation as part of state
+        float attentionLevel = 0.5f;
+        if (pImpl->attention) {
+            attentionLevel = pImpl->attention->getInhibitionStrength();
+        }
+        currentState[1] = attentionLevel; // Second element is attention
+        
+        // Get planning confidence
+        float planningConfidence = pImpl->planner->getPlanningConfidence();
+        currentState[2] = planningConfidence; // Third element is planning confidence
+        
+        // Get developmental stage as part of state
+        float developmentalMod = 1.0f;
+        switch (pImpl->developmentalStage) {
+            case DevelopmentalStage::Initial: developmentalMod = 1.0f; break;
+            case DevelopmentalStage::CriticalPeriod: developmentalMod = 0.8f; break;
+            case DevelopmentalStage::Maturation: developmentalMod = 0.5f; break;
+            case DevelopmentalStage::Adult: developmentalMod = 0.2f; break;
+            case DevelopmentalStage::Aging: developmentalMod = 0.1f; break;
+        }
+        currentState[3] = developmentalMod; // Fourth element is developmental modifier
+        
+        // Use NeuralPlanner to select action
+        ActionType plannedAction = pImpl->planner->planAction(currentState, reward);
+        
+        NLM_LOG_INFO("NeuralPlanner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+        
+        // Apply curiosity-based exploration if enabled
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(pImpl->timestep);
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            
+            // Higher curiosity increases likelihood of exploration
+            if (curiosityLevel > 0.3f && pImpl->novelty) {
+                // Check if novel exploration is beneficial
+                float noveltyLevel = pImpl->novelty->getLevel();
+                
+                // Occasionally choose exploratory action for high novelty
+                if (noveltyLevel > 0.6f && planningConfidence < 0.7f) {
+                    // Plan for an exploratory action
+                    // NeuralPlanner should already be handling exploration through
+                    // its random action selection when confidence is low
+                    NLM_LOG_INFO("High novelty triggering exploratory action selection");
+                }
+            }
+        }
+        
+        auto action = std::make_unique<Action>(plannedAction);
+        return action;
+    }
+    
+    // Fallback to simple action selection if no planner available
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
