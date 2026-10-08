@@ -29,6 +29,13 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declarations for extracted systems
+class SimulationController;
+class InputProcessor;
+class OutputProducer;
+class BrainStatistics;
+class MemorySystemManager;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;

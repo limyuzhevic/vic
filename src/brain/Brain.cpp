@@ -880,7 +880,7 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
                         }
                     }
                     idx++;
@@ -895,9 +895,50 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match by connection pattern (source->destination neuron)
+        NLM_LOG_INFO("Applying " + std::to_string(synapseData.weight.size()) + " synapses from checkpoint");
+        
+        size_t appliedCount = 0;
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            // Find or create synapse with matching connection
+            bool synapseFound = false;
+            
+            // Search through all regions and populations
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* syn : pop->getSynapses()) {
+                        // Check if this synapse matches the loaded connection
+                        if (syn->getSourceNeuron().index() == synapseData.sourceNeuron[i] &&
+                            syn->getDestinationNeuron().index() == synapseData.destinationNeuron[i]) {
+                            
+                            // Apply loaded synapse state
+                            syn->setWeight(synapseData.weight[i]);
+                            syn->setDelay(synapseData.delay[i]);
+                            syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                            
+                            // Enable plasticity for all loaded synapses
+                            syn->enablePlasticity(true, true, false);
+                            
+                            appliedCount++;
+                            synapseFound = true;
+                            break;
+                        }
+                    }
+                    if (synapseFound) break;
+                }
+                if (synapseFound) break;
+            }
+            
+            if (!synapseFound) {
+                // Create new synapse if not found (for incomplete checkpoint restoration)
+                NLM_LOG_WARNING("Synapse connection not found in current brain, skipping: " +
+                              std::to_string(synapseData.sourceNeuron[i]) + " -> " +
+                              std::to_string(synapseData.destinationNeuron[i]));
+            }
+        }
+        
+        NLM_LOG_INFO("Successfully applied " + std::to_string(appliedCount) + " synapses to brain");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
