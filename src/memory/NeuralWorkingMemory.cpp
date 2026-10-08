@@ -22,6 +22,10 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
 {
 }
 
@@ -163,22 +167,73 @@ void NeuralWorkingMemory::runCompetition() {
     
     if (memoryActivations_.empty()) return;
     
-    // Find neurons with above-threshold activation
-    float threshold = 0.3f;
+    // Enhanced competition with multiple stages:
+    // 1. Threshold-based selection
+    // 2. Lateral inhibition between competitors
+    // 3. Baseline activity normalization
     
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
+    // Normalize activations to [0, 1] range for fair competition
+    float maxActivation = *std::max_element(memoryActivations_.begin(), memoryActivations_.end());
+    float minActivation = *std::min_element(memoryActivations_.begin(), memoryActivations_.end());
+    float activationRange = maxActivation - minActivation;
+    
+    std::vector<float> normalizedActivations;
+    normalizedActivations.reserve(memoryActivations_.size());
+    
+    for (float act : memoryActivations_) {
+        if (activationRange > 0.001f) {
+            normalizedActivations.push_back((act - minActivation) / activationRange);
+        } else {
+            normalizedActivations.push_back(0.5f); // All equal
+        }
+    }
+    
+    // Apply sigmoidal response function to create sharper competition
+    std::vector<float> responseWeights;
+    responseWeights.reserve(normalizedActivations.size());
+    
+    for (float normAct : normalizedActivations) {
+        // Sigmoidal function for competitive dynamics
+        float response = 1.0f / (1.0f + std::exp(-10.0f * (normAct - 0.5f)));
+        responseWeights.push_back(response);
+    }
+    
+    // Lateral inhibition: stronger responses suppress weaker ones
+    std::vector<float> inhibitedResponses = responseWeights;
+    for (size_t i = 0; i < responseWeights.size(); ++i) {
+        for (size_t j = 0; j < responseWeights.size(); ++j) {
+            if (i != j) {
+                float inhibition = 0.5f * responseWeights[i] / (responseWeights[j] + 0.01f);
+                inhibitedResponses[j] = std::max(0.0f, inhibitedResponses[j] - inhibition);
+            }
+        }
+    }
+    
+    // Dynamic threshold based on inhibition level
+    float totalInhibition = std::accumulate(inhibitedResponses.begin(), inhibitedResponses.end(), 0.0f);
+    float threshold = 0.3f + 0.4f * (1.0f - totalInhibition / memoryActivations_.size());
+    
+    // Select winners based on inhibited responses
+    for (size_t i = 0; i < inhibitedResponses.size(); ++i) {
+        if (inhibitedResponses[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
     }
     
-    // Inhibitory competition - suppress non-winners
+    // Apply excitation to winners, inhibition to non-winners
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        if (isWinner) {
+            // Excitatory feedback to strengthen winner representation
+            if (brain_) {
+                brain_->injectCurrent(memoryNeurons_[i], 0.5f * memoryActivations_[i]);
+            }
+        } else {
+            // Lateral inhibition to suppress competitors
+            if (brain_) {
+                brain_->injectCurrent(memoryNeurons_[i], -0.3f * memoryActivations_[i]);
+            }
         }
     }
 }

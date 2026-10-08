@@ -20,6 +20,8 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
+    , episodes_()
+    , pImpl->episodeNeurons()
 {
 }
 
@@ -328,6 +330,8 @@ struct NeuralAssociativeMemory::Impl {
 NeuralAssociativeMemory::NeuralAssociativeMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
+    , patternNeurons_()
+    , associations_()
 {
 }
 
