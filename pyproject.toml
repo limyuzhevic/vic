@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "setuptools>=61.0.0", "wheel>=0.37.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -25,14 +25,16 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
 ]
-
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "mypy>=1.0.0",
+    "types-pybind11>=1.0.0",
 ]
 
 [project.urls]
@@ -51,6 +53,28 @@ cmake.args = [
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+
+[tool.setuptools]
+packages = ["pynlm"]
+package-dir = {
+    "" = "python"
+}
+py-modules = []
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
