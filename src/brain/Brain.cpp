@@ -527,9 +527,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Extract current neural activity patterns for concept formation
+        std::vector<float> currentPattern;
+        
+        // Collect activation levels from working memory
+        const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!memoryNeurons.empty()) {
+            // Create pattern from working memory activations
+            for (const auto& neuronId : memoryNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                currentPattern.push_back(activation);
+            }
+        } else {
+            // If no working memory, use current neural activity
+            currentPattern.clear();
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Get reward signal from dopamine for learning
+            float reward = 0.0f;
+            if (pImpl->dopamine) {
+                reward = pImpl->dopamine->getLevel();
+            }
+            
+            // Extract features from current pattern for concept learning
+            std::vector<float> features = currentPattern;
+            if (pImpl->attention) {
+                // Get attention-based features
+                const auto& winners = pImpl->attention->getWinners();
+                if (!winners.empty()) {
+                    features.clear();
+                    for (const auto& neuronId : winners) {
+                        float activation = pImpl->workingMemory ? 
+                            pImpl->workingMemory->getNeuronActivation(neuronId) : 0.0f;
+                        features.push_back(activation);
+                    }
+                }
+            }
+            
+            // Present current experience to concept formation system
+            pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
+            
+            // Update concept formation based on prediction error
+            if (pImpl->predictionSystem && pImpl->predictionError) {
+                float predictionError = pImpl->predictionError->getError();
+                if (predictionError > 0.1f) {  // Significant prediction error
+                    // Use prediction error to modulate concept stability
+                    // This helps incorporate surprising events into concepts
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -690,9 +747,70 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner for intelligent action selection
+    if (pImpl->planner) {
+        // Create current state representation for NeuralPlanner
+        std::vector<float> currentState;
+        
+        // Collect current neural activity patterns
+        size_t stateSize = 50;  // Limit state size for efficiency
+        currentState.reserve(stateSize);
+        
+        // Include working memory activations (highest priority for planning)
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            size_t neuronsToInclude = std::min(stateSize / 2, memoryNeurons.size());
+            
+            for (size_t i = 0; i < neuronsToInclude; ++i) {
+                float activation = pImpl->workingMemory->getNeuronActivation(memoryNeurons[i]);
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Add current motor neuron activity
+        if (pImpl->motorNeurons.size() > 0) {
+            size_t neuronsToInclude = std::min(stateSize / 2, pImpl->motorNeurons.size());
+            size_t startIdx = currentState.size();
+            currentState.resize(startIdx + neuronsToInclude);
+            
+            for (size_t i = 0; i < neuronsToInclude; ++i) {
+                size_t neuronIdx = i % pImpl->motorNeurons.size();
+                auto* neuron = pImpl->motorNeurons[neuronIdx];
+                float activation = std::abs(neuron->getState().membranePotential - 
+                                          neuron->getState().restingPotential) / 20.0f;
+                currentState[startIdx + i] = activation;
+            }
+        }
+        
+        // Get current reward prediction for goal-directed planning
+        float currentReward = 0.0f;
+        if (pImpl->dopamine) {
+            currentReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Get prediction error for learning-modulated planning
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            predictionError = pImpl->predictionError->getError();
+        }
+        
+        // Use NeuralPlanner to select the best action
+        ActionType plannedAction = pImpl->planner->planAction(currentState, currentReward);
+        
+        // If NeuralPlanner returns a valid action, use it
+        if (plannedAction != ActionType::Wait) {
+            auto action = std::make_unique<Action>(plannedAction);
+            
+            // Record the planned action for learning
+            if (pImpl->selfModel) {
+                pImpl->selfModel->recordSelfAction(plannedAction, currentState, {});
+            }
+            
+            return action;
+        }
+    }
     
+    // Fallback to simple motor-based action selection if NeuralPlanner not available
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -705,7 +823,7 @@ std::unique_ptr<class Action> Brain::produceAction() {
         }
     }
     
-    // Return a simple action
+    // Return a simple action based on motor activity
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
         type = ActionType::MoveForward;
@@ -843,6 +961,7 @@ bool Brain::save(const std::string& filepath) const {
     }
 }
 
+
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
@@ -880,7 +999,7 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            neuron->setRefractoryPeriod(neuronData.refractoryRemaining[idx]);
                         }
                     }
                     idx++;
@@ -895,9 +1014,120 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match source/destination neurons
+        for (size_t i = 0; i < synapseData.sourceNeuron.size() && i < synapseData.weight.size(); ++i) {
+            NeuronId sourceId = synapseData.sourceNeuron[i];
+            NeuronId destId = synapseData.destinationNeuron[i];
+            float weight = synapseData.weight[i];
+            Delay delay = synapseData.delay[i];
+            SynapseType type = synapseData.synapseType[i];
+            float eligibilityTrace = synapseData.eligibilityTrace[i];
+            
+            // Find the source and destination neurons
+            Neuron* sourceNeuron = nullptr;
+            Neuron* destNeuron = nullptr;
+            
+            // Search through all regions and populations
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->getId() == sourceId) {
+                            sourceNeuron = neuron;
+                        }
+                        if (neuron->getId() == destId) {
+                            destNeuron = neuron;
+                        }
+                    }
+                }
+            }
+            
+            // If both neurons are found, create or update the synapse
+            if (sourceNeuron && destNeuron) {
+                // Try to find existing synapse
+                bool synapseFound = false;
+                
+                // Search for existing synapse from source to destination
+                for (auto& region : pImpl->regions) {
+                    for (auto* syn : region->getSynapses()) {
+                        if (syn->getSourceNeuron() == sourceId && 
+                            syn->getDestinationNeuron() == destId) {
+                            // Update existing synapse
+                            syn->setWeight(weight);
+                            syn->setDelay(delay);
+                            syn->setType(type);
+                            syn->setEligibilityTrace(eligibilityTrace);
+                            
+                            // Re-enable plasticity if it was saved
+                            syn->enablePlasticity(
+                                syn->getPlasticityFlags().stdp,
+                                syn->getPlasticityFlags().hebbian,
+                                syn->getPlasticityFlags().structural
+                            );
+                            
+                            synapseFound = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // If no existing synapse found, create a new one
+                if (!synapseFound) {
+                    // Create a new synapse
+                    auto newSynapse = std::make_unique<Synapse>(
+                        sourceId, destId, weight, delay, type
+                    );
+                    
+                    // Set the eligibility trace
+                    newSynapse->setEligibilityTrace(eligibilityTrace);
+                    
+                    // Add synapse to the first region that contains both neurons
+                    for (auto& region : pImpl->regions) {
+                        bool sourceInRegion = false;
+                        bool destInRegion = false;
+                        
+                        for (auto& pop : region->getPopulations()) {
+                            for (auto* neuron : pop->getNeurons()) {
+                                if (neuron->getId() == sourceId) sourceInRegion = true;
+                                if (neuron->getId() == destId) destInRegion = true;
+                            }
+                        }
+                        
+                        if (sourceInRegion && destInRegion) {
+                            region->addSynapse(std::move(newSynapse));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Restore system states
+        reset();  // Clear current state first
+        
+        // Re-initialize essential systems with loaded state
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->initialize(this);
+        }
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->initialize(this);
+        }
+        if (pImpl->associativeMemory) {
+            pImpl->associativeMemory->initialize(this);
+        }
+        if (pImpl->planner) {
+            pImpl->planner->initialize(this);
+        }
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->initialize(this);
+        }
+        if (pImpl->attention) {
+            pImpl->attention->initialize(this);
+        }
+        
+        // Re-seed random generator for reproducible results
+        if (auto seedOpt = pImpl->config->get<uint64_t>("random_seed")) {
+            pImpl->rng = std::make_unique<RandomGenerator>(*seedOpt);
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -907,7 +1137,6 @@ bool Brain::load(const std::string& filepath) {
         return false;
     }
 }
-
 RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);

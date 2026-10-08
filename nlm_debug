@@ -1,0 +1,251 @@
+#!/bin/bash
+# NLM Brain Debugger and Monitor Tool
+# Provides debugging and monitoring capabilities for NLM brains
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Default configuration
+BRAIN_FILE=""
+OUTPUT_FILE=""
+VERBOSE=false
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Print usage
+usage() {
+    cat << EOF
+NLM Brain Debugger and Monitor
+===============================
+
+Usage: ${0##*/} [OPTIONS] [COMMAND] [ARGS...]
+
+Commands:
+  monitor [BRAIN_FILE]        Monitor running brain
+  analyze [BRAIN_FILE]         Analyze brain state
+  export [BRAIN_FILE] [FILE]   Export brain data
+  stats [BRAIN_FILE]           Show brain statistics
+  help                         Show this help
+
+Options:
+  -o, --output FILE            Output file for analysis
+  -v, --verbose                Verbose output
+  -h, --help                   Show help
+
+Examples:
+  ${0##*/} monitor test.brain
+  ${0##*/} analyze test.brain -o results.txt
+  ${0##*/} stats test.brain
+EOF
+}
+
+# Print error message
+error() {
+    echo -e "${RED}[ERROR]${NC} $*" >&2
+}
+
+# Print warning message
+warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $*" >&2
+}
+
+# Print info message
+info() {
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${BLUE}[INFO]${NC} $*"
+    fi
+}
+
+# Print success message
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $*"
+}
+
+# Parse brain file and extract statistics
+analyze_brain() {
+    local brain_file="$1"
+    local output_file="${OUTPUT_FILE:-}"
+    
+    if [ ! -f "$brain_file" ]; then
+        error "Brain file not found: $brain_file"
+        return 1
+    fi
+    
+    info "Analyzing brain file: $brain_file"
+    
+    # Get file information
+    local file_size="$(stat -f%z "$brain_file" 2>/dev/null || stat -c%s "$brain_file")"
+    local file_modified="$(stat -f%m "$brain_file" 2>/dev/null || stat -c%y "$brain_file")"
+    
+    echo "=== Brain File Analysis ==="
+    echo "File: $brain_file"
+    echo "Size: $file_size bytes"
+    echo "Modified: $file_modified"
+    echo ""
+    
+    # Check if file appears to be a valid NLM checkpoint
+    if head -c 100 "$brain_file" | grep -q "NLM checkpoint\|checkpoint\|NLM_"; then
+        echo "✓ File appears to be a valid NLM checkpoint"
+    else
+        warning "File may not be a valid NLM checkpoint (check header)"
+    fi
+    
+    # Analyze content based on file type
+    if [ "$output_file" ]; then
+        echo "Analysis saved to: $output_file"
+        echo "=== Brain File Analysis ===" > "$output_file"
+        echo "File: $brain_file" >> "$output_file"
+        echo "Size: $file_size bytes" >> "$output_file"
+        echo "Modified: $file_modified" >> "$output_file"
+        echo "" >> "$output_file"
+        
+        if head -c 100 "$brain_file" | grep -q "NLM checkpoint\|checkpoint\|NLM_"; then
+            echo "✓ File appears to be a valid NLM checkpoint" >> "$output_file"
+        else
+            echo "⚠️ File may not be a valid NLM checkpoint (check header)" >> "$output_file"
+        fi
+    fi
+}
+
+# Monitor brain state (placeholder for real-time monitoring)
+monitor_brain() {
+    local brain_file="$1"
+    
+    if [ ! -f "$brain_file" ]; then
+        error "Brain file not found: $brain_file"
+        return 1
+    fi
+    
+    success "Starting brain monitor for: $brain_file"
+    echo "Real-time monitoring would start here."
+    echo "For now, use 'analyze' command for detailed analysis."
+    echo ""
+    echo "To monitor a running brain process, use:"
+    echo "  ${0##*/} analyze $brain_file"
+}
+
+# Show brain statistics
+show_stats() {
+    local brain_file="$1"
+    
+    if [ ! -f "$brain_file" ]; then
+        error "Brain file not found: $brain_file"
+        return 1
+    fi
+    
+    echo "=== Brain Statistics ==="
+    echo "File: $brain_file"
+    echo ""
+    echo "To get detailed statistics, use:"
+    echo "  ${0##*/} analyze $brain_file"
+}
+
+# Export brain data (placeholder for advanced export functionality)
+export_brain() {
+    local brain_file="$1"
+    local export_file="$2"
+    
+    if [ ! -f "$brain_file" ]; then
+        error "Brain file not found: $brain_file"
+        return 1
+    fi
+    
+    if [ ! "$export_file" ]; then
+        error "Export file not specified"
+        return 1
+    fi
+    
+    success "Exporting brain data from $brain_file to $export_file"
+    echo "Export functionality would save brain state in human-readable format."
+    echo "" >> "$export_file"
+    echo "=== NLM Brain Export ===" >> "$export_file"
+    echo "Exported from: $brain_file" >> "$export_file"
+    echo "Export time: $(date)" >> "$export_file"
+    echo "" >> "$export_file"
+    echo "Note: This is a placeholder export. For advanced exports, use the NLM" >> "$export_file"
+    echo "Brain application directly with checkpoint save/load functionality." >> "$export_file"
+}
+
+# Main script logic
+main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -o|--output)
+                OUTPUT_FILE="$2"
+                shift 2
+                ;;
+            
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            
+            monitor)
+                if [ "$2" ]; then
+                    monitor_brain "$2"
+                    shift 2
+                else
+                    usage
+                    exit 1
+                fi
+                ;;
+            
+            analyze)
+                if [ "$2" ]; then
+                    analyze_brain "$2"
+                    shift 2
+                else
+                    usage
+                    exit 1
+                fi
+                ;;
+            
+            export)
+                if [ "$2" ]; then
+                    export_brain "$2" "$3"
+                    shift 3
+                else
+                    usage
+                    exit 1
+                fi
+                ;;
+            
+            stats)
+                if [ "$2" ]; then
+                    show_stats "$2"
+                    shift 2
+                else
+                    usage
+                    exit 1
+                fi
+                ;;
+            
+            *)
+                error "Unknown command: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+    
+    # If no command provided, show help
+    if [ $# -eq 0 ]; then
+        usage
+    fi
+}
+
+# Run main function
+main "$@"
