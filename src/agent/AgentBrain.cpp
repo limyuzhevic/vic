@@ -11,6 +11,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
     , expectedReward_(0.0f)
     , developmentalAge_(0.0)
     , plasticityModifier_(1.0f)
@@ -140,6 +143,20 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+        
+        // Update acetylcholine based on novelty (attention enhancement)
+        acetylcholineLevel_ = std::min(1.0f, acetylcholineLevel_ + noveltyLevel_ * 0.5f);
+        
+        // Update norepinephrine based on sensory stimulation (arousal)
+        float sensoryIntensity = std::max<float>(vision.size() > 0 ? *std::max_element(vision.begin(), vision.end()) : 0.0f,
+                                                 touch.size() > 0 ? *std::max_element(touch.begin(), touch.end()) : 0.0f);
+        norepinephrineLevel_ = std::min(1.0f, norepinephrineLevel_ + sensoryIntensity * 0.3f);
+        
+        // Update serotonin based on sensory consistency (mood)
+        if (predictionError_ < 0.1f) {
+            // Low prediction error (good prediction) boosts serotonin
+            serotoninLevel_ = std::min(1.0f, serotoninLevel_ + 0.1f);
+        }
     }
     
     // Update curiosity based on novelty
@@ -250,6 +267,27 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Update acetylcholine based on reward prediction error (attention enhancement)
+    if (std::abs(predictionError_) > 0.5f) {
+        // Large prediction error triggers attention boost
+        acetylcholineLevel_ = std::min(1.0f, acetylcholineLevel_ + std::abs(predictionError_) * 0.3f);
+    }
+    
+    // Update norepinephrine based on arousal from reward
+    if (reward > expectedReward_) {
+        // Positive reward increases arousal
+        norepinephrineLevel_ = std::min(1.0f, norepinephrineLevel_ + 0.3f * (reward - expectedReward_));
+    }
+    
+    // Update serotonin based on social reward prediction
+    if (reward > 0.5f && predictedReward_ < 0.5f) {
+        // Unexpected positive reward boosts serotonin
+        serotoninLevel_ = std::min(1.0f, serotoninLevel_ + 0.2f);
+    } else if (reward < 0.2f) {
+        // Negative outcome reduces serotonin
+        serotoninLevel_ = std::max(0.0f, serotoninLevel_ - 0.2f);
+    }
+    
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
@@ -319,7 +357,19 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    // Combine all neuromodulators into a single level
+    // This provides a holistic view of brain state for decision making
+    float totalLevel = 0.0f;
+    
+    // Weight different neuromodulators based on their importance
+    totalLevel += dopamineLevel_ * 0.3f;      // Reward learning (30%)
+    totalLevel += noveltyLevel_ * 0.2f;      // Novelty detection (20%)
+    totalLevel += curiosityLevel_ * 0.15f;   // Curiosity (15%)
+    totalLevel += acetylcholineLevel_ * 0.15f; // Attention/memory (15%)
+    totalLevel += norepinephrineLevel_ * 0.1f; // Arousal (10%)
+    totalLevel += serotoninLevel_ * 0.1f;   // Mood/social (10%)
+    
+    return totalLevel;
 }
 
 float AgentBrain::getCuriosityLevel() const {
@@ -334,11 +384,26 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    return serotoninLevel_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
