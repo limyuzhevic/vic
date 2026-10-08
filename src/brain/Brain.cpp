@@ -511,8 +511,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from sensory neurons
+        SensoryInput currentSensory;
+        currentSensory.data.reserve(pImpl->sensoryNeurons.size());
+        
+        // Convert sensory neuron membrane potentials to normalized input
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            float potential = neuron->getMembranePotential();
+            float normalized = (potential + 70.0f) / 140.0f;  // Normalize from [-70, 70] to [0, 1]
+            currentSensory.data.push_back(static_cast<int64_t>(normalized * 1000.0f));  // Scale to integer
+        }
+        
+        // Train prediction system with current state
+        pImpl->predictionSystem->train(currentSensory);
+        
+        // Generate prediction for next timestep
+        auto predictedNextState = pImpl->predictionSystem->predictNextState(currentSensory);
+        if (predictedNextState) {
+            // Store prediction in working memory for concept formation
+            if (pImpl->workingMemory && predictedNextState->data.size() > 10) {
+                for (size_t i = 0; i < predictedNextState->data.size() && i < 10; ++i) {
+                    pImpl->workingMemory->storeToNeuron(
+                        pImpl->sensoryNeurons[i % pImpl->sensoryNeurons.size()]->getId(),
+                        static_cast<float>(predictedNextState->data[i]) / 1000.0f);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +552,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes current neural activity patterns to discover
+        // recurring patterns and form abstract representations
+        
+        // Build concept input from current brain state
+        std::vector<float> conceptInput;
+        conceptInput.reserve(pImpl->regions.size() * 10);
+        
+        // Sample neural activity from different brain regions
+        for (const auto& region : pImpl->regions) {
+            float regionActivity = 0.0f;
+            size_t activeNeurons = 0;
+            
+            for (const auto& pop : region->getPopulations()) {
+                for (const Neuron* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        regionActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        activeNeurons++;
+                    }
+                }
+            }
+            
+            if (activeNeurons > 0) {
+                regionActivity /= activeNeurons;
+            }
+            conceptInput.push_back(regionActivity);
+        }
+        
+        // Add novelty signal for concept formation
+        float novelty = 0.0f;
+        if (pImpl->novelty) {
+            novelty = pImpl->novelty->getLevel();
+        }
+        conceptInput.push_back(novelty);
+        
+        // Add dopamine signal
+        float dopamineLevel = 0.0f;
+        if (pImpl->dopamine) {
+            dopamineLevel = pImpl->dopamine->getLevel();
+        }
+        conceptInput.push_back(dopamineLevel);
+        
+        // Update concept formation with current patterns
+        pImpl->conceptFormation->processPatterns(conceptInput, currentStep);
+        
+        // Let concepts influence attention based on their strength
+        auto strongConcepts = pImpl->conceptFormation->getActiveConcepts();
+        if (!strongConcepts.empty() && pImpl->attention) {
+            // Concepts compete for attention
+            pImpl->attention->processConceptCompetition(strongConcepts);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
