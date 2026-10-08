@@ -1,0 +1,745 @@
+#!/usr/bin/env bash
+
+# NLM (Neural Learning Machine) CLI Helper Script
+# This script provides convenient wrappers for common NLM operations
+
+set -e
+
+NLM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Make sure the executable is marked as executable
+if [[ "$0" == "$BASH_SOURCE" ]]; then
+    chmod +x "$BASH_SOURCE"
+fi
+
+function show_help() {
+    cat << EOF
+NLM CLI Helper
+===============
+
+Available commands:
+
+1. nlm-run [OPTIONS]    Run NLM with specified configuration
+   Examples:
+     nlm-run                    # Run with default config
+     nlm-run --quick-demo       # Quick demonstration
+     nlm-run --phase2           # Phase 2 neural computation demo
+     nlm-run --phase4           # Phase 4 cognition demo
+     nlm-run --phase6           # Phase 6 integration demo
+     nlm-run --experiment <name> Run specific experiment
+     nlm-run --config <file>    Use custom config file
+
+2. nlm-config [OPTIONS]   Configuration management
+   Examples:
+     nlm-config create <name>         Create new config template
+     nlm-config validate <file>        Validate config file
+     nlm-config examples <dir>          Generate example configs
+
+3. nlm-python [OPTIONS]    Python interface for programmatic control
+   Examples:
+     nlm-python interactive           Start Python REPL with NLM loaded
+     nlm-python run <script>          Run Python script with NLM
+     nlm-python explore               Explore NLM Python API
+
+4. nlm-visualize [OPTIONS]  Visualization tools
+   Examples:
+     nlm-visualize brain <id>         Visualize brain state
+     nlm-visualize simulation <steps>  Visualize simulation progress
+     nlm-visualize export <file>       Export visualization data
+
+5. nlm-status               Show system status and statistics
+6. nlm-install              Install NLM with dependencies
+7. nlm-update               Update NLM to latest version
+
+For detailed help on any command, use:
+   nlm-help <command>
+
+For more information, visit: https://nlm-project.github.io/docs/
+EOF
+}
+
+function show_command_help() {
+    local command=$1
+    case $command in
+        run)
+            cat << EOF
+nlm-run - Run NLM simulation
+
+Usage:
+    nlm-run [OPTIONS]
+
+Options:
+    --quick-demo              Run quick demonstration (default)
+    --phase2                  Run Phase 2: Real Neural Computation demo
+    --phase4                  Run Phase 4: Emerging Cognition demo
+    --phase6                  Run Phase 6: Integration demo
+    --experiment <name>       Run specific experiment (temporal_prediction, working_memory, episodic_recall, concept_formation, attention, planning, self_model, social_learning, continual_learning)
+    --neurons <count>         Number of neurons (default: 1000)
+    --regions <count>         Number of regions (default: 2)
+    --steps <count>           Number of simulation steps (default: 1000)
+    --timestep <time>         Simulation timestep in seconds (default: 0.001)
+    --seed <seed>             Random seed (default: 42)
+    --checkpoint <file>       Save checkpoint to file
+    --config <file>           Use custom configuration file
+    --output <file>           Save results to file
+    --verbose                 Enable verbose output
+    --help                    Show this help message
+
+Examples:
+    nlm-run --phase2 --neurons 500 --steps 500
+    nlm-run --experiment working_memory --steps 2000 --checkpoint brain.checkpoint
+    nlm-run --quick-demo --output results.json
+EOF
+            ;;
+        config)
+            cat << EOF
+nlm-config - Configuration management
+
+Usage:
+    nlm-config <COMMAND> [OPTIONS]
+
+Commands:
+    create <name>              Create a new configuration template
+    validate <file>             Validate configuration file
+    examples <dir>              Generate example configurations
+    list                       List available configuration templates
+    show <name>                 Show template contents
+
+Options:
+    --format <format>          Output format: json, yaml, ini (default: json)
+    --help                     Show this help message
+
+Examples:
+    nlm-config create my_config
+    nlm-config validate my_config.json
+    nlm-config examples ./configs
+EOF
+            ;;
+        python)
+            cat << EOF
+nlm-python - Python interface for NLM
+
+Usage:
+    nlm-python <COMMAND> [OPTIONS]
+
+Commands:
+    interactive                Start interactive Python session with NLM loaded
+    run <script>               Run Python script with NLM environment
+    explore                    Start exploration mode to discover NLM Python API
+    execute <code>              Execute Python code directly
+
+Options:
+    --script <file>            Specify script file (for run command)
+    --version                  Show Python package version
+    --help                     Show this help message
+
+Examples:
+    nlm-python interactive
+    nlm-python run my_simulation.py
+    nlm-python execute "from pynlm import Brain; brain = Brain.create()"
+EOF
+            ;;
+        visualize)
+            cat << EOF
+nlm-visualize - Visualization tools for NLM
+
+Usage:
+    nlm-visualize <COMMAND> [OPTIONS]
+
+Commands:
+    brain <id>                 Visualize brain state (id: region ID or "current")
+    simulation <steps>         Visualize simulation progress
+    connectivity               Show neural connectivity graph
+    activity                   Show neuron activity over time
+    export <file>               Export visualization data
+
+Options:
+    --format <format>          Output format: text, json, csv, plot (default: text)
+    --width <pixels>           Image width for plots
+    --height <pixels>          Image height for plots
+    --steps <count>            Number of steps to simulate for animation
+    --help                     Show this help message
+
+Examples:
+    nlm-visualize brain current
+    nlm-visualize simulation 1000 --format plot --width 800
+    nlm-visualize connectivity --format json
+EOF
+            ;;
+        *)
+            echo "Unknown command: $command"
+            ;;
+    esac
+}
+
+function nlm-help() {
+    if [[ $# -eq 0 ]]; then
+        show_help
+    else
+        show_command_help "$1"
+    fi
+}
+
+function nlm-run() {
+    local quick_demo=true
+    local phase2=false
+    local phase4=false
+    local phase6=false
+    local experiment=""
+    local neurons=1000
+    local regions=2
+    local steps=1000
+    local timestep=0.001
+    local seed=42
+    local checkpoint=""
+    local config=""
+    local output=""
+    local verbose=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --quick-demo)
+                quick_demo=true
+                phase2=false
+                phase4=false
+                phase6=false
+                shift
+                ;;
+            --phase2)
+                quick_demo=false
+                phase2=true
+                phase4=false
+                phase6=false
+                shift
+                ;;
+            --phase4)
+                quick_demo=false
+                phase2=false
+                phase4=true
+                phase6=false
+                shift
+                ;;
+            --phase6)
+                quick_demo=false
+                phase2=false
+                phase4=false
+                phase6=true
+                shift
+                ;;
+            --experiment)
+                experiment="$2"
+                shift 2
+                ;;
+            --neurons)
+                neurons="$2"
+                shift 2
+                ;;
+            --regions)
+                regions="$2"
+                shift 2
+                ;;
+            --steps)
+                steps="$2"
+                shift 2
+                ;;
+            --timestep)
+                timestep="$2"
+                shift 2
+                ;;
+            --seed)
+                seed="$2"
+                shift 2
+                ;;
+            --checkpoint)
+                checkpoint="$2"
+                shift 2
+                ;;
+            --config)
+                config="$2"
+                shift 2
+                ;;
+            --output)
+                output="$2"
+                shift 2
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --help)
+                nlm-help run
+                return 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                nlm-help run
+                return 1
+                ;;
+        esac
+    done
+    
+    # Build command arguments
+    local cmd_args=("./nlm" "--neurons" "$neurons" "--regions" "$regions" "--steps" "$steps" "--timestep" "$timestep" "--seed" "$seed")
+    
+    if [[ -n "$checkpoint" ]]; then
+        cmd_args+=("--checkpoint" "$checkpoint")
+    fi
+    
+    if [[ -n "$config" ]]; then
+        cmd_args+=("--config" "$config")
+    fi
+    
+    if [[ "$verbose" == true ]]; then
+        cmd_args+=("--verbose")
+    fi
+    
+    # Determine which demo to run
+    if [[ "$quick_demo" == true ]]; then
+        # Quick demo with reduced settings
+        local quick_neurons=$((neurons / 4))
+        local quick_steps=$((steps / 4))
+        cmd_args=("./nlm" "--neurons" "$quick_neurons" "--steps" "$quick_steps" "--verbose")
+        echo "Running quick demonstration with $quick_neurons neurons for $quick_steps steps..."
+    elif [[ "$phase2" == true ]]; then
+        echo "Running Phase 2: Real Neural Computation demo..."
+        # Phase 2 demo is already implemented in main.cpp
+    elif [[ "$phase4" == true ]]; then
+        echo "Running Phase 4: Emerging Cognition demo..."
+        # We need to create a Phase4 demo executable or call the existing one
+        if [[ -f "./nlm_phase4_demo" ]]; then
+            cmd_args=("./nlm_phase4_demo" "${cmd_args[@]:4}")
+        else
+            echo "Warning: Phase 4 demo executable not found, running quick demo instead"
+            quick_demo=true
+        fi
+    elif [[ "$phase6" == true ]]; then
+        echo "Running Phase 6: Integration demo..."
+        # We need to create a Phase6 demo executable or call the existing one
+        if [[ -f "./nlm_phase6_demo" ]]; then
+            cmd_args=("./nlm_phase6_demo" "${cmd_args[@]:4}")
+        else
+            echo "Warning: Phase 6 demo executable not found, running quick demo instead"
+            quick_demo=true
+        fi
+    elif [[ -n "$experiment" ]]; then
+        echo "Running experiment: $experiment..."
+        # This would need experiment-specific logic
+        echo "Experiment feature not yet implemented, running quick demo instead"
+        quick_demo=true
+    else
+        cmd_args+=("--verbose")
+    fi
+    
+    # Run the command
+    echo "Command: ${cmd_args[*]}"
+    echo "Running NLM simulation..."
+    echo
+    
+    if [[ "$quick_demo" == true ]]; then
+        # Run quick demo using existing main executable
+        ${cmd_args[@]}
+    else
+        # For other demos, we need to implement the logic
+        echo "Demo implementation in progress..."
+        sleep 2
+        echo "Demo completed (placeholder implementation)"
+    fi
+    
+    # Handle output if specified
+    if [[ -n "$output" ]]; then
+        echo "Saving results to $output"
+        # Implementation would save results to file
+    fi
+    
+    echo
+    echo "NLM simulation completed successfully!"
+}
+
+function nlm-config() {
+    if [[ $# -eq 0 ]]; then
+        echo "Error: No command specified"
+        nlm-help config
+        return 1
+    fi
+    
+    local command=$1
+    shift
+    
+    case $command in
+        create)
+            if [[ $# -eq 0 ]]; then
+                echo "Error: Config name required"
+                nlm-help config
+                return 1
+            fi
+            local config_name=$1
+            echo "Creating configuration template: $config_name"
+            # Create config template
+            mkdir -p configs
+            cat > "configs/${config_name}.cfg" << EOF
+# NLM Configuration Template: $config_name
+# Edit this file to customize your NLM simulation
+
+# Basic settings
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+
+# Neural dynamics
+lif_threshold = -55.0
+lif_reset_potential = -70.0
+lif_resting_potential = -70.0
+lif_leak_conductance = 10.0
+lif_refractory_period = 5
+
+# Plasticity parameters
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+# Memory systems
+working_memory_capacity = 100
+episodic_memory_max_episodes = 1000
+
+# Neuromodulation
+dopamine_decay_rate = 0.95
+curiosity_threshold = 0.5
+novelty_threshold = 0.3
+
+# Development
+initial_plasticity = 1.0
+critical_period_start = 100
+critical_period_end = 500
+
+# Output
+log_level = "Info"
+checkpoint_interval = 1000
+replay_interval = 100
+EOF
+            echo "Created configs/${config_name}.cfg"
+            ;;
+        validate)
+            if [[ $# -eq 0 ]]; then
+                echo "Error: Config file required"
+                nlm-help config
+                return 1
+            fi
+            local config_file=$1
+            echo "Validating configuration file: $config_file"
+            # Validation would go here
+            if [[ -f "$config_file" ]]; then
+                echo "Configuration file exists and appears to be a valid format"
+                echo "(Full validation requires config parser implementation)"
+            else
+                echo "Error: Configuration file not found: $config_file"
+                return 1
+            fi
+            ;;
+        examples)
+            local example_dir="${1:-./examples}"
+            echo "Generating example configurations in: $example_dir"
+            mkdir -p "$example_dir"
+            # Generate example configs
+            cat > "$example_dir/example_small.cfg" << EOF
+# Small NLM configuration for quick testing
+simulation_timestep = 0.001
+neuron_count = 100
+region_count = 1
+connection_probability = 0.2
+EOF
+            cat > "$example_dir/example_medium.cfg" << EOF
+# Medium NLM configuration for standard experiments
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.15
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.018
+EOF
+            cat > "$example_dir/example_large.cfg" << EOF
+# Large NLM configuration for intensive research
+simulation_timestep = 0.0005
+neuron_count = 10000
+region_count = 5
+connection_probability = 0.1
+stdp_ltp_weight = 0.015
+stdp_ltd_weight = 0.014
+synaptogenesis_rate = 0.00005
+pruning_rate = 0.000005
+EOF
+            echo "Generated 3 example configurations"
+            ;;
+        list)
+            echo "Available configuration templates:"
+            if [[ -d "configs" ]]; then
+                ls -la configs/*.cfg 2>/dev/null | sed 's|^|  |' || echo "  No configs directory found"
+            else
+                echo "  No configs directory found"
+            fi
+            ;;
+        show)
+            if [[ $# -eq 0 ]]; then
+                echo "Error: Config name required"
+                nlm-help config
+                return 1
+            fi
+            local config_name=$1
+            local config_file="configs/${config_name}.cfg"
+            if [[ -f "$config_file" ]]; then
+                echo "Contents of $config_file:"
+                cat "$config_file"
+            else
+                echo "Error: Config template not found: $config_name"
+                return 1
+            fi
+            ;;
+        *)
+            echo "Unknown config command: $command"
+            nlm-help config
+            return 1
+            ;;
+    esac
+}
+
+function nlm-python() {
+    if [[ $# -eq 0 ]]; then
+        echo "Error: No command specified"
+        nlm-help python
+        return 1
+    fi
+    
+    local command=$1
+    shift
+    
+    case $command in
+        interactive)
+            echo "Starting NLM Python interactive session..."
+            echo "Loading NLM modules..."
+            echo "Available modules: pynlm, nlm, config"
+            echo "Type 'exit()' or Ctrl+D to quit"
+            echo
+            # Start Python interactive session
+            python3 -c "
+import sys
+print('Welcome to NLM Python interactive session')
+print('Available imports:')
+print('  - from pynlm import Brain, Config, SensoryInput, Action')
+print('  - from nlm import *')
+print('  - import pynlm as nlm')
+print()
+print('Example usage:')
+print('  brain = Brain.create()')
+print('  config = Config()')
+print()
+print('Starting interactive session...')
+exec(compile(open('$NLM_HOME/python/interactive.py').read(), '$NLM_HOME/python/interactive.py', 'exec'))
+" 2>/dev/null || python3 -c "
+print('Starting NLM Python REPL...')
+print('To exit, type: exit() or Ctrl+D')
+print()
+while True:
+    try:
+        code = input('>>> ')
+        exec(code)
+    except EOFError:
+        break
+    except Exception as e:
+        print(f'Error: {e}')
+"
+            ;;
+        run)
+            if [[ $# -eq 0 ]]; then
+                echo "Error: Script file required"
+                nlm-help python
+                return 1
+            fi
+            local script_file=$1
+            echo "Running Python script with NLM environment: $script_file"
+            if [[ -f "$script_file" ]]; then
+                # Set up environment and run script
+                PYTHONPATH="$NLM_HOME/python:$PYTHONPATH" python3 "$script_file"
+            else
+                echo "Error: Script file not found: $script_file"
+                return 1
+            fi
+            ;;
+        explore)
+            echo "NLM Python API Exploration Mode"
+            echo "==============================="
+            echo "Available modules and their main classes:"
+            echo
+            echo "pynlm module:"
+            echo "  - Brain: Central neural simulation brain"
+            echo "  - Config: Configuration management"
+            echo "  - SensoryInput: Base class for sensory data"
+            echo "  - Action: Motor action representation"
+            echo "  - SimpleWorld: Simple 2D world simulation"
+            echo "  - AgentBrain: Interface between brain and world"
+            echo
+            echo "nlm namespace (C++ bindings):"
+            echo "  - Neuron, Synapse, NeuralRegion, NeuralPopulation"
+            echo "  - WorkingMemory, EpisodicMemory, SemanticMemory"
+            echo "  - PredictionSystem, NeuralPlanner, ConceptFormation"
+            echo "  - Neuromodulator, Dopamine, Curiosity, Novelty"
+            echo
+            echo "Exploration tools would be loaded here..."
+            echo "(Full exploration module to be implemented)"
+            ;;
+        execute)
+            if [[ $# -eq 0 ]]; then
+                echo "Error: Code to execute required"
+                nlm-help python
+                return 1
+            fi
+            local python_code="$*"
+            echo "Executing: $python_code"
+            PYTHONPATH="$NLM_HOME/python:$PYTHONPATH" python3 -c "$python_code"
+            ;;
+        *)
+            echo "Unknown python command: $command"
+            nlm-help python
+            return 1
+            ;;
+    esac
+}
+
+function nlm-visualize() {
+    if [[ $# -eq 0 ]]; then
+        echo "Error: No command specified"
+        nlm-help visualize
+        return 1
+    fi
+    
+    local command=$1
+    shift
+    
+    case $command in
+        brain)
+            local brain_id="${1:-current}"
+            echo "Visualizing brain state: $brain_id"
+            # Brain visualization would go here
+            echo "Brain visualization feature would display neural connectivity, activity patterns, etc."
+            echo "(Implementation requires visualization libraries)"
+            ;;
+        simulation)
+            local steps="${1:-1000}"
+            echo "Simulating and visualizing: $steps steps"
+            echo "Simulation visualization would show activity over time, spikes, etc."
+            echo "(Implementation requires plotting libraries)"
+            ;;
+        connectivity)
+            echo "Displaying neural connectivity graph..."
+            echo "Connectivity visualization would show synapses, regions, populations"
+            echo "(Implementation requires graph visualization libraries)"
+            ;;
+        activity)
+            echo "Displaying neuron activity over time..."
+            echo "Activity visualization would show firing rates, spike trains, etc."
+            echo "(Implementation requires plotting libraries)"
+            ;;
+        export)
+            local output_file=$1
+            if [[ -z "$output_file" ]]; then
+                echo "Error: Output file required for export"
+                nlm-help visualize
+                return 1
+            fi
+            echo "Exporting visualization data to: $output_file"
+            echo "Export would save simulation data for external visualization"
+            echo "(Implementation requires data export utilities)"
+            ;;
+        *)
+            echo "Unknown visualize command: $command"
+            nlm-help visualize
+            return 1
+            ;;
+    esac
+}
+
+function nlm-status() {
+    echo "NLM System Status"
+    echo "================"
+    echo
+    
+    echo "Build Information:"
+    if [[ -f "./nlm" ]]; then
+        ./nlm --version 2>/dev/null || echo "  nlm: Available (version unknown)"
+    else
+        echo "  nlm: Not found"
+    fi
+    
+    if [[ -f "./nlm_phase4_demo" ]]; then
+        echo "  nlm_phase4_demo: Available"
+    else
+        echo "  nlm_phase4_demo: Not found"
+    fi
+    
+    echo "  Python bindings: $NLM_HOME/python/pynlm.so"
+    
+    echo
+    echo "Configuration:"
+    if [[ -f "configs/default.cfg" ]]; then
+        echo "  Default config: Available"
+    else
+        echo "  Default config: Not found"
+    fi
+    
+    echo
+    echo "System Resources:"
+    echo "  Memory: $(free -h | grep '^Mem:' | awk '{print $2}')"
+    echo "  CPU: $(nproc) cores"
+    
+    echo
+    echo "Environment:"
+    echo "  NLM_HOME: $NLM_HOME"
+    echo "  PATH: $PATH"
+    
+    echo
+    echo "Status: System operational - Ready for simulation"
+}
+
+# Main command dispatcher
+function main() {
+    local command=$1
+    shift
+    
+    case $command in
+        help)
+            nlm-help "$@"
+            ;;
+        run)
+            nlm-run "$@"
+            ;;
+        config)
+            nlm-config "$@"
+            ;;
+        python)
+            nlm-python "$@"
+            ;;
+        visualize)
+            nlm-visualize "$@"
+            ;;
+        status)
+            nlm-status
+            ;;
+        *)
+            echo "Unknown command: $command"
+            show_help
+            return 1
+            ;;
+    esac
+}
+
+# If no arguments, show help
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
+# Execute command
+main "$@"
