@@ -61,23 +61,43 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
+        // Get brain from agent
+        auto brainPtr = agent.getBrain();
+        if (!brainPtr) {
+            NLM_LOG_ERROR("Brain is null, aborting simulation");
+            break;
+        }
+        
+        // Get first region for sensory/motor functions
+        auto regions = brainPtr->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No regions in brain, aborting simulation");
+            break;
+        }
+        
+        const NeuralRegion* region = regions[0].get();
+        if (!region) {
+            NLM_LOG_ERROR("Region is null, aborting simulation");
+            break;
+        }
+        
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        SensoryPercept percept = world.observe(region);
         
         // Process sensory input
         agent.processSensoryInput(percept);
         
         // Brain step
-        brain->step(step, step * 0.001);
+        brainPtr->step(step, step * 0.001);
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(region, cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(region);
         totalReward += reward;
         
         // Apply reward modulation
@@ -89,34 +109,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
         
         // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
+        totalFiringRate += brainPtr->getAverageFiringRate();
+        if (brainPtr->getFiringNeuronCount() > 0) firingCount++;
         
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | Firing: " + std::to_string(brainPtr->getAverageFiringRate()) +
+                        " | WorkingMem: " + std::to_string(brainPtr->getWorkingMemory() ? 
+                            brainPtr->getWorkingMemory()->getActiveTraces() : 0));
         }
+    }
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+    result.totalReward = totalReward / (config.maxSteps + 1.0f);
+    result.avgFiringRate = totalFiringRate / (config.maxSteps + 1.0f);
+    result.memoryEpisodesStored = brainPtr->getEpisodicMemory() ? 
+        static_cast<float>(brainPtr->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
     // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    result.memoryWorkingMemoryIntegrated = (brainPtr->getWorkingMemory() != nullptr);
+    result.memoryEpisodicMemoryIntegrated = (brainPtr->getEpisodicMemory() != nullptr);
+    result.neuromodulationIntegrated = (brainPtr->getDopamine() != nullptr);
+    result.predictionIntegrated = (brainPtr->getPredictionSystem() != nullptr);
+    result.developmentIntegrated = (brainPtr->getDevelopmentSystem() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));

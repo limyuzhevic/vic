@@ -416,10 +416,48 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Development system
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system)pbdoc")
+        .def(py::init<>())
+        .def("updateDevelopment", &DevelopmentSystem::updateDevelopment, py::arg("brain"), py::arg("timestep"))
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage)
+        .def("setDevelopmentalStage", &DevelopmentSystem::setDevelopmentalStage, py::arg("stage"))
+        .def("getAge", &DevelopmentSystem::getAge)
+        .def("setAge", &DevelopmentSystem::setAge, py::arg("age"))
+        .def("getPlasticityModifier", &DevelopmentSystem::getPlasticityModifier)
+        .def("setPlasticityModifier", &DevelopmentSystem::setPlasticityModifier, py::arg("modifier"))
+        .def("triggerDevelopmentEvent", &DevelopmentSystem::triggerDevelopmentEvent, py::arg("eventType"))
+        .def("reset", &DevelopmentSystem::reset);
+
+    // Performance monitoring
+    py::class_<PerformanceMonitor>(m, "PerformanceMonitor", R"pbdoc(Performance monitoring system)pbdoc")
+        .def(py::init<>())
+        .def("recordMetric", &PerformanceMonitor::recordMetric, py::arg("metricType"), py::arg("value"))
+        .def("getMetric", &PerformanceMonitor::getMetric, py::arg("metricType"))
+        .def("getAllMetrics", &PerformanceMonitor::getAllMetrics)
+        .def("reset", &PerformanceMonitor::reset);
+
+    // Experiment system
+    py::class_<Experiment>(m, "Experiment", R"pbdoc(Base experiment class)pbdoc")
+        .def(py::init<>())
+        .def("run", &Experiment::run, py::arg("brain"))
+        .def("getResult", &Experiment::getResult)
+        .def("getStatus", &Experiment::getStatus)
+        .def("stop", &Experiment::stop)
+        .def("pause", &Experiment::pause)
+        .def("resume", &Experiment::resume);
+
+    // Visualization system
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface)pbdoc")
+        .def(py::init<>())
+        .def("setBrain", &VisualizationInterface::setBrain, py::arg("brain"))
+        .def("setWorld", &VisualizationInterface::setWorld, py::arg("world"))
+        .def("renderFrame", &VisualizationInterface::renderFrame)
+        .def("saveFrame", &VisualizationInterface::saveFrame, py::arg("filename"))
+        .def("setRenderMode", &VisualizationInterface::setRenderMode, py::arg("mode"))
+        .def("getRenderMode", &VisualizationInterface::getRenderMode)
+        .def("togglePause", &VisualizationInterface::togglePause)
+        .def("isPaused", &VisualizationInterface::isPaused)
+        .def("reset", &VisualizationInterface::reset);
 
 } // namespace nlm
