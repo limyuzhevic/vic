@@ -348,6 +348,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
+                                 state.refractoryRemaining <= 2 &&
                                  state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
@@ -678,7 +679,9 @@ float Brain::getExcitationInhibitionRatio() const {
     if (totalInhibitory > 0.0f) {
         return totalExcitatory / totalInhibitory;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+    // Return a large but finite value when no inhibitory connections exist
+    // This prevents issues downstream that could arise from infinity
+    return totalExcitatory > 0.0f ? 1000000.0f : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {
@@ -880,7 +883,7 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
                         }
                     }
                     idx++;
