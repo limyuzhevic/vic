@@ -31,8 +31,18 @@ protected:
     Neuromodulator() = default;
 };
 
+// Statistics structure for dopamine monitoring
+struct DopamineStatistics {
+    float averageLevel;
+    float peakLevel;
+    float minLevel;
+    float maxLevel;
+    float averagePlasticity;
+    float rewardCount;
+    float errorCount;
+};
+
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -47,6 +57,12 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Advanced functionality
+    void setExpectedValue(float expected);
+    void updateSTDP(float deltaWeight, float spikeTimeDifference);
+    void adaptBaseline(float targetLearningRate, float feedbackStrength = 0.1f);
+    DopamineStatistics getStatistics() const;
     
 private:
     struct Impl;

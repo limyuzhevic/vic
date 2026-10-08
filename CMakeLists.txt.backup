@@ -1,0 +1,862 @@
+cmake_minimum_required(VERSION 3.20)
+
+# NLM - Neural Learning Machine
+# Modern CMake build system with modular dependency management
+
+project(NLM
+    VERSION 0.1.0
+    LANGUAGES CXX
+    DESCRIPTION "An Experimental Artificial Developmental Brain"
+)
+
+# Policy settings for modern CMake behavior
+cmake_policy(SET CMP0091 NEW) # MSVC runtime library flags
+
+cmake_minimum_required(VERSION 3.20)
+
+# Basic C++ configuration
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Project metadata
+set(NLM_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(NLM_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(NLM_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+# Build type configuration
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Debug, Release, RelWithDebInfo, MinSizeRel)")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Platform detection
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(NLM_PLATFORM_LINUX 1)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(NLM_PLATFORM_WINDOWS 1)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(NLM_PLATFORM_MACOS 1)
+endif()
+
+# Feature options
+option(NLM_ENABLE_TESTS "Enable testing framework" ON)
+option(NLM_ENABLE_EXPERIMENTS "Enable experiment libraries" ON)
+option(NLM_ENABLE_VISUALIZATION "Enable visualization subsystem" ON)
+option(NLM_ENABLE_PERFORMANCE "Enable performance optimizations" ON)
+option(NLM_ENABLE_PARALLEL "Enable parallel processing support" ON)
+option(NLM_BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(NLM_BUILD_STATIC_LIBS "Build static libraries" ON)
+option(NLM_LTO_ENABLE "Enable link-time optimization" OFF)
+option(NLM_PGO_ENABLE "Enable profile-guided optimization" OFF)
+
+# Compiler-specific optimizations
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Modern CMake target properties
+include(GNUInstallDirs)
+
+# Package configuration for dependency management
+include(CMakePackageConfigHelpers)
+include(CMakeFindDependencyMacro)
+
+# Forward declaration of components
+set(NLM_COMPONENTS)
+
+# Create interface library for core headers and configuration
+add_library(nlm_interface INTERFACE)
+target_include_directories(nlm_interface INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Create interface library for debugging utilities
+add_library(nlm_debug_interface INTERFACE)
+target_compile_definitions(nlm_debug_interface INTERFACE NLM_DEBUG)
+target_compile_options(nlm_debug_interface INTERFACE -g -O0)
+
+# Include dependency management module
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Dependencies.cmake)
+
+# Simplified modern CMake structure for NLM
+# Focus on working build system first, then enhance features
+
+cmake_minimum_required(VERSION 3.20)
+
+project(NLM VERSION 0.1.0 LANGUAGES CXX DESCRIPTION "An Experimental Artificial Developmental Brain")
+
+# Basic C++ configuration
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Build type configuration
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type (Debug, Release, RelWithDebInfo, MinSizeRel)")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Feature options
+option(NLM_ENABLE_TESTS "Enable testing framework" ON)
+option(NLM_ENABLE_EXPERIMENTS "Enable experiment libraries" ON)
+option(NLM_ENABLE_VISUALIZATION "Enable visualization subsystem" ON)
+option(NLM_ENABLE_PERFORMANCE "Enable performance optimizations" ON)
+
+# Compiler-specific optimizations
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Core module: nlm_core_basic
+add_library(nlm_core_basic
+    src/core/Types/Types.cpp
+    src/core/Config/Config.cpp
+    src/core/Random/Random.cpp
+    src/core/Logger/Logger.cpp
+    src/core/SimulationClock/SimulationClock.cpp
+)
+
+target_include_directories(nlm_core_basic PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core>
+    $<INSTALL_INTERFACE:include/core>
+)
+
+target_compile_features(nlm_core_basic PUBLIC cxx_std_20)
+
+set_target_properties(nlm_core_basic PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+    DEBUG_POSTFIX "_d"
+)
+
+# Core module: nlm_core_neural
+add_library(nlm_core_neural
+    src/brain/Neuron.cpp
+    src/brain/Synapse.cpp
+    src/brain/NeuralPopulation.cpp
+    src/brain/NeuralRegion.cpp
+    src/brain/Brain.cpp
+)
+
+target_include_directories(nlm_core_neural PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain>
+    $<INSTALL_INTERFACE:include/brain>
+)
+
+target_link_libraries(nlm_core_neural PUBLIC nlm_core_basic)
+
+set_target_properties(nlm_core_neural PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden
+)
+
+# Core module: nlm_core_dynamics
+add_library(nlm_core_dynamics
+    src/dynamics/NeuralDynamics.cpp
+    src/dynamics/SpikeSystem.cpp
+)
+
+target_include_directories(nlm_core_dynamics PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dynamics>
+    $<INSTALL_INTERFACE:include/dynamics>
+)
+
+target_link_libraries(nlm_core_dynamics PUBLIC nlm_core_neural)
+
+# Core module: nlm_core_plasticity
+add_library(nlm_core_plasticity
+    src/plasticity/PlasticityRule.cpp
+    src/plasticity/Hebbian.cpp
+    src/plasticity/STDP.cpp
+    src/plasticity/StructuralPlasticity.cpp
+)
+
+target_include_directories(nlm_core_plasticity PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity>
+    $<INSTALL_INTERFACE:include/plasticity>
+)
+
+target_link_libraries(nlm_core_plasticity PUBLIC nlm_core_dynamics)
+
+# Core module: nlm_core_memory
+add_library(nlm_core_memory
+    src/memory/WorkingMemory.cpp
+    src/memory/EpisodicMemory.cpp
+    src/memory/SemanticMemory.cpp
+    src/memory/ProceduralMemory.cpp
+    src/memory/AssociativeMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
+    src/memory/NeuralEpisodicMemory.cpp
+)
+
+target_include_directories(nlm_core_memory PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory>
+    $<INSTALL_INTERFACE:include/memory>
+)
+
+target_link_libraries(nlm_core_memory PUBLIC nlm_core_plasticity)
+
+# Core module: nlm_core_cognition
+add_library(nlm_core_cognition
+    src/cognition/ConceptFormation.cpp
+    src/cognition/NeuralPlanner.cpp
+)
+
+target_include_directories(nlm_core_cognition PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cognition>
+    $<INSTALL_INTERFACE:include/cognition>
+)
+
+target_link_libraries(nlm_core_cognition PUBLIC nlm_core_memory)
+
+# Core module: nlm_core_neuromod
+add_library(nlm_core_neuromod
+    src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Reward.cpp
+    src/neuromodulation/PredictionError.cpp
+    src/neuromodulation/Novelty.cpp
+    src/neuromodulation/Curiosity.cpp
+)
+
+target_include_directories(nlm_core_neuromod PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation>
+    $<INSTALL_INTERFACE:include/neuromodulation>
+)
+
+target_link_libraries(nlm_core_neuromod PUBLIC nlm_core_cognition)
+
+# Main NLM library that includes all core components
+add_library(nlm_core
+    nlm_core_basic
+    nlm_core_neural
+    nlm_core_dynamics
+    nlm_core_plasticity
+    nlm_core_memory
+    nlm_core_cognition
+    nlm_core_neuromod
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Agent system
+add_library(nlm_agent
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    src/agent/NeuromodulatorManager.cpp
+)
+
+target_include_directories(nlm_agent PUBLIC src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+# World system
+add_library(nlm_world
+    src/world/SimpleWorld.cpp
+)
+
+target_include_directories(nlm_world PUBLIC src)
+target_link_libraries(nlm_world PUBLIC nlm_core)
+
+# Phase 3 experiments
+add_library(nlm_phase3
+    src/experiments/Phase3Experiment.cpp
+)
+
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 4 experiments
+add_library(nlm_phase4
+    src/experiments/Phase4Experiment.cpp
+)
+
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Performance module (if enabled)
+if(NLM_ENABLE_PERFORMANCE)
+    add_library(nlm_performance
+        src/performance/Performance.cpp
+        src/performance/ParallelProcessing.cpp
+        src/performance/MemoryPool.cpp
+        src/performance/SIMDVectorization.cpp
+        src/performance/EventQueue.cpp
+        src/performance/OptimizedBrain.cpp
+    )
+
+    target_include_directories(nlm_performance PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
+    )
+
+    if(MSVC)
+        target_compile_options(nlm_performance PRIVATE /O2 /fp:fast)
+    else()
+        target_compile_options(nlm_performance PRIVATE -O3 -march=native)
+    endif()
+endif()
+
+# Main executable
+add_executable(nlm src/main.cpp)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo src/experiments/Phase3Demo.cpp)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo src/experiments/Phase4Demo.cpp)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Testing framework
+if(NLM_ENABLE_TESTS)
+    enable_testing()
+    
+    # Create unified test runner
+    add_executable(test_runner
+        tests/test_runner.cpp
+        tests/TestBase.hpp
+        tests/test_core.cpp
+        tests/test_brain_integration.cpp
+        tests/test_memory_system.cpp
+        tests/test_neuromodulation.cpp
+        tests/test_plasticity.cpp
+        tests/test_prediction.cpp
+        tests/test_integration.cpp
+        tests/test_performance.cpp
+        tests/test_config_main.cpp
+        tests/test_plasticity_implementation.cpp
+    )
+    
+    target_link_libraries(test_runner PUBLIC nlm_core)
+    
+    # Add tests to CTest
+    add_test(NAME unified_test_suite
+        COMMAND test_runner
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    
+    # Individual test targets
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_dopamine.cpp)
+        add_executable(test_dopamine test_dopamine.cpp)
+        target_link_libraries(test_dopamine PUBLIC nlm_core)
+        add_test(NAME test_dopamine COMMAND test_dopamine)
+    endif()
+    
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_plasticity_implementation.cpp)
+        add_executable(test_plasticity_implementation test_plasticity_implementation.cpp)
+        target_link_libraries(test_plasticity_implementation PUBLIC nlm_core)
+        add_test(NAME test_plasticity_implementation COMMAND test_plasticity_implementation)
+    endif()
+    
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_config.cpp)
+        add_executable(test_config test_config.cpp)
+        target_link_libraries(test_config PUBLIC nlm_core)
+        add_test(NAME test_config COMMAND test_config)
+    endif()
+endif()
+
+# Installation rules
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY src/
+    DESTINATION include/nlm
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Build configuration summary
+message(STATUS "=== NLM Build Configuration ===")
+message(STATUS "Project: ${PROJECT_NAME} ${PROJECT_VERSION}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Enable tests: ${NLM_ENABLE_TESTS}")
+message(STATUS "Enable experiments: ${NLM_ENABLE_EXPERIMENTS}")
+message(STATUS "Enable visualization: ${NLM_ENABLE_VISUALIZATION}")
+message(STATUS "Enable performance optimizations: ${NLM_ENABLE_PERFORMANCE}")
+message(STATUS "===============================")
+
+# Core module: nlm_core_neural
+add_library(nlm_core_neural
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain/Neuron.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain/Synapse.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain/NeuralPopulation.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain/NeuralRegion.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain/Brain.cpp>
+)
+
+target_include_directories(nlm_core_neural PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain>
+    $<INSTALL_INTERFACE:include/brain>
+)
+
+target_link_libraries(nlm_core_neural PUBLIC nlm_core_basic)
+
+# Neural-specific optimizations
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_core_neural PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -ftree-vectorize -funroll-loops>
+        $<$<CXX_COMPILER_ID:MSVC>:/O2 /gtg>
+    )
+    target_link_libraries(nlm_core_neural PUBLIC nlm_performance)
+endif()
+
+set_target_properties(nlm_core_neural PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden
+)
+
+list(APPEND NLM_COMPONENTS nlm_core_neural)
+
+# Core module: nlm_core_dynamics
+add_library(nlm_core_dynamics
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dynamics/NeuralDynamics.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dynamics/SpikeSystem.cpp>
+)
+
+target_include_directories(nlm_core_dynamics PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dynamics>
+    $<INSTALL_INTERFACE:include/dynamics>
+)
+
+target_link_libraries(nlm_core_dynamics PUBLIC nlm_core_neural)
+
+# Dynamics-specific optimizations
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_core_dynamics PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -march=native -ffast-math>
+        $<$<CXX_COMPILER_ID:MSVC>:/O2 /fp:fast>
+    )
+endif()
+
+set_target_properties(nlm_core_dynamics PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+list(APPEND NLM_COMPONENTS nlm_core_dynamics)
+
+# Core module: nlm_core_plasticity
+add_library(nlm_core_plasticity
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity/PlasticityRule.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity/Hebbian.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity/STDP.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity/StructuralPlasticity.cpp>
+)
+
+target_include_directories(nlm_core_plasticity PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity>
+    $<INSTALL_INTERFACE:include/plasticity>
+)
+
+target_link_libraries(nlm_core_plasticity PUBLIC nlm_core_dynamics)
+
+# Plasticity-specific optimizations
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_core_plasticity PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O2 -fno-exceptions -fno-rtti>
+        $<$<CXX_COMPILER_ID:MSVC>:/O1 /EHsc>
+    )
+endif()
+
+set_target_properties(nlm_core_plasticity PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+list(APPEND NLM_COMPONENTS nlm_core_plasticity)
+
+# Core module: nlm_core_memory
+add_library(nlm_core_memory
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/WorkingMemory.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/EpisodicMemory.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/SemanticMemory.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/ProceduralMemory.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/AssociativeMemory.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/NeuralWorkingMemory.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory/NeuralEpisodicMemory.cpp>
+)
+
+target_include_directories(nlm_core_memory PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory>
+    $<INSTALL_INTERFACE:include/memory>
+)
+
+target_link_libraries(nlm_core_memory PUBLIC nlm_core_plasticity)
+
+# Memory-specific optimizations
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_core_memory PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -march=native -flto>
+        $<$<CXX_COMPILER_ID:MSVC>:/O2 /GL>
+    )
+    
+    # Enable LTO if requested
+    if(NLM_LTO_ENABLE)
+        target_link_options(nlm_core_memory PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-flto>
+            $<$<CXX_COMPILER_ID:MSVC>:/LTCG>
+        )
+    endif()
+endif()
+
+set_target_properties(nlm_core_memory PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+list(APPEND NLM_COMPONENTS nlm_core_memory)
+
+# Core module: nlm_core_cognition
+add_library(nlm_core_cognition
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cognition/ConceptFormation.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cognition/NeuralPlanner.cpp>
+)
+
+target_include_directories(nlm_core_cognition PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cognition>
+    $<INSTALL_INTERFACE:include/cognition>
+)
+
+target_link_libraries(nlm_core_cognition PUBLIC nlm_core_memory)
+
+# Cognition-specific optimizations
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_core_cognition PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -ftree-vectorize>
+        $<$<CXX_COMPILER_ID:MSVC>:/O2>
+    )
+endif()
+
+set_target_properties(nlm_core_cognition PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+list(APPEND NLM_COMPONENTS nlm_core_cognition)
+
+# Core module: nlm_core_neuromod
+add_library(nlm_core_neuromod
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation/Neuromodulator.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation/Reward.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation/PredictionError.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation/Novelty.cpp>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation/Curiosity.cpp>
+)
+
+target_include_directories(nlm_core_neuromod PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation>
+    $<INSTALL_INTERFACE:include/neuromodulation>
+)
+
+target_link_libraries(nlm_core_neuromod PUBLIC nlm_core_cognition)
+
+# Neuromodulation-specific optimizations
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_core_neuromod PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O2 -fno-exceptions>
+        $<$<CXX_COMPILER_ID:MSVC>:/O1 /EHsc>
+    )
+endif()
+
+set_target_properties(nlm_core_neuromod PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+list(APPEND NLM_COMPONENTS nlm_core_neuromod)
+
+# Performance module (header-only with optimized implementations)
+add_library(nlm_performance INTERFACE)
+
+if(NLM_ENABLE_PERFORMANCE)
+    target_compile_options(nlm_performance INTERFACE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -march=native -flto -ffast-math>
+        $<$<CXX_COMPILER_ID:MSVC>:/O2 /GL /fp:fast /cg>
+    )
+    
+    # Add SIMD optimizations
+    target_compile_definitions(nlm_performance INTERFACE NLM_SSE4 NLM_AVX2 NLM_AVX512)
+endif()
+
+# Add performance source files if enabled
+if(NLM_ENABLE_PERFORMANCE)
+    target_sources(nlm_performance PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance/Performance.cpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance/ParallelProcessing.cpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance/MemoryPool.cpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance/SIMDVectorization.cpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance/EventQueue.cpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance/OptimizedBrain.cpp>
+    )
+    
+    target_include_directories(nlm_performance INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
+    )
+endif()
+
+list(APPEND NLM_COMPONENTS nlm_performance)
+
+# Main NLM library that includes all core components
+add_library(nlm_core ${NLM_COMPONENTS})
+
+target_link_libraries(nlm_core PUBLIC
+    nlm_core_basic
+    nlm_core_neural
+    nlm_core_dynamics
+    nlm_core_plasticity
+    nlm_core_memory
+    nlm_core_cognition
+    nlm_core_neuromod
+)
+
+if(NLM_ENABLE_PERFORMANCE)
+    target_link_libraries(nlm_core PUBLIC nlm_performance)
+endif()
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+set_target_properties(nlm_core PROPERTIES
+    OUTPUT_NAME "nlm"
+    POSITION_INDEPENDENT_CODE ON
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+# Agent system (body, sensory percept, agent-brain interface)
+add_library(nlm_agent STATIC
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    src/agent/NeuromodulatorManager.cpp
+)
+
+target_include_directories(nlm_agent PUBLIC src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+set_target_properties(nlm_agent PROPERTIES
+    OUTPUT_NAME "nlm_agent"
+)
+
+# World system (environment, objects, simple world)
+add_library(nlm_world STATIC
+    src/world/SimpleWorld.cpp
+)
+
+target_include_directories(nlm_world PUBLIC src)
+target_link_libraries(nlm_world PUBLIC nlm_core)
+
+set_target_properties(nlm_world PROPERTIES
+    OUTPUT_NAME "nlm_world"
+)
+
+# Phase 3 experiments (modularized)
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+)
+
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+set_target_properties(nlm_phase3 PROPERTIES
+    OUTPUT_NAME "nlm_phase3"
+)
+
+# Phase 4 experiments
+add_library(nlm_phase4 STATIC
+    src/experiments/Phase4Experiment.cpp
+)
+
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+set_target_properties(nlm_phase4 PROPERTIES
+    OUTPUT_NAME "nlm_phase4"
+)
+
+# Visualization module (header-only with optional implementation)
+if(NLM_ENABLE_VISUALIZATION)
+    add_library(nlm_visualization INTERFACE)
+    
+    target_include_directories(nlm_visualization INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/visualization>
+        $<INSTALL_INTERFACE:include/visualization>
+    )
+    
+    if(NLM_ENABLE_PERFORMANCE)
+        target_compile_options(nlm_visualization INTERFACE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-O2>
+            $<$<CXX_COMPILER_ID:MSVC>:/O1>
+        )
+    endif()
+    
+    list(APPEND NLM_COMPONENTS nlm_visualization)
+endif()
+
+# Main executable
+add_executable(nlm src/main.cpp)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo src/experiments/Phase3Demo.cpp)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo src/experiments/Phase4Demo.cpp)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Testing framework with modern CTest integration
+if(NLM_ENABLE_TESTS)
+    enable_testing()
+    
+    # Configure test options
+    set(TEST_TIMEOUT 300 CACHE STRING "Default timeout for tests in seconds")
+    set(NLM_TEST_SEED 42 CACHE STRING "Default random seed for tests")
+    
+    # Create unified test runner with modern CMake
+    add_executable(test_runner
+        tests/test_runner.cpp
+        tests/TestBase.hpp
+        tests/test_core.cpp
+        tests/test_brain_integration.cpp
+        tests/test_memory_system.cpp
+        tests/test_neuromodulation.cpp
+        tests/test_plasticity.cpp
+        tests/test_prediction.cpp
+        tests/test_integration.cpp
+        tests/test_performance.cpp
+        tests/test_config_main.cpp
+        tests/test_plasticity_implementation.cpp
+    )
+    
+    target_link_libraries(test_runner PUBLIC nlm_core)
+    
+    # Add test cases to CTest with modern CMake
+    add_test(NAME unified_test_suite
+        COMMAND test_runner
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    
+    set_tests_properties(unified_test_suite PROPERTIES
+        TIMEOUT ${TEST_TIMEOUT}
+        LABELS "integration;performance;functional"
+    )
+    
+    # Add individual test targets for granular execution
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_dopamine.cpp)
+        add_executable(test_dopamine test_dopamine.cpp)
+        target_link_libraries(test_dopamine PUBLIC nlm_core)
+        add_test(NAME test_dopamine COMMAND test_dopamine)
+    endif()
+    
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_plasticity_implementation.cpp)
+        add_executable(test_plasticity_implementation test_plasticity_implementation.cpp)
+        target_link_libraries(test_plasticity_implementation PUBLIC nlm_core)
+        add_test(NAME test_plasticity_implementation COMMAND test_plasticity_implementation)
+    endif()
+    
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/test_config.cpp)
+        add_executable(test_config test_config.cpp)
+        target_link_libraries(test_config PUBLIC nlm_core)
+        add_test(NAME test_config COMMAND test_config)
+    endif()
+    
+    # Add test categories
+    add_custom_target(coverage ALL
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        COMMAND $<TARGET_FILE:test_runner> --coverage
+        DEPENDS test_runner
+        COMMENT "Running coverage analysis"
+    )
+    
+    add_custom_target(performance_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} -L performance
+        DEPENDS test_runner
+        COMMENT "Running performance tests"
+    )
+    
+    add_custom_target(integration_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} -L integration
+        DEPENDS test_runner
+        COMMENT "Running integration tests"
+    )
+endif()
+
+# Installation rules for development
+install(TARGETS nlm nlm_core nlm_agent nlm_world
+    EXPORT NLMTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install executables
+install(TARGETS nlm nlm_phase3_demo nlm_phase4_demo
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install header files
+install(DIRECTORY src/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+    FILES_MATCHING PATTERN "*.hpp"
+    PATTERN ".*" EXCLUDE
+)
+
+# Generate and install package configuration
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+# Create config file for find_package support
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NLMConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM
+)
+
+install(EXPORT NLMTargets
+    FILE NLMTargets.cmake
+    NAMESPACE nlm::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM
+)
+
+# Build configuration summaries
+if(NOT CMAKE_BUILD_TYPE)
+    message(WARNING "Build type not specified. Defaulting to Release with optimizations.")
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# Print build configuration summary
+message(STATUS "=== NLM Build Configuration ===")
+message(STATUS "Project: ${PROJECT_NAME} ${PROJECT_VERSION}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Build shared libraries: ${NLM_BUILD_SHARED_LIBS}")
+message(STATUS "Enable tests: ${NLM_ENABLE_TESTS}")
+message(STATUS "Enable experiments: ${NLM_ENABLE_EXPERIMENTS}")
+message(STATUS "Enable visualization: ${NLM_ENABLE_VISUALIZATION}")
+message(STATUS "Enable performance optimizations: ${NLM_ENABLE_PERFORMANCE}")
+message(STATUS "Enable LTO: ${NLM_LTO_ENABLE}")
+message(STATUS "Enable PGO: ${NLM_PGO_ENABLE}")
+message(STATUS "Components: ${NLM_COMPONENTS}")
+message(STATUS "===============================")
+
+# Export compile commands for IDE integration
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+    file(WRITE ${CMAKE_BINARY_DIR}/compile_commands.json "{}")
+endif()

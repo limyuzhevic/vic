@@ -3,28 +3,107 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <random>
 
 namespace nlm {
 
 struct NeuralPrediction::Impl {
-    Brain* brain;
+    // Forward model parameters
+    std::vector<std::vector<float>> forwardModelWeights;      // Action-to-sensory mappings
+    std::vector<std::vector<float>> inverseModelWeights;      // Sensory-to-action mappings
+    std::vector<float> predictionGains;                       // Prediction precision weights
     
-    // Sequence learning state
-    std::vector<std::pair<std::vector<float>, NeuronId>> learnedSequences;
-    std::vector<std::pair<NeuronId, NeuronId>> sequenceAssociations;
+    // Hierarchical prediction components
+    std::vector<std::vector<float>> levelPredictions;          // Predictions at each level
+    std::vector<std::vector<float>> levelErrors;               // Errors at each level
+    std::vector<float> levelPrecision;                        // Precision of each level
+    std::vector<float> levelConfidence;                       // Confidence of each level
     
-    // Pattern neurons (one per unique sensory pattern cluster)
-    std::vector<NeuronId> patternNeurons;
-    std::vector<std::vector<float>> patternRepresentations;
+    // Temporal prediction state
+    std::deque<std::vector<float>> temporalPredictions;        // Predicted sequence
+    std::deque<float> temporalErrors;                         // Temporal prediction errors
+    std::vector<std::vector<float>> temporalSequences;         // Learned temporal patterns
     
-    // Recent states for sequence learning
-    std::deque<std::pair<std::vector<float>, SimulationStep>> stateHistory;
+    // Action prediction components
+    std::vector<std::vector<float>> actionPredictions;         // Action predictions
+    std::vector<float> actionValues;                          // Action values/rewards
+    std::vector<float> actionConfidence;                      // Action confidence
     
-    // Action-consequence learning
-    std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
-    std::vector<float> actionRewards;
+    // Belief state for Bayesian updating
+    std::vector<float> beliefState;                           // Current belief distribution
+    std::vector<float> predictionPosterior;                   // Updated belief after prediction
     
-    Impl() : brain(nullptr) {}
+    // Neuromodulation and learning
+    std::vector<float> rewardPredictionErrors;                // RPE for each level
+    std::vector<float> precisionWeights;                      // Precision-based learning rates
+    float neuromodulationSignal;                               // Integrated error signal
+    float explorationBonus;                                   // Exploration incentive
+    
+    // Free energy and surprise detection
+    std::vector<float> freeEnergy;                            // Free energy at each level
+    std::vector<float> surprise;                              // Surprise detection
+    float predictionErrorThreshold;                           // Threshold for surprise
+    
+    // Synaptic prediction effects
+    std::vector<float> predictionEligibilityTraces;           // Synaptic eligibility traces
+    std::vector<float> predictionWeightChanges;               // Accumulated weight changes
+    std::vector<float> predictionSynapticStrength;            // Strength of prediction pathways
+    
+    // Context and goal dependency
+    std::string currentContext;                               // Current behavioral context
+    std::vector<float> goalVector;                            // Goal-dependent predictions
+    std::vector<std::vector<float>> contextualPredictions;   // Context-aware predictions
+    
+    Impl() : predictionError(0.0f), predictionConfidence(0.5f),
+             neuromodulationSignal(0.0f), explorationBonus(0.0f),
+             predictionErrorThreshold(0.3f) {
+        
+        // Initialize hierarchical prediction system (4 levels)
+        int numLevels = 4;
+        
+        // Allocate memory for hierarchical components
+        forwardModelWeights.resize(numLevels);
+        inverseModelWeights.resize(numLevels);
+        predictionGains.resize(numLevels, 1.0f);
+        levelPredictions.resize(numLevels);
+        levelErrors.resize(numLevels);
+        levelPrecision.resize(numLevels, 1.0f);
+        levelConfidence.resize(numLevels, 0.5f);
+        actionPredictions.resize(numLevels);
+        actionValues.resize(numLevels, 0.0f);
+        actionConfidence.resize(numLevels, 0.5f);
+        rewardPredictionErrors.resize(numLevels, 0.0f);
+        precisionWeights.resize(numLevels, 1.0f);
+        freeEnergy.resize(numLevels, 0.0f);
+        surprise.resize(numLevels, 0.0f);
+        predictionEligibilityTraces.resize(numLevels, 0.0f);
+        predictionWeightChanges.resize(numLevels, 0.0f);
+        predictionSynapticStrength.resize(numLevels, 0.1f);
+        contextualPredictions.resize(numLevels);
+        
+        // Initialize neural sequence memory
+        for (int level = 0; level < numLevels; ++level) {
+            forwardModelWeights[level].resize(3, 0.0f);  // 3 sensory dimensions typical
+            inverseModelWeights[level].resize(3, 0.0f);  // 3 action dimensions typical
+            levelPredictions[level].resize(3, 0.0f);
+            levelErrors[level].resize(3, 0.0f);
+            actionPredictions[level].resize(3, 0.0f);
+            contextualPredictions[level].resize(3, 0.0f);
+            
+            // Initialize random weights for forward/inverse models
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_real_distribution<float> dist(-0.5f, 0.5f);
+            
+            for (size_t i = 0; i < forwardModelWeights[level].size(); ++i) {
+                forwardModelWeights[level][i] = dist(gen);
+                inverseModelWeights[level][i] = dist(gen);
+            }
+        }
+        
+        // Initialize belief state
+        beliefState.resize(3, 1.0f / 3.0f);  // Uniform initial belief
+    }
 };
 
 NeuralPrediction::NeuralPrediction()
@@ -35,8 +114,103 @@ NeuralPrediction::NeuralPrediction()
     , actionConsequenceEnabled_(true)
     , brain_(nullptr)
     , predictionError_(0.0f)
-    , predictionConfidence_(0.5f)
-{
+    , predictionConfidence_(0.5f) {
+    
+    NLM_LOG_INFO("NeuralPrediction: Initialized with hierarchical predictive coding");
+}
+
+NeuralPrediction::~NeuralPrediction() = default;
+
+void NeuralPrediction::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    brain_ = brain;
+    
+    NLM_LOG_INFO("NeuralPrediction: Initialized with hierarchical predictive coding");
+}
+
+void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState, 
+                                         SimulationStep currentStep) {
+    if (!temporalPredictionEnabled_) return;
+    
+    recentSensoryStates_.push_back(sensoryState);
+    stateTimestamps_.push_back(currentStep);
+    
+    // Keep only recent states
+    if (recentSensoryStates_.size() > sequenceMemorySize_) {
+        recentSensoryStates_.erase(recentSensoryStates_.begin());
+        stateTimestamps_.erase(stateTimestamps_.begin());
+    }
+    
+    // Learn temporal sequence if we have at least 2 states
+    if (recentSensoryStates_.size() >= 2) {
+        learnTemporalSequence(recentSensoryStates_[recentSensoryStates_.size() - 2],
+                            recentSensoryStates_.back(),
+                            currentStep);
+    }
+}
+
+std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentStep) {
+    // Implement hierarchical predictive coding with forward models
+    if (!temporalPredictionEnabled_ || recentSensoryStates_.empty()) {
+        return std::vector<float>();
+    }
+    
+    const auto& currentState = recentSensoryStates_.back();
+    
+    // Multi-level prediction computation
+    std::vector<float> multiLevelPrediction(currentState.size(), 0.0f);
+    float totalPrecision = 0.0f;
+    
+    for (size_t level = 0; level < pImpl->levelPredictions.size(); ++level) {
+        // Get prediction at this level using forward model
+        std::vector<float> levelPrediction = computeLevelPrediction(currentState, level);
+        
+        // Update prediction confidence based on precision
+        float precision = pImpl->levelPrecision[level];
+        float confidence = calculateLevelConfidence(levelPrediction, currentState);
+        
+        pImpl->levelConfidence[level] = confidence;
+        
+        // Apply precision weighting
+        float precisionWeight = precision * confidence;
+        
+        // Integrate prediction into multi-level result
+        for (size_t i = 0; i < currentState.size() && i < levelPrediction.size(); ++i) {
+            multiLevelPrediction[i] += levelPrediction[i] * precisionWeight;
+        }
+        
+        totalPrecision += precisionWeight;
+    }
+    
+    // Normalize by total precision
+    if (totalPrecision > 0.0f) {
+        for (size_t i = 0; i < multiLevelPrediction.size(); ++i) {
+            multiLevelPrediction[i] /= totalPrecision;
+        }
+    }
+    
+    // Store prediction for temporal sequence
+    pImpl->temporalPredictions.push_back(multiLevelPrediction);
+    if (pImpl->temporalPredictions.size() > predictionHorizon_) {
+        pImpl->temporalPredictions.pop_front();
+    }
+    
+    // Compute overall prediction error
+    computePredictionError(multiLevelPrediction, currentState);
+    
+    // Update belief state using Bayesian updating
+    updateBeliefState(multiLevelPrediction);
+    
+    // Generate final prediction based on highest confidence level
+    size_t bestLevel = std::distance(pImpl->levelConfidence.begin(),
+        std::max_element(pImpl->levelConfidence.begin(), pImpl->levelConfidence.end()));
+    
+    predictionConfidence_ = pImpl->levelConfidence[bestLevel];
+    
+    NLM_LOG_DEBUG(std::string("NeuralPrediction: Generated multi-level prediction, confidence=") + 
+                 std::to_string(predictionConfidence_));
+    
+    return multiLevelPrediction;
 }
 
 NeuralPrediction::~NeuralPrediction() = default;
@@ -69,71 +243,62 @@ void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState
     }
 }
 
-std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentStep) {
-    if (!temporalPredictionEnabled_ || recentSensoryStates_.empty()) {
-        return std::vector<float>();
-    }
-    
-    // Find best matching learned sequence
-    const auto& currentState = recentSensoryStates_.back();
-    
-    // Find most similar pattern we've seen
-    NeuronId bestMatch = INVALID_NEURON_ID;
-    float bestSimilarity = 0.0f;
-    
-    for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
-        float sim = computeSimilarity(currentState, pImpl->patternRepresentations[i]);
-        if (sim > bestSimilarity) {
-            bestSimilarity = sim;
-            bestMatch = pImpl->patternNeurons[i];
-        }
-    }
-    
-    // If we have a good match, predict what comes next
-    if (bestSimilarity > 0.7f && bestMatch != INVALID_NEURON_ID) {
-        // Find what we associate with this pattern
-        for (const auto& assoc : pImpl->sequenceAssociations) {
-            if (assoc.first == bestMatch) {
-                // Found association - return the associated pattern
-                for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
-                    if (pImpl->patternNeurons[i] == assoc.second) {
-                        predictionConfidence_ = bestSimilarity;
-                        return pImpl->patternRepresentations[i];
-                    }
-                }
-            }
-        }
-    }
-    
-    // No good prediction - return current state as baseline
-    predictionConfidence_ = 0.0f;
-    return currentState;
-}
-
 float NeuralPrediction::updateWithObservation(const std::vector<float>& actualState,
-                                             SimulationStep currentStep) {
-    // Generate prediction first
+                                              SimulationStep currentStep) {
+    // Compute prediction error and update forward models
     auto predicted = generatePrediction(currentStep);
     
-    // Compute error
     if (predicted.empty()) {
         predictionError_ = 0.0f;
-    } else {
-        predictionError_ = computeSimilarity(predicted, actualState);
-        predictionError_ = 1.0f - predictionError_;  // Convert to error
+        return predictionError_;
     }
     
-    errorHistory_.push_back(predictionError_);
-    if (errorHistory_.size() > 1000) {
-        errorHistory_.erase(errorHistory_.begin());
+    // Compute multi-level prediction error
+    std::vector<float> levelErrors;
+    for (size_t level = 0; level < pImpl->levelPredictions.size(); ++level) {
+        float error = computeLevelPredictionError(predicted, actualState, level);
+        levelErrors.push_back(error);
+        
+        // Update forward model weights using this error
+        updateForwardModel(predicted, actualState, level, error);
     }
     
-    // Record the actual state for future learning
+    // Compute integrated prediction error with precision weighting
+    float integratedError = computeIntegratedPredictionError(levelErrors);
+    predictionError_ = integratedError;
+    
+    // Store error for learning and analysis
+    pImpl->temporalErrors.push_back(integratedError);
+    if (pImpl->temporalErrors.size() > 1000) {
+        pImpl->temporalErrors.pop_front();
+    }
+    
+    // Apply prediction error modulation to synaptic learning
+    applyPredictionErrorModulation(integratedError, actualState);
+    
+    // Compute reward prediction error if reward is in the state
+    float reward = 0.0f;
+    if (!actualState.empty()) {
+        reward = actualState[0]; // First dimension often represents reward
+        updateRewardPredictionError(reward, predicted, actualState);
+    }
+    
+    // Check for prediction error spikes (surprise)
+    checkPredictionErrorSurprise(integratedError);
+    
+    // Update action predictions based on prediction error
+    updateActionPredictions(actualState, reward);
+    
+    // Update belief state using Bayesian principles
+    updateBeliefState(actualState);
+    
+    // Apply free energy minimization
+    applyFreeEnergyMinimization(predicted, actualState);
+    
+    // Record actual state for future learning
     recordSensoryState(actualState, currentStep);
     
-    // Modulate learning based on error
-    float reward = 1.0f - predictionError_;
-    modulatePredictionSynapses(predictionError_, reward);
+    NLM_LOG_DEBUG(std::string("NeuralPrediction: Updated with error=") + std::to_string(integratedError));
     
     return predictionError_;
 }
@@ -144,45 +309,60 @@ std::vector<float> NeuralPrediction::predictActionConsequence(ActionType action,
         return currentState;  // No change predicted
     }
     
-    // Find experiences with same action and similar state
-    float bestMatch = 0.0f;
-    std::vector<float> bestConsequence;
+    // Use inverse model to predict sensory consequences of action
+    std::vector<float> predictedConsequence(currentState.size(), 0.0f);
+    float totalPrecision = 0.0f;
     
-    for (size_t i = 0; i < recentActions_.size(); ++i) {
-        if (recentActions_[i].first == action) {
-            float sim = computeSimilarity(currentState, recentActions_[i].second);
-            if (sim > bestMatch) {
-                bestMatch = sim;
-                if (i < pImpl->actionConsequences.size()) {
-                    bestConsequence = pImpl->actionConsequences[i].second;
-                }
-            }
+    for (size_t level = 0; level < pImpl->inverseModelWeights.size(); ++level) {
+        // Get action consequences from inverse model
+        std::vector<float> levelConsequence = predictActionConsequenceLevel(action, currentState, level);
+        
+        float precision = pImpl->levelPrecision[level];
+        float confidence = calculateActionConfidence(action, currentState, level);
+        
+        // Apply precision-weighted combination
+        float weight = precision * confidence;
+        totalPrecision += weight;
+        
+        for (size_t i = 0; i < currentState.size() && i < levelConsequence.size(); ++i) {
+            predictedConsequence[i] += levelConsequence[i] * weight;
         }
     }
     
-    if (bestMatch > 0.5f && !bestConsequence.empty()) {
-        return bestConsequence;
+    if (totalPrecision > 0.0f) {
+        for (size_t i = 0; i < predictedConsequence.size(); ++i) {
+            predictedConsequence[i] /= totalPrecision;
+        }
     }
     
-    return currentState;  // Default: no change
+    // Check for prediction confidence
+    float confidence = calculateActionConfidence(action, currentState, 0);
+    NLM_LOG_DEBUG(std::string("NeuralPrediction: Predicted consequence for action ") + 
+                 std::to_string(static_cast<int>(action)) + 
+                 std::string(", confidence=") + std::to_string(confidence));
+    
+    return predictedConsequence;
 }
 
 std::vector<std::vector<float>> NeuralPrediction::predictMultipleSteps(SimulationStep currentStep,
-                                                                       size_t numSteps) {
+                                                                      size_t numSteps) {
     std::vector<std::vector<float>> predictions;
     
-    auto currentPred = recentSensoryStates_.empty() ? 
-                       std::vector<float>() : recentSensoryStates_.back();
+    if (recentSensoryStates_.empty()) {
+        return predictions;
+    }
+    
+    auto currentPred = recentSensoryStates_.back();
     
     for (size_t step = 0; step < numSteps; ++step) {
         if (currentPred.empty()) break;
         
         predictions.push_back(currentPred);
         
-        // Use current prediction to generate next
-        // (simple approach - in reality this would use chained predictions)
+        // Generate next prediction using forward model
         auto nextPred = generatePrediction(currentStep + step);
         if (nextPred.empty()) break;
+        
         currentPred = nextPred;
     }
     
@@ -196,23 +376,53 @@ void NeuralPrediction::recordAction(ActionType action, SimulationStep step) {
     if (recentActions_.size() > 100) {
         recentActions_.erase(recentActions_.begin());
     }
+    
+    // Update action prediction models
+    updateActionPredictionModels(action, recentSensoryStates_.back(), step);
 }
 
 void NeuralPrediction::learnTemporalSequence(const std::vector<float>& currentState,
                                             const std::vector<float>& nextState,
                                             SimulationStep currentStep) {
-    // Find or create pattern neuron for current state
+    // Learn temporal associations using forward and inverse models
+    
+    // Find matching pattern neurons for current and next states
     NeuronId currentNeuron = findMatchingPatternNeuron(currentState);
     NeuronId nextNeuron = findMatchingPatternNeuron(nextState);
     
-    if (currentNeuron != nextNeuron) {
-        createSequenceAssociation(currentNeuron, nextNeuron, 0.8f);
+    if (currentNeuron == INVALID_NEURON_ID || nextNeuron == INVALID_NEURON_ID) {
+        // Create new pattern neurons if needed
+        if (brain_) {
+            currentNeuron = NeuronId(pImpl->patternNeurons.size() + 10000);
+            pImpl->patternNeurons.push_back(currentNeuron);
+            pImpl->patternRepresentations.push_back(currentState);
+        }
+        
+        if (brain_) {
+            nextNeuron = NeuronId(pImpl->patternNeurons.size() + 10000);
+            pImpl->patternNeurons.push_back(nextNeuron);
+            pImpl->patternRepresentations.push_back(nextState);
+        }
+    }
+    
+    if (currentNeuron != nextNeuron && brain_) {
+        // Create sequence association with strength based on prediction error
+        float predictionError = computeSimilarity(currentState, nextState);
+        float associationStrength = 0.8f * predictionError; // Scale by prediction accuracy
+        
+        createSequenceAssociation(currentNeuron, nextNeuron, associationStrength);
+        
+        // Store in temporal sequence memory
+        pImpl->temporalSequences.push_back({currentState, nextState});
+        if (pImpl->temporalSequences.size() > 100) {
+            pImpl->temporalSequences.erase(pImpl->temporalSequences.begin());
+        }
     }
 }
 
 NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& pattern,
                                                     float similarityThreshold) {
-    // Check if we already have a similar pattern
+    // Check if we already have a similar pattern using multiple levels
     for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
         float sim = computeSimilarity(pattern, pImpl->patternRepresentations[i]);
         if (sim >= similarityThreshold) {
@@ -220,7 +430,7 @@ NeuronId NeuralPrediction::findMatchingPatternNeuron(const std::vector<float>& p
         }
     }
     
-    // Create new pattern neuron
+    // Create new pattern neuron if we have a brain reference
     if (brain_) {
         NeuronId newId = NeuronId(pImpl->patternNeurons.size() + 10000);
         pImpl->patternNeurons.push_back(newId);
@@ -244,68 +454,6 @@ void NeuralPrediction::createSequenceAssociation(NeuronId from, NeuronId to, flo
     
     // Create new association
     pImpl->sequenceAssociations.emplace_back(from, to);
-}
-
-float NeuralPrediction::computeSimilarity(const std::vector<float>& a, 
-                                         const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
-    
-    // Cosine similarity
-    float dotProduct = 0.0f;
-    float normA = 0.0f;
-    float normB = 0.0f;
-    
-    for (size_t i = 0; i < a.size(); ++i) {
-        dotProduct += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
-    }
-    
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
-    
-    return dotProduct / (std::sqrt(normA) * std::sqrt(normB));
-}
-
-void NeuralPrediction::modulatePredictionSynapses(float error, float reward) {
-    if (!brain_) return;
-    
-    // Apply reward-modulated plasticity to prediction-related synapses
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            // If this synapse was recently active in prediction pathway
-            if (std::abs(eligibility) > 0.001f) {
-                float delta = eligibility * (reward - 0.5f) * 2.0f;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility
-                syn->decayEligibilityTrace(0.1f);
-            }
-        }
-    }
-}
-
-std::vector<NeuronId> NeuralPrediction::getPredictionNeurons() const {
-    return predictionNeurons_;
-}
-
-std::vector<NeuronId> NeuralPrediction::getSequenceNeurons() const {
-    std::vector<NeuronId> result;
-    for (const auto& assoc : pImpl->sequenceAssociations) {
-        result.push_back(assoc.first);
-        result.push_back(assoc.second);
-    }
-    return result;
-}
-
-void NeuralPrediction::clearHistory() {
-    errorHistory_.clear();
-    recentSensoryStates_.clear();
-    stateTimestamps_.clear();
-    recentActions_.clear();
-    pImpl->learnedSequences.clear();
-    pImpl->sequenceAssociations.clear();
 }
 
 // ActionConsequencePredictor Implementation
@@ -402,7 +550,7 @@ std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType act
 }
 
 float ActionConsequencePredictor::getConsequenceConfidence(ActionType action,
-                                                          const std::vector<float>& currentState) const {
+                                                           const std::vector<float>& currentState) const {
     size_t matchingCount = 0;
     for (const auto& exp : pImpl->experiences) {
         if (exp.first.second == action) {
@@ -514,3 +662,68 @@ void PredictionErrorSignal::recordError(float error, SimulationStep step) {
 }
 
 } // namespace nlm
+
+// Helper functions for prediction system
+
+float NeuralPrediction::sampleGaussianNoise(float stddev) {
+    // Simple Gaussian noise sampling
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<float> dist(0.0f, stddev);
+    return dist(gen);
+}
+
+void NeuralPrediction::computePredictionError(const std::vector<float>& predicted,
+                                             const std::vector<float>& actual) {
+    if (predicted.size() != actual.size() || predicted.empty()) {
+        predictionError_ = 0.0f;
+        return;
+    }
+    
+    float sumSqError = 0.0f;
+    for (size_t i = 0; i < predicted.size(); ++i) {
+        float error = predicted[i] - actual[i];
+        sumSqError += error * error;
+    }
+    
+    predictionError_ = std::sqrt(sumSqError / predicted.size());
+}
+
+void NeuralPrediction::updateBeliefState(const std::vector<float>& observation) {
+    // Simple Bayesian belief updating
+    if (observation.empty()) return;
+    
+    // Update belief state based on observation
+    float totalWeight = 0.0f;
+    
+    for (size_t i = 0; i < observation.size(); ++i) {
+        // Scale observation to belief update
+        pImpl->beliefState[i] = 0.9f * pImpl->beliefState[i] + 0.1f * observation[i];
+        totalWeight += std::abs(observation[i]);
+    }
+    
+    // Normalize belief state
+    if (totalWeight > 0.0f) {
+        for (size_t i = 0; i < pImpl->beliefState.size(); ++i) {
+            pImpl->beliefState[i] /= totalWeight;
+        }
+    }
+}
+
+float NeuralPrediction::computeLevelPredictionError(const std::vector<float>& predicted,
+                                                  const std::vector<float>& actual,
+                                                  size_t level) const {
+    if (predicted.size() != actual.size() || predicted.empty()) {
+        return 0.0f;
+    }
+    
+    // Compute prediction error with precision weighting
+    float error = 0.0f;
+    for (size_t i = 0; i < predicted.size(); ++i) {
+        float diff = predicted[i] - actual[i];
+        error += diff * diff;
+    }
+    
+    float avgError = error / predicted.size();
+    return std::sqrt(avgError);
+}

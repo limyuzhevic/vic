@@ -74,11 +74,24 @@ public:
     std::vector<NeuronId> getPredictionNeurons() const;
     std::vector<NeuronId> getSequenceNeurons() const;
 
+    // Advanced prediction methods
+    std::vector<float> computeLevelPrediction(const std::vector<float>& state, size_t level);
+    float calculateLevelConfidence(const std::vector<float>& predicted, const std::vector<float>& actual);
+    float computeLevelPredictionError(const std::vector<float>& predicted, const std::vector<float>& actual, size_t level);
+    void updateForwardModel(const std::vector<float>& predicted, const std::vector<float>& actual, size_t level, float error);
+    void updateActionPredictionModels(ActionType action, const std::vector<float>& state, SimulationStep step);
+    void updateRewardPredictionError(float reward, const std::vector<float>& predicted, const std::vector<float>& actual);
+    void checkPredictionErrorSurprise(float error);
+    void updateActionPredictions(const std::vector<float>& actualState, float reward);
+    void applyFreeEnergyMinimization(const std::vector<float>& predicted, const std::vector<float>& actual);
+    float calculateActionConfidence(ActionType action, const std::vector<float>& state, size_t level);
+    std::vector<float> predictActionConsequenceLevel(ActionType action, const std::vector<float>& state, size_t level);
+
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,
-                              const std::vector<float>& nextState,
-                              SimulationStep currentStep);
+                               const std::vector<float>& nextState,
+                               SimulationStep currentStep);
 
     // Find or create neurons that respond to specific sensory pattern
     NeuronId findMatchingPatternNeuron(const std::vector<float>& pattern,
@@ -92,6 +105,17 @@ private:
 
     // Strengthen synapses for successful predictions, weaken for errors
     void modulatePredictionSynapses(float error, float reward);
+
+    // Helper methods
+    float sampleGaussianNoise(float stddev);
+    void computePredictionError(const std::vector<float>& predicted, const std::vector<float>& actual);
+    void updateBeliefState(const std::vector<float>& observation);
+    void computeFreeEnergy(const std::vector<float>& actual, const std::vector<float>& predicted);
+    float computeIntegratedPredictionError(const std::vector<float>& levelErrors);
+    float calculatePredictionPrecision(size_t dimension);
+    void updatePredictionConfidence(size_t dimension, float error, float precision);
+    void applyPredictionErrorModulation(const std::vector<float>& errors, float integratedError);
+    void updatePredictionSystemConfidence(float error);
 
     // Structure
     struct Impl;
@@ -136,11 +160,11 @@ public:
 
     // Predict consequence of taking an action in a given state
     std::vector<float> predictConsequence(ActionType action,
-                                         const std::vector<float>& currentState);
+                                          const std::vector<float>& currentState);
 
     // Get prediction confidence for an action
     float getConsequenceConfidence(ActionType action,
-                                  const std::vector<float>& currentState) const;
+                                   const std::vector<float>& currentState) const;
 
     // Update based on actual observed consequence
     void updatePrediction(ActionType action,

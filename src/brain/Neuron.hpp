@@ -41,13 +41,41 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+//
+// This class implements a biologically-inspired neuron model using the
+// Leaky Integrate-and-Fire (LIF) dynamics framework. Each neuron maintains
+// its own state including membrane potential, firing thresholds, and spike
+// history. Neurons receive synaptic inputs, integrate them over time, and
+// generate action potentials when threshold is reached.
+//
+// The neuron model supports multiple neuron types (excitatory, inhibitory,
+// modulatory, sensory, motor, internal) and integrates with the plasticity
+// system for learning and adaptation.
+//
+// @note This is a core component of the NLM brain architecture and forms the
+//       basic processing unit of the neural network.
+//
+// @warning Memory management is handled via Pimpl idiom. Direct deletion
+//          of pImpl is prohibited to prevent memory leaks.
+//
+// @see https://en.wikipedia.org/wiki/Integrate-and-fire
+//
 class Neuron {
 public:
-    // Create neuron with ID
-    explicit Neuron(NeuronId id);
+    // Create neuron with unique identifier
+//
+// @param id Unique identifier for this neuron (must be valid NeuronId)
+//
+// @note Neuron is constructed with default physiological parameters:
+//       - Membrane potential near resting potential (-70mV)
+//       - Firing threshold at typical cortical values (-55mV)
+//       - Default refractory period of 5 simulation steps
+Neuron(NeuronId id);
     
-    ~Neuron();
+// Destructor
+//
+// @note Memory management is automatic due to Pimpl idiom
+~Neuron();
     
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
@@ -55,35 +83,127 @@ public:
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
-    NeuronId getId() const;
+// Get unique identifier of this neuron
+//
+// @return NeuronId Unique identifier for this neuron
+//
+// @note NeuronId is a strongly-typed identifier for safety and debugging
+NeuronId getId() const;
     
-    // Type
-    NeuronType getType() const;
+// Get neuron type (functional classification)
+//
+// @return NeuronType Type of neuron (Excitatory, Inhibitory, Modulatory, etc.)
+//
+// @note Neuron type influences synaptic connections and computational role
+NeuronType getType() const;
+
+    // Set neuron type
+    //
+    // @param type New neuron type to assign
+    //
+    // @note Changing neuron type affects synaptic behavior and plasticity
     void setType(NeuronType type);
     
-    // State access
-    const NeuronState& getState() const;
+// Get complete neuron state snapshot
+//
+// @return const NeuronState& Reference to neuron state (read-only access)
+//
+// @note State includes membrane potential, firing rate, refractory status, etc.
+const NeuronState& getState() const;
+
+    // Get mutable reference to neuron state for direct modification
+    //
+    // @return NeuronState& Mutable reference to neuron state
+    //
+    // @warning Direct modification bypasses safety checks - use with caution
     NeuronState& getState();
     
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
+// Get current membrane potential
+//
+// @return MembranePotential Current membrane potential in millivolts (mV)
+//
+// @note Typical resting potential is -70mV. Depolarization brings potential closer
+//       to threshold (-55mV), hyperpolarization moves away from threshold.
+MembranePotential getMembranePotential() const;
+
+    // Set membrane potential directly
+    //
+    // @param potential New membrane potential in mV
+    //
+    // @warning Direct setting may bypass biophysical constraints - use setCurrent
+    //          or synaptic inputs for normal operation
     void setMembranePotential(MembranePotential potential);
+
+    // Inject current to change membrane potential
+    //
+    // @param delta Change in membrane potential in mV
+    //
+    // @note This method is used by synaptic inputs and external current sources
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
-    MembranePotential getThreshold() const;
+// Get firing threshold
+//
+// @return MembranePotential Firing threshold in mV (typically -55mV)
+//
+// @note Spike is generated when membrane potential >= threshold
+MembranePotential getThreshold() const;
+
+    // Set firing threshold
+    //
+    // @param threshold New firing threshold in mV
+    //
+    // @note Threshold affects neuron excitability and firing dynamics
     void setThreshold(MembranePotential threshold);
     
-    // Firing state
-    bool isFiring() const;
+// Check if neuron is currently firing (active)
+//
+// @return bool true if neuron is in Active state, false otherwise
+//
+// @note Neuron enters Active state when membrane potential reaches threshold
+//       and remains until spike generation or reaching threshold again
+bool isFiring() const;
+
+    // Check if neuron is in refractory period after firing
+    //
+    // @return bool true if neuron is in Refractory state, false otherwise
+    //
+    // @note During refractory period, neuron cannot fire new spikes
     bool isRefractory() const;
+
+    // Set firing state directly
+    //
+    // @param state New firing state (Resting, Active, Refractory, Inhibited)
+    //
+    // @warning Direct state changes may bypass spike generation logic
+    //          - use stepLIF() for normal spike generation
     void setFiringState(FiringState state);
+
+    // Set refractory period duration
+    //
+    // @param steps Number of simulation steps for refractory period
+    //
+    // @note Refractory period prevents excessive firing rates
     void setRefractoryPeriod(uint32_t steps);
+
+    // Decrement refractory counter
+    //
+    // @note Called during simulation step to progress through refractory period
+    //       automatically exits Refractory state when counter reaches zero
     void decrementRefractory();
     
-    // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
+// Get current firing rate
+//
+// @return FiringRate Current firing rate in Hertz (Hz)
+//
+// @note Firing rate is maintained separately from spike detection for rate-based
+//       computation and monitoring purposes
+FiringRate getFiringRate() const;
+
+    // Set firing rate directly
+    //
+    // @param rate New firing rate in Hz
+    //
+    // @note Useful for rate-based plasticity models and control signals
     void setFiringRate(FiringRate rate);
     
     // LIF neuron parameters
