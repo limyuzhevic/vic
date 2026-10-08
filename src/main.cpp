@@ -28,24 +28,128 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+bool parseAdvancedOptions(int argc, char** argv, std::shared_ptr<Config>& config,
+                            bool& enablePerf, int& experiment, bool& enableAllPlasticity,
+                            bool& enableCuriosity, bool& enableNovelty, bool& enablePrediction,
+                            bool& enableMemory, bool& enableCognition, bool& enableVisualization) {
+    // Default values
+    enablePerf = false;
+    experiment = 6; // Default to Phase 6 demo
+    enableAllPlasticity = false;
+    enableCuriosity = false;
+    enableNovelty = false;
+    enablePrediction = false;
+    enableMemory = false;
+    enableCognition = false;
+    enableVisualization = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return false;
+        }
+        else if (arg == "--version") {
+            std::cout << "NLM Phase 6 (Final Integration) - Version 0.1.0" << std::endl;
+            return false;
+        }
+        else if (arg == "--perf") {
+            enablePerf = true;
+        }
+        else if (arg == "--enable-all-plasticity") {
+            enableAllPlasticity = true;
+        }
+        else if (arg == "--enable-curiosity") {
+            enableCuriosity = true;
+        }
+        else if (arg == "--enable-novelty") {
+            enableNovelty = true;
+        }
+        else if (arg == "--enable-prediction") {
+            enablePrediction = true;
+        }
+        else if (arg == "--enable-memory") {
+            enableMemory = true;
+        }
+        else if (arg == "--enable-cognition") {
+            enableCognition = true;
+        }
+        else if (arg == "--enable-visualization") {
+            enableVisualization = true;
+        }
+        else if (arg == "--experiment") {
+            if (i + 1 < argc) {
+                experiment = std::atoi(argv[++i]);
+            }
+        }
+        else if (arg == "--log-level" || arg == "--log") {
+            if (i + 1 < argc) {
+                std::string level = argv[++i];
+                config->set("log_level", level, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--log-file") {
+            if (i + 1 < argc) {
+                std::string filename = argv[++i];
+                config->set("log_to_file", true, ConfigSource::CommandLine);
+                config->set("log_filename", filename, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--simulation-steps") {
+            if (i + 1 < argc) {
+                int steps = std::atoi(argv[++i]);
+                config->set("max_simulation_steps", steps, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--timestep") {
+            if (i + 1 < argc) {
+                double timestep = std::atof(argv[++i]);
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--neuron-count") {
+            if (i + 1 < argc) {
+                int64_t neurons = std::atoll(argv[++i]);
+                config->set("neuron_count", neurons, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--region-count") {
+            if (i + 1 < argc) {
+                int64_t regions = std::atoll(argv[++i]);
+                config->set("region_count", regions, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--connection-prob") {
+            if (i + 1 < argc) {
+                float prob = std::atof(argv[++i]);
+                config->set("connection_probability", prob, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--random-seed") {
+            if (i + 1 < argc) {
+                int64_t seed = std::atoll(argv[++i]);
+                config->set("random_seed", seed, ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                std::string checkpoint = argv[++i];
+                // Note: checkpoint functionality would need to be implemented
+                // For now, just log the intent
+                NLM_LOG_INFO("Checkpoint functionality would save to: " + checkpoint);
+            }
+        }
+        else if (arg == "--load") {
+            if (i + 1 < argc) {
+                std::string loadfile = argv[++i];
+                // Note: load functionality would need to be implemented
+                NLM_LOG_INFO("Load functionality would load from: " + loadfile);
+            }
+        }
+    }
+    
+    return true;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

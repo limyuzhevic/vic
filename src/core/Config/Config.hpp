@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Set description for existing key
+    void setDescription(const std::string& key, const std::string& description);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

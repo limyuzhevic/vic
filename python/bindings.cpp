@@ -134,35 +134,54 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
-
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<ConsoleLogger, std::shared_ptr<ConsoleLogger>>(m, "ConsoleLogger", R"pbdoc(Console logger implementation)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def(py::init<LogLevel>(), py::arg("level"))
+        .def("setLevel", &ConsoleLogger::setLevel, py::arg("level"))
+        .def("getLevel", &ConsoleLogger::getLevel)
+        .def("setUseColors", &ConsoleLogger::setUseColors, py::arg("useColors"))
+        .def("getUseColors", &ConsoleLogger::getUseColors)
+        .def("setOutputFile", &ConsoleLogger::setOutputFile, py::arg("filepath"))
+        .def("closeOutputFile", &ConsoleLogger::closeOutputFile);
+
+    py::class_<Logger, std::shared_ptr<Logger>>(m, "Logger", R"pbdoc(Logging system)pbdoc")
+        .def(py::init<>())
+        .def("addLogger", &Logger::addLogger, py::arg("logger"),
+             "Add a logger")
+        .def("clearLoggers", &Logger::clearLoggers,
+             "Remove all loggers")
+        .def("setLevel", &Logger::setLevel, py::arg("level"),
+             "Set minimum level for all loggers")
+        .def("log", [](Logger& self, LogLevel level, const std::string& message) {
+            self.log(level, message);
+        }, py::arg("level"), py::arg("message"),
+             "Log a message")
+        .def("debug", [](Logger& self, const std::string& message) {
+            self.debug(message);
+        }, py::arg("message"),
+             "Log debug message")
+        .def("info", [](Logger& self, const std::string& message) {
+            self.info(message);
+        }, py::arg("message"),
+             "Log info message")
+        .def("warning", [](Logger& self, const std::string& message) {
+            self.warning(message);
+        }, py::arg("message"),
+             "Log warning message")
+        .def("error", [](Logger& self, const std::string& message) {
+            self.error(message);
+        }, py::arg("message"),
+             "Log error message")
+        .def("critical", [](Logger& self, const std::string& message) {
+            self.critical(message);
+        }, py::arg("message"),
+             "Log critical message")
+        .def("isEnabled", &Logger::isEnabled, py::arg("level"),
+             "Check if level is enabled")
+        .def("getGlobal", &Logger::getGlobal, py::return_value_policy::reference_internal,
+             "Get global logger instance")
+        .def("setGlobal", &Logger::setGlobal, py::arg("logger"),
+             "Set global logger");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

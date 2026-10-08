@@ -10,7 +10,31 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default values - using proper type matching
+    set("random_seed", 42, ConfigSource::Default, "Random seed for reproducible experiments");
+    set("simulation_timestep", 0.001, ConfigSource::Default, "Simulation timestep in seconds");
+    set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default, "Number of neurons in the brain");
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default, "Number of brain regions");
+    set("connection_probability", 0.15f, ConfigSource::Default, "Connection probability for random connectivity");
+    set("stdp_ltp_weight", 0.02f, ConfigSource::Default, "STDP long-term potentiation weight");
+    set("stdp_ltd_weight", 0.015f, ConfigSource::Default, "STDP long-term depression weight");
+    set("stdp_time_constant", 20.0f, ConfigSource::Default, "STDP time constant");
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default, "Development synaptogenesis rate");
+    set("pruning_rate", 0.00001f, ConfigSource::Default, "Development pruning rate");
+    set("dopamine_baseline", 0.1f, ConfigSource::Default, "Dopamine baseline value");
+    set("reward_discount_factor", 0.99, ConfigSource::Default, "Reward discount factor");
+    set("environment_name", std::string("SimpleWorld"), ConfigSource::Default, "Environment name");
+    set("environment_width", static_cast<int64_t>(20), ConfigSource::Default, "Environment width");
+    set("environment_height", static_cast<int64_t>(20), ConfigSource::Default, "Environment height");
+    set("log_level", std::string("INFO"), ConfigSource::Default, "Log level");
+    set("log_to_file", false, ConfigSource::Default, "Log to file");
+    set("log_filename", std::string("nlm.log"), ConfigSource::Default, "Log filename");
+    set("max_simulation_steps", static_cast<int64_t>(10000), ConfigSource::Default, "Maximum simulation steps");
+    set("simulation_time_limit", 0.0, ConfigSource::Default, "Simulation time limit");
+    set("visualization_enabled", false, ConfigSource::Default, "Enable visualization");
+    set("visualization_update_rate", 30.0, ConfigSource::Default, "Visualization update rate");
+}
 
 Config::~Config() = default;
 
@@ -19,9 +43,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -35,7 +56,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,6 +69,36 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Convert numeric strings
+            if (!value.empty()) {
+                char* endptr = nullptr;
+                // Try int
+                long long_val = std::strtoll(value.c_str(), &endptr, 10);
+                if (endptr && *endptr == '\0') {
+                    set(key, static_cast<int>(ll_val), ConfigSource::File);
+                    continue;
+                }
+                // Try unsigned int
+                unsigned long ull_val = std::strtoul(value.c_str(), &endptr, 10);
+                if (endptr && *endptr == '\0') {
+                    set(key, static_cast<unsigned int>(ull_val), ConfigSource::File);
+                    continue;
+                }
+                // Try double
+                double double_val = std::strtod(value.c_str(), &endptr);
+                if (endptr && *endptr == '\0') {
+                    set(key, double_val, ConfigSource::File);
+                    continue;
+                }
+                // Try bool
+                if (value == "true" || value == "false") {
+                    bool bool_val = (value == "true");
+                    set(key, bool_val, ConfigSource::File);
+                    continue;
+                }
+            }
+            
+            // Fall back to string
             set(key, value, ConfigSource::File);
         }
     }
@@ -121,25 +172,47 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        it->description = ""; // Default empty description
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, value, source, "");
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+void Config::set(const std::string& key, const std::string& value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (!description.empty()) {
+        setDescription(key, description);
+    }
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
+void Config::set(const std::string& key, int value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (!description.empty()) {
+        setDescription(key, description);
+    }
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
+void Config::set(const std::string& key, double value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (!description.empty()) {
+        setDescription(key, description);
+    }
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
+void Config::set(const std::string& key, bool value, ConfigSource source, const std::string& description) {
     set(key, ConfigValue(value), source);
+    if (!description.empty()) {
+        setDescription(key, description);
+    }
+}
+
+void Config::setDescription(const std::string& key, const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->description = description;
+    }
 }
 
 bool Config::has(const std::string& key) const {
