@@ -30,6 +30,16 @@ struct AgentBody {
     bool isTurning;
     float lastActionTime;
     
+    // Internal state
+    float speedX;
+    float speedY;
+    float angularSpeed;
+    
+    // Energy and health dynamics
+    float energyChangeRate;
+    float healthChangeRate;
+    float metabolismRate;
+    
     AgentBody()
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)

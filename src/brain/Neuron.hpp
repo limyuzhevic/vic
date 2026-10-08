@@ -52,86 +52,87 @@ public:
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    Neuron(Neuron&&) noexcept = default;
+    Neuron& operator=(Neuron&&) noexcept = default;
     
     // Identity
-    NeuronId getId() const;
+    [[nodiscard]] NeuronId getId() const;
     
     // Type
-    NeuronType getType() const;
+    [[nodiscard]] NeuronType getType() const;
     void setType(NeuronType type);
     
     // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
+    [[nodiscard]] const NeuronState& getState() const;
+    [[nodiscard]] NeuronState& getState();
     
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
+    // Membrane potential operations
+    [[nodiscard]] MembranePotential getMembranePotential() const;
     void setMembranePotential(MembranePotential potential);
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
-    MembranePotential getThreshold() const;
+    // Threshold operations
+    [[nodiscard]] MembranePotential getThreshold() const;
     void setThreshold(MembranePotential threshold);
     
-    // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
+    // Firing state checks
+    [[nodiscard]] bool isFiring() const;
+    [[nodiscard]] bool isRefractory() const;
     void setFiringState(FiringState state);
     void setRefractoryPeriod(uint32_t steps);
     void decrementRefractory();
     
     // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
+    [[nodiscard]] FiringRate getFiringRate() const;
     void setFiringRate(FiringRate rate);
     
     // LIF neuron parameters
     void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
+    [[nodiscard]] MembranePotential getLeakConductance() const;
+    [[nodiscard]] uint32_t getRefractoryPeriod() const;
     void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
+    [[nodiscard]] MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
     
-    // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
+    // Spike detection and management
+    [[nodiscard]] bool checkThreshold() const;
+    [[nodiscard]] float getLastSpikeTime() const;
+    [[nodiscard]] bool isActive() const;  // Convenience method for debugging
     
     // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    [[nodiscard]] bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
-    // Incoming signals (post-synaptic potentials)
+    // Input handling methods
     void receiveExcitatoryInput(MembranePotential amplitude);
     void receiveInhibitoryInput(MembranePotential amplitude);
     void receiveModulatoryInput(MembranePotential amplitude);
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
+    [[nodiscard]] MembranePotential getTotalCurrent() const;
     void clearTotalCurrent();
     
-    // Spike history (recent spikes for STDP)
+    // Spike history management (recent spikes for STDP)
     void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
+    [[nodiscard]] const std::vector<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
     
     // Synapse management (incoming and outgoing)
     void addIncomingSynapse(SynapseHandle handle);
     void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
+    [[nodiscard]] const std::vector<SynapseHandle>& getIncomingSynapses() const;
+    [[nodiscard]] const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
-    // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
+    // Plasticity state management
+    [[nodiscard]] const PlasticityFlags& getPlasticityFlags() const;
+    [[nodiscard]] PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
     // Region/population membership
     void setRegionId(RegionId region);
-    RegionId getRegionId() const;
+    [[nodiscard]] RegionId getRegionId() const;
     void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
+    [[nodiscard]] PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
@@ -143,9 +144,13 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Convenience methods for common operations
+    [[nodiscard]] float getExcitability() const;  // Sum of excitatory inputs
+    [[nodiscard]] float getInhibition() const;   // Sum of inhibitory inputs
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

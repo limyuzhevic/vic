@@ -7,8 +7,6 @@
 #include <memory>
 #include <vector>
 
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -37,6 +35,9 @@ public:
     // Update development system
     void updateDevelopment(double timestep);
     
+    // Update autonomous development system
+    void updateAutonomousDevelopment(double timestep);
+    
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
     
@@ -52,8 +53,23 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
+    // Get combined neuromodulation score
+    float getNeuromodulationScore() const;
+    
+    // Get developmental age
+    double getDevelopmentalAge() const;
+    
+    // Get current environmental temperature
+    float getEnvironmentalTemperature() const;
+    
+    // Get current environmental humidity
+    float getEnvironmentalHumidity() const;
+    
+    // Get current environmental pressure
+    float getEnvironmentalPressure() const;
+    
+    // Reset environmental context
+    void resetEnvironmentalContext();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
@@ -69,12 +85,29 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Advanced learning control
+    void enableAdvancedLearning(bool enable);
+    void setLearningRate(float rate);
+    void enableMetaControl(bool enable);
+    void setExplorationRate(float rate);
+    void enableSelfMonitor(bool enable);
+    void enableAutonomousDevelopment(bool enable);
+    void enableSelfOptimization(bool enable);
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Performance tracking
+    void recordSuccess();
+    void recordStep();
+    float getSuccessRate() const;
+    float getAverageReward() const;
+    
+    // Exploration and behavior
+    void executeExplorationPattern();
+    void setEnvironmentalContext(float temperature, float humidity, float pressure);
+    void addReward(float reward, float predictedReward);
+    void addError(float error);
+    
+    // Reset methods
+    void reset();
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +145,30 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced learning features
+    bool advancedLearningEnabled_;
+    bool metaControlEnabled_;
+    bool selfMonitorEnabled_;
+    bool autonomousDevelopmentEnabled_;
+    
+    // Learning parameters
+    float learningRate_;
+    float explorationRate_;
+    
+    // Environmental sensors
+    float environmentalTemperature_;
+    float environmentalHumidity_;
+    float environmentalPressure_;
+    
+    // Performance tracking
+    uint64_t totalStepsExecuted_;
+    uint64_t successfulActions_;
+    float cumulativeReward_;
+    
+    // Internal processing
+    struct Impl;
+    Impl* internal_;
 };
 
 } // namespace nlm

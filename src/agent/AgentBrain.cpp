@@ -5,22 +5,7 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
+// Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -67,6 +52,24 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize advanced features
+    advancedLearningEnabled_ = false;
+    metaControlEnabled_ = false;
+    selfMonitorEnabled_ = false;
+    autonomousDevelopmentEnabled_ = false;
+    learningRate_ = 1.0f;
+    explorationRate_ = 0.1f;
+    
+    // Initialize performance tracking
+    totalStepsExecuted_ = 0;
+    successfulActions_ = 0;
+    cumulativeReward_ = 0.0f;
+    
+    // Initialize environment
+    environmentalTemperature_ = 20.0f;
+    environmentalHumidity_ = 50.0f;
+    environmentalPressure_ = 1013.0f;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -279,38 +282,177 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+void AgentBrain::enableAdvancedLearning(bool enable) {
+    // Enable advanced learning features
+    advancedLearningEnabled_ = enable;
     
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    if (enable) {
+        // Pre-compute synaptic eligibility traces for faster learning
+        precomputeEligibilityTraces();
     }
-    
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+}
+
+void AgentBrain::setLearningRate(float rate) {
+    // Set global learning rate modifier
+    learningRate_ = std::clamp(rate, 0.0f, 2.0f);
+}
+
+float AgentBrain::getLearningRate() const {
+    return learningRate_;
+}
+
+void AgentBrain::enableMetaControl(bool enable) {
+    // Enable meta-control systems (curiosity, exploration, etc.)
+    metaControlEnabled_ = enable;
+}
+
+void AgentBrain::setExplorationRate(float rate) {
+    // Set exploration rate (0.0 = no exploration, 1.0 = full exploration)
+    explorationRate_ = std::clamp(rate, 0.0f, 1.0f);
+}
+
+float AgentBrain::getExplorationRate() const {
+    return explorationRate_;
+}
+
+void AgentBrain::enableSelfMonitor(bool enable) {
+    // Enable self-monitoring and prediction systems
+    selfMonitorEnabled_ = enable;
+}
+
+void AgentBrain::enableAutonomousDevelopment(bool enable) {
+    // Enable autonomous developmental processes
+    autonomousDevelopmentEnabled_ = enable;
+}
+
+void AgentBrain::addReward(float reward, float predictedReward) {
+    // Add reward signal and update learning
+    applyRewardModulation(reward, predictedReward);
+}
+
+void AgentBrain::addError(float error) {
+    // Add prediction error signal
+    predictionError_ += error;
+    predictionError_ = std::clamp(predictionError_, -1.0f, 1.0f);
+}
+
+void AgentBrain::executeExplorationPattern() {
+    // Execute exploration behavior based on curiosity level
+    if (curiosityEnabled_ && curiosityLevel_ > 0.5f) {
+        // High curiosity = more random exploration
+        float exploreChance = curiosityLevel_ * explorationRate_;
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            // Random motor command for exploration
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            switch (choice) {
+                case 0: 
+                    // Inject current to neurons to trigger random activity
+                    brain_->injectCurrentToNeurons(NeuronType::Motor, 40.0f);
+                    break;
+                case 1: 
+                    brain_->injectCurrentToNeurons(NeuronType::Sensory, 20.0f);
+                    break;
+                case 2: 
+                    brain_->injectCurrentToNeurons(NeuronType::Internal, 15.0f);
+                    break;
+                case 3: 
+                    // Increase plasticity for exploration
+                    if (auto* stdp = brain_->getSTDP()) {
+                        stdp->setLTPWeight(stdp->getLTPWeight() * 1.5f);
+                        stdp->setLTDWeight(stdp->getLTDWeight() * 1.5f);
+                    }
+                    break;
+                default: 
+                    // Just trigger random spiking
+                    brain_->injectCurrentToNeurons(NeuronType::Excitatory, 25.0f);
+                    break;
+            }
         }
     }
+}
+
+void AgentBrain::updateAutonomousDevelopment(double timestep) {
+    if (autonomousDevelopmentEnabled_) {
+        // Autonomous developmental processes
+        developmentalAge_ += timestep;
+        
+        // Change developmental stage based on age
+        if (developmentalAge_ > 120.0 && developmentalAge_ < 180.0) {
+            // Adolescence - optimize for exploration
+            plasticityModifier_ = 0.9f;
+            curiosityEnabled_ = true;
+            
+            // Increase connection formation rate
+            if (auto* sp = brain_->getStructuralPlasticity()) {
+                sp->setSynaptogenesisRate(0.0002f);
+                sp->setPruningRate(0.00002f);
+            }
+        } else if (developmentalAge_ > 300.0 && developmentalAge_ < 600.0) {
+            // Adulthood - optimize for efficiency
+            plasticityModifier_ = 0.5f;
+            curiosityEnabled_ = false;
+            
+            // Stabilize connections
+            if (auto* sp = brain_->getStructuralPlasticity()) {
+                sp->setSynaptogenesisRate(0.00005f);
+                sp->setPruningRate(0.00001f);
+            }
+        }
+    }
+}
+
+void AgentBrain::setEnvironmentalContext(float temperature, float humidity, float pressure) {
+    // Set environmental context that affects brain function
+    environmentalTemperature_ = temperature;
+    environmentalHumidity_ = humidity;
+    environmentalPressure_ = pressure;
+    
+    // Environmental effects on brain
+    if (temperature > 35.0f) {
+        // Heat stress - reduce plasticity
+        plasticityModifier_ *= 0.8f;
+    } else if (temperature < 10.0f) {
+        // Cold stress - increase exploration
+        curiosityEnabled_ = true;
+        explorationRate_ = std::min(explorationRate_ * 1.2f, 1.0f);
+    }
+    
+    if (humidity > 80.0f) {
+        // High humidity - increase novelty detection
+        sensoryNoveltyDecay_ = 0.95f;
+    }
+    
+    if (pressure > 1013.0f) {
+        // High pressure - reduce risk-taking
+        explorationRate_ *= 0.9f;
+    }
+}
+
+float AgentBrain::getNeuromodulationScore() const {
+    // Get combined neuromodulation score
+    float score = 0.0f;
+    
+    // Dopamine contribution
+    score += std::abs(dopamineLevel_) * 0.4f;
+    
+    // Curiosity contribution
+    score += curiosityLevel_ * 0.3f;
+    
+    // Novelty contribution
+    score += noveltyLevel_ * 0.2f;
+    
+    // Prediction error contribution
+    score += std::abs(predictionError_) * 0.1f;
+    
+    return score;
+}
+
+void AgentBrain::resetEnvironmentalContext() {
+    environmentalTemperature_ = 20.0f;
+    environmentalHumidity_ = 50.0f;
+    environmentalPressure_ = 1013.0f;
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -334,6 +476,57 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+    // Apply curiosity-based exploration
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        decoded = selectWithCuriosity(decoded);
+    }
+    
+    return decoded;
+}
+
+void AgentBrain::enableAdvancedLearning(bool enable) {
+    // Enable advanced learning features
+    advancedLearningEnabled_ = enable;
+    
+    if (enable) {
+        // Pre-compute synaptic eligibility traces for faster learning
+        precomputeEligibilityTraces();
+    }
+}
+
+void AgentBrain::setLearningRate(float rate) {
+    // Set global learning rate modifier
+    learningRate_ = std::clamp(rate, 0.0f, 2.0f);
+}
+
+float AgentBrain::getLearningRate() const {
+    return learningRate_;
+}
+
+void AgentBrain::enableMetaControl(bool enable) {
+    // Enable meta-control systems (curiosity, exploration, etc.)
+    metaControlEnabled_ = enable;
+}
+
+void AgentBrain::setExplorationRate(float rate) {
+    // Set exploration rate (0.0 = no exploration, 1.0 = full exploration)
+    explorationRate_ = std::clamp(rate, 0.0f, 1.0f);
+}
+
+float AgentBrain::getExplorationRate() const {
+    return explorationRate_;
+}
+
+void AgentBrain::enableSelfMonitor(bool enable) {
+    // Enable self-monitoring and prediction systems
+    selfMonitorEnabled_ = enable;
+}
+
+void AgentBrain::enableAutonomousDevelopment(bool enable) {
+    // Enable autonomous developmental processes
+    autonomousDevelopmentEnabled_ = enable;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -345,6 +538,202 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset advanced features
+    advancedLearningEnabled_ = false;
+    metaControlEnabled_ = false;
+    selfMonitorEnabled_ = false;
+    autonomousDevelopmentEnabled_ = false;
+    learningRate_ = 1.0f;
+    explorationRate_ = 0.1f;
+    
+    // Reset performance tracking
+    totalStepsExecuted_ = 0;
+    successfulActions_ = 0;
+    cumulativeReward_ = 0.0f;
+    
+    // Reset environment
+    environmentalTemperature_ = 20.0f;
+    environmentalHumidity_ = 50.0f;
+    environmentalPressure_ = 1013.0f;
+}
+
+void AgentBrain::addError(float error) {
+    // Add prediction error signal
+    predictionError_ += error;
+    predictionError_ = std::clamp(predictionError_, -1.0f, 1.0f);
+}
+
+void AgentBrain::executeExplorationPattern() {
+    // Execute exploration behavior based on curiosity level
+    if (curiosityEnabled_ && curiosityLevel_ > 0.5f) {
+        // High curiosity = more random exploration
+        float exploreChance = curiosityLevel_ * explorationRate_;
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            // Random motor command for exploration
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            switch (choice) {
+                case 0: 
+                    // Inject current to neurons to trigger random activity
+                    brain_->injectCurrentToNeurons(NeuronType::Motor, 40.0f);
+                    break;
+                case 1: 
+                    brain_->injectCurrentToNeurons(NeuronType::Sensory, 20.0f);
+                    break;
+                case 2: 
+                    brain_->injectCurrentToNeurons(NeuronType::Internal, 15.0f);
+                    break;
+                case 3: 
+                    // Increase plasticity for exploration
+                    if (auto* stdp = brain_->getSTDP()) {
+                        stdp->setLTPWeight(stdp->getLTPWeight() * 1.5f);
+                        stdp->setLTDWeight(stdp->getLTDWeight() * 1.5f);
+                    }
+                    break;
+                default: 
+                    // Just trigger random spiking
+                    brain_->injectCurrentToNeurons(NeuronType::Excitatory, 25.0f);
+                    break;
+            }
+        }
+    }
+}
+
+void AgentBrain::updateAutonomousDevelopment(double timestep) {
+    if (autonomousDevelopmentEnabled_) {
+        // Autonomous developmental processes
+        developmentalAge_ += timestep;
+        
+        // Change developmental stage based on age
+        if (developmentalAge_ > 120.0 && developmentalAge_ < 180.0) {
+            // Adolescence - optimize for exploration
+            plasticityModifier_ = 0.9f;
+            curiosityEnabled_ = true;
+            
+            // Increase connection formation rate
+            if (auto* sp = brain_->getStructuralPlasticity()) {
+                sp->setSynaptogenesisRate(0.0002f);
+                sp->setPruningRate(0.00002f);
+            }
+        } else if (developmentalAge_ > 300.0 && developmentalAge_ < 600.0) {
+            // Adulthood - optimize for efficiency
+            plasticityModifier_ = 0.5f;
+            curiosityEnabled_ = false;
+            
+            // Stabilize connections
+            if (auto* sp = brain_->getStructuralPlasticity()) {
+                sp->setSynaptogenesisRate(0.00005f);
+                sp->setPruningRate(0.00001f);
+            }
+        }
+    }
+}
+
+void AgentBrain::setEnvironmentalContext(float temperature, float humidity, float pressure) {
+    // Set environmental context that affects brain function
+    environmentalTemperature_ = temperature;
+    environmentalHumidity_ = humidity;
+    environmentalPressure_ = pressure;
+    
+    // Environmental effects on brain
+    if (temperature > 35.0f) {
+        // Heat stress - reduce plasticity
+        plasticityModifier_ *= 0.8f;
+    } else if (temperature < 10.0f) {
+        // Cold stress - increase exploration
+        curiosityEnabled_ = true;
+        explorationRate_ = std::min(explorationRate_ * 1.2f, 1.0f);
+    }
+    
+    if (humidity > 80.0f) {
+        // High humidity - increase novelty detection
+        sensoryNoveltyDecay_ = 0.95f;
+    }
+    
+    if (pressure > 1013.0f) {
+        // High pressure - reduce risk-taking
+        explorationRate_ *= 0.9f;
+    }
+}
+
+float AgentBrain::getNeuromodulationScore() const {
+    // Get combined neuromodulation score
+    float score = 0.0f;
+    
+    // Dopamine contribution
+    score += std::abs(dopamineLevel_) * 0.4f;
+    
+    // Curiosity contribution
+    score += curiosityLevel_ * 0.3f;
+    
+    // Novelty contribution
+    score += noveltyLevel_ * 0.2f;
+    
+    // Prediction error contribution
+    score += std::abs(predictionError_) * 0.1f;
+    
+    return score;
+}
+
+void AgentBrain::resetEnvironmentalContext() {
+    environmentalTemperature_ = 20.0f;
+    environmentalHumidity_ = 50.0f;
+    environmentalPressure_ = 1013.0f;
+}
+
+void AgentBrain::precomputeEligibilityTraces() {
+    if (!advancedLearningEnabled_) return;
+    
+    // Pre-compute eligibility traces for faster reward-modulated learning
+    // This is a placeholder for more sophisticated eligibility trace computation
+    for (const auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            // Simple trace initialization
+            float trace = syn->getEligibilityTrace();
+            trace *= 0.95f; // Decay
+            syn->setEligibilityTrace(trace);
+        }
+    }
+}
+
+void AgentBrain::enableSelfOptimization(bool enable) {
+    // Enable self-optimization systems
+    if (enable) {
+        // Enable meta-learning
+        metaControlEnabled_ = true;
+        selfMonitorEnabled_ = true;
+        
+        // Set appropriate learning rates for meta-learning
+        learningRate_ = 0.5f;
+        explorationRate_ = 0.3f;
+    } else {
+        metaControlEnabled_ = false;
+        selfMonitorEnabled_ = false;
+    }
+}
+
+void AgentBrain::recordSuccess() {
+    // Record a successful action
+    successfulActions_++;
+}
+
+void AgentBrain::recordStep() {
+    // Record a simulation step
+    totalStepsExecuted_++;
+}
+
+float AgentBrain::getSuccessRate() const {
+    // Get success rate
+    if (totalStepsExecuted_ == 0) return 0.0f;
+    return static_cast<float>(successfulActions_) / totalStepsExecuted_;
+}
+
+float AgentBrain::getAverageReward() const {
+    // Get average reward per step
+    if (totalStepsExecuted_ == 0) return 0.0f;
+    return cumulativeReward_ / totalStepsExecuted_;
 }
 
 } // namespace nlm
