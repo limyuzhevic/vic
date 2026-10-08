@@ -111,6 +111,8 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
@@ -1017,10 +1019,68 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
+
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
+}
+
+// ========== MEMORY SYSTEM INTEGRATION ==========
+
+void Brain::integrateMemorySystems() {
+    if (!pImpl->workingMemory) return;
+    
+    // Working memory integration with attention
+    pImpl->workingMemory->setAttentionCallback(
+        [this](NeuronId winner) {
+            if (pImpl->attention) {
+                pImpl->attention->processCompetition(std::vector<NeuronId>{winner});
+            }
+        }
+    );
+    
+    // Working memory consolidation with episodic memory
+    if (pImpl->episodicMemory) {
+        pImpl->workingMemory->setConsolidationCallback(
+            [this](const std::vector<NeuronId>& memoryNeurons) {
+                // Convert working memory to episodic episode
+                std::vector<NeuronId> activeNeurons;
+                std::vector<float> activationStrengths;
+                
+                for (const auto& region : pImpl->regions) {
+                    for (const auto& pop : region->getPopulations()) {
+                        for (const auto* neuron : pop->getNeurons()) {
+                            if (std::find(memoryNeurons.begin(), memoryNeurons.end(), neuron->getId()) != memoryNeurons.end()) {
+                                activeNeurons.push_back(neuron->getId());
+                                activationStrengths.push_back(
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f
+                                );
+                            }
+                        }
+                    }
+                }
+                
+                if (!activeNeurons.empty()) {
+                    // Create episode with reward from dopamine
+                    Episode episode;
+                    episode.activeNeurons = activeNeurons;
+                    episode.neuronActivations = activationStrengths;
+                    episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                    episode.timestamp = pImpl->currentTime;
+                    
+                    pImpl->episodicMemory->storeEpisode(episode);
+                }
+            }
+        );
+    }
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
