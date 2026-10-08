@@ -24,7 +24,12 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
-    ${NLM_SOURCE_DIR}/brain/Brain.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainRefactored.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainComputation.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainMemory.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainCognition.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainNeuromodulation.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainIntegration.cpp
     ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
