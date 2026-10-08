@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Raises RuntimeError if file not found or invalid.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file. Raises RuntimeError if write fails.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,156 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Enhanced Python-friendly methods with validation
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue = 0) {
+            std::optional<int> value = self.get<int>(key);
+            if (!value) {
+                self.set(key, defaultValue, ConfigSource::Runtime);
+                return defaultValue;
+            }
+            return *value;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+            "Get integer value with default. If key doesn't exist, sets it to default and returns default.")
+        
+        .def("getFloat", [](Config& self, const std::string& key, double defaultValue = 0.0) {
+            std::optional<double> value = self.get<double>(key);
+            if (!value) {
+                self.set(key, defaultValue, ConfigSource::Runtime);
+                return defaultValue;
+            }
+            return *value;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+            "Get float value with default. If key doesn't exist, sets it to default and returns default.")
+        
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            std::optional<bool> value = self.get<bool>(key);
+            if (!value) {
+                self.set(key, defaultValue, ConfigSource::Runtime);
+                return defaultValue;
+            }
+            return *value;
+        }, py::arg("key"), py::arg("defaultValue") = false,
+            "Get boolean value with default. If key doesn't exist, sets it to default and returns default.")
+        
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue = "") {
+            std::optional<std::string> value = self.get<std::string>(key);
+            if (!value) {
+                self.set(key, defaultValue, ConfigSource::Runtime);
+                return defaultValue;
+            }
+            return *value;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+            "Get string value with default. If key doesn't exist, sets it to default and returns default.")
+        
+        .def("setInt", [](Config& self, const std::string& key, int value, 
+                         ConfigSource source = ConfigSource::Runtime) {
+            // Validate key format
+            if (key.empty() || key.find('.') == std::string::npos) {
+                throw py::value_error("Invalid key format. Use 'section.key' format.");
+            }
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+            "Set integer configuration value. Key must be in 'section.key' format.")
+        
+        .def("setFloat", [](Config& self, const std::string& key, double value,
+                           ConfigSource source = ConfigSource::Runtime) {
+            // Validate key format
+            if (key.empty() || key.find('.') == std::string::npos) {
+                throw py::value_error("Invalid key format. Use 'section.key' format.");
+            }
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+            "Set float configuration value. Key must be in 'section.key' format.")
+        
+        .def("setBool", [](Config& self, const std::string& key, bool value,
+                          ConfigSource source = ConfigSource::Runtime) {
+            // Validate key format
+            if (key.empty() || key.find('.') == std::string::npos) {
+                throw py::value_error("Invalid key format. Use 'section.key' format.");
+            }
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+            "Set boolean configuration value. Key must be in 'section.key' format.")
+        
+        .def("setString", [](Config& self, const std::string& key, const std::string& value,
+                            ConfigSource source = ConfigSource::Runtime) {
+            // Validate key format
+            if (key.empty() || key.find('.') == std::string::npos) {
+                throw py::value_error("Invalid key format. Use 'section.key' format.");
+            }
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+            "Set string configuration value. Key must be in 'section.key' format.")
+        
+        .def("getConfigDict", [](const Config& self) {
+            auto keys = self.getKeys();
+            std::map<std::string, std::string> configDict;
+            for (const auto& key : keys) {
+                // Try to get as string first, fallback to other types
+                std::optional<std::string> strOpt = self.get<std::string>(key);
+                if (strOpt) {
+                    configDict[key] = *strOpt;
+                } else {
+                    configDict[key] = "[]"; // Simplified representation
+                }
+            }
+            return configDict;
+        }, "Get configuration as Python-friendly dictionary")
+        
+        .def("getSection", [](const Config& self, const std::string& section) {
+            std::map<std::string, std::string> sectionDict;
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                if (key.find(section + ".") == 0) {
+                    std::string subkey = key.substr(section.length() + 1);
+                    std::optional<std::string> strOpt = self.get<std::string>(key);
+                    if (strOpt) {
+                        sectionDict[subkey] = *strOpt;
+                    }
+                }
+            }
+            return sectionDict;
+        }, py::arg("section"),
+            "Get all configuration values for a specific section.")
+        
+        .def("setSection", [](Config& self, const std::string& section, 
+                              const std::map<std::string, std::string>& sectionDict,
+                              ConfigSource source = ConfigSource::Runtime) {
+            for (const auto& [subkey, value] : sectionDict) {
+                std::string fullKey = section + "." + subkey;
+                // Try to infer type and set appropriately
+                try {
+                    // Try to parse as boolean
+                    if (value == "true" || value == "false") {
+                        self.set(fullKey, value == "true", source);
+                    }
+                    // Try to parse as int
+                    else {
+                        size_t pos;
+                        int intValue = std::stoi(value, &pos);
+                        if (pos == value.length()) {
+                            self.set(fullKey, intValue, source);
+                            continue;
+                        }
+                    }
+                    // Try to parse as float
+                    size_t pos2;
+                    double floatValue = std::stod(value, &pos2);
+                    if (pos2 == value.length()) {
+                        self.set(fullKey, floatValue, source);
+                        continue;
+                    }
+                    // Treat as string
+                    self.set(fullKey, value, source);
+                } catch (const std::exception&) {
+                    // If parsing fails, treat as string
+                    self.set(fullKey, value, source);
+                }
+            }
+        }, py::arg("section"), py::arg("sectionDict"), py::arg("source") = "Runtime",
+            "Set multiple configuration values for a section from a dictionary.")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -289,10 +439,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+              "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
@@ -351,54 +501,122 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Enhanced convenience methods
+        .def("runSimulation", [](Brain& self, int numSteps) {
+            for (int step = 0; step < numSteps; ++step) {
+                self.step(step);
+            }
+        }, py::arg("numSteps"), "Run simulation for specified number of steps")
+        
+        .def("getStats", [](const Brain& self) {
+            return std::map<std::string, std::variant<size_t, float, std::string>>({
+                {"total_neurons", self.getTotalNeuronCount()},
+                {"total_synapses", self.getTotalSynapseCount()},
+                {"active_neurons", self.getActiveNeuronCount()},
+                {"firing_neurons", self.getFiringNeuronCount()},
+                {"average_firing_rate", self.getAverageFiringRate()},
+                {"excitation_inhibition_ratio", self.getExcitationInhibitionRatio()},
+                {"total_spikes", self.getTotalSpikeCount()},
+                {"development_stage", static_cast<int>(self.getDevelopmentalStage())}
+            });
+        }, "Get comprehensive brain statistics")
+        
+        .def("__repr__", [](const Brain& self) {
+            return "<Brain: neurons=" + std::to_string(self.getTotalNeuronCount()) +
+                   ", synapses=" + std::to_string(self.getTotalSynapseCount()) +
+                   ", firing=" + std::to_string(self.getFiringNeuronCount()) + 
+                   ", stage=" + std::to_string(static_cast<int>(self.getDevelopmentalStage())) + ">";
+        });
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
+              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
+              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
+              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+              py::arg("percept"),
+              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
+              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+              py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+              py::arg("timestep"),
+              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
+              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+              "Get current neuromodulation level")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
+              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+              "Get prediction error")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Enhanced convenience methods for better user experience
+        .def("stepWorld", [](AgentBrain& self, SimpleWorld& world, double timestep) {
+            auto percept = world.getSensoryPercept();
+            self.processSensoryInput(percept);
+            return self.decodeMotorCommand();
+        }, py::arg("world"), py::arg("timestep"),
+             "Perform one complete world step: sense and act")
+        
+        .def("runEpisode", [](AgentBrain& self, SimpleWorld& world, 
+                            double timestep, int numSteps) {
+            for (int step = 0; step < numSteps; ++step) {
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                world.applyMotorCommand(self.decodeMotorCommand(), world.getSimulationTime());
+                world.update(timestep);
+            }
+        }, py::arg("world"), py::arg("timestep"), py::arg("numSteps"),
+             "Run a complete episode of world interaction")
+        
+        .def("enableAllSystems", &AgentBrain::enableRewardModulation, 
+              py::arg("enable"), "Enable/disable all learning systems")
+        
+        .def("getSystemStatus", [](const AgentBrain& self) {
+            return std::map<std::string, std::variant<bool, float, std::string>>({
+                {"reward_modulation", self.isRewardModulationEnabled()},
+                {"structural_plasticity", self.isStructuralPlasticityEnabled()},
+                {"development", self.isDevelopmentEnabled()},
+                {"curiosity", self.isCuriosityEnabled()},
+                {"curiosity_level", self.getCuriosityLevel()},
+                {"novelty_level", self.getNoveltyLevel()},
+                {"prediction_error", self.getPredictionError()},
+                {"neuromodulation_level", self.getNeuromodulationLevel()}
+            });
+        }, "Get comprehensive system status")
+        
+        .def("__repr__", [](const AgentBrain& self) {
+            return "<AgentBrain: reward_modulation=" + 
+                   std::string(self.isRewardModulationEnabled() ? "enabled" : "disabled") +
+                   ", development_stage=" + std::to_string(static_cast<int>(self.getDevelopmentalStage())) + ">";
+        })
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
