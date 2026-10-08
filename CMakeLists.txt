@@ -15,8 +15,39 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
+
+# Performance optimization options
+option(NLM_ENABLE_SSE "Enable SSE optimizations" ON)
+option(NLM_ENABLE_AVX "Enable AVX optimizations" OFF)
+option(NLM_ENABLE_FMA "Enable FMA instructions" OFF)
+option(NLM_ENABLE_SIMD "Enable general SIMD optimizations" ON)
+option(NLM_PARALLEL_PROCESSING "Enable parallel processing" ON)
+option(NLM_MEMORY_POOLS "Enable memory pools" ON)
+
+# Debug and profiling
+option(NLM_ENABLE_DEBUG_INFO "Enable debug information" OFF)
+option(NLM_ENABLE_PROFILING "Enable profiling support" OFF)
+option(NLM_ENABLE_COVERAGE "Enable code coverage" OFF)
+
+# Python bindings
+option(NLM_BUILD_PYTHON "Build Python bindings" ON)
+option(NLM_PYTHON_MODULE_NAME "Python module name" pynlm)
+option(NLM_PYTHON_PACKAGE_NAME "Python package name" nlm)
+
+# Visualization
+option(NLM_ENABLE_VISUALIZATION "Enable visualization support" OFF)
+option(NLM_ENABLE_GRAPHICS "Enable graphics libraries" OFF)
+
+# Testing
+option(NLM_BUILD_TESTS "Build tests" ON)
+option(NLM_ENABLE_BENCHMARKS "Enable benchmarks" OFF)
+
+# Install targets
+option(NLM_INSTALL_HEADERS "Install headers" ON)
+option(NLM_INSTALL_PYTHON "Install Python bindings" ON)
+option(NLM_INSTALL_DOC "Install documentation" ON)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
