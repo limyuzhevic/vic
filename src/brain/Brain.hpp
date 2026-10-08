@@ -6,24 +6,36 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/ErrorHandling.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for independent modules
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
+// Memory system interfaces
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+
+// Prediction system interfaces
 class PredictionSystem;
+class NeuralPrediction;
+
+// Cognition system interfaces
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+
+// Development system interfaces
 class DevelopmentSystem;
+
+// Neuromodulation system interfaces
 class Dopamine;
 class Curiosity;
 class Novelty;
@@ -44,10 +56,9 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+// Central coordinator of the neural system
+// Uses composition over inheritance to reduce coupling
+// Each subsystem is independent and can be modified/replaced
 class Brain {
 public:
     // Create brain with configuration
@@ -71,7 +82,6 @@ public:
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron
@@ -194,6 +204,47 @@ public:
     void logStatus() const;
     
 private:
+    // Composition of subsystems
+    std::shared_ptr<Config> config_;
+    std::shared_ptr<RandomGenerator> random_;
+    std::shared_ptr<SimulationClock> clock_;
+    std::shared_ptr<Logger> logger_;
+    
+    // Neural subsystems
+    std::unique_ptr<SpikeSystem> spikeSystem_;
+    std::unique_ptr<STDP> stdp_;
+    std::unique_ptr<Hebbian> hebbian_;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity_;
+    
+    // Brain regions
+    std::vector<std::unique_ptr<NeuralRegion>> regions_;
+    
+    // Inter-region connections
+    std::vector<InterRegionConnection> interRegionConnections_;
+    
+    // Memory subsystems
+    std::unique_ptr<NeuralWorkingMemory> workingMemory_;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory_;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory_;
+    
+    // Prediction system
+    std::unique_ptr<PredictionSystem> predictionSystem_;
+    
+    // Cognition systems
+    std::unique_ptr<NeuralPlanner> planner_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<AttentionalSelection> attention_;
+    
+    // Development system
+    std::unique_ptr<DevelopmentSystem> developmentSystem_;
+    
+    // Neuromodulation systems
+    std::unique_ptr<Dopamine> dopamine_;
+    std::unique_ptr<Curiosity> curiosity_;
+    std::unique_ptr<Novelty> novelty_;
+    std::unique_ptr<PredictionError> predictionError_;
+    
+    // Private implementation (for PIMPL pattern if needed)
     struct Impl;
     Impl* pImpl;
 };

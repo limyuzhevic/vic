@@ -4,7 +4,7 @@
 
 namespace nlm {
 
-// Hebbian learning implementation
+// Hebbian learning implementation - Covariance rule
 class Hebbian : public PlasticityRule {
 public:
     Hebbian();
@@ -17,11 +17,28 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
+    // Basic parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
     
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
+    
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    // Advanced parameters
+    void setCovarianceThreshold(float threshold);
+    float getCovarianceThreshold() const;
+    
+    void setActivityBaseline(float baseline);
+    float getActivityBaseline() const;
+    
+    void setAdaptationRate(float rate);
+    float getAdaptationRate() const;
+    
+    void setActivityWindow(float window);
+    float getActivityWindow() const;
     
 private:
     struct Impl;
