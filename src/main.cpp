@@ -1,11 +1,17 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase integrates all existing systems into a coherent artificial brain.
+// All previous phases built individual components; Phase 6 ensures they work together as a unified system.
+//
+// Phase 6 Integration Achievements:
+// - Memory systems (working memory, episodic memory, associative memory)
+// - Neuromodulation (dopamine, curiosity, novelty detection)
+// - Prediction system
+// - Cognition systems (neural planner, concept formation, attention)
+// - Development integration
+// - Persistence (checkpoint save/load)
+// - Replay and consolidation
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
