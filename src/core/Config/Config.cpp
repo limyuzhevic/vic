@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +20,80 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    try {
+        // Try to parse as JSON first
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        pImpl->entries.clear();
+        
+        // Convert JSON to ConfigEntry vector
+        for (auto& [key, value] : jsonData.items()) {
+            ConfigEntry entry;
+            entry.key = key;
+            entry.source = ConfigSource::File;
+            
+            // Parse value based on type
+            if (value.is_string()) {
+                entry.value = value.get<std::string>();
+                entry.description = "JSON string value";
+            } else if (value.is_number_integer()) {
+                entry.value = value.get<int>();
+                entry.description = "JSON integer value";
+            } else if (value.is_number_float()) {
+                entry.value = value.get<double>();
+                entry.description = "JSON float value";
+            } else if (value.is_boolean()) {
+                entry.value = value.get<bool>();
+                entry.description = "JSON boolean value";
+            } else if (value.is_array()) {
+                // For arrays, we need to determine element type
+                if (!value.empty()) {
+                    if (value[0].is_number_integer()) {
+                        entry.value = value.get<std::vector<int>>();
+                        entry.description = "JSON integer array";
+                    } else if (value[0].is_number_float()) {
+                        entry.value = value.get<std::vector<double>>();
+                        entry.description = "JSON float array";
+                    } else if (value[0].is_string()) {
+                        entry.value = value.get<std::vector<std::string>>();
+                        entry.description = "JSON string array";
+                    } else {
+                        // Default to string array
+                        std::vector<std::string> strArray;
+                        for (const auto& item : value) {
+                            strArray.push_back(item.get<std::string>());
+                        }
+                        entry.value = strArray;
+                        entry.description = "JSON string array (default)";
+                    }
+                } else {
+                    entry.value = std::vector<int>();
+                    entry.description = "JSON empty array";
+                }
+            } else {
+                // Default to string
+                entry.value = value.get<std::string>();
+                entry.description = "JSON string value (default)";
+            }
+            
+            pImpl->entries.push_back(entry);
+        }
+        
+        return true;
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        // If JSON parsing fails, fall back to simple key=value format
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,10 +156,35 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json jsonData;
+    
+    // Convert ConfigEntry vector to JSON
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to JSON
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                jsonData[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                jsonData[entry.key] = arg;
+            }
+        }, entry.value);
     }
+    
+    // Write JSON to file with pretty formatting
+    file << std::setw(2) << jsonData;
     
     return true;
 }
