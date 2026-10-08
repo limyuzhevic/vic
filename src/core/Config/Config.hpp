@@ -43,7 +43,6 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
 class Config {
 public:
     Config();
@@ -55,7 +54,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -63,8 +62,9 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    std::string saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with error checking
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
@@ -92,6 +92,11 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Internal parsing methods (for advanced users)
+    bool parseJSONFormat(const std::string& content);
+    bool parseYAMLFormat(const std::string& content);
+    bool parseSimpleFormat(const std::string& content, ConfigSource source = ConfigSource::Runtime);
     
 private:
     struct Impl;

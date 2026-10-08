@@ -18,6 +18,7 @@ public:
     // Format: row-major, values 0.0-1.0
     const std::vector<float>& getVision() const { return vision_; }
     void setVision(const std::vector<float>& v) { vision_ = v; }
+    void setVision(const std::vector<float>& v, size_t width, size_t height);
     size_t getVisionWidth() const { return visionWidth_; }
     size_t getVisionHeight() const { return visionHeight_; }
     
@@ -40,9 +41,18 @@ public:
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     
+    // Get signal by type for convenience
+    std::vector<float> getSignalByType(const std::string& type) const;
+    
     // Timestamp
     double getTimestamp() const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }
+    
+    // Validation
+    bool validate() const;
+    
+    // Format for display/debugging
+    std::string toString() const;
     
 private:
     std::vector<float> vision_;
