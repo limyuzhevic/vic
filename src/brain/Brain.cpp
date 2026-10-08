@@ -7,6 +7,9 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
@@ -14,6 +17,8 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SemanticWorkingMemory.hpp"
+#include "../cognition/ProceduralWorkingMemory.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -40,12 +45,20 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SemanticWorkingMemory> semanticWorkingMemory;
+    std::unique_ptr<ProceduralWorkingMemory> proceduralWorkingMemory;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
+    std::unique_ptr<SelfModel> selfModel;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -120,12 +133,20 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        semanticWorkingMemory = std::make_unique<SemanticWorkingMemory>();
+        proceduralWorkingMemory = std::make_unique<ProceduralWorkingMemory>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
+        selfModel = std::make_unique<SelfModel>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -250,14 +271,31 @@ bool Brain::initialize() {
     pImpl->planner->setPlanningDepth(5);
     
     pImpl->conceptFormation->initialize(this);
-    
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
+    // Initialize new neural cognitive systems
+    pImpl->semanticWorkingMemory->initialize(this);
+    pImpl->proceduralWorkingMemory->initialize(this);
+    pImpl->spatialRepresentation->initialize(this);
+    pImpl->temporalRelation->initialize(this);
+    pImpl->selfModel->initialize(this);
+    
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
+    
+    // Connect neuromodulators to brain
+    pImpl->dopamine->setBrainReference(this);
+    pImpl->acetylcholine->setBrainReference(this);
+    pImpl->norepinephrine->setBrainReference(this);
+    pImpl->serotonin->setBrainReference(this);
+    pImpl->curiosity->setBrainReference(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -1037,6 +1075,40 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+// ========== COGNITION SYSTEM ACCESSORS ==========
+
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+SemanticWorkingMemory* Brain::getSemanticWorkingMemory() {
+    return pImpl->semanticWorkingMemory.get();
+}
+
+ProceduralWorkingMemory* Brain::getProceduralWorkingMemory() {
+    return pImpl->proceduralWorkingMemory.get();
+}
+
+SpatialRepresentation* Brain::getSpatialRepresentation() {
+    return pImpl->spatialRepresentation.get();
+}
+
+TemporalRelation* Brain::getTemporalRelation() {
+    return pImpl->temporalRelation.get();
+}
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
@@ -1055,6 +1127,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {

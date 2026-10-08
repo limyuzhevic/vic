@@ -25,9 +25,17 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SemanticWorkingMemory;
+class ProceduralWorkingMemory;
+class SpatialRepresentation;
+class TemporalRelation;
+class SelfModel;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,6 +172,21 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Neural semantic working memory
+    SemanticWorkingMemory* getSemanticWorkingMemory();
+    
+    // Neural procedural working memory
+    ProceduralWorkingMemory* getProceduralWorkingMemory();
+    
+    // Spatial representation for navigation
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relation processing
+    TemporalRelation* getTemporalRelation();
+    
+    // Neural self-model
+    SelfModel* getSelfModel();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -174,6 +197,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
