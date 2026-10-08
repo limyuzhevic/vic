@@ -1,6 +1,8 @@
 #include "SpikeSystem.hpp"
 #include <algorithm>
 #include <limits>
+#include <unordered_set>
+#include <chrono>
 
 namespace nlm {
 
@@ -12,10 +14,40 @@ struct SpikeSystem::Impl {
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
     size_t maxHistorySize;
     
+    // Track spike delivery statistics
+    struct DeliveryStats {
+        uint64_t totalDelivered = 0;
+        uint64_t totalDropped = 0;
+        float deliveryEfficiency = 1.0f;
+        float averageDeliveryTime = 0.0f;
+        std::chrono::steady_clock::time_point lastDelivery;
+        uint64_t spikesProcessed = 0;
+        uint64_t spikesDropped = 0;
+        
+        // Reset function to reinitialize stats
+        void reset() {
+            totalDelivered = 0;
+            totalDropped = 0;
+            deliveryEfficiency = 1.0f;
+            averageDeliveryTime = 0.0f;
+            lastDelivery = std::chrono::steady_clock::time_point();
+            spikesProcessed = 0;
+            spikesDropped = 0;
+        }
+    } deliveryStats;
+    
+    // Maximum number of delayed spikes to store
+    size_t maxDelayedSpikes;
+    
+    // Function to lookup neurons by ID for spike delivery
+    NeuronLookupFunc neuronLookupFunc;
+    
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    Impl() : maxHistorySize(10000), maxDelayedSpikes(100000) {
+        deliveryStats.reset();
+    }
 };
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
@@ -68,7 +100,7 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         
         // Trim history if needed
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin() + pImpl->maxHistorySize, pImpl->spikeHistory.end());
         }
         
         // Call handlers
@@ -88,9 +120,44 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
             for (auto& handler : pImpl->delayedHandlers) {
                 handler(delayedEvent);
             }
+            
+            // Update delivery statistics
+            pImpl->deliveryStats.totalDelivered++;
+            pImpl->deliveryStats.spikesProcessed++;
+            
+            // Record delivery time
+            auto deliveryTime = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(deliveryTime - pImpl->deliveryStats.lastDelivery);
+            float elapsedSeconds = static_cast<float>(elapsed.count()) / 1000000.0f;
+            pImpl->deliveryStats.averageDeliveryTime = (pImpl->deliveryStats.averageDeliveryTime + elapsedSeconds) / 2.0f;
+            pImpl->deliveryStats.lastDelivery = deliveryTime;
         }
+        
         // Remove processed spikes
         pImpl->delayedSpikes.erase(it);
+    }
+    
+    // Cleanup old delayed spikes to prevent memory leak
+    // Remove entries older than the current step (approximate)
+    auto cleanupThreshold = currentStep - pImpl->maxDelayedSpikes / 10;  // Keep last 10% of steps
+    std::vector<SimulationStep> toRemove;
+    for (const auto& pair : pImpl->delayedSpikes) {
+        if (pair.first < cleanupThreshold) {
+            toRemove.push_back(pair.first);
+            pImpl->deliveryStats.totalDropped += pair.second.size();
+            pImpl->deliveryStats.spikesDropped += pair.second.size();
+        }
+    }
+    
+    for (const auto& step : toRemove) {
+        pImpl->delayedSpikes.erase(step);
+    }
+    
+    // Recalculate delivery efficiency
+    if (pImpl->deliveryStats.spikesProcessed > 0) {
+        pImpl->deliveryStats.deliveryEfficiency = 
+            static_cast<float>(pImpl->deliveryStats.totalDelivered) / 
+            static_cast<float>(pImpl->deliveryStats.spikesProcessed);
     }
 }
 
@@ -178,6 +245,28 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+    
+    // Reset delivery statistics
+    pImpl->deliveryStats = DeliveryStats{};
 }
 
-} // namespace nlm
+// Implementation of new methods
+void SpikeSystem::setNeuronLookupFunc(NeuronLookupFunc lookupFunc) {
+    pImpl->neuronLookupFunc = lookupFunc;
+}
+
+void SpikeSystem::setMaxDelayedSpikes(size_t maxDelayedSpikes) {
+    pImpl->maxDelayedSpikes = maxDelayedSpikes;
+}
+
+SpikeSystem::DeliveryStats SpikeSystem::getDeliveryStats() const {
+    return pImpl->deliveryStats;
+}
+
+float SpikeSystem::getDeliveryEfficiency() const {
+    return pImpl->deliveryStats.deliveryEfficiency;
+}
+
+float SpikeSystem::getAverageDeliveryTime() const {
+    return pImpl->deliveryStats.averageDeliveryTime;
+}

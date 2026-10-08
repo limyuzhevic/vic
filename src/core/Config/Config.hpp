@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -28,7 +29,8 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    Preset
 };
 
 // Configuration entry
@@ -93,13 +95,50 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Apply preset configuration
+    void applyPreset(const std::string& presetName);
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
+    // Merge configuration from another config object
+    void mergeFrom(const Config& other, ConfigSource source = ConfigSource::File);
+    
+    // Get default configuration template
+    static std::string getTemplate(const std::string& format = "json");
+    
+    // Validate configuration with detailed error reporting
+    std::vector<std::string> validateDetailed() const;
+    
+    // Get configuration quality score (0-100)
+    int getQualityScore() const;
+    
+    // Check if configuration is optimized
+    bool isOptimized() const;
+    
+    // Get memory usage of configuration
+    size_t getMemoryUsage() const;
 
 } // namespace nlm
+
+// nlohmann JSON serialization for ConfigValue
+template<typename... Ts>
+struct nlohmann::json_serializer<std::variant<Ts...>> {
+    static void to_json(json& j, const std::variant<Ts...>& value) {
+        j = nlm::Config::convertConfigValueToJson(value);
+    }
+    
+    static void from_json(const json& j, std::variant<Ts...>& value) {
+        value = nlm::Config::convertJsonToConfigValue(j);
+    }
+};
+
+// Explicit template instantiations
+extern template std::optional<int> nlm::Config::get<int>(const std::string&) const;
+extern template std::optional<int64_t> nlm::Config::get<int64_t>(const std::string&) const;
+extern template std::optional<double> nlm::Config::get<double>(const std::string&) const;
+extern template std::optional<bool> nlm::Config::get<bool>(const std::string&) const;
+extern template std::optional<std::string> nlm::Config::get<std::string>(const std::string&) const;
+
+extern template int nlm::Config::getOr<int>(const std::string&, const int&) const;
+extern template int64_t nlm::Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+extern template double nlm::Config::getOr<double>(const std::string&, const double&) const;
+extern template bool nlm::Config::getOr<bool>(const std::string&, const bool&) const;
+extern template std::string nlm::Config::getOr<std::string>(const std::string&, const std::string&) const;

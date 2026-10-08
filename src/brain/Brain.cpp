@@ -259,11 +259,13 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Track spike delivery statistics
+        ++pImpl->spikeSystem->pImpl->deliveryStats.spikesProcessed;
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -285,6 +287,22 @@ bool Brain::initialize() {
             }
         }
     });
+    
+    // Set neuron lookup function for efficient spike delivery
+    pImpl->spikeSystem->setNeuronLookupFunc([this](const NeuronId& neuronId) {
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == neuronId) {
+                    return neuron;
+                }
+            }
+        }
+        return static_cast<Neuron*>(nullptr);
+    });
+    
+    // Configure spike system
+    pImpl->spikeSystem->setMaxDelayedSpikes(100000);
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");

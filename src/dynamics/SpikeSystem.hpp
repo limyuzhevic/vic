@@ -56,21 +56,30 @@ public:
     using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
-    // Get spike history
-    const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
-    void clearHistory();
+    // Set function to lookup neurons by ID for spike delivery
+    // This is needed for delayed spike handlers to deliver synaptic input
+    using NeuronLookupFunc = std::function<Neuron*(const NeuronId&)>;
+    void setNeuronLookupFunc(NeuronLookupFunc lookupFunc);
     
-    // Get spike count
-    size_t getSpikeCount() const;
-    size_t getPendingSpikeCount() const;
-    size_t getPendingDelayedCount() const;
+    // Set maximum number of delayed spikes to store
+    void setMaxDelayedSpikes(size_t maxDelayedSpikes);
     
-    // Statistics
-    float getAverageSpikeRate() const;
-    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    // Get delivery statistics
+    struct DeliveryStats {
+        uint64_t totalDelivered;
+        uint64_t totalDropped;
+        float deliveryEfficiency;
+        float averageDeliveryTime;
+        uint64_t spikesProcessed;
+        uint64_t spikesDropped;
+    };
+    DeliveryStats getDeliveryStats() const;
     
-    // Reset
-    void reset();
+    // Get current delivery efficiency (0.0 to 1.0)
+    float getDeliveryEfficiency() const;
+    
+    // Get average time for spike delivery (in seconds)
+    float getAverageDeliveryTime() const;
     
 private:
     struct Impl;
