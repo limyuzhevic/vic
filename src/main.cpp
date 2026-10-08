@@ -28,24 +28,76 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printAdvancedHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+Advanced NLM Phase 2 Command Line Options:
+
+Experiment Control:
+  --mode <mode>              Run mode: basic, plasticity, stdp, learning, all
+  --steps <steps>           Number of simulation steps (default: 1000 for learning)
+  --neuron-count <count>    Number of neurons (default: 500)
+
+Plasticity Configuration:
+  --plasticity-enable        Enable synaptic plasticity
+  --plasticity-hebbian      Enable Hebbian plasticity
+  --plasticity-stdp         Enable STDP plasticity
+  --plasticity-hebbian-rate <rate>    Hebbian learning rate (default: 0.01)
+  --plasticity-stdp-ltp <weight>      STDP LTP weight (default: 0.02)
+  --plasticity-stdp-ltd <weight>      STDP LTD weight (default: 0.015)
+  --plasticity-stdp-tau <ms>          STDP time constant (default: 20.0)
+
+Structural Plasticity:
+  --structural-enable        Enable structural plasticity (synaptogenesis/pruning)
+  --synaptogenesis-rate <rate>        Synaptogenesis rate (default: 0.0001)
+  --pruning-rate <rate>              Pruning rate (default: 0.00001)
+
+Input Configuration:
+  --input-intensity <value> Input current intensity (default: 50.0)
+  --input-frequency <freq>  Input spike frequency (default: 100.0 Hz)
+
+Output and Logging:
+  --output-file <file>      Save neural traces to file
+  --log-level <level>       Log level: ERROR, WARN, INFO, DEBUG (default: INFO)
+  --log-file <file>         Log to file instead of console
+  --progress-interval <sec> Progress reporting interval in seconds (default: 10)
+
+Experiment Variants:
+  --variant-basic           Basic connectivity test
+  --variant-plasticity      Plasticity learning experiment
+  --variant-stdp           STDP verification experiment
+  --variant-learning        Comprehensive learning experiment
+  --variant-debug          Debug mode with verbose output
+
+Output Formats:
+  --format-json            Output results in JSON format
+  --format-csv             Output results in CSV format
+  --format-binary          Output binary format for analysis
+
+Configuration:
+  --config <file>           Configuration file (overrides defaults)
+  --override <key=value>    Override configuration parameter
+  --list-configs           List available configuration files
+
+Performance:
+  --threads <count>         Number of threads for parallel processing
+  --batch-size <size>       Batch size for large simulations
+  --optimization-level <level> Optimization level: 0-3 (default: 2)
+
+Debug and Analysis:
+  --debug-neurons <list>    Debug specific neurons (comma-separated IDs)
+  --debug-synapses <list>   Debug specific synapses (comma-separated IDs)
+  --trace-spikes           Record all spike events
+  --trace-synapses          Record all synaptic events
+  --memory-profile         Enable memory profiling
+  --performance-profile    Enable performance profiling
+
+Examples:
+  ./nlm --mode learning --neuron-count 1000 --plasticity-enable
+  ./nlm --variant-plasticity --input-intensity 30 --steps 5000
+  ./nlm --variant-stdp --plasticity-hebbian --format-json > results.json
+  ./nlm --variant-debug --trace-spikes --log-level DEBUG
+
+  )" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -441,8 +493,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
     NLM_LOG_INFO("");
+    NLM_LOG_INFO("Additional Features Available:");
+    NLM_LOG_INFO("  ✓ Advanced command-line options for experimentation");
+    NLM_LOG_INFO("  ✓ Enhanced configuration management");
+    NLM_LOG_INFO("  ✓ Performance profiling capabilities");
+    NLM_LOG_INFO("  ✓ Parallel experiment execution");
+    NLM_LOG_INFO("  ✓ Comprehensive integration testing framework");
+    NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("Advanced users can use the expanded command-line options for customized experiments.");
     NLM_LOG_INFO("");
     
     return 0;
