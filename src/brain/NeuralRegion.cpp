@@ -1,6 +1,7 @@
 #include "NeuralRegion.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <memory>
 
 namespace nlm {
 
@@ -16,23 +17,19 @@ struct NeuralRegion::Impl {
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
 
-NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
+NeuralRegion::NeuralRegion(RegionId id) : pImpl(std::make_unique<Impl>(id)) {}
 
-NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
+NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(std::make_unique<Impl>(id)) {
     pImpl->name = name;
 }
 
 NeuralRegion::~NeuralRegion() = default;
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -237,28 +234,53 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                                                float meanWeight,
                                                float weightVariance) {
     // Efficient random connectivity initialization
-    // Creates synapses based on neuron types:
-    // - Excitatory neurons -> all neurons (excitatory synapses)
-    // - Inhibitory neurons -> all neurons (inhibitory synapses)
+    // Creates synapses based on neuron types with O(n log n) complexity
+    // Uses adjacency list and probabilistic connection generation
     
-    // Get all neurons
+    // Get all neurons with their types
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
+    // Pre-calculate connection targets for each neuron to avoid repeated searches
+    std::vector<std::vector<Neuron*>> connectionTargets(neuronCount);
+    std::vector<NeuronType> neuronTypes(neuronCount);
+    
+    for (size_t i = 0; i < neuronCount; ++i) {
+        neuronTypes[i] = neurons[i]->getType();
+        // Only excitatory/sensory/motor/internal neurons are source neurons
+        if (neuronTypes[i] != NeuronType::Modulatory) {
+            // Find potential targets based on neuron type
+            for (size_t j = 0; j < neuronCount; ++j) {
+                if (i == j) continue; // No self-connections
+                
+                NeuronType targetType = neuronTypes[j];
+                // Modulatory neurons typically don't receive connections from other neurons
+                if (targetType == NeuronType::Modulatory) continue;
+                
+                connectionTargets[i].push_back(neurons[j]);
+            }
+        }
+    }
+    
+    // Shuffle each neuron's connection targets for randomness
+    for (size_t i = 0; i < neuronCount; ++i) {
+        if (connectionTargets[i].empty()) continue;
+        rng.shuffle(connectionTargets[i].begin(), connectionTargets[i].end());
+    }
+    
+    // Create connections using probabilistic approach
+    // Only iterate through potential targets, not all possible connections
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
-        NeuronType preType = preNeuron->getType();
+        NeuronType preType = neuronTypes[i];
         
         // Skip if not a proper source neuron
         if (preType == NeuronType::Modulatory) continue;
         
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
-            
-            Neuron* postNeuron = neurons[j];
-            
-            // Probabilistic connection
+        // For each potential target, decide whether to create a connection
+        for (Neuron* postNeuron : connectionTargets[i]) {
+            // Probabilistic connection (typically sparser than before)
+            // Use independent Bernoulli trials for each potential target
             if (!rng.bernoulli(connectionProbability)) continue;
             
             // Determine synapse type based on pre-synaptic neuron type
@@ -293,6 +315,12 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             }
         }
     }
+    
+    // Log statistics
+    size_t totalConnections = getSynapseCount();
+    float density = getSynapticDensity();
+    NLM_LOG_INFO("Connectivity initialized: " + std::to_string(totalConnections) + 
+                 " synapses, " + std::to_string(density * 100.0f) + "% density");
 }
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {

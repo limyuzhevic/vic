@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <string>
 
 namespace nlm {
 
@@ -71,9 +72,9 @@ public:
     
     // Initialize connectivity
     void initializeRandomConnectivity(class RandomGenerator& rng, 
-                                      float connectionProbability,
-                                      float meanWeight,
-                                      float weightVariance);
+                                       float connectionProbability,
+                                       float meanWeight,
+                                       float weightVariance);
     
     // Get all neurons across all populations
     std::vector<Neuron*> getAllNeurons();
@@ -81,7 +82,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -2,6 +2,7 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 namespace nlm {
 
@@ -16,7 +17,7 @@ struct STDP::Impl {
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP() : pImpl(std::make_unique<Impl>()) {}
 
 STDP::~STDP() = default;
 

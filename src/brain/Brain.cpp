@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <mutex>
 
 namespace nlm {
 
@@ -27,6 +28,9 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Thread safety
+    mutable std::mutex stepMutex;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -324,6 +328,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 13. Apply development effects
      * 14. Collect statistics
      */
+    
+    // Thread safety: Lock the mutex for the entire step operation
+    // This ensures consistent brain state across concurrent threads
+    std::lock_guard<std::mutex> lock(pImpl->stepMutex);
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;

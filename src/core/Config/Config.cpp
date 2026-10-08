@@ -6,8 +6,117 @@
 
 namespace nlm {
 
+// Validation helper functions
+namespace Validation {
+    bool isInRange(double value, double min, double max) {
+        return value >= min && value <= max;
+    }
+    
+    bool isPositive(double value) {
+        return value > 0.0;
+    }
+    
+    bool isNonNegative(double value) {
+        return value >= 0.0;
+    }
+    
+    bool isInteger(double value) {
+        return std::abs(value - std::round(value)) < 1e-6;
+    }
+    
+    bool isString(const std::string& value) {
+        return !value.empty();
+    }
+    
+    bool isValidNeuronCount(double value) {
+        return isInRange(value, 1.0, 10000.0) && isInteger(value);
+    }
+    
+    bool isValidSynapseCount(double value) {
+        return isInRange(value, 0.0, 1000000.0) && isInteger(value);
+    }
+    
+    bool isValidConnectionProbability(double value) {
+        return isInRange(value, 0.0, 1.0);
+    }
+    
+    bool isValidTimeStep(double value) {
+        return isInRange(value, 0.0001, 0.1);
+    }
+    
+    bool isValidPlasticityRate(double value) {
+        return isInRange(value, 0.0, 1.0);
+    }
+    
+    bool isValidWeight(double value) {
+        return isInRange(value, -10.0, 10.0);
+    }
+    
+    bool isValidBias(double value) {
+        return isInRange(value, -100.0, 100.0);
+    }
+    
+    bool isValidTemperature(double value) {
+        return isInRange(value, 0.0, 100.0);
+    }
+    
+    // Create validator with range
+    ValidationFunction rangeValidator(double min, double max) {
+        return [min, max](const ConfigValue& value) {
+            if (std::holds_alternative<double>(value)) {
+                return isInRange(std::get<double>(value), min, max);
+            } else if (std::holds_alternative<int>(value)) {
+                return isInRange(static_cast<double>(std::get<int>(value)), min, max);
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return isInRange(static_cast<double>(std::get<int64_t>(value)), min, max);
+            }
+            return false;
+        };
+    }
+    
+    ValidationFunction positiveValidator() {
+        return [](const ConfigValue& value) {
+            if (std::holds_alternative<double>(value)) {
+                return isPositive(std::get<double>(value));
+            } else if (std::holds_alternative<int>(value)) {
+                return isPositive(static_cast<double>(std::get<int>(value)));
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return isPositive(static_cast<double>(std::get<int64_t>(value)));
+            }
+            return false;
+        };
+    }
+    
+    ValidationFunction nonNegativeValidator() {
+        return [](const ConfigValue& value) {
+            if (std::holds_alternative<double>(value)) {
+                return isNonNegative(std::get<double>(value));
+            } else if (std::holds_alternative<int>(value)) {
+                return isNonNegative(static_cast<double>(std::get<int>(value)));
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return isNonNegative(static_cast<double>(std::get<int64_t>(value)));
+            }
+            return false;
+        };
+    }
+    
+    ValidationFunction integerValidator() {
+        return [](const ConfigValue& value) {
+            if (std::holds_alternative<double>(value)) {
+                return isInteger(std::get<double>(value));
+            } else if (std::holds_alternative<int>(value)) {
+                return true;
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return true;
+            }
+            return false;
+        };
+    }
+}
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<std::string> validationErrors;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -48,6 +157,7 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Set with default validator (no validation for file loading)
             set(key, value, ConfigSource::File);
         }
     }
@@ -114,32 +224,35 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const ValidationFunction& validator) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Update existing entry
         it->value = value;
         it->source = source;
+        it->validator = validator;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Create new entry
+        pImpl->entries.emplace_back(key, value, source, "", validator);
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, const std::string& value, ConfigSource source, const ValidationFunction& validator) {
+    set(key, ConfigValue(value), source, validator);
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, int value, ConfigSource source, const ValidationFunction& validator) {
+    set(key, ConfigValue(value), source, validator);
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, double value, ConfigSource source, const ValidationFunction& validator) {
+    set(key, ConfigValue(value), source, validator);
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, bool value, ConfigSource source, const ValidationFunction& validator) {
+    set(key, ConfigValue(value), source, validator);
 }
 
 bool Config::has(const std::string& key) const {
@@ -184,6 +297,22 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+bool Config::validate() const {
+    pImpl->validationErrors.clear();
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.validator && !entry.validator(entry.value)) {
+            pImpl->validationErrors.push_back("Invalid value for key '" + entry.key + "': validation failed");
+        }
+    }
+    
+    return pImpl->validationErrors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
 }
 
 std::string Config::trim(const std::string& str) {
