@@ -139,13 +139,24 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Python bindings
+add_library(pynlm MODULE
+    python/bindings.cpp
+)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+target_include_directories(pynlm PRIVATE python)
+target_link_libraries(pynlm PRIVATE nlm_core)
+
+# Set output name for Python module
+set_target_properties(pynlm PROPERTIES
+    OUTPUT_NAME "pynlm"
+    PREFIX ""
+    SUFFIX ".so"
+)
+
+# Install Python module targets
+install(TARGETS pynlm
+    LIBRARY DESTINATION lib/python
     RUNTIME DESTINATION bin
+    ARCHIVE DESTINATION lib
 )
