@@ -1,19 +1,16 @@
+// Phase4Demo.cpp - Refactored to use experiment utilities
+
+#include "Phase4Experiment.hpp"
+#include "experiment_utils.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../agent/AgentBrain.hpp"
+#include "../world/SimpleWorld.hpp"
 #include <iostream>
 #include <memory>
 #include <iomanip>
 #include <sstream>
-#include "core/Config/Config.hpp"
-#include "core/Logger/Logger.hpp"
-#include "brain/Brain.hpp"
-#include "agent/AgentBrain.hpp"
-#include "world/SimpleWorld.hpp"
-#include "experiments/Phase4Experiment.hpp"
-#include "prediction/NeuralPrediction.hpp"
-#include "memory/NeuralWorkingMemory.hpp"
-#include "memory/NeuralEpisodicMemory.hpp"
-#include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -46,20 +43,19 @@ int main(int argc, char* argv[]) {
         numTrials = std::stoi(argv[1]);
     }
     
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    // Use utility to create default configuration
+    auto config = createDefaultConfigForExperiment(1000, 2, 0.1f);
     
-    // Create brain
+    // Set additional configuration parameters
+    config.set("random_seed", uint64_t(42));
+    config.set("simulation_timestep", 0.001);
+    config.set("stdp_ltp_weight", 0.01f);
+    config.set("stdp_ltd_weight", 0.012f);
+    
+    // Use utility to create brain from config (reduces duplication)
     std::cout << "Initializing brain...\n";
-    auto brain = std::make_shared<Brain>(config);
-    if (!brain->initialize()) {
+    auto brain = createBrainFromConfig(config);
+    if (!brain) {
         std::cerr << "Failed to initialize brain!\n";
         return 1;
     }

@@ -42,6 +42,11 @@ public:
     // Set agent starting position
     void setAgentStart(float x, float y);
     
+    // Initialize world with configuration
+    void initialize(float width = 20.0f, float height = 20.0f, 
+                    size_t visionWidth = 16, size_t visionHeight = 16,
+                    float maxEnergy = 100.0f, float energyDecayRate = 0.01f);
+    
     // Update world state (call each simulation step)
     void update(double timestep);
     

@@ -32,6 +32,20 @@ SimpleWorld::SimpleWorld()
     agent_.reset();
 }
 
+void SimpleWorld::initialize(float width, float height, 
+                           size_t visionWidth, size_t visionHeight,
+                           float maxEnergy, float energyDecayRate) {
+    width_ = width;
+    height_ = height;
+    visionWidth_ = visionWidth;
+    visionHeight_ = visionHeight;
+    maxEnergy_ = maxEnergy;
+    energyDecayRate_ = energyDecayRate;
+    
+    // Reset the world after configuration
+    reset();
+}
+
 SimpleWorld::~SimpleWorld() = default;
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
@@ -398,6 +412,44 @@ void SimpleWorld::checkCollisions() {
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
     }
+}
+
+// Observe world state and create observation from sensory percept
+Observation SimpleWorld::observe(class NeuralRegion* region) const {
+    Observation observation;
+    observation.setFromPercept(sensory_);
+    return observation;
+}
+
+// Apply motor command using brain's motor neurons
+ActionResult SimpleWorld::applyAction(class NeuralRegion* region, MotorCommand cmd, double currentTime) {
+    // If region is provided, use it for motor neuron activation
+    // For now, use the standard motor command system
+    return applyMotorCommand(cmd, currentTime);
+}
+
+// Compute reward based on agent state and world conditions
+float SimpleWorld::computeReward(class NeuralRegion* region) const {
+    // Simple reward computation based on energy and resources
+    float reward = 0.0f;
+    
+    // Reward for having energy
+    if (agent_.energy > 0.0f) {
+        reward += agent_.energy * 0.1f;
+    }
+    
+    // Reward for hitting resources (check objects)
+    for (const auto& obj : objects_) {
+        if (obj.active && obj.type == WorldObjectType::Resource) {
+            float dist = std::sqrt((obj.x - agent_.x) * (obj.x - agent_.x) + 
+                                  (obj.y - agent_.y) * (obj.y - agent_.y));
+            if (dist < obj.radius + 0.5f) {  // Agent-body collision
+                reward += obj.value;
+            }
+        }
+    }
+    
+    return reward;
 }
 
 } // namespace nlm
