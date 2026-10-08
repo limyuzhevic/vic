@@ -1,7 +1,9 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 namespace nlm {
 
@@ -24,10 +26,28 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize state with biologically plausible defaults
+        state.membranePotential = -70.0f;  // Resting potential
+        state.restingPotential = -70.0f;
+        state.threshold = -55.0f;
+        state.resetPotential = -70.0f;
+        state.leakConductance = 10.0f;
+        state.synapseConductance = 0.0f;
+        state.firingRate = 0.0f;
+        state.firingState = FiringState::Resting;
+        state.refractoryRemaining = 0;
+        state.refractoryPeriod = 5;
+        state.adaptationVariable = 0.0f;
+        state.lastSpikeTime = -1.0f;
+    }
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(new Impl()) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Failed to allocate memory for neuron");
+        return;
+    }
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -51,144 +71,219 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
+    if (pImpl) {
+        pImpl->type = type;
+    }
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+    if (pImpl) {
+        // Validate membrane potential is within reasonable bounds
+        if (potential < -100.0f || potential > 50.0f) {
+            NLM_LOG_WARNING("Unusual membrane potential: " + std::to_string(potential));
+        }
+        pImpl->state.membranePotential = potential;
+    }
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+    if (pImpl) {
+        pImpl->state.membranePotential += delta;
+    }
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    if (pImpl) {
+        // Validate threshold is reasonable
+        if (threshold < -100.0f || threshold > 0.0f) {
+            NLM_LOG_WARNING("Unusual threshold: " + std::to_string(threshold));
+        }
+        pImpl->state.threshold = threshold;
+    }
 }
 
 void Neuron::setFiringState(FiringState state) {
-    pImpl->state.firingState = state;
+    if (pImpl) {
+        pImpl->state.firingState = state;
+    }
 }
 
 void Neuron::decrementRefractory() {
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+    if (pImpl) {
+        if (pImpl->state.refractoryRemaining > 0) {
+            --pImpl->state.refractoryRemaining;
+            if (pImpl->state.refractoryRemaining == 0) {
+                pImpl->state.firingState = FiringState::Resting;
+            }
         }
     }
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
-    pImpl->state.firingRate = rate;
+    if (pImpl) {
+        if (rate < 0.0f || rate > 1000.0f) {
+            NLM_LOG_WARNING("Unusual firing rate: " + std::to_string(rate));
+        }
+        pImpl->state.firingRate = rate;
+    }
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    if (pImpl) {
+        if (conductance < 0.0f || conductance > 100.0f) {
+            NLM_LOG_WARNING("Unusual leak conductance: " + std::to_string(conductance));
+        }
+        pImpl->state.leakConductance = conductance;
+    }
 }
 
 MembranePotential Neuron::getLeakConductance() const {
-    return pImpl->state.leakConductance;
+    return pImpl ? pImpl->state.leakConductance : 0.0f;
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
+    if (pImpl) {
+        if (steps > 1000) {
+            NLM_LOG_WARNING("Unusually long refractory period: " + std::to_string(steps) + " steps");
+        }
+        pImpl->state.refractoryPeriod = steps;
+        // Cap remaining refractory period if it's currently set
+        if (pImpl->state.refractoryRemaining > steps) {
+            pImpl->state.refractoryRemaining = steps;
+        }
+    }
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
-    return pImpl->state.refractoryPeriod;
+    return pImpl ? pImpl->state.refractoryPeriod : 0;
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    if (pImpl) {
+        if (potential < -100.0f || potential > 0.0f) {
+            NLM_LOG_WARNING("Unusual resting potential: " + std::to_string(potential));
+        }
+        pImpl->state.restingPotential = potential;
+    }
 }
 
 MembranePotential Neuron::getRestingPotential() const {
-    return pImpl->state.restingPotential;
+    return pImpl ? pImpl->state.restingPotential : 0.0f;
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    if (pImpl) {
+        pImpl->state.resetPotential = potential;
+    }
 }
 
 bool Neuron::checkThreshold() const {
-    return pImpl->state.membranePotential >= pImpl->state.threshold;
+    return pImpl && pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 float Neuron::getLastSpikeTime() const {
-    return pImpl->state.lastSpikeTime;
+    return pImpl ? pImpl->state.lastSpikeTime : -1.0f;
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    if (pImpl) {
+        if (amplitude < 0.0f) {
+            NLM_LOG_WARNING("Negative excitatory input amplitude: " + std::to_string(amplitude));
+        }
+        pImpl->synapticInput += amplitude;
+    }
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    if (pImpl) {
+        if (amplitude > 0.0f) {
+            NLM_LOG_WARNING("Positive inhibitory input amplitude: " + std::to_string(amplitude));
+        }
+        pImpl->synapticInput -= amplitude;
+    }
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    if (pImpl) {
+        pImpl->state.adaptationVariable += amplitude * 0.1f;
+    }
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    if (pImpl) {
+        if (std::abs(current) > 1000.0f) {
+            NLM_LOG_WARNING("Large current injection: " + std::to_string(current));
+        }
+        pImpl->synapticInput += current;
+    }
 }
 
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    if (pImpl) {
+        pImpl->synapticInput = 0.0f;
+    }
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    if (pImpl) {
+        pImpl->spikeHistory.push_back(timestamp);
+        if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        }
     }
 }
 
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    if (pImpl) {
+        pImpl->spikeHistory.clear();
+    }
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+    if (pImpl) {
+        pImpl->incomingSynapses.push_back(handle);
+    }
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+    if (pImpl) {
+        pImpl->outgoingSynapses.push_back(handle);
+    }
 }
 
 NeuronState& Neuron::getState() {
-    return pImpl->state;
+    static NeuronState emptyState;
+    return pImpl ? pImpl->state : emptyState;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
+    static PlasticityFlags emptyFlags;
+    return pImpl ? pImpl->plasticityFlags : emptyFlags;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+    if (pImpl) {
+        pImpl->plasticityFlags.hebbian = hebbian;
+        pImpl->plasticityFlags.stdp = stdp;
+        pImpl->plasticityFlags.reward_modulated = rewardModulated;
+    }
 }
 
 void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
+    if (pImpl) {
+        pImpl->regionId = region;
+    }
 }
 
 void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
+    if (pImpl) {
+        pImpl->populationId = population;
+    }
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    if (!pImpl) return false;
+    
     bool fired = false;
     
     // Handle refractory period
@@ -266,12 +361,16 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
-    pImpl->state = NeuronState();
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    if (pImpl) {
+        pImpl->state = NeuronState();
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+    }
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
+    if (!pImpl) return;
+    
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);

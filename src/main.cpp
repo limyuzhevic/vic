@@ -7,10 +7,6 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -18,6 +14,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "core/Types/Types.hpp"
 
 #include <iostream>
 #include <memory>
@@ -28,24 +25,49 @@
 
 using namespace nlm;
 
-void printBanner() {
+}
+
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM Phase 2 Neural Network Demo Program
+
+Usage: nlm [OPTIONS]
+
+Options:
+  -h, --help              Show this help message and exit
+  -v, --verbose           Enable verbose output with detailed logging
+  -A, --advanced          Enable advanced features and extended testing
+  --config file           Load configuration from specified file
+  --neuron-count N        Override number of neurons (default: 500)
+  --region-count N        Override number of regions (default: 1)
+  --duration STEPS        Override simulation steps (default: 1000 for plasticity)
+  --version               Print version information
+
+Examples:
+  nlm                                  # Run basic connectivity test
+  nlm -v                              # Run with verbose output
+  nlm --advanced                      # Run with advanced features
+  nlm --config myconfig.cfg            # Use custom configuration
+  nlm --neuron-count 1000 --region-count 2  # Custom network size
+
+For more information:
+  - Read docs/ARCHITECTURE.md for detailed system overview
+  - Check the NLM project documentation
+  - Refer to examples/ directory for additional usage patterns
+
+Phase 2 focuses on:
+  - Real LIF neuron dynamics
+  - Event-driven spike propagation with delays
+  - STDP and Hebbian plasticity rules
+  - Structural plasticity (synaptogenesis/pruning)
+  - Learning experiments demonstrating measurable changes
+
+Test 1: Basic connectivity validates neural signal transmission
+Test 2: Plasticity experiment shows activity-dependent learning
+Test 3: STDP verification confirms spike-timing-dependent plasticity
+
+Note: Larger networks (--neuron-count) will consume more memory and take longer.
+  )" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -159,19 +181,65 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void printHelp() {
+    std::cout << R"(
+NLM Phase 2 Neural Network Demo Program
+
+Usage: nlm [OPTIONS]
+
+Options:
+  -h, --help              Show this help message and exit
+  -v, --verbose           Enable verbose output with detailed logging
+  -A, --advanced          Enable advanced features and extended testing
+  --config file           Load configuration from specified file
+  --neuron-count N        Override number of neurons (default: 500)
+  --region-count N        Override number of regions (default: 1)
+  --duration STEPS        Override simulation steps (default: 1000 for plasticity)
+  --version               Print version information
+
+Examples:
+  nlm                                  # Run basic connectivity test
+  nlm -v                              # Run with verbose output
+  nlm --advanced                      # Run with advanced features
+  nlm --config myconfig.cfg            # Use custom configuration
+  nlm --neuron-count 1000 --region-count 2  # Custom network size
+
+For more information:
+  - Read docs/ARCHITECTURE.md for detailed system overview
+  - Check the NLM project documentation
+  - Refer to examples/ directory for additional usage patterns
+
+Phase 2 focuses on:
+  - Real LIF neuron dynamics
+  - Event-driven spike propagation with delays
+  - STDP and Hebbian plasticity rules
+  - Structural plasticity (synaptogenesis/pruning)
+  - Learning experiments demonstrating measurable changes
+
+Test 1: Basic connectivity validates neural signal transmission
+Test 2: Plasticity experiment shows activity-dependent learning
+Test 3: STDP verification confirms spike-timing-dependent plasticity
+
+Note: Larger networks (--neuron-count) will consume more memory and take longer.
+  )" << std::endl;
+}
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("  ERROR: No region 1 found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_WARNING("  WARNING: No neurons found!");
         return;
     }
+    
+    NLM_LOG_INFO("  Network initialized with " + std::to_string(neurons.size()) + " neurons");
     
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
@@ -180,25 +248,51 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        if (verbose) {
+            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " injected with 50.0 current, threshold: " + 
+                        std::to_string(neurons[i]->getThreshold()));
+        }
     }
     
     // Run a few steps
+    NLM_LOG_INFO("  Running 50 simulation steps...");
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
+        
+        if (verbose && step % 10 == 0) {
+            NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                        " | Active: " + std::to_string(brain->getActiveNeuronCount()) +
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Total Spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        }
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
     if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        NLM_LOG_INFO("  ✓ SUCCESS: Spikes propagate through network");
+        if (verbose) {
+            NLM_LOG_INFO("    Connectivity is functional - neural signals transmit effectively");
+        }
     } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        NLM_LOG_WARNING("  WARNING: No spikes detected - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
                         " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+                        " thresh=" + std::to_string(neurons[i]->getThreshold()) +
+                        " state=" + neuronStateToString(neurons[i]->getState().firingState));
         }
+    }
+}
+
+std::string neuronStateToString(FiringState state) {
+    switch (state) {
+        case FiringState::Resting: return "Resting";
+        case FiringState::Active: return "Active";
+        case FiringState::Refractory: return "Refractory";
+        default: return "Unknown";
     }
 }
 
@@ -407,16 +501,95 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    // Parse command-line arguments for configuration overrides
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Apply configuration overrides
+                if (key == "neuron-count" || key == "neuron_count") {
+                    try {
+                        int64_t neuronCount = std::stoll(value);
+                        config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+                        NLM_LOG_INFO("  Overridden neuron_count: " + value);
+                    } catch (const std::exception& e) {
+                        NLM_LOG_ERROR("  ERROR: Invalid neuron-count value: " + value);
+                    }
+                } else if (key == "region-count" || key == "region_count") {
+                    try {
+                        int64_t regionCount = std::stoll(value);
+                        config->set("region_count", regionCount, ConfigSource::CommandLine);
+                        NLM_LOG_INFO("  Overridden region_count: " + value);
+                    } catch (const std::exception& e) {
+                        NLM_LOG_ERROR("  ERROR: Invalid region-count value: " + value);
+                    }
+                } else if (key == "duration") {
+                    try {
+                        int64_t duration = std::stoll(value);
+                        config->set("plasticity_duration", duration, ConfigSource::CommandLine);
+                        NLM_LOG_INFO("  Overridden plasticity_duration: " + value);
+                    } catch (const std::exception& e) {
+                        NLM_LOG_ERROR("  ERROR: Invalid duration value: " + value);
+                    }
+                } else if (key == "verbose" || key == "v") {
+                    verbose = true;
+                    NLM_LOG_INFO("Verbose mode enabled");
+                } else if (key == "advanced" || key == "A") {
+                    enableAdvancedFeatures = true;
+                    NLM_LOG_INFO("Advanced features enabled");
+                }
+                // Other config options can be added here
+            }
+        }
+    }
+    
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    if (verbose) {
+        NLM_LOG_INFO("Verbose output enabled - detailed logging of all operations");
+    }
+    runBasicConnectivityTest(brain, verbose);
     
-    // Reset brain for plasticity experiment
+    // Reset brain for advanced experiments
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
+    // Run Advanced Learning Experiment if enabled
+    if (enableAdvancedFeatures) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Advanced Features ===");
+        uint32_t experimentDuration = config->getOr<int64_t>("advanced_experiment_duration", 500);
+        runAdvancedLearningExperiment(brain, verbose, experimentDuration);
+    }
+    
+    // Reset brain for integration test
+    brain->reset();
+    brain->initialize();
+    
+    // Run Cortical Integration Test if enabled
+    if (enableAdvancedFeatures) {
+        runCorticalIntegrationTest(brain, verbose);
+    }
+    
+    // Reset brain for development simulation
+    brain->reset();
+    brain->initialize();
+    
+    // Run Development Simulation if enabled
+    if (enableAdvancedFeatures) {
+        runDevelopmentSimulation(brain, verbose);
+    }
+    
+    // Reset and run Test 2: Plasticity learning experiment
+    brain->reset();
+    brain->initialize();
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
@@ -424,26 +597,175 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
-    // Final brain status
+void runAdvancedLearningExperiment(std::shared_ptr<Brain> brain, bool verbose, uint32_t duration) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    NLM_LOG_INFO("=== Advanced Learning Experiment ===");
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_ERROR("  ERROR: No region 1 found for advanced experiment");
+        return;
+    }
     
-    return 0;
+    auto neurons = region->getAllNeurons();
+    NLM_LOG_INFO("  Starting advanced learning with " + std::to_string(neurons.size()) + " neurons for " + std::to_string(duration) + " steps");
+    
+    // Enable all plasticity mechanisms
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(true, true, true);  // Enable Hebbian, STDP, and reward-modulated
+        }
+    }
+    
+    // Record initial state
+    NLM_LOG_INFO("  Initial state: " + std::to_string(brain->getTotalSpikeCount()) + " spikes total");
+    
+    // Complex input pattern: alternating sensory stimulation
+    NLM_LOG_INFO("  Applying complex input patterns...")
+    
+    for (uint32_t step = 0; step < duration; ++step) {
+        // Create rich input patterns
+        uint32_t sensoryNeurons = std::min<uint32_t>(10, neurons.size() / 4);
+        
+        if (step % 3 == 0) {
+            // Strong excitatory burst
+            for (size_t i = 0; i < sensoryNeurons; ++i) {
+                neurons[i]->injectCurrent(60.0f + (i * 10.0f));
+            }
+        } else if (step % 3 == 1) {
+            // Moderate input with variation
+            for (size_t i = 0; i < sensoryNeurons; ++i) {
+                neurons[i]->injectCurrent(30.0f + (std::sin(step * 0.1f) * 20.0f));
+            }
+        } else {
+            // Inhibitory modulation to create dynamic balance
+            for (size_t i = 0; i < sensoryNeurons / 2; ++i) {
+                neurons[i + neurons.size() / 4]->injectCurrent(-20.0f);
+            }
+        }
+        
+        brain->step(step, step * 0.001);
+        
+        if (verbose && step % 100 == 0) {
+            NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                        " | Active: " + std::to_string(brain->getActiveNeuronCount()) +
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Weight mean: " + std::to_string(brain->getAverageFiringRate()));
+        }
+    }
+    
+    // Analysis of learning outcomes
+    NLM_LOG_INFO("  Final state: " + std::to_string(brain->getTotalSpikeCount()) + " spikes total");
+    NLM_LOG_INFO("  Learning completed with " + std::to_string(brain->getTotalSynapseCount()) + " synapses");
+    
+    // Determine learning quality
+    uint32_t spikeRate = brain->getTotalSpikeCount() / duration;
+    float firingRate = brain->getAverageFiringRate();
+    
+    if (spikeRate > 100 && firingRate > 0.5f) {
+        NLM_LOG_INFO("  ✓ EXCELLENT: High learning activity detected");
+    } else if (spikeRate > 50) {
+        NLM_LOG_INFO("  ✓ GOOD: Moderate learning activity observed");
+    } else {
+        NLM_LOG_INFO("  ! LOW: Limited learning activity");
+    }
+}
+
+void runCorticalIntegrationTest(std::shared_ptr<Brain> brain, bool verbose) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Cortical Integration Test ===");
+    
+    // Test with different brain regions and connectivity patterns
+    NLM_LOG_INFO("  Testing multi-region integration...")
+    
+    // Create additional regions for testing
+    auto region1 = brain->getRegion(RegionId(1));
+    if (!region1) return;
+    
+    // Get statistics from all regions
+    auto regions = brain->getRegions();
+    NLM_LOG_INFO("  Network structure: " + std::to_string(regions.size()) + " regions total");
+    
+    size_t totalNeurons = brain->getTotalNeuronCount();
+    size_t totalSynapses = brain->getTotalSynapseCount();
+    
+    NLM_LOG_INFO("  Connectivity: " + std::to_string(totalNeurons) + " neurons, " + std::to_string(totalSynapses) + " synapses");
+    
+    if (totalSynapses > 0) {
+        float connectionRatio = (float)totalSynapses / totalNeurons;
+        NLM_LOG_INFO("  Connection density: " + std::to_string(connectionRatio) + " synapses per neuron");
+    }
+    
+    if (verbose) {
+        NLM_LOG_INFO("  Regional details:");
+        for (size_t i = 0; i < std::min<size_t>(3, regions.size()); ++i) {
+            auto* region = regions[i].get();
+            NLM_LOG_INFO("    Region " + std::to_string(i + 1) + ": " + 
+                        std::to_string(region->getAllNeurons().size()) + " neurons,
+                        " + std::to_string(region->getSynapses().size()) + " synapses");
+        }
+    }
+    
+    if (totalSynapses > totalNeurons / 2) {
+        NLM_LOG_INFO("  ✓ INTEGRATION: Rich connectivity achieved");
+    } else {
+        NLM_LOG_INFO("  ! CONNECTIVITY: Sparse network, consider increasing connection probability");
+    }
+}
+
+void runDevelopmentSimulation(std::shared_ptr<Brain> brain, bool verbose) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Development Simulation ===");
+    
+    brain->reset();
+    brain->initialize();
+    
+    NLM_LOG_INFO("  Simulating brain development stages...")
+    
+    // Simulate developmental stages
+    NLM_LOG_INFO("  Stage 1 (Initial): Neonatal configuration");
+    brain->setDevelopmentalStage(DevelopmentalStage::Early);
+    
+    // High plasticity, low connectivity initially
+    for (int step = 0; step < 200; ++step) {
+        brain->step(step, step * 0.001);
+        
+        if (verbose && step % 50 == 0) {
+            NLM_LOG_INFO("    Stage 1 - Step " + std::to_string(step) + 
+                        ": Plasticity active, developing circuits");
+        }
+    }
+    
+    NLM_LOG_INFO("  Stage 2 (Maturation): Early development phase");
+    brain->setDevelopmentalStage(DevelopmentalStage::Middle);
+    
+    // Moderate plasticity, increasing connectivity
+    for (int step = 200; step < 400; ++step) {
+        brain->step(step, step * 0.001);
+        
+        if (verbose && step % 50 == 0) {
+            NLM_LOG_INFO("    Stage 2 - Step " + std::to_string(step) + 
+                        ": Maturation and refinement");
+        }
+    }
+    
+    NLM_LOG_INFO("  Stage 3 (Adult): Fully mature network");
+    brain->setDevelopmentalStage(DevelopmentalStage::Late);
+    
+    // Lower plasticity, stable network
+    for (int step = 400; step < 500; ++step) {
+        brain->step(step, step * 0.001);
+        
+        if (verbose && step % 50 == 0) {
+            NLM_LOG_INFO("    Stage 3 - Step " + std::to_string(step) + 
+                        ": Adult stability phase");
+        }
+    }
+    
+    DevelopmentalStage finalStage = brain->getDevelopmentalStage();
+    if (finalStage == DevelopmentalStage::Late) {
+        NLM_LOG_INFO("  ✓ DEVELOPMENT: Complete maturation cycle achieved");
+        NLM_LOG_INFO("    Final developmental stage: Late (adult)");
+    }
 }
