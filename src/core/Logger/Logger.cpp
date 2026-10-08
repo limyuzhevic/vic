@@ -182,8 +182,18 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    // Replace the global logger instance
+    // This is a more advanced global logger management
+    if (logger) {
+        // We can't directly replace the static instance, but we can
+        // at least configure it if it has the same interface
+        // For now, we'll just log a warning that this is not fully implemented
+        std::cerr << "WARNING: Logger::setGlobal() is not fully implemented. "
+                  << "The static global logger cannot be replaced." << std::endl;
+        std::cerr << "Note: The actual implementation would need to use more "
+                  << "advanced techniques like thread-local storage or "
+                  << "dependency injection." << std::endl;
+    }
 }
 
 // LogStream implementation

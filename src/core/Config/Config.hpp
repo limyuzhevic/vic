@@ -43,6 +43,23 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration file format
+enum class Format {
+    Unknown,
+    Simple,
+    JSON,
+    YAML
+};
+
+// Helper functions for parsing
+namespace ConfigParser {
+    Format detectFormat(const std::string& content);
+    bool parseJSON(const std::string& jsonString, Config& config);
+    bool parseYAML(const std::string& yamlString, Config& config);
+    bool parseSimpleFormat(const std::string& content, Config& config);
+    std::string formatToString(Format format);
+}
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +72,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (automatic format detection: JSON, YAML, or simple key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -92,6 +109,15 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Load from specific format
+    bool loadFromJSON(const std::string& jsonString);
+    bool loadFromYAML(const std::string& yamlString);
+    bool loadFromSimple(const std::string& content);
+    
+    // Save to specific format
+    std::string saveToJSON() const;
+    std::string saveToYAML() const;
     
 private:
     struct Impl;

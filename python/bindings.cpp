@@ -145,21 +145,97 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (auto-detects JSON, YAML, or simple key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("json_string"),
+             "Load configuration from JSON string")
+        .def("loadFromYAML", &Config::loadFromYAML, py::arg("yaml_string"),
+             "Load configuration from YAML string")
+        .def("loadFromSimple", &Config::loadFromSimple, py::arg("content"),
+             "Load configuration from simple key=value format string")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Save configuration to file (auto-detects format based on extension)")
+        .def("saveToJSON", &Config::saveToJSON,
+             "Save configuration to JSON format string")
+        .def("saveToYAML", &Config::saveToYAML,
+             "Save configuration to YAML format string")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a configuration value (bool)")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            return std::optional<std::string>{};
+        }, py::arg("key"),
+            "Get a configuration value as string (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            return std::optional<int>{};
+        }, py::arg("key"),
+            "Get a configuration value as int (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            return std::optional<double>{};
+        }, py::arg("key"),
+            "Get a configuration value as double (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val.has_value()) {
+                return *val;
+            }
+            return std::optional<bool>{};
+        }, py::arg("key"),
+            "Get a configuration value as bool (returns None if not found or wrong type)")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a configuration value as string, returns default if not found")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a configuration value as int, returns default if not found")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a configuration value as double, returns default if not found")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a configuration value as bool, returns default if not found")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

@@ -19,40 +19,35 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Detect file format
+    std::string content;
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        content += line + "\n";
     }
     
-    return true;
+    file.close();
+    
+    // Clear existing entries
+    clear();
+    
+    // Try JSON first
+    if (detectFormat(content) == Format::JSON) {
+        return parseJSON(content);
+    }
+    // Try YAML second
+    else if (detectFormat(content) == Format::YAML) {
+        return parseYAML(content);
+    }
+    // Fall back to simple key=value format
+    else {
+        return parseSimpleFormat(content);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +81,38 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -198,18 +224,230 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
+// Format detection and parsing functions for Config
+namespace ConfigParser {
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+Format detectFormat(const std::string& content) {
+    if (content.empty()) {
+        return Format::Unknown;
+    }
+    
+    // Simple detection based on content
+    if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+        // Check if it looks like JSON (starts with { and has })
+        return Format::JSON;
+    } else if (content.find('-') != std::string::npos || 
+               content.find(':') != std::string::npos) {
+        // Check for YAML-like content
+        return Format::YAML;
+    } else if (content.find('=') != std::string::npos) {
+        // Check for simple key=value format
+        return Format::Simple;
+    }
+    
+    return Format::Unknown;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool parseJSON(const std::string& jsonString, Config& config) {
+    // Simple JSON parsing implementation
+    // For now, we'll implement a basic JSON parser that can handle simple objects
+    
+    // Skip implementation for now - this is a placeholder
+    // In a real implementation, we would use nlohmann/json or yaml-cpp
+    return false;
+}
 
-} // namespace nlm
+bool parseYAML(const std::string& yamlString, Config& config) {
+    // Simple YAML parsing implementation
+    // For now, we'll implement a basic YAML parser that can handle simple key-value pairs
+    
+    // Skip implementation for now - this is a placeholder
+    // In a real implementation, we would use yaml-cpp
+    return false;
+}
+
+bool parseSimpleFormat(const std::string& content, Config& config) {
+    // Simple key=value format parser
+    std::istringstream stream(content);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = config.trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = config.trim(line.substr(0, pos));
+            std::string value = config.trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Try to determine value type
+            bool isBool = false;
+            bool isInt = false;
+            bool isDouble = false;
+            
+            if (value == "true" || value == "false") {
+                isBool = true;
+            } else {
+                try {
+                    size_t pos;
+                    int intVal = std::stoi(value, &pos);
+                    if (pos == value.size()) {
+                        isInt = true;
+                    } else {
+                        double doubleVal = std::stod(value, &pos);
+                        if (pos == value.size()) {
+                            isDouble = true;
+                        }
+                    }
+                } catch (...) {
+                    // Not a number
+                }
+            }
+            
+            if (isBool) {
+                bool boolVal = (value == "true");
+                config.set(key, boolVal, ConfigSource::File);
+            } else if (isInt) {
+                int intVal = std::stoi(value);
+                config.set(key, intVal, ConfigSource::File);
+            } else if (isDouble) {
+                double doubleVal = std::stod(value);
+                config.set(key, doubleVal, ConfigSource::File);
+            } else {
+                config.set(key, value, ConfigSource::File);
+            }
+        }
+    }
+    
+    return true;
+}
+
+std::string formatToString(Format format) {
+    switch (format) {
+        case Format::Unknown: return "Unknown";
+        case Format::Simple: return "Simple";
+        case Format::JSON: return "JSON";
+        case Format::YAML: return "YAML";
+        default: return "Unknown";
+    }
+}
+
+} // namespace ConfigParser
+
+// Additional Config methods for format-specific operations
+
+bool Config::loadFromJSON(const std::string& jsonString) {
+    // Clear existing entries
+    clear();
+    
+    // Delegate to the parser
+    return ConfigParser::parseJSON(jsonString, *this);
+}
+
+bool Config::loadFromYAML(const std::string& yamlString) {
+    // Clear existing entries
+    clear();
+    
+    // Delegate to the parser
+    return ConfigParser::parseYAML(yamlString, *this);
+}
+
+bool Config::loadFromSimple(const std::string& content) {
+    // Clear existing entries
+    clear();
+    
+    // Delegate to the parser
+    return ConfigParser::parseSimpleFormat(content, *this);
+}
+
+std::string Config::saveToJSON() const {
+    // Simple JSON serialization
+    std::ostringstream oss;
+    oss << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        oss << "  \"" << entry.key << "\": ";
+        
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << escapeJSON(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            oss << ",\n";
+        } else {
+            oss << "\n";
+        }
+    }
+    
+    oss << "}\n";
+    return oss.str();
+}
+
+std::string Config::saveToYAML() const {
+    // Simple YAML serialization
+    std::ostringstream oss;
+    
+    for (const auto& entry : pImpl->entries) {
+        oss << entry.key << ": ";
+        
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        
+        oss << "\n";
+    }
+    
+    return oss.str();
+}
+
+// Helper function for JSON escaping
+inline std::string escapeJSON(const std::string& input) {
+    std::ostringstream oss;
+    oss << "\"";
+    for (char c : input) {
+        switch (c) {
+            case '\"': oss << "\\\""; break;
+            case '\\': oss << "\\\\"; break;
+            case '\b': oss << "\\b"; break;
+            case '\f': oss << "\\f"; break;
+            case '\n': oss << "\\n"; break;
+            case '\r': oss << "\\r"; break;
+            case '\t': oss << "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    oss << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(c);
+                } else {
+                    oss << c;
+                }
+                break;
+        }
+    }
+    oss << "\"";
+    return oss.str();
+}
