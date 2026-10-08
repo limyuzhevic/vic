@@ -3,6 +3,12 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
+#include <iomanip>
+#include <cctype>
+#ifdef _WIN32
+#define _SILENCE_CXX17_CISOFS_GUARD
+#endif
 
 namespace nlm {
 
@@ -213,3 +219,8 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+
+// Include nlohmann/json if available (Phase 2 config upgrade)
+#ifdef _MSC_VER
+#pragma comment(lib, "JsonCpp.lib")
+#endif
