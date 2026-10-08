@@ -1,134 +1,110 @@
-#include "Random.hpp"
+#include <cstdint>
+#include <random>
+#include <functional>
+#include <stdexcept>
 #include <stdexcept>
 
 namespace nlm {
 
-struct RandomGenerator::Impl {
-    std::mt19937_64 gen;
-    uint64_t currentSeed;
+// Deterministic random number generator
+// Supports explicit seeds for reproducible experiments
+
+class RandomGenerator {
+public:
+    using result_type = uint32_t;
     
-    Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
+    // Create with explicit seed
+    explicit RandomGenerator(uint64_t seed);
+    
+    // Create with time-based seed (not deterministic)
+    RandomGenerator();
+    
+    ~RandomGenerator();
+    
+    // Disable copying
+    RandomGenerator(const RandomGenerator&) = delete;
+    RandomGenerator& operator=(const RandomGenerator&) = delete;
+    
+    // Enable moving
+    RandomGenerator(RandomGenerator&&) noexcept;
+    RandomGenerator& operator=(RandomGenerator&&) noexcept;
+    
+    // Seed operations
+    void seed(uint64_t seed);
+    uint64_t getSeed() const;
+    
+    // Random number generation
+    // Uniform integer in [min, max]
+    uint32_t uniformInt(uint32_t min, uint32_t max);
+    uint64_t uniformInt(uint64_t min, uint64_t max);
+    
+    // Uniform real in [min, max)
+    double uniformReal(double min, double max);
+    float uniformReal(float min, float max);
+    
+    // Normal distribution
+    double normal(double mean, double stddev);
+    float normal(float mean, float stddev);
+    
+    // Bernoulli distribution
+    bool bernoulli(double p);
+    
+    // Poisson distribution
+    uint32_t poisson(double lambda);
+    
+    // Exponential distribution
+    double exponential(double lambda);
+    
+    // Random boolean
+    bool randomBool();
+    
+    // Random bit
+    uint32_t randomBit();
+    
+    // Shuffle container
+    template<typename Container>
+    void shuffle(Container& container);
+    
+    // Pick random element from container
+    template<typename Container>
+    auto pickRandom(const Container& container) -> typename Container::const_reference;
+    
+    // Pick random index from 0 to n-1
+    uint64_t pickRandomIndex(uint64_t n);
+    
+    // Fill range with random bytes
+    void fillBytes(void* data, size_t size);
+    
+    // Get underlying engine for advanced use
+    std::mt19937_64& engine();
+    const std::mt19937_64& engine() const;
+    
+    // Static minimum/maximum for mt19937_64
+    static constexpr result_type min() { return std::mt19937_64::min(); }
+    static constexpr result_type max() { return std::mt19937_64::max(); }
+    
+    // Operator for compatibility with std functions
+    result_type operator()() { return static_cast<result_type>(engine()()); }
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
-
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
-
-RandomGenerator::~RandomGenerator() = default;
-
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+// Template implementations
+template<typename Container>
+void RandomGenerator::shuffle(Container& container) {
+    std::shuffle(container.begin(), container.end(), engine());
 }
 
-RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+template<typename Container>
+auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
+    if (container.empty()) {
+        throw std::runtime_error("Cannot pick from empty container");
     }
-    return *this;
-}
-
-void RandomGenerator::seed(uint64_t seed) {
-    pImpl->gen.seed(seed);
-    pImpl->currentSeed = seed;
-}
-
-uint64_t RandomGenerator::getSeed() const {
-    return pImpl->currentSeed;
-}
-
-uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
-    if (min == max) {
-        return min;
-    }
-    std::uniform_int_distribution<uint32_t> dist(min, max);
-    return dist(pImpl->gen);
-}
-
-uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
-    if (min == max) {
-        return min;
-    }
-    std::uniform_int_distribution<uint64_t> dist(min, max);
-    return dist(pImpl->gen);
-}
-
-double RandomGenerator::uniformReal(double min, double max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
-    std::uniform_real_distribution<double> dist(min, max);
-    return dist(pImpl->gen);
-}
-
-float RandomGenerator::uniformReal(float min, float max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
-    std::uniform_real_distribution<float> dist(min, max);
-    return dist(pImpl->gen);
-}
-
-double RandomGenerator::normal(double mean, double stddev) {
-    std::normal_distribution<double> dist(mean, stddev);
-    return dist(pImpl->gen);
-}
-
-float RandomGenerator::normal(float mean, float stddev) {
-    std::normal_distribution<float> dist(mean, stddev);
-    return dist(pImpl->gen);
-}
-
-bool RandomGenerator::bernoulli(double p) {
-    std::bernoulli_distribution dist(p);
-    return dist(pImpl->gen);
-}
-
-uint32_t RandomGenerator::poisson(double lambda) {
-    std::poisson_distribution<uint32_t> dist(lambda);
-    return dist(pImpl->gen);
-}
-
-double RandomGenerator::exponential(double lambda) {
-    std::exponential_distribution<double> dist(lambda);
-    return dist(pImpl->gen);
-}
-
-bool RandomGenerator::randomBool() {
-    return bernoulli(0.5);
-}
-
-uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
-}
-
-uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
-    if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
-    }
-    return uniformInt(0, n - 1);
-}
-
-void RandomGenerator::fillBytes(void* data, size_t size) {
-    uint8_t* bytes = static_cast<uint8_t*>(data);
-    for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
-    }
-}
-
-std::mt19937_64& RandomGenerator::engine() {
-    return pImpl->gen;
-}
-
-const std::mt19937_64& RandomGenerator::engine() const {
-    return pImpl->gen;
+    auto it = container.begin();
+    std::advance(it, pickRandomIndex(container.size()));
+    return *it;
 }
 
 } // namespace nlm

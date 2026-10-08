@@ -392,6 +392,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        
+                        // Create episodic memory from this firing event
+                        // This provides the bottom-up input for episodic memory formation
+                        if (pImpl->episodicMemory) {
+                            EpisodicMemoryItem episode;
+                            episode.timestamp = currentStep;
+                            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                            
+                            // Combine with existing episodic memory if available
+                            if (pImpl->episodicMemory->getEpisodeCount() > 0) {
+                                // Store the new episode to extend experience
+                                pImpl->episodicMemory->storeEpisode(episode);
+                            }
+                        }
                     }
                 }
             }
@@ -404,6 +420,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Enhance working memory with attention when attention is active
+        if (pImpl->attention && !pImpl->attention->getWinners().empty()) {
+            // Apply top-down bias from attention to working memory
+            for (const auto& neuronId : pImpl->attention->getWinners()) {
+                if (pImpl->workingMemory->contains(neuronId)) {
+                    // Enhance this neuron in working memory
+                    float currentAct = pImpl->workingMemory->getNeuronActivation(neuronId);
+                    float enhancedAct = std::min(1.0f, currentAct * 1.5f); // Boost by 50%
+                    pImpl->workingMemory->storeToNeuron(neuronId, enhancedAct);
+                }
+            }
+        }
+        
+        // Apply attention to working memory for action selection
+        if (pImpl->attention) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                pImpl->attention->processCompetition(memoryNeurons);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -433,6 +470,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== NEUROMODULATION EXPANSION ==========
+    
+    // Serotonin (5-HT) - affects attention and mood
+    if (pImpl->curiosity) {  // For now, reuse curiosity system for serotonin
+        // Serotonin modulates attention through curiosity system
+        // Higher serotonin reduces attention breadth (more focused)
+        float serotoninLevel = pImpl->curiosity->getLevel();
+        if (pImpl->attention) {
+            // Adjust attention parameters based on serotonin
+            float newThreshold = 0.3f + serotoninLevel * 0.4f;  // 0.3 to 0.7
+            pImpl->attention->setCompetitionThreshold(newThreshold);
+        }
+    }
+    
+    // Norepinephrine (NE) - affects arousal and memory consolidation
+    // For now, integrate with dopamine system
+    if (pImpl->dopamine) {
+        float norepinephrineLevel = pImpl->dopamine->getLevel() * 0.5f;  // Simplified
+        
+        if (pImpl->episodicMemory) {
+            // Norepinephrine enhances memory consolidation
+            // Higher NE during novel events strengthens episodic memory
+            if (pImpl->novelty && pImpl->novelty->getLevel() > 0.5f) {
+                // Strong consolidation during novel events
+                pImpl->episodicMemory->consolidate(0.7f);
+            } else {
+                // Normal consolidation
+                pImpl->episodicMemory->consolidate(0.3f + norepinephrineLevel * 0.4f);
+            }
+        }
+    }
+    
+    // Acetylcholine (ACh) - affects attention and memory encoding
+    // For now, integrate with attention system
+    if (pImpl->attention && pImpl->curiosity) {
+        float acetylcholineLevel = pImpl->curiosity->getLevel() * 0.3f;  // Simplified
+        
+        // ACh enhances attention and memory encoding
+        // Apply bottom-up salience based on ACh level
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float saliency = acetylcholineLevel * neuron->getMembranePotential() / 20.0f;
+                    if (saliency > 0.1f) {
+                        pImpl->attention->applyBottomUpSalience(neuron->getId(), saliency);
                     }
                 }
             }
@@ -505,6 +593,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Enhanced episodic memory integration:
+            // 1. Include working memory content
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                    // Check if this neuron is active
+                    for (auto& region : pImpl->regions) {
+                        auto neurons = region->getAllNeurons();
+                        for (auto* neuron : neurons) {
+                            if (neuron->getId() == neuronId && 
+                                (neuron->isFiring() || std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 2.0f)) {
+                                // This working memory trace is active - include in episode
+                                bool alreadyAdded = false;
+                                for (const auto& storedNeuron : episode.activeNeurons) {
+                                    if (storedNeuron == neuronId) {
+                                        alreadyAdded = true;
+                                        break;
+                                    }
+                                }
+                                if (!alreadyAdded) {
+                                    episode.activeNeurons.push_back(neuronId);
+                                    episode.neuronActivations.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 2. Include attention state
+            if (pImpl->attention && !pImpl->attention->getWinners().empty()) {
+                // Add attended neurons to episode
+                for (const auto& neuronId : pImpl->attention->getWinners()) {
+                    bool alreadyAdded = false;
+                    for (const auto& storedNeuron : episode.activeNeurons) {
+                        if (storedNeuron == neuronId) {
+                            alreadyAdded = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyAdded) {
+                        episode.activeNeurons.push_back(neuronId);
+                        episode.neuronActivations.push_back(1.0f);  // High activation for attended items
+                    }
+                }
+            }
+            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
@@ -513,6 +648,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        
+        // Integrate prediction with working memory
+        if (pImpl->workingMemory && pImpl->dopamine) {
+            // Prediction error can enhance working memory if prediction is wrong
+            float predictionError = pImpl->dopamine->getPredictionErrorLevel();
+            if (predictionError > 0.5f) {  // High prediction error - learning opportunity
+                // Enhance all working memory traces to encourage exploration
+                for (size_t i = 0; i < pImpl->workingMemory->getMemoryNeurons().size(); ++i) {
+                    NeuronId neuron = pImpl->workingMemory->getMemoryNeurons()[i];
+                    float currentAct = pImpl->workingMemory->getNeuronActivation(neuron);
+                    float enhancedAct = std::min(1.0f, currentAct * 1.2f); // Boost by 20%
+                    pImpl->workingMemory->storeToNeuron(neuron, enhancedAct);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,6 +680,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        
+        // Integrate concept formation with working memory
+        if (pImpl->workingMemory) {
+            // Concepts can bias working memory based on goals/context
+            // For now, implement basic concept-based enhancement
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty() && pImpl->attention) {
+                // Check if attention is focused on relevant concepts
+                // If so, boost those neurons in working memory
+                for (const auto& neuronId : memoryNeurons) {
+                    float currentAct = pImpl->workingMemory->getNeuronActivation(neuronId);
+                    
+                    // Apply concept-based modulation
+                    // Check if this neuron matches any concept prototypes
+                    // For now, just implement a simple boost for active concepts
+                    bool conceptActive = false;
+                    if (conceptActive) {
+                        // Boost neuron activation based on concept
+                        float boostedAct = std::min(1.0f, currentAct * 1.3f); // Boost by 30%
+                        pImpl->workingMemory->storeToNeuron(neuronId, boostedAct);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -549,6 +723,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        
+        // Development affects multiple aspects, not just plasticity
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        
+        if (stage != DevelopmentalStage::Adult) {  // Keep developing
+            // 1. Enhance memory consolidation during development
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->consolidate(0.5f);  // High consolidation during development
+            }
+            
+            // 2. Strengthen working memory through development
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->strengthenMemory(1.1f);  // 10% strength boost
+            }
+            
+            // 3. Adjust attention parameters based on development
+            if (pImpl->attention) {
+                // More exploration during early stages
+                float newInhibition = stage == DevelopmentalStage::Initial ? 0.3f : 
+                                      stage == DevelopmentalStage::CriticalPeriod ? 0.5f : 0.7f;
+                pImpl->attention->setInhibitionStrength(newInhibition);
+                
+                float newExcitation = stage == DevelopmentalStage::Initial ? 2.0f : 
+                                      stage == DevelopmentalStage::CriticalPeriod ? 1.5f : 1.2f;
+                pImpl->attention->setExcitationStrength(newExcitation);
+            }
+        }
         
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
