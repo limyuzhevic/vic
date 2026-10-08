@@ -85,10 +85,13 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # CLI
+    src/cli/NLMCLI.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cli>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -119,13 +122,25 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Main executable
-add_executable(nlm
+# Enhanced CLI executable
+add_executable(nlm_cli
+    src/main_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Original NLM executable (backward compatibility)
+add_executable(nlm_original
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_original PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -138,6 +153,36 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Enhanced NLM CLI executable (main_cli)
+add_executable(nlm_cli
+    src/main_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Enhanced NLM main executable (main_enhanced)
+add_executable(nlm_enhanced
+    src/main_enhanced.cpp
+)
+target_link_libraries(nlm_enhanced PUBLIC nlm_core)
+
+# CLI test executable
+add_executable(test_cli
+    tests/test_cli.cpp
+)
+target_link_libraries(test_cli PUBLIC nlm_core)
+
+# Main test executable
+add_executable(test_main
+    tests/test_main.cpp
+)
+target_link_libraries(test_main PUBLIC nlm_core)
+
+# CLI comprehensive test executable
+add_executable(nlm_cli_test
+    tests/nlm_cli_test.cpp
+)
+target_link_libraries(nlm_cli_test PUBLIC nlm_core)
 
 # Testing
 enable_testing()

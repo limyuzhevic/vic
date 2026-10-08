@@ -1,11 +1,16 @@
 // NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
-//
+// Enhanced with modular CLI and improved code structure
+
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Note: For enhanced functionality and command-line interface,
+// use the modular CLI version in src/main_cli.cpp
+// This file is retained for backward compatibility and basic functionality
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
