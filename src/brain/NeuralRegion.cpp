@@ -251,7 +251,13 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
         NeuronType preType = preNeuron->getType();
         
         // Skip if not a proper source neuron
+        // Modulatory neurons are not typically presynaptic in standard neural circuits
+        // (they usually release neuromodulators that affect other neurons' properties)
         if (preType == NeuronType::Modulatory) continue;
+        
+        // Note: If only modulatory neurons exist in the region, 
+        // this will result in no outgoing connections, which may be biologically plausible
+        // for regions that primarily modulate rather than drive other regions.
         
         for (size_t j = 0; j < neuronCount; ++j) {
             if (i == j) continue;  // No self-connections

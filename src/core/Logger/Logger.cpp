@@ -23,11 +23,11 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     if (entry.level < pImpl->level) {
         return;
     }
-    
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";

@@ -20,7 +20,7 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PLACEHOLDER - Phase 1 uses an improved key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -35,20 +35,38 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with better handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Handle empty values
+            if (value.empty()) {
+                set(key, value, ConfigSource::File);
+                continue;
+            }
+            
+            // Remove quotes if present, handling escaped quotes
+            bool hasQuotes = false;
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
+                hasQuotes = true;
                 value = value.substr(1, value.size() - 2);
+                
+                // Unescape quotes inside the value
+                size_t quotePos = 0;
+                while ((quotePos = value.find('\\"', quotePos)) != std::string::npos) {
+                    value.replace(quotePos, 2, "\"");
+                    quotePos += 1;
+                }
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Handle lines without '=' as boolean flags or special keys
+            set(line, "true", ConfigSource::File);
         }
     }
     
@@ -86,7 +104,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
