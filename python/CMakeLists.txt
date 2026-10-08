@@ -95,8 +95,10 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
-install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+# Add a custom target for building and testing the Python bindings
+add_custom_target(pynlm_python_tests
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../test_enhanced_brain_python.py
+    DEPENDS pynlm
+    COMMENT "Run Python integration tests for enhanced Brain.cpp"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
