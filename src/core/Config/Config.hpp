@@ -5,8 +5,36 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <stdexcept>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
+
+// Configuration error types
+class ConfigError : public std::runtime_error {
+public:
+    enum class Type {
+        InvalidKey,
+        InvalidType,
+        InvalidValue,
+        ValidationFailed,
+        FileError,
+        ParseError,
+        SerializationError
+    };
+    
+    ConfigError(Type type, const std::string& message) 
+        : std::runtime_error(message), error_type(type) {}
+    
+    Type getErrorType() const { return error_type; }
+    
+private:
+    Type error_type;
+};
 
 // Forward declarations
 class Config;
@@ -31,6 +59,16 @@ enum class ConfigSource {
     Runtime
 };
 
+// Validation callback type
+using ValidationCallback = std::function<bool(const std::string&, const ConfigValue&, std::string&)>;
+
+// Type descriptor for validation
+struct ConfigType {
+    std::string type_name;
+    std::function<bool(const ConfigValue&)> type_checker;
+    ValidationCallback custom_validator;
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -43,63 +81,39 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
+// Configuration metadata
+struct ConfigMetadata {
+    std::string description;
+    std::string type_name;
+    std::vector<std::string> allowed_values;
+    std::pair<double, double> range;
+    bool required;
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    ConfigMetadata() : description(), type_name(), allowed_values(), range({0.0, 0.0}), required(false) {}
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    ConfigMetadata(const std::string& desc, const std::string& type, bool req = false)
+        : description(desc), type_name(type), required(req) {}
+};
+
+// Configuration metadata
+struct ConfigMetadata {
+    std::string description;
+    std::string type_name;
+    std::vector<std::string> allowed_values;
+    std::pair<double, double> range;
+    bool required;
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    ConfigMetadata() : description(), type_name(), allowed_values(), range({0.0, 0.0}), required(false) {}
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    ConfigMetadata(const std::string& desc, const std::string& type, bool req = false)
+        : description(desc), type_name(type), required(req) {}
+};
+
+// Configuration template for presets
+struct ConfigTemplate {
+    std::string name;
+    std::map<std::string, ConfigValue> values;
+    std::string description;
 };
 
 } // namespace nlm
