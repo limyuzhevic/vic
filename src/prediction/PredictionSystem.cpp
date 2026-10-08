@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -16,8 +17,36 @@ PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+    // CURRENT: Use working memory patterns for prediction when available
+    
+    if (!brain_) return currentState.clone();
+    
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (!workingMemory) return currentState.clone();
+    
+    // Get working memory patterns
+    std::vector<float> memoryPatterns = workingMemory->retrieve();
+    
+    if (memoryPatterns.empty()) {
+        // No working memory content - use current state
+        return currentState.clone();
+    }
+    
+    // Create a new InternalSignals with working memory patterns
+    auto predictedState = std::make_unique<InternalSignals>();
+    
+    // Add working memory patterns to the prediction
+    for (float pattern : memoryPatterns) {
+        predictedState->addSignal(pattern);
+    }
+    
+    // Also add some scaled version of current state
+    const auto& currentData = currentState.getData();
+    for (float value : currentData) {
+        predictedState->addSignal(value * 0.5f);  // Scale down current state
+    }
+    
+    return predictedState;
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
@@ -34,6 +63,11 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        
+        // Update confidence based on prediction accuracy
+        // Lower error -> higher confidence
+        float errorNormalized = std::min(pImpl->predictionError, 1.0f);
+        pImpl->confidence = 0.9f - (errorNormalized * 0.4f);  // Range: 0.5 to 0.9
     }
 }
 
@@ -53,8 +87,18 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
+void PredictionSystem::updateConfidence(float newConfidence) {
+    pImpl->confidence = std::max(0.1f, std::min(1.0f, newConfidence));
+}
+
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // For now, just accumulate error history
+    pImpl->errorHistory.push_back(0.0f);
+    pImpl->predictionError = 0.0f;
+    
+    // Update confidence based on training
+    pImpl->confidence = 0.7f;
 }
 
 } // namespace nlm

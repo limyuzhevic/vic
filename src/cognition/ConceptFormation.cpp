@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -31,27 +32,48 @@ void ConceptFormation::initialize(Brain* brain) {
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
-                                          const std::vector<float>& features,
-                                          float reward,
-                                          SimulationStep currentTime) {
+                                           const std::vector<float>& features,
+                                           float reward,
+                                           SimulationStep currentTime) {
     if (pattern.empty()) return 0;
     
+    // First, check if working memory has relevant patterns to enhance this experience
+    std::vector<float> enhancedPattern = pattern;
+    if (brain_) {
+        auto* workingMemory = brain_->getWorkingMemory();
+        if (workingMemory) {
+            // Get working memory patterns
+            std::vector<float> memoryPatterns = workingMemory->retrieve();n
+            if (!memoryPatterns.empty()) {
+                // Blend working memory patterns with new pattern
+                enhancedPattern.resize(std::max(enhancedPattern.size(), memoryPatterns.size()));
+                for (size_t i = 0; i < enhancedPattern.size(); ++i) {
+                    float memoryVal = (i < memoryPatterns.size()) ? memoryPatterns[i] : 0.0f;
+                    float patternVal = (i < pattern.size()) ? pattern[i] : 0.0f;
+                    // Blend: weighted average, more weight to recent pattern
+                    enhancedPattern[i] = patternVal * 0.7f + memoryVal * 0.3f;
+                }
+                NLM_LOG_INFO("ConceptFormation: Enhanced pattern with working memory content");
+            }
+        }
+    }
+    
     // Check if this pattern matches any existing concept
-    size_t matchingConcept = findConceptForPattern(pattern);
+    size_t matchingConcept = findConceptForPattern(enhancedPattern);
     
     if (matchingConcept > 0) {
         // Update existing concept
-        updateConcept(matchingConcept, pattern, features, reward);
+        updateConcept(matchingConcept, enhancedPattern, features, reward);
         return matchingConcept;
     }
     
     // Check if this is novel enough to form a new concept
-    if (isNovel(pattern, formationThreshold_)) {
+    if (isNovel(enhancedPattern, formationThreshold_)) {
         // But wait - we need a few observations before committing to a concept
         // This prevents forming concepts from noise
         
         // For now, create concept if sufficiently different from all others
-        return createConcept(pattern, features, reward);
+        return createConcept(enhancedPattern, features, reward);
     }
     
     return 0;  // Not yet classifiable

@@ -14,8 +14,11 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // CURRENT: Use working memory patterns for prediction when available
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -27,16 +30,20 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
-    // Get prediction history
-    const std::vector<float>& getErrorHistory() const;
-    void clearHistory();
+    // Update confidence in prediction accuracy
+    void updateConfidence(float confidence);
     
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Get brain pointer for working memory access
+    Brain* getBrain() { return brain_; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
 };
 
 } // namespace nlm
