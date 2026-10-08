@@ -100,6 +100,19 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Legacy file format parsers
+    bool loadFromSimpleFile(const std::string& filepath);
+    bool loadFromJsonFile(const std::string& filepath);
+    
+    // Helper to convert string to appropriate type
+    template<typename T>
+    T convertStringToType(const std::string& str);
 };
 
-} // namespace nlm
+// JSON parsing implementation (requires external library)
+namespace {
+    // Simple JSON parser implementation
+    bool parseJsonValue(const std::string& str, ConfigValue& value);
+    bool parseJsonFile(const std::string& filepath, Config::Impl* configImpl);
+}
