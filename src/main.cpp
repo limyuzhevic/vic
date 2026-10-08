@@ -28,28 +28,138 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printAdvancedHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+Advanced NLM Commands:
+
+Configuration:
+  --config=FILE        Load configuration from file
+  --set KEY=VALUE      Set configuration value
+  --reset              Reset to default configuration
+
+Experiment Control:
+  --run-test X         Run specific test (1-3)
+  --steps N            Run N simulation steps
+  --continue           Resume from saved state
+  --save-state FILE    Save current brain state
+
+Visualization:
+  --enable-visualization    Enable network visualization
+  --viz-rate FPS           Visualization update rate
+  --viz-mode MODE          Visualization mode (network/activity/spikes/weights)
+
+Debug:
+  --enable-debug           Enable debug logging
+  --profile                Enable performance profiling
+  --dump-brains FILE       Dump neural state to file
+  --analyze                Run network analysis
+
+Performance:
+  --threads N             Set number of threads (0 = auto)
+  --timestep DELTA        Set simulation timestep
+  --neuron-count N        Set number of neurons
+
+Output:
+  --output-mode MODE      Output format (text/csv/json/plot)
+  --output-file FILE      Output file path
+  --quiet                 Reduce output verbosity
+  --verbose               Increase output verbosity
+
+Examples:
+  ./nlm --config=myconfig.cfg --run-test 2 --enable-visualization
+  ./nlm --set random_seed=123 --set neuron_count=2000 --run-test 1
+  ./nlm --save-state=checkpoint.nml --load-state=saved.nml
+
+For more information, visit the NLM documentation.
+)" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
+void printVersion() {
+    std::cout << R"(
+NLM - Neural Learning Machine
+Version: 2.0.0
+Phase: Real Neural Computation
+
+Build: Phase 2 - Real LIF neuron dynamics with full plasticity
+
+Author: NLM Development Team
+License: MIT
+
+Features:
+  ✓ Real Leaky Integrate-and-Fire (LIF) neuron dynamics
+  ✓ Event-driven spike propagation with synaptic delays
+  ✓ STDP and Hebbian plasticity rules
+  ✓ Structural plasticity (synaptogenesis/pruning)
+  ✓ Neuromodulation (dopamine, reward, curiosity)
+  ✓ Development and maturation systems
+  ✓ Memory systems (working/episodic/semantic/procedural)
+  ✓ Prediction and planning systems
+  ✓ Visualization and analysis tools
+  ✓ Advanced configuration and command-line interface
+
+For documentation and examples, visit:
+  https://github.com/nml/neural-learning-machine
+
+)" << std::endl;
+}
+
+void printHelp() {
+    printBanner();
+    std::cout << R"(
+Usage: nlm [OPTIONS]
+
+NLM - Neural Learning Machine (熙然)
+Phase 2: Real Neural Computation
+
+Basic Options:
+  --help                 Show this help message
+  --version              Show version information
+  --advanced-help        Show advanced command help
+
+Configuration:
+  --config=FILE        Load configuration from file
+  --set KEY=VALUE      Set configuration value
+  --reset              Reset to default configuration
+
+Simulation Control:
+  --run-test X         Run specific test (1-3)
+  --steps N            Run N simulation steps
+  --continue           Resume from saved state
+  --save-state FILE    Save current brain state
+
+Visualization:
+  --enable-visualization    Enable network visualization
+  --viz-rate FPS           Visualization update rate
+  --viz-mode MODE          Visualization mode (network/activity/spikes/weights)
+
+Debug:
+  --enable-debug           Enable debug logging
+  --profile                Enable performance profiling
+  --dump-brains FILE       Dump neural state to file
+  --analyze                Run network analysis
+
+Performance:
+  --threads N             Set number of threads (0 = auto)
+  --timestep DELTA        Set simulation timestep
+  --neuron-count N        Set number of neurons
+
+Output:
+  --output-mode MODE      Output format (text/csv/json/plot)
+  --output-file FILE      Output file path
+  --quiet                 Reduce output verbosity
+  --verbose               Increase output verbosity
+
+Examples:
+  ./nlm                    Run default simulation
+  ./nlm --run-test 2        Run plasticity experiment
+  ./nlm --enable-visualization --viz-mode network
+  ./nlm --set random_seed=123 --set neuron_count=2000
+
+For documentation and examples, visit:
+  https://github.com/nml/neural-learning-machine
+
+)" << std::endl;
+}
     std::shared_ptr<Brain> brain;
     uint64_t seed;
     size_t initialSynapseCount;
@@ -322,6 +432,21 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version commands
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--advanced-help") {
+            printAdvancedHelp();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
