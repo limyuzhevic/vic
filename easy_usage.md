@@ -1,28 +1,107 @@
-# NLM - Easy Usage Guide for Beginners
+This guide covers the basic NLM usage. For more advanced features, see `HOW_TO_USE.md`.
 
-## What is NLM?
+## Quick Reference Guide
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+| Function | Description | Example |
+|----------|-------------|---------|
+| `pynlm.createBrain(config)` | Create a neural brain | `brain = pynlm.createBrain(pynlm.createDefaultConfig())` |
+| `brain.initialize()` | Initialize brain subsystems | `brain.initialize()` |
+| `brain.step(step)` | Run simulation step | `brain.step(step)` |
+| `pynlm.createSimpleWorld()` | Create simulation world | `world = pynlm.createSimpleWorld()` |
+| `agent.processSensoryInput(percept)` | Process sensory input | `agent.processSensoryInput(percept)` |
+| `agent.decodeMotorCommand()` | Get motor action | `action = agent.decodeMotorCommand()` |
+| `brain.getTotalNeuronCount()` | Get neuron count | `neurons = brain.getTotalNeuronCount()` |
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+## Common Patterns
 
-That's it! NLM simulates all of this.
+### Pattern 1: Simulation with Agent
 
----
+```python
+import pynlm
 
-## The 3 Things You Need to Know
+def run_agent_episode(config, num_steps=1000):
+    """Run a complete agent episode with world interaction."""
+    
+    # 1. Create brain and world
+    brain = pynlm.createBrain(config)
+    world = pynlm.createSimpleWorld()
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 2. Configure and initialize
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent.initialize(world)
+    
+    # 3. Enable learning systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # 4. Run simulation
+    for step in range(num_steps):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        motor_cmd = agent.decodeMotorCommand()
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Optional: Get reward and apply neuromodulation
+        # reward = get_reward_from_environment(percept)
+        # agent.applyRewardModulation(reward, 0.0)
+    
+    return brain, world, agent
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+# Usage
+config = pynlm.createDefaultConfig()
+brain, world, agent = run_agent_episode(config, num_steps=500)
+print(f"Simulation complete! Neurons: {brain.getTotalNeuronCount()}")
+```
 
----
+### Pattern 2: Brain Development Monitoring
 
-## Quick Start (Copy & Paste)
+```python
+import pynlm
+
+def monitor_brain_development(config, num_steps=1000):
+    """Run simulation while monitoring brain development."""
+    
+    brain = pynlm.createBrain(config)
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Track development
+    development_log = []
+    
+    brain.initialize()
+    
+    for step in range(num_steps):
+        brain.step(step)
+        
+        # Log development status
+        dev_stage = brain.getDevelopmentalStage()
+        firing_rate = brain.getAverageFiringRate()
+        neurons_active = brain.getFiringNeuronCount()
+        
+        development_log.append({
+            'step': step,
+            'development_stage': dev_stage,
+            'firing_rate': firing_rate,
+            'neurons_active': neurons_active
+        })
+        
+        # Print progress every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step}: Stage {dev_stage}, "
+                  f"Firing Rate: {firing_rate:.2f}")
+    
+    return development_log
+
+# Usage
+config = pynlm.createDefaultConfig()
+log = monitor_brain_development(config, num_steps=1000)
+print(f"Development monitored over {len(log)} steps")
+```
 
 ### Example 1: Simplest Brain
 
@@ -71,87 +150,155 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Pattern 3: Learning with Curiosity
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+def run_curiosity_driven_learning(config, num_steps=1000):
+    """Run simulation with curiosity-driven exploration."""
+    
+    brain = pynlm.createBrain(config)
+    world = pynlm.createSimpleWorld()
+    agent = pynlm.createAgentBrain(brain)
+    
+    world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent.initialize(world)
+    
+    # Enable curiosity for exploration
+    agent.enableCuriosity(True)
+    agent.enableRewardModulation(True)
+    
+    curiosity_scores = []
+    
+    for step in range(num_steps):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Curiosity affects exploration
+        curiosity = agent.getCuriosityLevel()
+        curiosity_scores.append(curiosity)
+        
+        motor_cmd = agent.decodeMotorCommand()
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        if step % 200 == 0:
+            print(f"Step {step}: Curiosity = {curiosity:.3f}")
+    
+    avg_curiosity = sum(curiosity_scores) / len(curiosity_scores)
+    print(f"Average curiosity level: {avg_curiosity:.3f}")
+    
+    return curiosity_scores
 
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Usage
+config = pynlm.createDefaultConfig()
+curiosity_scores = run_curiosity_driven_learning(config, num_steps=1000)
 ```
+
+## Advanced Features
+
+NLM supports several advanced features for complex simulations:
+
+### 1. Multiple Regions
+```python
+# Add different brain regions for specialized functions
+region1 = brain.addRegion("SensoryCortex")
+region2 = brain.addRegion("MotorCortex")
+region3 = brain.addRegion("AssociationCortex")
+```
+
+### 2. Memory Systems
+```python
+# Access memory systems for cognitive modeling
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+associative_memory = brain.getAssociativeMemory()
+
+# Store and retrieve experiences
+working_memory.storeToNeuron(neuron_id, activation_value)
+memory_neuron = working_memory.getMemoryNeurons()
+```
+
+### 3. Neuromodulation
+```python
+# Monitor neuromodulation systems
+dopamine = brain.getDopamine()
+curiosity = brain.getCuriosity()
+novelty = brain.getNovelty()
+
+print(f"Dopamine: {dopamine.getLevel():.3f}")
+print(f"Curiosity: {curiosity.getLevel():.3f}")
+print(f"Novelty: {novelty.getLevel():.3f}")
+```
+
+### 4. Checkpointing
+```python
+# Save and load brain state
+brain.save("checkpoint_brain.nlm")
+
+# Later...
+brain.load("checkpoint_brain.nlm")
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+**Issue: Brain doesn't fire neurons**
+- **Solution**: Ensure `brain.initialize()` is called before simulation
+- **Check**: Verify brain configuration has enough neurons
+
+**Issue: Agent doesn't move**
+- **Solution**: Check that `world.applyMotorCommand()` is called
+- **Check**: Verify world simulation is being updated with `world.update()`
+
+**Issue: Memory systems not working**
+- **Solution**: Enable memory systems via configuration
+- **Check**: Verify brain has sufficient neuron count for memory
+
+**Issue: High memory usage**
+- **Solution**: Reduce brain size or adjust memory system capacity
+- **Check**: Monitor neuron and synapse counts
+
+### Debug Commands
+
+```python
+# Check brain configuration
+brain_config = brain.getConfig()
+print(brain_config.summary())
+
+# Get comprehensive status
+brain.logStatus()
+
+# Check memory usage
+print(f"Working Memory Active Traces: {working_memory.getActiveTraces()}")
+print(f"Episodic Memory Episodes: {episodic_memory.getEpisodeCount()}")
+```
+
+## Further Learning
+
+Once comfortable with the basics:
+
+1. **Explore HOW_TO_USE.md** - Comprehensive API documentation and examples
+2. **Study ARCHITECTURE.md** - Deep dive into NLM design patterns
+3. **Read SCIENCE.md** - Scientific background and theoretical foundations
+4. **Experiment with configurations** - Different brain sizes and connection patterns
+5. **Build custom environments** - Extend beyond SimpleWorld
+6. **Implement learning algorithms** - Custom plasticity rules
+
+## Version Information
+
+This is Phase 6 (FINAL INTEGRATION) of the NLM project. The Python API is designed to be intuitive while exposing the full power of the C++ neural simulation engine.
 
 ---
 
-## Common Patterns
-
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
+*For technical documentation, see `HOW_TO_USE.md`
+For scientific background, see `docs/SCIENCE.md`
+For architecture details, see `docs/ARCHITECTURE.md`*
 
 ---
 
@@ -181,81 +328,6 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
-```
-
----
-
 ## Quick Reference
 
 | What you want | Code |
@@ -273,25 +345,56 @@ print("Agent simulation complete!")
 
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### Common Issues and Solutions
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+**Issue: Brain doesn't fire neurons**
+- **Solution**: Ensure `brain.initialize()` is called before simulation
+- **Check**: Verify brain configuration has enough neurons
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+**Issue: Agent doesn't move**
+- **Solution**: Check that `world.applyMotorCommand()` is called
+- **Check**: Verify world simulation is being updated with `world.update()`
+
+**Issue: Memory systems not working**
+- **Solution**: Enable memory systems via configuration
+- **Check**: Verify brain has sufficient neuron count for memory
+
+**Issue: High memory usage**
+- **Solution**: Reduce brain size or adjust memory system capacity
+- **Check**: Monitor neuron and synapse counts
+
+### Debug Commands
+
+```python
+# Check brain configuration
+brain_config = brain.getConfig()
+print(brain_config.summary())
+
+# Get comprehensive status
+brain.logStatus()
+
+# Check memory usage
+print(f"Working Memory Active Traces: {working_memory.getActiveTraces()}")
+print(f"Episodic Memory Episodes: {episodic_memory.getEpisodeCount()}")
+```
+
+## Further Learning
+
+Once comfortable with the basics:
+
+1. **Explore HOW_TO_USE.md** - Comprehensive API documentation and examples
+2. **Study ARCHITECTURE.md** - Deep dive into NLM design patterns
+3. **Read SCIENCE.md** - Scientific background and theoretical foundations
+4. **Experiment with configurations** - Different brain sizes and connection patterns
+5. **Build custom environments** - Extend beyond SimpleWorld
+6. **Implement learning algorithms** - Custom plasticity rules
+
+## Version Information
+
+This is Phase 6 (FINAL INTEGRATION) of the NLM project. The Python API is designed to be intuitive while exposing the full power of the C++ neural simulation engine.
 
 ---
 
-## Next Steps
-
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
-
-That's it! You're now ready to use NLM.
+*For technical documentation, see `HOW_TO_USE.md`
+For scientific background, see `docs/SCIENCE.md`
+For architecture details, see `docs/ARCHITECTURE.md`*

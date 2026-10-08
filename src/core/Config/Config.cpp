@@ -79,17 +79,72 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Try to write as JSON format
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Write the actual value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeJsonString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double> || 
+                                std::is_same_v<T, float> || 
+                                std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << "\"" << escapeJsonString(arg[j]) << "\"";
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << "null";  // Default for unknown types
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        }
     }
     
-    return true;
+    file << "\n}\n";
+    
+    if (file.good()) {
+        NLM_LOG_INFO("Configuration saved to: " + filepath);
+        return true;
+    } else {
+        NLM_LOG_ERROR("Failed to write configuration to file: " + filepath);
+        return false;
+    }
 }
 
 template<typename T>
@@ -115,6 +170,15 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Basic validation
+    if (key.empty()) {
+        NLM_LOG_WARNING("Attempt to set empty configuration key");
+        return;
+    }
+    
+    // Validate value type based on key
+    validateKeyValue(key, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -126,63 +190,114 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+// Add validation method
+void Config::validateKeyValue(const std::string& key, const ConfigValue& value) {
+    // Convert key to lowercase for validation
+    std::string lowerKey = toLower(key);
+    
+    // Define validation rules for specific keys
+    if (lowerKey == "random_seed" || lowerKey == "neuron_count" || 
+        lowerKey == "region_count" || lowerKey == "max_steps") {
+        // Should be integer values
+        if (!std::holds_alternative<int>(value) && 
+            !std::holds_alternative<int64_t>(value)) {
+            NLM_LOG_WARNING("Configuration key \"" + key + 
+                "\" should be an integer, got " + valueTypeToString(value));
+        }
     }
-    return keys;
+    else if (lowerKey == "connection_probability" || 
+             lowerKey == "plasticity_learning_rate" || 
+             lowerKey == "stdp_ltp_weight" || 
+             lowerKey == "stdp_ltd_weight" || 
+             lowerKey == "stdp_time_constant" ||
+             lowerKey == "simulation_timestep" ||
+             lowerKey == "reward_discount_factor") {
+        // Should be floating point values
+        if (!std::holds_alternative<double>(value) && 
+            !std::holds_alternative<float>(value)) {
+            NLM_LOG_WARNING("Configuration key \"" + key + 
+                "\" should be a floating point number, got " + valueTypeToString(value));
+        }
+    }
+    else if (lowerKey == "enable_" || lowerKey == "enabled" ||
+             lowerKey == "visualization_enabled") {
+        // Should be boolean values
+        if (!std::holds_alternative<bool>(value)) {
+            NLM_LOG_WARNING("Configuration key \"" + key + 
+                "\" should be a boolean, got " + valueTypeToString(value));
+        }
+    }
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+// Helper to convert value type to string
+std::string Config::valueTypeToString(const ConfigValue& value) {
+    std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) return "int";
+        else if constexpr (std::is_same_v<T, int64_t>) return "int64_t";
+        else if constexpr (std::is_same_v<T, double>) return "double";
+        else if constexpr (std::is_same_v<T, float>) return "float";
+        else if constexpr (std::is_same_v<T, bool>) return "bool";
+        else if constexpr (std::is_same_v<T, std::string>) return "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) return "vector<int>";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) return "vector<double>";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) return "vector<string>";
+        else return "unknown";
+    }, value);
+    return "unknown";
 }
 
+// Enhanced has method with case-insensitive search
+bool Config::has(const std::string& key) const {
+    std::string lowerKey = toLower(key);
+    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+        [&lowerKey](const ConfigEntry& e) { return toLower(e.key) == lowerKey; });
+}
+
+// Enhanced getOr method with better error handling
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    if (val.has_value()) {
+        return val.value();
+    }
+    
+    // Log missing key with default
+    NLM_LOG_INFO("Using default value for configuration key \"" + key + 
+        "\": " + std::to_string(defaultValue));
+    
+    return defaultValue;
+}
+
+// Enhanced summary method with more details
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
+    // Sort entries by key for consistent output
+    std::vector<const ConfigEntry*> sortedEntries;
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        sortedEntries.push_back(&entry);
+    }
+    
+    std::sort(sortedEntries.begin(), sortedEntries.end(),
+        [](const ConfigEntry* a, const ConfigEntry* b) {
+            return a->key < b->key;
+        });
+    
+    for (const auto* entry : sortedEntries) {
+        oss << "  " << entry->key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\"" << escapeJsonString(arg) << "\"";
             } else {
                 oss << arg;
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }, entry->value);
+        oss << "] (" << static_cast<int>(entry->source) << ") - " << entry->description << "\n";
     }
+    
     return oss.str();
 }
 
