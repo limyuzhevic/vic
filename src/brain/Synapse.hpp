@@ -9,7 +9,31 @@ class Neuron;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
-
+// Phase 6: Integrated with neuromodulation and reward systems
+/**
+ * @class Synapse
+ * @brief Represents a synaptic connection between two neurons
+ * 
+ * The Synapse class implements realistic synaptic transmission in the NLM brain,
+ * including synaptic delays, short-term plasticity, and integration with
+ * neuromodulatory systems. Synapses are the fundamental connections that allow
+ * neurons to communicate and form complex neural circuits.
+ * 
+ * Key features:
+ * - Synaptic delay modeling (1-5 simulation steps)
+ * - Short-term plasticity (facilitation and depression)
+ * - Eligibility traces for reward-modulated learning
+ * - Integration with neuromodulation (dopamine, acetylcholine, etc.)
+ * - Structural plasticity (creation, modification, pruning)
+ * - Hebbian and STDP learning rule integration
+ * - Real synaptic weight dynamics with bounds
+ * 
+ * The synapse dynamics are event-driven and integrated with the brain's
+ * spike-based computation, allowing for realistic neural network behavior.
+ * 
+ * @note This is a Phase 6 component - part of the final integrated artificial brain
+ * @see Neuron, StructuralPlasticity, Neuromodulator
+ */
 class Synapse {
 public:
     // Create synapse with IDs

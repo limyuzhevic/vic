@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
 
 namespace nlm {
 
@@ -43,7 +44,34 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class for NLM
+/**
+ * @class Config
+ * @brief Central configuration management for the NLM neural simulation framework
+ * 
+ * The Config class provides a unified interface for loading, storing, and accessing
+ * configuration parameters for the NLM (Neural Learning Machine) system. It supports
+ * multiple configuration sources (files, command line, runtime) and handles various
+ * data types including integers, floats, booleans, strings, and complex types like
+ * vectors and variants.
+ * 
+ * Key features:
+ * - JSON configuration file support with automatic parsing
+ * - Command-line argument integration with flexible format (--key=value, -key value)
+ * - Runtime configuration modification capabilities
+ * - Comprehensive error handling and validation
+ * - Type-safe value retrieval with automatic conversion
+ * - Multiple configuration sources with precedence handling
+ * - Persistent configuration saving and loading
+ * 
+ * The configuration system is designed to be both simple for basic use cases and
+ * powerful enough for complex experimental setups. It supports all configuration
+ * options needed by the Phase 6 integrated brain system.
+ * 
+ * @note This is a Phase 6 component - provides the configuration backbone for
+ *       the final integrated artificial brain system
+ * @see ConfigEntry, ConfigSource
+ */
 class Config {
 public:
     Config();
@@ -92,6 +120,13 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Helper methods for enhanced parsing
+    std::string escapeString(const std::string& str);
+    void setFromString(const std::string& key, const std::string& valueStr, ConfigSource source);
+    bool loadFromSimpleFormat(std::ifstream& file);
+    bool loadFromJson(std::ifstream& file);
+    void parseJsonString(const std::string& jsonStr);
     
 private:
     struct Impl;

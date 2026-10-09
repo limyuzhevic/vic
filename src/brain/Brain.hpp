@@ -47,8 +47,37 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
-
+/**
+ * @class Brain
+ * @brief The central neural simulation brain in the NLM framework
+ * 
+ * The Brain class represents the complete artificial brain system in the NLM
+ * (Neural Learning Machine) project. It serves as the main coordinator that
+ * integrates all subsystems including neurons, synapses, memory systems,
+ * neuromodulation, prediction, cognition, and development.
+ * 
+ * Phase 6 Integration:
+ * - Real spiking neural computation with LIF neuron dynamics
+ * - Event-driven spike propagation with synaptic delays
+ * - Integrated memory systems (working, episodic, associative)
+ * - Complete neuromodulation system (dopamine, curiosity, novelty, etc.)
+ * - Prediction system integrated with learning
+ * - Cognitive mechanisms (planning, attention, concept formation)
+ * - Developmental plasticity system
+ * - Checkpointing and replay capabilities
+ * - Structural plasticity (synaptogenesis, pruning)
+ * 
+ * The Brain class provides the complete neural substrate for cognitive
+ * behaviors that emerge from neural dynamics and plasticity through
+ * interaction with an environment.
+ * 
+ * @note This is a Phase 6 component - the final integrated artificial brain
+ * @see Neuron, Synapse, NeuralRegion, MemorySystem, Neuromodulator
+ */
 class Brain {
+public:
+    // Create brain with configuration
+    explicit Brain(std::shared_ptr<Config> config);
 public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);

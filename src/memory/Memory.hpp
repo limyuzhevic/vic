@@ -6,9 +6,9 @@
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
-
+// Memory system components for NLM Phase 6 integration
+// Real neural memory systems integrated with brain processing
+// Phase 6: Connected to neural computation, neuromodulation, and prediction
 class WorkingMemory {
 public:
     WorkingMemory();

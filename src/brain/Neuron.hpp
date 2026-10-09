@@ -41,8 +41,8 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
-class Neuron {
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with spike-frequency adaptation
+// Phase 6: Real neural computation with advanced plasticity support
 public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);

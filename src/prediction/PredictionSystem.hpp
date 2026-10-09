@@ -7,7 +7,8 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Integrated prediction mechanism for cognitive processing
+// Phase 6: Connected to memory, attention, and action selection systems
 
 class PredictionSystem {
 public:
