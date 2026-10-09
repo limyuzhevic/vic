@@ -73,6 +73,156 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
+## Configuration System
+
+NLM now has an improved configuration system that supports both JSON and text formats:
+
+### JSON Configuration (Recommended)
+
+```python
+import pynlm
+import json
+
+# Create custom configuration
+config_data = {
+    "neuron_count": 2000,
+    "region_count": 3,
+    "simulation_timestep": 0.001,
+    "stdp_ltp_weight": 0.02,
+    "stdp_ltd_weight": 0.015,
+    "enable_checkpointing": True,
+    "visualization_enabled": True
+}
+
+config = pynlm.createConfigFromJSON(json.dumps(config_data))
+brain = pynlm.createBrain(config)
+```
+
+### Text Configuration (Legacy)
+
+```python
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2000)
+config.set("region_count", 3)
+config.set("enable_checkpointing", True)
+```
+
+### Command Line Configuration
+
+```bash
+./nlm --config=config.json --neuron_count=5000 --simulation_timestep=0.0005
+```
+
+## Advanced Configuration Options
+
+### Available Configuration Parameters
+
+- `random_seed`: Random seed for reproducible experiments (int64_t)
+- `simulation_timestep`: Simulation timestep in seconds (double)
+- `neuron_count`: Number of neurons in the brain (int64_t)
+- `region_count`: Number of brain regions (int64_t)
+- `connection_probability`: Connection probability for random connectivity (double)
+- `stdp_ltp_weight`: STDP LTP weight (double)
+- `stdp_ltd_weight`: STDP LTD weight (double)
+- `stdp_tau`: STDP time constant (double)
+- `synaptogenesis_rate`: Synaptogenesis rate (double)
+- `pruning_rate`: Pruning rate (double)
+- `neuromodulation_dopamine_baseline`: Dopamine baseline for neuromodulation (double)
+- `reward_discount_factor`: Reward discount factor (double)
+- `environment_name`: Environment name (string)
+- `environment_width`: Environment width (int64_t)
+- `environment_height`: Environment height (int64_t)
+- `log_level`: Log level (Debug, Info, Warning, Error, Critical) (string)
+- `log_to_file`: Whether to log to file (bool)
+- `log_filename`: Log filename (string)
+- `max_simulation_steps`: Maximum simulation steps (int64_t)
+- `simulation_time_limit`: Simulation time limit in seconds (double)
+- `working_memory_capacity`: Working memory capacity (int64_t)
+- `episodic_memory_max_episodes`: Maximum episodic memory episodes (int64_t)
+- `enable_checkpointing`: Enable checkpointing (bool)
+- `checkpoint_path`: Checkpoint file path (string)
+- `replay_interval`: Replay interval in steps (int64_t)
+- `consolidation_interval`: Consolidation interval in steps (int64_t)
+
+### Configuration File Format
+
+**JSON Format (`config.json`):**
+
+```json
+{
+  "neuron_count": 2000,
+  "region_count": 3,
+  "simulation_timestep": 0.001,
+  "stdp_ltp_weight": 0.02,
+  "stdp_ltd_weight": 0.015,
+  "enable_checkpointing": true,
+  "visualization_enabled": true
+}
+```
+
+**Text Format (`config.cfg`):**
+
+```
+# NLM Configuration File
+# This is the default configuration for Phase 6 integration
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds
+simulation_timestep = 0.001
+
+# Number of neurons in the brain
+neuron_count = 1000
+
+# Number of brain regions
+region_count = 2
+
+# Connection probability for random connectivity
+connection_probability = 0.1
+
+# Plasticity settings
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+
+# Development settings
+development_synaptogenesis_rate = 0.001
+development_pruning_rate = 0.0001
+
+# Neuromodulation settings (dopamine baseline - multiple instances removed)
+neuromodulation_dopamine_baseline = 0.1
+
+# Reward settings
+reward_discount_factor = 0.99
+
+# Environment settings
+environment_name = SimpleWorld
+environment_width = 16
+environment_height = 16
+
+# Logging settings
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
+
+# Simulation settings
+max_simulation_steps = 5000
+simulation_time_limit = 0.0
+
+# Memory settings
+working_memory_capacity = 100
+episodic_memory_max_episodes = 1000
+
+# Integration settings
+enable_checkpointing = true
+checkpoint_path = ./checkpoints/nlm_checkpoint
+replay_interval = 100
+consolidation_interval = 1000
+```
+
+---
+
 ## Simple Analogy
 
 | Real World | NLM Code |
