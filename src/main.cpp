@@ -25,6 +25,9 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <algorithm>
+#include <chrono>
 
 using namespace nlm;
 
