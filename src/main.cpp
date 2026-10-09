@@ -353,36 +353,117 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--debug") {
+            config->set("debug_mode", true, ConfigSource::CommandLine);
+        } else if (arg == "--verbose") {
+            config->set("verbose_logging", true, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 8) == "--plasticity") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = arg.substr(8, arg.find('=') - 8);
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("plasticity." + key, std::stoi(value), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 13) == "--neuromodulation") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = arg.substr(13, arg.find('=') - 13);
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("neuromod." + key, std::stof(value), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 12) == "--prediction") {
+            if (arg.find('=') != std::string::npos) {
+                std::string key = arg.substr(12, arg.find('=') - 12);
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("prediction." + key, std::stof(value), ConfigSource::CommandLine);
+            }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Validate configuration
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Configuration Validation ===");
+    
+    bool configValid = true;
+    
+    // Check neuron count
+    if (config->getOr<int64_t>("neuron_count", 500) < 1) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be positive");
+        configValid = false;
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Check connection probability
+    float connProb = config->getOr<float>("connection_probability", 0.15f);
+    if (connProb < 0.0f || connProb > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be between 0.0 and 1.0");
+        configValid = false;
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Check plasticity parameters
+    bool stdpEnabled = config->getOr<bool>("plasticity.stdp.enable", true);
+    bool hebbianEnabled = config->getOr<bool>("plasticity.hebbian.enable", true);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!stdpEnabled && !hebbianEnabled) {
+        NLM_LOG_WARNING("Both STDP and Hebbian plasticity are disabled");
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Check neuromodulation parameters
+    bool curiosityEnabled = config->getOr<bool>("neuromod.curiosity.enable", true);
+    bool noveltyEnabled = config->getOr<bool>("neuromod.novelty.enable", true);
     
-    // Log configuration summary
+    if (!curiosityEnabled && !noveltyEnabled) {
+        NLM_LOG_WARNING("Both curiosity and novelty detection are disabled");
+    }
+    
+    // Check prediction system parameters
+    bool predictionEnabled = config->getOr<bool>("prediction.enabled", true);
+    if (!predictionEnabled) {
+        NLM_LOG_WARNING("Prediction system is disabled");
+    }
+    
+    // Check development parameters
+    bool developmentEnabled = config->getOr<bool>("development.enabled", true);
+    if (!developmentEnabled) {
+        NLM_LOG_WARNING("Development system is disabled");
+    }
+    
+    // Check memory system parameters
+    bool memoryWorkingEnabled = config->getOr<bool>("memory.working.enabled", true);
+    bool memoryEpisodicEnabled = config->getOr<bool>("memory.episodic.enabled", true);
+    bool memorySemanticEnabled = config->getOr<bool>("memory.semantic.enabled", true);
+    bool memoryProceduralEnabled = config->getOr<bool>("memory.procedural.enabled", true);
+    
+    int memorySystemCount = 0;
+    if (memoryWorkingEnabled) memorySystemCount++;
+    if (memoryEpisodicEnabled) memorySystemCount++;
+    if (memorySemanticEnabled) memorySystemCount++;
+    if (memoryProceduralEnabled) memorySystemCount++;
+    
+    if (memorySystemCount == 0) {
+        NLM_LOG_ERROR("All memory systems are disabled");
+        configValid = false;
+    }
+    
+    // Check cognitive system parameters
+    bool plannerEnabled = config->getOr<bool>("cognition.planner.enabled", true);
+    bool conceptFormationEnabled = config->getOr<bool>("cognition.concept.enabled", true);
+    bool attentionEnabled = config->getOr<bool>("cognition.attention.enabled", true);
+    
+    int cognitionSystemCount = 0;
+    if (plannerEnabled) cognitionSystemCount++;
+    if (conceptFormationEnabled) cognitionSystemCount++;
+    if (attentionEnabled) cognitionSystemCount++;
+    
+    if (cognitionSystemCount == 0) {
+        NLM_LOG_ERROR("All cognitive systems are disabled");
+        configValid = false;
+    }
+    
+    if (configValid) {
+        NLM_LOG_INFO("✓ Configuration validation passed");
+    } else {
+        NLM_LOG_ERROR("✗ Configuration validation failed");
+        return 1;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -390,6 +471,31 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Advanced features
+    NLM_LOG_INFO("  Advanced features enabled:");
+    NLM_LOG_INFO("    plasticity: STDP enabled = " + std::to_string(config->getOr<bool>("plasticity.stdp.enable", true)));
+    NLM_LOG_INFO("    plasticity: Hebbian enabled = " + std::to_string(config->getOr<bool>("plasticity.hebbian.enable", true)));
+    NLM_LOG_INFO("    neuromodulation: dopamine = " + std::to_string(config->getOr<float>("neuromod.dopamine.scale", 1.0f)));
+    NLM_LOG_INFO("    neuromodulation: curiosity = " + std::to_string(config->getOr<bool>("neuromod.curiosity.enable", true)));
+    NLM_LOG_INFO("    neuromodulation: novelty = " + std::to_string(config->getOr<bool>("neuromod.novelty.enable", true)));
+    NLM_LOG_INFO("");
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Advanced features
+    NLM_LOG_INFO("  Advanced features enabled:");
+    NLM_LOG_INFO("    plasticity: STDP enabled = " + std::to_string(config->getOr<bool>("plasticity.stdp.enable", true)));
+    NLM_LOG_INFO("    plasticity: Hebbian enabled = " + std::to_string(config->getOr<bool>("plasticity.hebbian.enable", true)));
+    NLM_LOG_INFO("    neuromodulation: dopamine = " + std::to_string(config->getOr<float>("neuromod.dopamine.scale", 1.0f)));
+    NLM_LOG_INFO("    neuromodulation: curiosity = " + std::to_string(config->getOr<bool>("neuromod.curiosity.enable", true)));
+    NLM_LOG_INFO("    neuromodulation: novelty = " + std::to_string(config->getOr<bool>("neuromod.novelty.enable", true)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -397,53 +503,95 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with comprehensive error handling
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    NLM_LOG_INFO("=== Brain Initialization with Error Handling ===");
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    try {
+        NLM_LOG_INFO("Creating brain instance...");
+        auto brain = std::make_shared<Brain>(config);
+        
+        NLM_LOG_INFO("Brain instance created successfully");
+        
+        NLM_LOG_INFO("Initializing brain...");
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        NLM_LOG_INFO("Brain initialization completed successfully");
+        
+        // Run comprehensive tests with error handling
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Comprehensive Test Suite ===");
+        
+        // Test 1: Basic connectivity
+        NLM_LOG_INFO("Test 1: Basic Neural Connectivity");
+        try {
+            runBasicConnectivityTest(brain);
+            NLM_LOG_INFO("✓ Test 1 PASSED");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("✗ Test 1 FAILED: " + std::string(e.what()));
+            return 1;
+        }
+        
+        // Reset brain for plasticity experiment
+        NLM_LOG_INFO("Resetting brain for plasticity experiments...");
+        brain->reset();
+        brain->initialize();
+        
+        // Test 2: Plasticity learning experiment
+        NLM_LOG_INFO("Test 2: Plasticity Learning Experiment");
+        try {
+            runPlasticityExperiment(brain);
+            NLM_LOG_INFO("✓ Test 2 PASSED");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("✗ Test 2 FAILED: " + std::string(e.what()));
+            return 1;
+        }
+        
+        // Reset and run Test 3: STDP verification
+        NLM_LOG_INFO("Resetting brain for STDP verification...");
+        brain->reset();
+        brain->initialize();
+        
+        NLM_LOG_INFO("Test 3: STDP Verification");
+        try {
+            runStdpVerification(brain);
+            NLM_LOG_INFO("✓ Test 3 PASSED");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("✗ Test 3 FAILED: " + std::string(e.what()));
+            return 1;
+        }
+        
+        // Final brain status
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Final Brain Status ===");
+        brain->logStatus();
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Phase 2 Complete ===");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Phase 2 Objectives Completed:");
+        NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
+        NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  ✓ STDP plasticity rule");
+        NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+        NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+        NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
+        NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
+        NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+        NLM_LOG_INFO("");
+        
+        return 0;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Fatal error during brain execution: " + std::string(e.what()));
+        return 1;
+    } catch (...) {
+        NLM_LOG_ERROR("Unknown error occurred during brain execution");
         return 1;
     }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
 }

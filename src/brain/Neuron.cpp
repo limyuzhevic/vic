@@ -143,6 +143,11 @@ void Neuron::injectCurrent(MembranePotential current) {
     pImpl->synapticInput += current;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    // Return the total synaptic current (from injected current + synaptic inputs)
+    return pImpl->synapticInput;
+}
+
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
