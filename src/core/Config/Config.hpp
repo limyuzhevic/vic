@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -100,6 +101,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    void parseJsonToConfig(const nlohmann::json& jsonData, const std::string& prefix);
+    void setValueFromJson(const std::string& key, const nlohmann::json& jsonValue);
+    void setArrayValue(const std::string& key, const nlohmann::json& jsonArray);
+    nlohmann::json getValueAsJson(const ConfigValue& value) const;
 };
 
 } // namespace nlm

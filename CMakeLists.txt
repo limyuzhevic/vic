@@ -11,6 +11,42 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Enable performance optimizations
+option(NLM_PERFORMANCE_ENABLED "Enable performance optimizations" ON)
+option(NLM_SIMD_ENABLED "Enable SIMD acceleration" ON)
+option(NLM_MULTITHREADING_ENABLED "Enable multithreading" ON)
+option(NLM_EVENT_DRIVEN_ENABLED "Enable event-driven processing" ON)
+
+# Performance configuration
+if(NLM_PERFORMANCE_ENABLED)
+    add_compile_definitions(NLM_PERFORMANCE_ENABLED)
+    if(NLM_SIMD_ENABLED)
+        add_compile_definitions(NLM_USE_SIMD)
+        # Detect available SIMD instructions
+        include(CheckCXXCompilerFlag)
+        check_cxx_compiler_flag(-mavx2 HAS_AVX2)
+        if(HAS_AVX2)
+            add_compile_options(-mavx2)
+            add_compile_definitions(NLM_SIMD_AVX2)
+        else()
+            check_cxx_compiler_flag(-msse SSE_SUPPORTED)
+            if(SSE_SUPPORTED)
+                add_compile_options(-msse)
+                add_compile_definitions(NLM_SIMD_SSE)
+            endif()
+        endif()
+    endif()
+    
+    if(NLM_MULTITHREADING_ENABLED)
+        add_compile_definitions(NLM_USE_MULTITHREADING)
+        set(NLM_NUM_THREADS "OpenMP" CACHE STRING "Number of threads (OpenMP or specific number)")
+    endif()
+    
+    if(NLM_EVENT_DRIVEN_ENABLED)
+        add_compile_definitions(NLM_USE_EVENT_QUEUE)
+    endif()
+endif()
+
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
@@ -85,10 +121,17 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance
+    src/performance/MemoryPool.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/EventQueue.cpp
+    src/performance/CheckpointSystem.cpp
+    src/performance/SIMDVectorization.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/performance>
     $<INSTALL_INTERFACE:include>
 )
 
