@@ -14,10 +14,11 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_advanced.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
+target_link_libraries(nlm_test PUBLIC nlm_core)
+set_target_properties(nlm_test PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED TRUE)
 
 # Enable testing
 enable_testing()
