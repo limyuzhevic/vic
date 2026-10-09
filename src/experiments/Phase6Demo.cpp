@@ -1,6 +1,6 @@
 /**
  * Phase 6 Demo - Integration Test
- * 
+ *
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
  */
@@ -8,6 +8,7 @@
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
+#include <string>
 
 using namespace nlm;
 
@@ -21,8 +22,52 @@ int main(int argc, char* argv[]) {
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
-    // First, run the quick integration verification
-    std::cout << "--- Integration Verification ---" << std::endl;
+    // Advanced demo options
+    std::string savePath = "";
+    std::string loadPath = "";
+    std::string debugMode = "none";
+    int debugSteps = 0;
+    bool enableAdvancedFeatures = false;
+    bool enableDebugOutput = false;
+    
+    // Parse advanced command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--save" && i + 1 < argc) {
+            savePath = argv[++i];
+            enableAdvancedFeatures = true;
+        } else if (arg == "--load" && i + 1 < argc) {
+            loadPath = argv[++i];
+            enableAdvancedFeatures = true;
+        } else if (arg == "--debug" && i + 1 < argc) {
+            debugMode = argv[++i];
+            enableDebugOutput = true;
+            enableAdvancedFeatures = true;
+        } else if (arg == "--debug-steps" && i + 1 < argc) {
+            debugSteps = std::atoi(argv[++i]);
+            enableDebugOutput = true;
+            enableAdvancedFeatures = true;
+        } else if (arg == "--advanced") {
+            enableAdvancedFeatures = true;
+        } else if (arg == "--debug-output") {
+            enableDebugOutput = true;
+        }
+    }
+    
+    // Run integration verification with advanced options
+    std::cout << "--- Integration Verification (Advanced Mode) ---" << std::endl;
+    
+    if (enableAdvancedFeatures) {
+        std::cout << "Advanced features enabled: " << std::endl;
+        if (!savePath.empty()) std::cout << "  Save path: " << savePath << std::endl;
+        if (!loadPath.empty()) std::cout << "  Load path: " << loadPath << std::endl;
+        if (debugMode != "none") std::cout << "  Debug mode: " << debugMode << std::endl;
+        if (debugSteps > 0) std::cout << "  Debug steps: " << debugSteps << std::endl;
+        std::cout << std::endl;
+    }
+    
+    // For now, just verify integration
     bool integrationOK = experiment.verifyIntegration();
     
     std::cout << std::endl;

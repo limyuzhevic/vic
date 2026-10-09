@@ -147,6 +147,23 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Update cognitive systems
+    if (brain_) {
+        // Update attention system with current sensory input
+        if (attention_ && !sensoryVision_.empty()) {
+            // Convert vision to NeuronId format for attention processing
+            std::vector<NeuronId> competitors;
+            for (size_t i = 0; i < std::min(sensoryVision_.size(), sensoryVision_.size()); ++i) {
+                if (sensoryVision_[i] && sensoryVision_[i]->isActive()) {
+                    competitors.push_back(sensoryVision_[i]->getId());
+                }
+            }
+            if (!competitors.empty()) {
+                attention_->processCompetition(competitors);
+            }
+        }
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {

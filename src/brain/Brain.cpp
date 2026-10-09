@@ -406,6 +406,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
+    // ========== STEP 4.5: Episodic memory storage ==========
+    if (pImpl->episodicMemory && currentStep % 10 == 0) {  // Store every 10 steps
+        EpisodicMemoryItem item;
+        item.timestamp = currentStep;
+        item.age = 0;
+        
+        // Store reward prediction error from dopamine system
+        if (pImpl->dopamine) {
+            item.reward = pImpl->dopamine->getLevel();
+        }
+        
+        // Store current neural activity snapshot
+        item.novelty = pImpl->workingMemory ? pImpl->workingMemory->getMemoryActivity() : 0.0f;
+        
+        // Store active neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        item.activeNeurons.push_back(neuron->getId());
+                        item.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store to episodic memory
+        pImpl->episodicMemory->storeEpisode(item);
+    }
+    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
