@@ -85,6 +85,7 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/AdvancedVisualization.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -121,27 +122,87 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Performance and optimization system
+add_library(nlm_performance STATIC
+    src/performance/PerformanceProfiler.cpp
+    src/performance/ThreadProfiler.cpp
+    src/performance/MemoryProfiler.cpp
+    src/performance/CPUProfiler.cpp
+    src/performance/IOProfiler.cpp
+    src/performance/PerformanceMonitor.cpp
+    src/performance/PerformanceStatistics.cpp
+    src/performance/NeuralPerformanceAnalyzer.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_include_directories(nlm_performance PUBLIC src)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+# Optimized brain implementation
+add_library(nlm_optimized_brain STATIC
+    src/performance/OptimizedBrain.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_include_directories(nlm_optimized_brain PUBLIC src)
+target_link_libraries(nlm_optimized_brain PUBLIC nlm_performance)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Memory pool system
+add_library(nlm_memory_pool STATIC
+    src/performance/MemoryPool.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_include_directories(nlm_memory_pool PUBLIC src)
+target_link_libraries(nlm_memory_pool PUBLIC nlm_performance)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# SIMD vectorization
+add_library(nlm_simd STATIC
+    src/performance/SIMDVectorization.cpp
+)
+target_include_directories(nlm_simd PUBLIC src)
+target_link_libraries(nlm_simd PUBLIC nlm_performance)
+
+# Event queue system
+add_library(nlm_event_queue STATIC
+    src/performance/EventQueue.cpp
+)
+target_include_directories(nlm_event_queue PUBLIC src)
+target_link_libraries(nlm_event_queue PUBLIC nlm_performance)
+
+# Checkpoint system
+add_library(nlm_checkpoint_system STATIC
+    src/performance/CheckpointSystem.cpp
+)
+target_include_directories(nlm_checkpoint_system PUBLIC src)
+target_link_libraries(nlm_checkpoint_system PUBLIC nlm_performance)
+
+# Parallel processing
+add_library(nlm_parallel_processing STATIC
+    src/performance/ParallelProcessing.cpp
+)
+target_include_directories(nlm_parallel_processing PUBLIC src)
+target_link_libraries(nlm_parallel_processing PUBLIC nlm_performance)
+
+# Sparse connectivity optimization
+add_library(nlm_sparse_connectivity STATIC
+    src/performance/SparseConnectivity.cpp
+)
+target_include_directories(nlm_sparse_connectivity PUBLIC src)
+target_link_libraries(nlm_sparse_connectivity PUBLIC nlm_performance)
+
+# Phase 5 performance optimizations
+add_library(nlm_phase5 STATIC
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/neuromodulation/Dopamine.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_performance nlm_memory_pool nlm_simd nlm_event_queue)
+
+# Main executable with performance optimizations
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_optimized_brain nlm_memory_pool nlm_simd nlm_event_queue nlm_checkpoint_system nlm_parallel_processing nlm_sparse_connectivity)
+
+# Phase 3 demo with performance optimizations
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_optimized_brain nlm_memory_pool nlm_simd nlm_event_queue nlm_checkpoint_system)
+
+# Phase 4 demo with performance optimizations
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_optimized_brain nlm_memory_pool nlm_simd nlm_event_queue nlm_checkpoint_system)
+
+# Advanced visualization demo with performance optimizations
+target_link_libraries(nlm_advanced_viz_demo PUBLIC nlm_core nlm_optimized_brain nlm_memory_pool nlm_simd nlm_event_queue nlm_checkpoint_system)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

@@ -37,12 +37,27 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_reward {
+    void runAll();
+}
+
+namespace test_rstdp {
+    void runAll();
+}
+
+namespace test_reward_new {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Reward-Modulated STDP (R-STDP)" << std::endl;
+    std::cout << "  - Dopamine Neuromodulation" << std::endl;
+    std::cout << "  - Complete Reward System" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -104,6 +119,33 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Reward tests..." << std::endl;
+    try {
+        test_reward::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Complete Reward System tests..." << std::endl;
+    try {
+        test_reward_new::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Reward-Modulated STDP tests..." << std::endl;
+    try {
+        test_rstdp::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

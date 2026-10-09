@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "wheel"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -12,10 +12,12 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "brain-emulation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +27,73 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bioinformatics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "pandas>=1.3.0",
+    "matplotlib>=3.3.0",
+    "seaborn>=0.11.0",
+    "scipy>=1.7.0",
+    "scikit-learn>=1.0",
+    "tqdm>=4.60.0",
+    "joblib>=1.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov>=3.0",
+    "black>=21.12b0",
+    "isort>=5.10.0",
+    "flake8>=4.0.0",
+    "mypy>=0.910",
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=0.15.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.0.0",
+]
+
+[project.optional-dependencies]
+full = [
+    "tensorflow>=2.8.0",
+    "torch>=1.9.0",
+    "keras>=2.8.0",
+    "xgboost>=1.5.0",
+    "lightgbm>=3.2.0",
+    "catboost>=0.26.0",
+    "hmmlearn>=0.2.5",
+    "statsmodels>=0.13.0",
+    "gym>=0.21.0",
+    "pyglet>=1.0.0",
+]
+
+[project.optional-dependencies]
+debug = [
+    "line_profiler>=2.1.0",
+    "memory_profiler>=0.60.0",
+    "python-profiler>=1.0.0",
+]
+
+[project.optional-dependencies]
+visualization = [
+    "plotly>=5.0.0",
+    "plotly-express>=0.1.0",
+    "kaleido>=0.2.1",
+    "pyvis==0.1.0",
+    "networkx>=2.6.0",
+    "igraph>=0.10.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+Changelog = "https://github.com/nlm-project/nlm/releases"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +102,112 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DCMAKE_POSITION_INDEPENDENT_COMPILATION=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON = ON
+NLM_ENABLE_TESTING = OFF
+NLM_ENABLE_EXPERIMENTS = ON
+NLM_ENABLE_PERFORMANCE_PROFILING = ON
+
+[tool.scikit-build.cmake.options]
+NLM_PYTHON_MODULE = "pynlm"
+NLM_PYTHON_BINDINGS = "${CMAKE_CURRENT_SOURCE_DIR}/python/bindings.cpp"
+NLM_PYTHON_INCLUDES = "${CMAKE_CURRENT_SOURCE_DIR}/python"
+
+[project.scripts]
+nlm = "nlm_python_module:main"
+nlm-explore = "nlm_configuration_module:main"
+nlm-analyze = "nlm_analysis_module:main"
+nlm-ml = "nlm_ml_module:main"
+nlm-debug = "nlm_debug_module:main"
+nlm-configure = "nlm_configuration_module:main"
+
+[project.entry-points]
+nlm.plugins = [
+    "default = nlm.plugins.default",
+    "neural = nlm.plugins.neural",
+    "plasticity = nlm.plugins.plasticity",
+    "neuromodulation = nlm.plugins.neuromodulation",
+]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = ["tests", "python/tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=nlm_python_module",
+    "--cov=nlm_configuration_module",
+    "--cov=nlm_analysis_module",
+    "--cov=nlm_ml_module",
+    "--cov=nlm_debug_module",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | migrations
+  | \*egg-info
+  | \*\.egg
+  | \.gitignore
+  | \.hgignore
+  | \.hgsub
+  | \.hgsubstate
+  | \.gitignore
+)/
+''
+
+[tool.isort]
+skip_gitignore = true
+force_sort_within_sections = true
+known_first_party = ["nlm", "pynlm"]
+known_third_party = ["numpy", "pandas", "matplotlib", "seaborn", "scipy", "sklearn"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+''
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "performance: marks tests as performance tests",
+    "ml: marks tests as machine learning tests",
+    "debug: marks tests as debugging tests",
+]

@@ -19,9 +19,136 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Determine file format based on extension and content
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool success = false;
+    if (ext == ".json" || ext == ".jsonc") {
+        success = loadFromJSONFile(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        success = loadFromYAMLFile(filepath);
+    } else if (ext == ".toml") {
+        success = loadFromTOMLFile(filepath);
+    } else {
+        // Default to simple format for backward compatibility
+        success = loadFromSimpleFile(filepath);
+    }
+    
+    if (success) {
+        NLM_LOG_INFO("Configuration loaded from: " + filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON parsing (implementation placeholder - would use real JSON library in production)
+    // For now, read as text and parse manually
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    if (content.empty()) {
+        return false;
+    }
+    
+    // Simple JSON parsing - would use nlohmann::json in real implementation
+    // For now, parse key-value pairs from JSON
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        trim(key);
+        
+        // Find value
+        size_t colonPos = content.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        size_t valueStart = content.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        if (content[valueStart] == '"') {
+            // String value
+            size_t valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (content[valueStart] == '{' || content[valueStart] == '[') {
+            // Complex object/array - would need proper parsing
+            // For now, skip complex values
+            pos = valueStart + 1;
+            while (pos < content.size() && content[pos] != '}') break;
+            if (pos < content.size()) pos++;
+        } else {
+            // Numeric value
+            size_t valueEnd = content.find_first_of(",}\", valueStart);
+            if (valueEnd == std::string::npos) break;
+            std::string valueStr = content.substr(valueStart, valueEnd - valueStart);
+            trim(valueStr);
+            
+            // Try to convert to numeric
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    double value = std::stod(valueStr);
+                    set(key, value, ConfigSource::File);
+                } else {
+                    int value = std::stoi(valueStr);
+                    set(key, value, ConfigSource::File);
+                }
+            } catch (...) {
+                // If conversion fails, treat as string
+                set(key, valueStr, ConfigSource::File);
+            }
+            
+            pos = valueEnd + 1;
+        }
+        
+        // Skip whitespace and comma
+        while (pos < content.size() && (std::isspace(content[pos]) || content[pos] == ',')) {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // For now, treat as simple format with comments
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromTOMLFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // For now, treat as simple format with comments
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,7 +158,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == ';') {
             continue;
         }
         
@@ -48,11 +175,71 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Handle environment variable substitution
+            value = substituteEnvironmentVariables(value);
+            
+            // Handle template variables
+            value = substituteTemplateVariables(value);
+            
             set(key, value, ConfigSource::File);
         }
     }
     
     return true;
+}
+
+std::string Config::substituteEnvironmentVariables(const std::string& value) const {
+    std::string result = value;
+    size_t pos = 0;
+    
+    while ((pos = result.find("${", pos)) != std::string::npos) {
+        size_t end = result.find('}', pos + 2);
+        if (end == std::string::npos) break;
+        
+        std::string varName = result.substr(pos + 2, end - pos - 2);
+        trim(varName);
+        
+        const char* envValue = std::getenv(varName.c_str());
+        if (envValue) {
+            result.replace(pos, end - pos + 1, envValue);
+        } else {
+            result.replace(pos, end - pos + 1, "");
+        }
+        
+        pos += strlen(envValue);
+    }
+    
+    return result;
+}
+
+std::string Config::substituteTemplateVariables(const std::string& value) const {
+    std::string result = value;
+    size_t pos = 0;
+    
+    while ((pos = result.find("@{", pos)) != std::string::npos) {
+        size_t end = result.find('}', pos + 2);
+        if (end == std::string::npos) break;
+        
+        std::string varName = result.substr(pos + 2, end - pos - 2);
+        trim(varName);
+        
+        // Template variable substitution
+        if (varName == "random_seed") {
+            result.replace(pos, end - pos + 1, std::to_string(std::rand()));
+        } else if (varName == "current_time") {
+            auto now = std::chrono::system_clock::now();
+            auto time = std::chrono::system_clock::to_time_t(now);
+            char timeStr[100];
+            std::strftime(timeStr, sizeof(timeStr), "%Y%m%d_%H%M%S", std::localtime(&time));
+            result.replace(pos, end - pos + 1, timeStr);
+        } else {
+            // Keep original template variable if not recognized
+        }
+        
+        pos += 2;
+    }
+    
+    return result;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

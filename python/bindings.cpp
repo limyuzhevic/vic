@@ -2,19 +2,84 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/complex.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <map>
+#include <optional>
+#include <variant>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
+#include "../src/core/Config/Config.hpp"
+#include "../src/core/Random/Random.hpp"
+#include "../src/core/SimulationClock/SimulationClock.hpp"
+#include "../src/core/Logger/Logger.hpp"
+#include "../src/brain/Brain.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/dynamics/NeuralDynamics.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "src/cognition/ConceptFormation.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/motor/MotorSystem.hpp"
 #include "../src/motor/Action.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/environment/Environment.hpp"
+#include "../src/environment/Observation.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/performance/Performance.hpp"
+#include "../src/performance/SparseConnectivity.hpp"
+#include "src/performance/ParallelProcessing.hpp"
+#include "../src/performance/ProfilingInfrastructure.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
+#include "../src/performance/MemoryPool.hpp"
+#include "../src/performance/OptimizedBrain.hpp"
+#include "../src/performance/SIMDVectorization.hpp"
+#include "../src/performance/EventQueue.hpp"
+#include "../src/performance/PerformanceProfiler.hpp"
+#include "../src/agent/AgentBrain.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/agent/SensoryPercept.hpp"
+#include "../src/world/SimpleWorld.hpp"
+
+// Forward declarations for complex types
+namespace py = pybind11;
+namespace nlm {
+
+// Helper functions for Python bindings
+
+}} // namespace nlm
 
 namespace py = pybind11;
 namespace nlm {
