@@ -1,11 +1,6 @@
-// NLM (熙然) - Neural Learning Machine
+// NLM Main Entry Point
 // Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// Enhanced with command-line interface and flexible execution modes
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,13 +13,14 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
+#include "nlm/TestFramework.hpp"
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
 
 using namespace nlm;
 
@@ -41,11 +37,61 @@ void printBanner() {
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                    ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "=== NLM Usage ===" << std::endl;
+    std::cout << "NLM [OPTIONS] [TEST_MODE]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --version, -v           Show version information" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --test-mode <mode>      Specify test mode (basic|plasticity|stdp|full|all)" << std::endl;
+    std::cout << "  --environment <name>    Set environment type (GridWorld, Maze, etc.)" << std::endl;
+    std::cout << "  --neuron-count <count>  Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region-count <count>  Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <ms>         Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --run-tests             Run all available tests" << std::endl;
+    std::cout << "  --test-runner           Use enhanced test framework" << std::endl;
+    std::cout << "  --quiet, -q             Minimal output" << std::endl;
+    std::cout << "  --verbose, -V           Verbose output" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Test Modes:" << std::endl;
+    std::cout << "  basic                   Run basic connectivity test" << std::endl;
+    std::cout << "  plasticity              Run plasticity learning experiment" << std::endl;
+    std::cout << "  stdp                    Run STDP verification" << std::endl;
+    std::cout << "  full                    Run all main tests" << std::endl;
+    std::cout << "  all                     Run all tests including unit tests" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Environment Types:" << std::endl;
+    std::cout << "  GridWorld              Simple grid-based environment" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  NLM --test-mode plasticity --neuron-count 1000" << std::endl;
+    std::cout << "  NLM --run-tests --test-runner" << std::endl;
+    std::cout << "  NLM --config custom.cfg --environment GridWorld" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Neural Learning Machine" << std::endl;
+    std::cout << "Version: Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "Build: 2024" << std::endl;
+    std::cout << "Author: NLM Development Team" << std::endl;
+}
+
+void runEnhancedTests() {
+    std::cout << "=== Enhanced Test Suite ===" << std::endl;
+    std::cout << "Running all tests with improved reporting..." << std::endl;
+    std::cout << std::endl;
+    
+    // The enhanced test framework will automatically run all registered tests
+    nlm::getDefaultTestRunner().runAll();
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -340,31 +386,50 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Override console log level based on mode
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (quietMode) {
+        consoleLogger->setLevel(LogLevel::Error);
+    } else if (verboseMode) {
+        consoleLogger->setLevel(LogLevel::Debug);
     }
     
-    // Load config from file (ignore if not found)
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation..." << std::endl;
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity");
+    NLM_LOG_INFO("");
+    
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    std::string testMode = "full";  // Default test mode
+    std::string environment = "GridWorld";
+    size_t neuronCount = 500;
+    size_t regionCount = 1;
+    double timestep = 0.001;
+    bool useTestRunner = false;
+    bool runTests = false;
+    bool quietMode = false;
+    bool verboseMode = false;
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Initialize environment factory
+    nlm::registerAllEnvironments();
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

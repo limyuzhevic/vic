@@ -1,5 +1,6 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "nlm/TestFramework.hpp"
 #include <cassert>
 #include <iostream>
 
@@ -79,11 +80,24 @@ void testConfigKeys() {
 }
 
 void runAll() {
+    std::cout << "Running Config tests..." << std::endl;
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+}
+
+// Register tests with the test framework
+namespace {
+    class ConfigTestRegistration {
+    public:
+        ConfigTestRegistration() {
+            nlm::getDefaultTestRunner().addTest("Config Test Suite", runAll, "Configuration");
+        }
+    };
+    
+    ConfigTestRegistration configTestRegistrar;
 }
 
 } // namespace test_config

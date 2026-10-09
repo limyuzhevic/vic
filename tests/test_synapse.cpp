@@ -1,6 +1,7 @@
 // Synapse Tests
 #include "brain/Synapse.hpp"
 #include "core/Random/Random.hpp"
+#include "nlm/TestFramework.hpp"
 #include <cassert>
 #include <iostream>
 #include <cmath>
@@ -187,6 +188,18 @@ void runAll() {
     testSynapseRandomInitialization();
     testSynapseReset();
     testSynapsePlasticityFlags();
+}
+
+// Register tests with the test framework
+namespace {
+    class SynapseTestRegistration {
+    public:
+        SynapseTestRegistration() {
+            nlm::getDefaultTestRunner().addTest("Synapse Test Suite", runAll, "Synaptic Transmission");
+        }
+    };
+    
+    SynapseTestRegistration synapseTestRegistrar;
 }
 
 } // namespace test_synapse
