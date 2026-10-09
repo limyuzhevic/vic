@@ -357,14 +357,18 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    auto fileResult = config->loadFromFile(configFile);
+    if (fileResult.success()) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    auto argsResult = config->loadFromArgs(argc, argv);
+    if (!argsResult.success()) {
+        NLM_LOG_INFO("Config argument warning: " + argsResult.message);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

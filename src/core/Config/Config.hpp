@@ -5,8 +5,34 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
+
+// Error codes for configuration operations
+enum class ConfigErrorCode {
+    Success = 0,
+    FileNotFound = 1,
+    PermissionDenied = 2,
+    InvalidFormat = 3,
+    KeyNotFound = 4,
+    InvalidType = 5,
+    DuplicateKey = 6,
+    OutOfRange = 7,
+    ValidationFailed = 8
+};
+
+// Result type for configuration operations
+class ConfigResult {
+public:
+    ConfigResult() : code(ConfigErrorCode::Success), message() {}
+    ConfigResult(ConfigErrorCode c, const std::string& m) : code(c), message(m) {}
+    
+    bool success() const { return code == ConfigErrorCode::Success; }
+    
+    ConfigErrorCode code;
+    std::string message;
+};
 
 // Forward declarations
 class Config;
@@ -28,8 +54,30 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Environment,
     Runtime
 };
+
+// Configuration constants
+namespace ConfigConstants {
+    // Default file paths
+    const std::string DEFAULT_CONFIG_FILE = "config.ini";
+    const std::string DEFAULT_JSON_CONFIG_FILE = "config.json";
+    
+    // Environment variable prefix
+    const std::string ENV_PREFIX = "APP_";
+    
+    // Key validation
+    const size_t MIN_KEY_LENGTH = 1;
+    const size_t MAX_KEY_LENGTH = 100;
+    
+    // Value limits
+    const int MAX_INT_VALUE = INT_MAX;
+    const int MIN_INT_VALUE = INT_MIN;
+    const double MAX_DOUBLE_VALUE = 1e300;
+    const double MIN_DOUBLE_VALUE = -1e300;
+    const size_t MAX_STRING_LENGTH = 1000;
+}
 
 // Configuration entry
 struct ConfigEntry {
@@ -56,13 +104,33 @@ public:
     Config& operator=(Config&&) noexcept;
     
     // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    ConfigResult loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file
+    ConfigResult loadFromJsonFile(const std::string& filepath);
+    
+    // Load from INI file
+    ConfigResult loadFromIniFile(const std::string& filepath);
+    
+    // Load from environment variables
+    ConfigResult loadFromEnv(const std::string& prefix = ConfigConstants::ENV_PREFIX);
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    ConfigResult loadFromArgs(int argc, char** argv);
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    ConfigResult saveToFile(const std::string& filepath) const;
+    
+    // Save as JSON
+    ConfigResult saveToJsonFile(const std::string& filepath) const;
+    
+    // Get values
+    template<typename T>
+    ConfigResult get(const std::string& key, T& outValue) const;
+    
+    // Environment variable support
+    template<typename T>
+    T getEnv(const std::string& key, const T& defaultValue) const;
     
     // Get values
     template<typename T>

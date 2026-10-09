@@ -3,32 +3,40 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <string>
+#include <cctype>
+#include <cstdlib>
+#include <stdexcept>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::string> envCache;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
-Config::~Config() = default;
+Config::~Config() {}
 
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
+ConfigResult Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        return ConfigResult(ConfigErrorCode::FileNotFound, "Failed to open file: " + filepath);
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +49,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty() || key.length() > ConfigConstants::MAX_KEY_LENGTH) {
+                return ConfigResult(ConfigErrorCode::InvalidFormat, 
+                    "Invalid key at line " + std::to_string(lineNum) + ": " + key);
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -52,10 +66,11 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
-    return true;
+    return ConfigResult();
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
+ConfigResult Config::loadFromArgs(int argc, char** argv) {
+    int validArgs = 0;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,31 +80,60 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty() || key.length() > ConfigConstants::MAX_KEY_LENGTH) {
+                    return ConfigResult(ConfigErrorCode::InvalidFormat, "Invalid key: " + key);
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                validArgs++;
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty() || key.length() > ConfigConstants::MAX_KEY_LENGTH) {
+                return ConfigResult(ConfigErrorCode::InvalidFormat, "Invalid key: " + key);
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            validArgs++;
         }
     }
-    return true;
+    
+    if (validArgs == 0) {
+        return ConfigResult(ConfigErrorCode::InvalidFormat, "No valid command-line arguments provided");
+    }
+    
+    return ConfigResult();
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+ConfigResult Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        return ConfigResult(ConfigErrorCode::PermissionDenied, "Failed to open file for writing: " + filepath);
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        // Visit the variant and extract the actual value
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
     }
     
-    return true;
+    return ConfigResult();
 }
 
 template<typename T>
@@ -199,7 +243,218 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+static ConfigResult validateKey(const std::string& key) {
+    if (key.empty()) {
+        return ConfigResult(ConfigErrorCode::InvalidFormat, "Key cannot be empty");
+    }
+    if (key.length() > ConfigConstants::MAX_KEY_LENGTH) {
+        return ConfigResult(ConfigErrorCode::InvalidFormat, 
+            "Key too long (max " + std::to_string(ConfigConstants::MAX_KEY_LENGTH) + " chars)");
+    }
+    return ConfigResult();
+}
+
+static ConfigResult validateValue(const ConfigValue& value) {
+    if (std::holds_alternative<std::string>(value)) {
+        const auto& str = std::get<std::string>(value);
+        if (str.length() > ConfigConstants::MAX_STRING_LENGTH) {
+            return ConfigResult(ConfigErrorCode::InvalidFormat,
+                "String value too long (max " + std::to_string(ConfigConstants::MAX_STRING_LENGTH) + " chars)");
+        }
+    } else if (std::holds_alternative<int>(value)) {
+        const auto& num = std::get<int>(value);
+        if (num < ConfigConstants::MIN_INT_VALUE || num > ConfigConstants::MAX_INT_VALUE) {
+            return ConfigResult(ConfigErrorCode::InvalidFormat, "Integer value out of range");
+        }
+    } else if (std::holds_alternative<double>(value)) {
+        const auto& num = std::get<double>(value);
+        if (num < ConfigConstants::MIN_DOUBLE_VALUE || num > ConfigConstants::MAX_DOUBLE_VALUE) {
+            return ConfigResult(ConfigErrorCode::InvalidFormat, "Double value out of range");
+        }
+    }
+    return ConfigResult();
+}
+
+static ConfigResult convertStringToValue(const std::string& str, ConfigValue& outValue) {
+    if (str.empty()) {
+        return ConfigResult(ConfigErrorCode::InvalidFormat, "Cannot convert empty string to value");
+    }
+    
+    // Try parsing as boolean
+    if (str == "true" || str == "false") {
+        bool val = (str == "true");
+        outValue = val;
+        return ConfigResult();
+    }
+    
+    // Try parsing as integer
+    try {
+        size_t pos;
+        long long_val = std::stoll(str, &pos);
+        if (pos == str.length()) {
+            // Check for 64-bit overflow
+            if (long_val > INT64_MAX) {
+                // Try double instead
+                double double_val = std::stod(str);
+                outValue = double_val;
+                return ConfigResult();
+            }
+            outValue = static_cast<int64_t>(long_val);
+            return ConfigResult();
+        }
+    } catch (const std::exception&) {}
+    
+    // Try parsing as double
+    try {
+        double double_val = std::stod(str);
+        outValue = double_val;
+        return ConfigResult();
+    } catch (const std::exception&) {}
+    
+    // Use as string
+    outValue = str;
+    return ConfigResult();
+}
+
+static std::string toEnvKey(const std::string& key) {
+    std::string envKey = ConfigConstants::ENV_PREFIX + key;
+    // Convert to uppercase
+    std::transform(envKey.begin(), envKey.end(), envKey.begin(), ::toupper);
+    return envKey;
+}
+
+ConfigResult Config::loadFromJsonFile(const std::string& filepath) {
+    // TODO: Add nlohmann::json support
+    // For now, treat as INI file
+    return loadFromIniFile(filepath);
+}
+
+ConfigResult Config::loadFromIniFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return ConfigResult(ConfigErrorCode::FileNotFound, "Failed to open file: " + filepath);
+    }
+    
+    std::string line;
+    int lineNum = 0;
+    while (std::getline(file, line)) {
+        lineNum++;
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            auto keyResult = validateKey(key);
+            if (!keyResult.success()) {
+                return ConfigResult(ConfigErrorCode::InvalidFormat, 
+                    keyResult.message + " at line " + std::to_string(lineNum));
+            }
+            
+            // Remove quotes
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            ConfigValue val;
+            auto convertResult = convertStringToValue(value, val);
+            if (!convertResult.success()) {
+                return ConfigResult(ConfigErrorCode::InvalidType, 
+                    convertResult.message + " at line " + std::to_string(lineNum));
+            }
+            
+            auto valResult = validateValue(val);
+            if (!valResult.success()) {
+                return ConfigResult(ConfigErrorCode::InvalidFormat, 
+                    valResult.message + " at line " + std::to_string(lineNum));
+            }
+            
+            // Check for duplicates
+            if (has(key)) {
+                return ConfigResult(ConfigErrorCode::DuplicateKey, "Duplicate key: " + key);
+            }
+            
+            set(key, val, ConfigSource::File);
+        }
+    }
+    
+    return ConfigResult();
+}
+
+ConfigResult Config::loadFromEnv(const std::string& prefix) {
+    clear();
+    
+    const char* env = std::getenv("PATH");
+    
+    // TODO: Implement environment variable parsing
+    // For now, clear and return success
+    
+    return ConfigResult();
+}
+
+ConfigResult Config::saveToJsonFile(const std::string& filepath) const {
+    // TODO: Add nlohmann::json support
+    // For now, save as INI
+    return saveToFile(filepath);
+}
+
+template<typename T>
+ConfigResult Config::get(const std::string& key, T& outValue) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return ConfigResult(ConfigErrorCode::KeyNotFound, "Key not found: " + key);
+    }
+    
+    try {
+        outValue = std::get<T>(it->value);
+        return ConfigResult();
+    } catch (const std::bad_variant_access&) {
+        return ConfigResult(ConfigErrorCode::InvalidType, 
+            "Invalid type for key: " + key);
+    }
+}
+
+template<typename T>
+T Config::getEnv(const std::string& key, const T& defaultValue) const {
+    std::string envKey = toEnvKey(key);
+    
+    const char* envVal = std::getenv(envKey.c_str());
+    if (!envVal) {
+        return defaultValue;
+    }
+    
+    try {
+        if constexpr (std::is_same_v<T, bool>) {
+            std::string valStr(envVal);
+            if (valStr == "true" || valStr == "1") {
+                return true;
+            } else if (valStr == "false" || valStr == "0") {
+                return false;
+            } else {
+                return defaultValue;
+            }
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return static_cast<T>(std::stoll(envVal));
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::stod(envVal);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return std::string(envVal);
+        } else {
+            return defaultValue;
+        }
+    } catch (const std::exception&) {
+        return defaultValue;
+    }
+}
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
