@@ -1,95 +1,150 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
+# Modern C++ standards
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# Optimized build configuration
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Enable warnings
+# Modern compiler flags
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+# Use file globbing for better maintainability
+file(GLOB_RECURSE NLM_CORE_SOURCES
+    "${NLM_SOURCE_DIR}/core/**/*.cpp"
+    "${NLM_SOURCE_DIR}/brain/**/*.cpp"
+    "${NLM_SOURCE_DIR}/dynamics/**/*.cpp"
+    "${NLM_SOURCE_DIR}/plasticity/**/*.cpp"
+    "${NLM_SOURCE_DIR}/development/**/*.cpp"
+    "${NLM_SOURCE_DIR}/neuromodulation/**/*.cpp"
+    "${NLM_SOURCE_DIR}/memory/**/*.cpp"
+    "${NLM_SOURCE_DIR}/cognition/**/*.cpp"
+    "${NLM_SOURCE_DIR}/sensory/**/*.cpp"
+    "${NLM_SOURCE_DIR}/prediction/**/*.cpp"
+    "${NLM_SOURCE_DIR}/motor/**/*.cpp"
+    "${NLM_SOURCE_DIR}/environment/**/*.cpp"
+    "${NLM_SOURCE_DIR}/experiments/**/*.cpp"
+    "${NLM_SOURCE_DIR}/visualization/**/*.cpp"
+    "${NLM_SOURCE_DIR}/agent/**/*.cpp"
+    "${NLM_SOURCE_DIR}/world/**/*.cpp"
 )
+
+# Create core library with optimized settings
+add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+)
+
+# Modern compiler flags with optimization levels
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<CONFIG:Release>:-O3 -march=native -flto>
+    $<$<CONFIG:Debug>:-O0 -g -DDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+    -fconcepts -fconstexpr-ops-limit=1000000
+)
+
+# Preprocessor definitions
+target_compile_definitions(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:_GNU_SOURCE>
+    $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
+    NLM_EXPORTS
+    NLM_CORE_IMPLEMENTATION
+)
+
+# Position independent code for shared libraries
+target_compile_options(nlm_core PRIVATE -fPIC)
+
+# Linker optimization
+target_link_libraries(nlm_core PUBLIC pthread)
+
+# Installation configuration
+set(INSTALL_INCDIR include/nlm CACHE PATH "Installation directory for headers")
+
+set_target_properties(nlm_core PROPERTIES
+    PUBLIC_HEADER "nlm_core.h"
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    POSITION_INDEPENDENT_CODE ON
+)
+
+install(TARGETS nlm_core
+    EXPORT NLMTargets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    PUBLIC_HEADER DESTINATION ${INSTALL_INCDIR}
+)
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION ${INSTALL_INCDIR}/nlm
+    FILES_MATCHING PATTERN "*.hpp"
+    PATTERN "*.h"
+)
+
+# Modern compiler flags with optimization levels
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<CONFIG:Release>:-O3 -march=native -flto>
+    $<$<CONFIG:Debug>:-O0 -g -DDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+    -fconcepts -fconstexpr-ops-limit=1000000
+)
+
+# Preprocessor definitions
+target_compile_definitions(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:_GNU_SOURCE>
+    $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
+    NLM_EXPORTS
+    NLM_CORE_IMPLEMENTATION
+)
+
+# Position independent code for shared libraries
+target_compile_options(nlm_core PRIVATE -fPIC)
+
+# Linker optimization
+target_link_libraries(nlm_core PUBLIC pthread)
+
+# Installation configuration
+set(INSTALL_INCDIR include/nlm CACHE PATH "Installation directory for headers")
+
+set_target_properties(nlm_core PROPERTIES
+    PUBLIC_HEADER "nlm_core.h"
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    POSITION_INDEPENDENT_CODE ON
+)
+
+install(TARGETS nlm_core
+    EXPORT NLMTargets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    PUBLIC_HEADER DESTINATION ${INSTALL_INCDIR}
+)
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION ${INSTALL_INCDIR}/nlm
+    FILES_MATCHING PATTERN "*.hpp"
+    PATTERN "*.h"
 )
 
 # Agent system (body, sensory percept, agent-brain interface)

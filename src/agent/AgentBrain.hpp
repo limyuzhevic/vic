@@ -13,6 +13,11 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Static factory methods
+    static std::unique_ptr<AgentBrain> create(std::shared_ptr<Brain> brain) {
+        return std::make_unique<AgentBrain>(brain);
+    }
+    
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     

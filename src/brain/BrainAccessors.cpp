@@ -4,42 +4,85 @@
 #include "brain/BrainAccessors.hpp"
 #include <cmath>
 #include <limits>
+#include <optional>
+
+// Modern C++ constants for better code readability and maintainability
+constexpr float EPSILON_FLOAT = 1e-6f;
+constexpr float NANOS_TO_SECONDS = 1e-9f;
+constexpr float DEFAULT_WEIGHT_THRESHOLD = 0.01f;
 
 namespace nlm {
 
+/**
+ * @brief Calculate the excitation/inhibition ratio of the network
+ * 
+ * This ratio provides insight into the overall balance of the neural network:
+ * - Ratio > 1.0: Excitatory influence dominates
+ * - Ratio < 1.0: Inhibitory influence dominates
+ * - Ratio = 1.0: Balanced excitation and inhibition
+ * - Ratio = infinity: Only excitatory connections present
+ * - Ratio = 0.0: Only inhibitory connections present or no connections
+ * 
+ * The E/I ratio is important for:
+ * - Network stability analysis
+ * - Understanding computational capabilities
+ * - Predicting dynamic behaviors
+ * - Monitoring learning progress
+ * 
+ * @return Excitation/inhibition ratio. Returns infinity if only excitatory
+ *         connections exist, 0.0 if only inhibitory connections exist or no
+ *         connections, or the actual ratio otherwise.
+ * 
+ * @note This metric is used to monitor network health and computational state.
+ *       Healthy networks typically have ratios between 0.8 and 2.0, though
+ *       this varies by task and network architecture.
+ * 
+ * @see nlm::Brain::Impl::getExcitationInhibitionRatio()
+ */
 float Brain::Impl::getExcitationInhibitionRatio() const {
     try {
+        // ========== SYNAPTIC ANALYSIS ==========
+        // Calculate excitation-to-inhibition ratio by summing synaptic weights
+        // Excitation: positive weights, Inhibition: negative weights (absolute value)
+        
         float totalExcitatory = 0.0f;
         float totalInhibitory = 0.0f;
         
+        // Iterate through all regions and analyze synaptic connections
         for (const auto& region : regions) {
-            for (const auto& syn : region->getSynapses()) {
+            // Process all synapses in the current region
+            for (const auto& synapse : region->getSynapses()) {
+                // Extract synaptic weight with bounds checking
                 try {
-                    float weight = syn->getWeight();
-                    if (weight > 0.0f) {
+                    float weight = synapse->getWeight();
+                    
+                    if (weight > EPSILON_FLOAT) {
+                        // Excitatory synapse: positive contribution to total excitation
                         totalExcitatory += weight;
-                    } else if (weight < 0.0f) {
+                    } else if (weight < -EPSILON_FLOAT) {
+                        // Inhibitory synapse: absolute value contributes to total inhibition
                         totalInhibitory += std::abs(weight);
                     }
-                    // Invalid weights (NaN, infinity) are ignored
+                    
                 } catch (const std::exception& e) {
-                    NLM_LOG_WARNING("Error getting synapse weight: " + std::string(e.what()));
-                    // Continue with next synapse
+                    NLM_LOG_WARNING("Error accessing synapse weight: " + std::string(e.what()));
+                    // Continue processing other synapses
                 }
             }
         }
         
-        if (totalInhibitory > 0.0f) {
+        // Calculate final excitation-inhibition ratio with edge case handling
+        if (totalInhibitory > EPSILON_FLOAT) {
             return totalExcitatory / totalInhibitory;
-        } else if (totalExcitatory > 0.0f) {
+        } else if (totalExcitatory > EPSILON_FLOAT) {
             return std::numeric_limits<float>::infinity();
         } else {
-            return 0.0f;  // No connections or all weights are zero
+            return 0.0f;
         }
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception in getExcitationInhibitionRatio: ") + e.what());
-        return 0.0f;  // Safe default
+        NLM_LOG_ERROR(std::string("System error in excitation-inhibition ratio calculation: ") + e.what());
+        return 0.0f;
     }
 }
 
@@ -151,39 +194,39 @@ size_t Brain::Impl::getPendingSpikeEventCount() const {
 }
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
-NeuralWorkingMemory* Brain::Impl::getWorkingMemory() {
-    return workingMemory.get();
+std::shared_ptr<NeuralWorkingMemory> Brain::Impl::getWorkingMemory() {
+    return workingMemory.)
 }
 
-NeuralEpisodicMemory* Brain::Impl::getEpisodicMemory() {
-    return episodicMemory.get();
+std::shared_ptr<NeuralEpisodicMemory> Brain::Impl::getEpisodicMemory() {
+    return episodicMemory.)
 }
 
-NeuralAssociativeMemory* Brain::Impl::getAssociativeMemory() {
-    return associativeMemory.get();
+std::shared_ptr<NeuralAssociativeMemory> Brain::Impl::getAssociativeMemory() {
+    return associativeMemory.)
 }
 
 // ========== PREDICTION SYSTEM ACCESSORS ==========
-PredictionSystem* Brain::Impl::getPredictionSystem() {
-    return predictionSystem.get();
+std::shared_ptr<PredictionSystem> Brain::Impl::getPredictionSystem() {
+    return predictionSystem.)
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
-NeuralPlanner* Brain::Impl::getPlanner() {
-    return planner.get();
+std::shared_ptr<NeuralPlanner> Brain::Impl::getPlanner() {
+    return planner.)
 }
 
-ConceptFormation* Brain::Impl::getConceptFormation() {
-    return conceptFormation.get();
+std::shared_ptr<ConceptFormation> Brain::Impl::getConceptFormation() {
+    return conceptFormation.)
 }
 
-AttentionalSelection* Brain::Impl::getAttention() {
-    return attention.get();
+std::shared_ptr<AttentionalSelection> Brain::Impl::getAttention() {
+    return attention.)
 }
 
 // ========== DEVELOPMENT SYSTEM ACCESSORS ==========
-DevelopmentSystem* Brain::Impl::getDevelopmentSystem() {
-    return developmentSystem.get();
+std::shared_ptr<DevelopmentSystem> Brain::Impl::getDevelopmentSystem() {
+    return developmentSystem.)
 }
 
 DevelopmentalStage Brain::Impl::getDevelopmentalStage() const {
@@ -195,19 +238,19 @@ void Brain::Impl::setDevelopmentalStage(DevelopmentalStage stage) {
 }
 
 // ========== NEUROMODULATION SYSTEM ACCESSORS ==========
-Dopamine* Brain::Impl::getDopamine() {
-    return dopamine.get();
+std::shared_ptr<Dopamine> Brain::Impl::getDopamine() {
+    return dopamine.)
 }
 
-Curiosity* Brain::Impl::getCuriosity() {
+std::shared_ptr<Curiosity> Brain::Impl::getCuriosity() {
     return curiosity.get();
 }
 
-Novelty* Brain::Impl::getNovelty() {
+std::shared_ptr<Novelty> Brain::Impl::getNovelty() {
     return novelty.get();
 }
 
-PredictionError* Brain::Impl::getPredictionErrorSignal() {
+std::shared_ptr<PredictionError> Brain::Impl::getPredictionErrorSignal() {
     return predictionError.get();
 }
 
@@ -216,7 +259,7 @@ std::shared_ptr<const Config> Brain::Impl::getConfig() const {
     return config;
 }
 
-RandomGenerator* Brain::Impl::getRandomGenerator() {
+std::shared_ptr<RandomGenerator> Brain::Impl::getRandomGenerator() {
     return rng.get();
 }
 

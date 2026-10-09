@@ -29,6 +29,20 @@ enum class ActionType {
 // Action representation
 class Action {
 public:
+    // Static factory methods
+    static std::unique_ptr<Action> createWaitAction() {
+        return std::make_unique<Action>(ActionType::Wait);
+    }
+    
+    static std::unique_ptr<Action> createMoveAction(ActionType type) {
+        return std::make_unique<Action>(type);
+    }
+    
+    static std::unique_ptr<Action> createCustomAction(ActionType type, 
+                                                     const std::vector<float>& parameters) {
+        return std::make_unique<Action>(type, parameters);
+    }
+    
     Action();
     Action(ActionType type);
     Action(ActionType type, const std::vector<float>& parameters);

@@ -5,6 +5,35 @@
 
 namespace nlm {
 
+/**
+ * @brief Receive and process sensory input from the environment
+ * 
+ * This method injects sensory information into the brain's neural network:
+ * - Converts sensory data into neuronal currents
+ * - Injects currents into sensory neurons
+ * - Updates working memory with significant sensory inputs
+ * - Handles input normalization and validation
+ * 
+ * @param input Sensory input data from the environment. This should contain
+ *             sensory measurements (vision, audio, internal states, etc.) as
+ *             floating-point values in the range [-1.0, 1.0].
+ * 
+ * @throws std::runtime_error if sensory processing fails
+ * 
+ * @note This is a core input processing method that connects the brain to
+ *       the external world. The input represents sensory data that the brain
+ *       must process to understand its environment and determine appropriate actions.
+ * 
+ * Input processing flow:
+ * 1. Validate input data (non-empty, reasonable size)
+ * 2. Normalize input values to biological current ranges (-10 to 10 mV)
+ * 3. Inject currents into appropriate sensory neurons
+ * 4. Update working memory with significant inputs
+ * 5. Handle errors and log for debugging
+ * 
+ * @see nlm::SensoryInput for input data formats
+ * @see nlm::Brain::Impl::receiveSensoryInput()
+ */
 void Brain::Impl::receiveSensoryInput(const SensoryInput& input) {
     // Inject current into sensory neurons based on input pattern
     try {
@@ -43,7 +72,25 @@ void Brain::Impl::receiveSensoryInput(const SensoryInput& input) {
     }
 }
 
-void Brain::Impl::injectCurrent(NeuronId neuronId, MembranePotential current) {
+/**
+ * @brief Inject current directly into a specific neuron
+ * 
+ * This method injects a current value into a specific neuron in the network,
+ * directly modifying its membrane potential and potentially causing it to fire.
+ * 
+ * @param neuron ID of the target neuron to inject current into
+ * @param current Current to inject in membrane potential units (mV)
+ * 
+ * @throws std::runtime_error if neuron not found or injection fails
+ * 
+ * @note This is a low-level method for direct neural manipulation. It's useful
+ *       for targeted stimulation or for implementing specific input patterns
+ *       that bypass the sensory system. For environmental input, use
+ *       receiveSensoryInput() instead.
+ * 
+ * @see nlm::Brain::Impl::injectCurrent()
+ */
+void Brain::Impl::injectCurrent(NeuronId neuron, MembranePotential current) {
     try {
         for (auto& region : regions) {
             for (auto& neuron : region->getNeurons()) {
@@ -67,6 +114,24 @@ void Brain::Impl::injectCurrent(NeuronId neuronId, MembranePotential current) {
     }
 }
 
+/**
+ * @brief Inject current into all neurons of a specific type
+ * 
+ * This method injects current into all neurons in the brain of the specified
+ * type, which is useful for implementing global neuromodulatory signals or
+ * targeted stimulation of specific neuron populations.
+ * 
+ * @param type Type of neurons to inject current into (Sensory, Motor, Excitatory, etc.)
+ * @param current Current to inject in membrane potential units (mV)
+ * 
+ * @throws std::runtime_error if no neurons of the specified type are found
+ * 
+ * @note This is useful for implementing global signals like neuromodulation,
+ *       attention signals, or for testing system-wide effects. The number of
+ *       neurons injected is logged for monitoring.
+ * 
+ * @see nlm::Brain::Impl::injectCurrentToNeurons()
+ */
 void Brain::Impl::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     try {
         size_t injectedCount = 0;
@@ -94,6 +159,19 @@ void Brain::Impl::injectCurrentToNeurons(NeuronType type, MembranePotential curr
     }
 }
 
+/**
+ * @brief Reset brain state to initial conditions
+ * 
+ * This method resets all neural components of the brain to their initial state,
+ * including neuron membrane potentials, spike systems, working memory, and
+ * statistical counters. This effectively restarts the brain from a clean state.
+ * 
+ * @note This method can be used to restart the simulation or to clear the
+ *       brain's state between tasks. It preserves the brain's configuration
+ *       and connectivity structure but resets dynamic state variables.
+ * 
+ * @see nlm::Brain::Impl::reset()
+ */
 void Brain::Impl::reset() {
     try {
         size_t resetNeurons = 0;
@@ -135,6 +213,22 @@ void Brain::Impl::reset() {
     }
 }
 
+/**
+ * @brief Save brain state to file (checkpointing)
+ * 
+ * This method saves the brain's current state to a binary file for later
+ * restoration. This is useful for checkpointing long-running simulations,
+ * saving progress, or implementing learning across sessions.
+ * 
+ * @param filepath Path to the file where brain state will be saved
+ * @return true if the state was saved successfully, false otherwise
+ * 
+ * @note Saved state includes simulation progress (step count, time, spikes)
+ *       and can be loaded later to resume from the same point. The saved
+ *       file contains the brain's dynamic state but not its configuration.
+ * 
+ * @see nlm::Brain::Impl::save()
+ */
 bool Brain::Impl::save(const std::string& filepath) const {
     try {
         NLM_LOG_INFO("Saving brain state to " + filepath);
@@ -170,6 +264,22 @@ bool Brain::Impl::save(const std::string& filepath) const {
     }
 }
 
+/**
+ * @brief Load brain state from file
+ * 
+ * This method loads a previously saved brain state from a binary file.
+ * This allows the brain to resume from a checkpoint or load a previously
+ * saved brain state.
+ * 
+ * @param filepath Path to the file containing saved brain state
+ * @return true if the state was loaded successfully, false otherwise
+ * 
+ * @note Loaded state includes simulation progress (step count, time, spikes)
+ *       and can be used to resume from the same point. The loaded state
+ *       will override the brain's current dynamic state but not its configuration.
+ * 
+ * @see nlm::Brain::Impl::load()
+ */
 bool Brain::Impl::load(const std::string& filepath) {
     try {
         std::ifstream file(filepath, std::ios::binary);
@@ -204,6 +314,19 @@ bool Brain::Impl::load(const std::string& filepath) {
     }
 }
 
+/**
+ * @brief Log brain status for monitoring and debugging
+ * 
+ * This method generates a status report of the brain's current state and
+ * logs it for monitoring purposes. This is useful for debugging, performance
+ * monitoring, and understanding brain dynamics during simulation.
+ * 
+ * @note This method is called automatically during the simulation step
+ *       process (at every 1000 steps) to provide ongoing status monitoring.
+ *       It can also be called manually for specific monitoring needs.
+ * 
+ * @see nlm::Brain::Impl::logStatus()
+ */
 void Brain::Impl::logStatus() const {
     try {
         std::ostringstream status;

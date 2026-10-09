@@ -30,6 +30,11 @@ struct WorldObject {
 // Provides sensory experience without semantic labels
 class SimpleWorld {
 public:
+    // Static factory methods
+    static std::unique_ptr<SimpleWorld> create() {
+        return std::make_unique<SimpleWorld>();
+    }
+    
     SimpleWorld();
     ~SimpleWorld();
     

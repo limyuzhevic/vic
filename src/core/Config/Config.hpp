@@ -46,6 +46,11 @@ struct ConfigEntry {
 // Main configuration class
 class Config {
 public:
+    // Static factory methods
+    static std::unique_ptr<Config> createDefault() {
+        return std::make_unique<Config>();
+    }
+    
     Config();
     ~Config();
     

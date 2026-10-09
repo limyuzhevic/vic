@@ -19,6 +19,22 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Template to reduce duplication in ID type bindings
+template<typename T>
+void bindIdType(py::module_& m, const std::string& name) {
+    py::class_<T>(m, name.c_str())
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &T::value)
+        .def("index", &T::index)
+        .def("__eq__", &T::operator==)
+        .def("__ne__", &T::operator!=)
+        .def("__hash__", [](const T& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const T& id) {
+            return "<" + name + ": " + std::to_string(id.value) + ">";
+        });
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -29,49 +45,11 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+    // Use template to bind ID types - reduces code duplication by ~60%
+    bindIdType<NeuronId>(m, "NeuronId");
+    bindIdType<SynapseId>(m, "SynapseId");
+    bindIdType<RegionId>(m, "RegionId");
+    bindIdType<PopulationId>(m, "PopulationId");
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -143,13 +121,15 @@ PYBIND11_MODULE(pynlm, m) {
         .export_values();
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        // Static factory method
+        .def_static("createDefault", &Config::createDefault, "Create default configuration")
+        
+        // Instance methods
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+        .def("loadFromArgs", &Config::loadFromArgs, py::arg("argc"), py::arg("argv"),
+             "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -264,8 +244,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
+        // Static factory method
+        .def_static("create", &SimpleWorld::create, "Create a new world instance")
+        
+        // Instance methods
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+        .def(py::init<>())
+
              py::arg("visionWidth"), py::arg("visionHeight"))
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
@@ -290,6 +275,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        // Static factory method
+        .def_static("create", &Brain::create, py::arg("config"), "Create a new brain instance")
+        
+        // Instance methods
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
