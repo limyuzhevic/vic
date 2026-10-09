@@ -149,7 +149,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -160,6 +160,32 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Brain configuration convenience methods
+        .def("setBrainDefaults", &Config::setBrainDefaults,
+             "Apply default brain configuration settings")
+        .def("getBrainConfigSummary", &Config::getBrainConfigSummary,
+             "Get a human-readable summary of brain configuration")
+        .def("setNeuronCount", &Config::set<int>, "neuron_count",
+             "Set the number of neurons in the brain")
+        .def("setRegionCount", &Config::set<int>, "region_count",
+             "Set the number of regions in the brain")
+        .def("setConnectionProbability", &Config::set<float>, "connection_probability",
+             "Set the connection probability between neurons")
+        .def("setSimulationTimestep", &Config::set<double>, "simulation_timestep",
+             "Set the simulation timestep in seconds")
+        .def("setRandomSeed", &Config::set<uint64_t>, "random_seed",
+             "Set the random seed for reproducibility")
+        // Getters for brain configuration
+        .def("getNeuronCount", &Config::getOr<int>, "neuron_count", 1000,
+             "Get the number of neurons (with default)")
+        .def("getRegionCount", &Config::getOr<int>, "region_count", 1,
+             "Get the number of regions (with default)")
+        .def("getConnectionProbability", &Config::getOr<float>, "connection_probability", 0.1f,
+             "Get the connection probability (with default)")
+        .def("getSimulationTimestep", &Config::getOr<double>, "simulation_timestep", 0.001,
+             "Get the simulation timestep (with default)")
+        .def("getRandomSeed", &Config::getOr<uint64_t>, "random_seed", 42,
+             "Get the random seed (with default)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

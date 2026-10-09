@@ -49,20 +49,12 @@ public:
     Config();
     ~Config();
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Set values
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Get values
     template<typename T>
@@ -70,13 +62,6 @@ public:
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -92,6 +77,24 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Brain configuration convenience methods
+    void setBrainDefaults();
+    std::string getBrainConfigSummary() const;
+    
+    // Set brain-specific configuration values
+    void setNeuronCount(size_t count);
+    void setRegionCount(size_t count);
+    void setConnectionProbability(float prob);
+    void setSimulationTimestep(double timestep);
+    void setRandomSeed(uint64_t seed);
+    
+    // Get brain-specific configuration values with defaults
+    size_t getNeuronCount() const;
+    size_t getRegionCount() const;
+    float getConnectionProbability() const;
+    double getSimulationTimestep() const;
+    uint64_t getRandomSeed() const;
     
 private:
     struct Impl;

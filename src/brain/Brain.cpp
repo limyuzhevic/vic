@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -895,9 +896,38 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match loaded synapses to existing ones
+        NLM_LOG_INFO("Applying loaded synapses...");
+        size_t appliedCount = 0;
+        
+        // Create a lookup table for faster matching: map<source_id, map<dest_id, synapse_ptr>>
+        std::unordered_map<uint64_t, std::unordered_map<uint64_t, Synapse*>> synapseLookup;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                uint64_t srcId = syn->getSourceNeuron().index();
+                uint64_t dstId = syn->getDestinationNeuron().index();
+                synapseLookup[srcId][dstId] = syn;
+            }
+        }
+        
+        // Match loaded synapses to existing ones using the lookup table
+        // Use the actual number of synapses read, not inter-region connections
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            uint64_t srcId = synapseData.sourceNeuron[i];
+            uint64_t dstId = synapseData.destinationNeuron[i];
+            
+            auto sourceIt = synapseLookup.find(srcId);
+            if (sourceIt != synapseLookup.end()) {
+                auto destIt = sourceIt->second.find(dstId);
+                if (destIt != sourceIt->second.end()) {
+                    Synapse* syn = destIt->second;
+                    syn->setWeight(synapseData.weight[i]);
+                    syn->setDelay(synapseData.delay[i]);
+                    appliedCount++;
+                }
+            }
+        }
+        NLM_LOG_INFO("Applied " + std::to_string(appliedCount) + " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
