@@ -16,10 +16,7 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
-    ${NLM_SOURCE_DIR}/core/Config/Config.cpp
-    ${NLM_SOURCE_DIR}/core/Random/Random.cpp
-    ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
-    ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
+    ${NLM_SOURCE_DIR}/core/Config/EnhancedConfig.cpp
     ${NLM_SOURCE_DIR}/brain/Neuron.cpp
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp

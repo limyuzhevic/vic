@@ -1,8 +1,47 @@
 #include "Config.hpp"
+#include "EnhancedConfig.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cctype>
+
+namespace nlm {
+
+// Backwards compatibility function to convert EnhancedConfig to original Config interface
+static void copyEnhancedToOriginal(const nlm::Config& enhanced, nlm::Config& original) {
+    // Clear original config
+    original.clear();
+    
+    // Copy entries from enhanced config
+    for (const auto& entry : enhanced.getKeys()) {
+        // Get value using template for different types
+        auto valueOpt = enhanced.get<int64_t>(entry);
+        if (valueOpt.has_value()) {
+            original.set(entry, *valueOpt, nlm::ConfigSource::Runtime);
+        } else {
+            auto valueOptStr = enhanced.get<std::string>(entry);
+            if (valueOptStr.has_value()) {
+                original.set(entry, *valueOptStr, nlm::ConfigSource::Runtime);
+            } else {
+                auto valueOptDouble = enhanced.get<double>(entry);
+                if (valueOptDouble.has_value()) {
+                    original.set(entry, *valueOptDouble, nlm::ConfigSource::Runtime);
+                } else {
+                    auto valueOptBool = enhanced.get<bool>(entry);
+                    if (valueOptBool.has_value()) {
+                        original.set(entry, *valueOptBool, nlm::ConfigSource::Runtime);
+                    }
+                }
+            }
+        }
+    }
+}
+
+}
 
 namespace nlm {
 
