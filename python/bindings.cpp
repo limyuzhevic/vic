@@ -152,14 +152,93 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("set", py::overload_cast<const std::string&, const std::string&, ConfigSource>(&Config::set),
+             py::arg("key").noconvert(), py::arg("value").noconvert(), py::arg("source").noconvert(),
+             "Set configuration value (string). Key and value are validated for safety.")
+        .def("set", py::overload_cast<const std::string&, int, ConfigSource>(&Config::set),
+             py::arg("key").noconvert(), py::arg("value"), py::arg("source").noconvert(),
+             "Set configuration value (integer). Value is validated to be within range.")
+        .def("set", py::overload_cast<const std::string&, double, ConfigSource>(&Config::set),
+             py::arg("key").noconvert(), py::arg("value"), py::arg("source").noconvert(),
+             "Set configuration value (float). Value is validated to be within range.")
+        .def("set", py::overload_cast<const std::string&, bool, ConfigSource>(&Config::set),
+             py::arg("key").noconvert(), py::arg("value"), py::arg("source").noconvert(),
+             "Set configuration value (boolean).")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.get<std::string>(key);
+            return value.value_or("");
+        }, py::arg("key"), "Get configuration value as string. Key must be non-empty.")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.get<int>(key);
+            return value.value_or(0);
+        }, py::arg("key"), "Get configuration value as integer. Key must be non-empty.")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.get<double>(key);
+            return value.value_or(0.0);
+        }, py::arg("key"), "Get configuration value as float. Key must be non-empty.")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.get<bool>(key);
+            return value.value_or(false);
+        }, py::arg("key"), "Get configuration value as boolean. Key must be non-empty.")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.getOr<std::string>(key, defaultValue);
+            return value;
+        }, py::arg("key").noconvert(), py::arg("defaultValue").noconvert(),
+           "Get configuration value with string default. Key must be non-empty.")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.getOr<int>(key, defaultValue);
+            return value;
+        }, py::arg("key").noconvert(), py::arg("defaultValue"), "Get configuration value with integer default. Key must be non-empty.")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.getOr<double>(key, defaultValue);
+            return value;
+        }, py::arg("key").noconvert(), py::arg("defaultValue"), "Get configuration value with float default. Key must be non-empty.")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            // Validate key before accessing
+            if (key.empty()) {
+                throw std::invalid_argument("Configuration key cannot be empty");
+            }
+            auto value = self.getOr<bool>(key, defaultValue);
+            return value;
+        }, py::arg("key").noconvert(), py::arg("defaultValue"), "Get configuration value with boolean default. Key must be non-empty.")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Check if a configuration key exists. Key must be non-empty.")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys.")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key. Key must be non-empty.")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             "Clear all configuration entries.")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a summary string of the configuration.")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -398,7 +477,29 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("enableAllFeatures", [](AgentBrain& self, bool enable) {
+            self.enableRewardModulation(enable);
+            self.enableStructuralPlasticity(enable);
+            self.enableDevelopment(enable);
+            self.enableCuriosity(enable);
+        }, py::arg("enable"),
+           "Enable/disable all neuromodulation, plasticity, development, and curiosity features")
+        .def("resetFeatures", &AgentBrain::reset,
+             "Reset all neuromodulation and development states")
+        .def("getAllStats", [](const AgentBrain& self) {
+            py::dict stats;
+            stats["curiosity"] = self.getCuriosityLevel();
+            stats["novelty"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["neuromodulation"] = self.getNeuromodulationLevel();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            stats["reward_enabled"] = self.isRewardModulationEnabled();
+            stats["plasticity_enabled"] = self.isStructuralPlasticityEnabled();
+            stats["development_enabled"] = self.isDevelopmentEnabled();
+            stats["curiosity_enabled"] = self.isCuriosityEnabled();
+            return stats;
+        }, "Get a dictionary with all system statistics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +517,316 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    // Convenience utility functions
+    m.def("createStandardWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 16, 16);
+        world->reset();
+        return world;
+    }, "Create a standard world with default settings");
+
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
+
+    m.def("createAgentWithDefaults", []() -> std::shared_ptr<AgentBrain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
+    }, "Create an agent brain with default settings");
+
+    m.def("runEpisode", [](std::shared_ptr<AgentBrain> agent, 
+                         std::shared_ptr<SimpleWorld> world, 
+                         int numSteps) {
+        if (!agent || !world) return;
+        
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            agent->getBrain()->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            agent->applyRewardModulation(0.0f, 0.0f);  // Default reward
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("numSteps"),
+       "Run a complete simulation episode with agent and world");
+
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Enhanced error handling utilities
+    m.def("validate_config", [](const Config& config) {
+        std::vector<std::string> errors;
+        
+        // Validate common configuration parameters
+        if (config.has("brain.neuron_count")) {
+            auto neuron_count = config.get<int>("brain.neuron_count");
+            if (neuron_count && (*neuron_count < 100 || *neuron_count > 100000)) {
+                errors.push_back("brain.neuron_count must be between 100 and 100000");
+            }
+        }
+        
+        if (config.has("brain.synapse_density")) {
+            auto density = config.get<double>("brain.synapse_density");
+            if (density && (*density < 0.01 || *density > 0.5)) {
+                errors.push_back("brain.synapse_density must be between 0.01 and 0.5");
+            }
+        }
+        
+        if (config.has("brain.connection_probability")) {
+            auto prob = config.get<double>("brain.connection_probability");
+            if (prob && (*prob < 0.0 || *prob > 1.0)) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (config.has("brain.learning_rate")) {
+            auto rate = config.get<double>("brain.learning_rate");
+            if (rate && (*rate < 0.0 || *rate > 1.0)) {
+                errors.push_back("brain.learning_rate must be between 0.0 and 1.0");
+            }
+        }
+        
+        return errors;
+    }, "Validate configuration parameters and return error messages",
+       py::arg("config"),
+       py::return_value_policy::copy);
+
+    // Advanced error handling wrapper functions
+    m.def("safe_config_operation", [](Config& config, const std::string& key, 
+                                     const std::string& operation, 
+                                     const std::string& defaultValue = "") {
+        try {
+            if (operation == "get") {
+                if (!config.has(key)) {
+                    return defaultValue;
+                }
+                return config.get(key);
+            } else if (operation == "set") {
+                config.set(key, defaultValue);
+                return true;
+            } else if (operation == "has") {
+                return config.has(key);
+            }
+            return "";
+        } catch (const std::exception& e) {
+            return "Error: " + std::string(e.what());
+        }
+    }, py::arg("config"), py::arg("key"), py::arg("operation"), 
+       py::arg("defaultValue") = "",
+       "Safely perform configuration operations with error handling");
+
+    // Configuration validation presets
+    m.def("createBalancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Balanced configuration for general use
+        config.set("brain.neuron_count", 2000, ConfigSource::Runtime);
+        config.set("brain.synapse_density", 0.15, ConfigSource::Runtime);
+        config.set("brain.connection_probability", 0.05, ConfigSource::Runtime);
+        config.set("brain.initial_weight_mean", 0.5, ConfigSource::Runtime);
+        config.set("brain.initial_weight_std", 0.1, ConfigSource::Runtime);
+        config.set("brain.v_thresh", -50.0, ConfigSource::Runtime);
+        config.set("brain.v_rest", -70.0, ConfigSource::Runtime);
+        config.set("brain.v_reset", -75.0, ConfigSource::Runtime);
+        config.set("brain.tau_mem", 20.0, ConfigSource::Runtime);
+        config.set("brain.tau_ref", 2.0, ConfigSource::Runtime);
+        
+        // Plasticity settings
+        config.set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config.set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Runtime);
+        config.set("plasticity.stdp.tau_plus", 20.0, ConfigSource::Runtime);
+        config.set("plasticity.stdp.tau_minus", 20.0, ConfigSource::Runtime);
+        config.set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config.set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        
+        // Neuromodulation
+        config.set("neuromod.dopamine.scale", 1.0, ConfigSource::Runtime);
+        config.set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config.set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        
+        // Development
+        config.set("development.enable", true, ConfigSource::Runtime);
+        config.set("development.initial_plasticity", 1.0, ConfigSource::Runtime);
+        config.set("development.plasticity_decay_rate", 0.01, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a balanced configuration with reasonable defaults for general use");
+
+    m.def("createHighPerformanceConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // High-performance configuration
+        config.set("brain.neuron_count", 5000, ConfigSource::Runtime);
+        config.set("brain.synapse_density", 0.25, ConfigSource::Runtime);
+        config.set("brain.connection_probability", 0.08, ConfigSource::Runtime);
+        config.set("brain.initial_weight_mean", 0.6, ConfigSource::Runtime);
+        config.set("brain.initial_weight_std", 0.15, ConfigSource::Runtime);
+        config.set("brain.v_thresh", -45.0, ConfigSource::Runtime);
+        config.set("brain.v_rest", -65.0, ConfigSource::Runtime);
+        config.set("brain.v_reset", -70.0, ConfigSource::Runtime);
+        config.set("brain.tau_mem", 15.0, ConfigSource::Runtime);
+        config.set("brain.tau_ref", 1.5, ConfigSource::Runtime);
+        
+        // Aggressive learning
+        config.set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config.set("plasticity.stdp.learning_rate", 0.002, ConfigSource::Runtime);
+        config.set("plasticity.stdp.tau_plus", 15.0, ConfigSource::Runtime);
+        config.set("plasticity.stdp.tau_minus", 15.0, ConfigSource::Runtime);
+        config.set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config.set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        
+        // Enhanced neuromodulation
+        config.set("neuromod.dopamine.scale", 1.2, ConfigSource::Runtime);
+        config.set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config.set("neuromod.curiosity.intensity", 0.8, ConfigSource::Runtime);
+        config.set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        config.set("neuromod.prediction.error.weight", 0.5, ConfigSource::Runtime);
+        
+        // Fast development
+        config.set("development.enable", true, ConfigSource::Runtime);
+        config.set("development.initial_plasticity", 1.2, ConfigSource::Runtime);
+        config.set("development.plasticity_decay_rate", 0.02, ConfigSource::Runtime);
+        config.set("development.critical_period_length", 300.0, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a high-performance configuration optimized for rapid learning and development");
+
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Minimal configuration for quick testing
+        config.set("brain.neuron_count", 500, ConfigSource::Runtime);
+        config.set("brain.synapse_density", 0.05, ConfigSource::Runtime);
+        config.set("brain.connection_probability", 0.02, ConfigSource::Runtime);
+        config.set("brain.initial_weight_mean", 0.5, ConfigSource::Runtime);
+        config.set("brain.initial_weight_std", 0.1, ConfigSource::Runtime);
+        
+        // Basic plasticity
+        config.set("plasticity.stdp.enable", false, ConfigSource::Runtime);
+        config.set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config.set("plasticity.structural.enable", false, ConfigSource::Runtime);
+        
+        // Basic neuromodulation
+        config.set("neuromod.dopamine.scale", 0.5, ConfigSource::Runtime);
+        config.set("neuromod.curiosity.enable", false, ConfigSource::Runtime);
+        config.set("neuromod.novelty.enable", false, ConfigSource::Runtime);
+        
+        // No development
+        config.set("development.enable", false, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a minimal configuration for quick testing and debugging");
+
+    // Advanced simulation utilities
+    m.def("create_reproducible_simulation", 
+          [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+             int num_steps, uint64_t seed) -> std::tuple<std::vector<py::dict>, float, float> {
+              
+              if (!agent || !world) {
+                  throw std::invalid_argument("Agent and world must not be null");
+              }
+              
+              world->setRandomSeed(seed);
+              agent->initialize(*world);
+              
+              std::vector<py::dict> history;
+              float final_curiosity = 0.0f;
+              float final_novelty = 0.0f;
+              
+              for (int step = 0; step < num_steps; ++step) {
+                  world->update(0.1);
+                  auto percept = world->getSensoryPercept();
+                  agent->processSensoryInput(percept);
+                  agent->getBrain()->step(step);
+                  auto action = agent->decodeMotorCommand();
+                  world->applyMotorCommand(action, world->getSimulationTime());
+                  agent->applyRewardModulation(0.0f, 0.0f);
+                  
+                  if (step % 10 == 0) {  // Record every 10 steps to reduce memory
+                      py::dict record;
+                      record["step"] = step;
+                      record["time"] = world->getSimulationTime();
+                      record["curiosity"] = agent->getCuriosityLevel();
+                      record["novelty"] = agent->getNoveltyLevel();
+                      record["prediction_error"] = agent->getPredictionError();
+                      record["neuromodulation"] = agent->getNeuromodulationLevel();
+                      record["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+                      
+                      history.push_back(record);
+                  }
+              }
+              
+              final_curiosity = agent->getCuriosityLevel();
+              final_novelty = agent->getNoveltyLevel();
+              
+              return std::make_tuple(history, final_curiosity, final_novelty);
+          }, py::arg("agent"), py::arg("world"), py::arg("num_steps"), py::arg("seed"),
+             "Run a reproducible simulation with fixed random seed and return history");
+
+    // Memory management utilities
+    m.def("cleanup_agent_brain", [](std::shared_ptr<AgentBrain> agent) {
+        if (agent) {
+            agent->reset();
+            // Force cleanup of internal state
+        }
+    }, "Clean up and reset agent brain for memory management");
+
+    m.def("get_agent_memory_usage", [](const AgentBrain& agent) {
+        py::dict memory_info;
+        memory_info["brain_pointer"] = (void*)agent.getBrain();
+        memory_info["curiosity_level"] = agent.getCuriosityLevel();
+        memory_info["novelty_level"] = agent.getNoveltyLevel();
+        memory_info["prediction_error"] = agent.getPredictionError();
+        memory_info["neuromodulation_level"] = agent.getNeuromodulationLevel();
+        return memory_info;
+    }, "Get memory usage information for agent brain");
+
+    // Type aliases for better user experience
+    m.def("create_neuron_id", [](uint64_t value) {
+        return py::cast(NeuronId(value));
+    }, py::arg("value"), "Create a NeuronId with the specified value");
+
+    m.def("create_synapse_id", [](uint64_t value) {
+        return py::cast(SynapseId(value));
+    }, py::arg("value"), "Create a SynapseId with the specified value");
+
+    m.def("create_region_id", [](uint64_t value) {
+        return py::cast(RegionId(value));
+    }, py::arg("value"), "Create a RegionId with the specified value");
+
+    m.def("create_population_id", [](uint64_t value) {
+        return py::cast(PopulationId(value));
+    }, py::arg("value"), "Create a PopulationId with the specified value");
+
+    // Utility functions
+    m.def("get_default_action_types", []() {
+        std::vector<std::string> action_types;
+        action_types.reserve(20);
+        action_types = {"MoveForward", "MoveBackward", "TurnLeft", "TurnRight", "LookLeft", "LookRight", 
+                       "Interact", "Look", "LookUp", "LookDown", "Eat", "Drink", "Rest", "Wait", "Custom"};
+        return action_types;
+    }, "Get list of available action types");
+
+    m.def("get_neuron_types", []() {
+        std::vector<std::string> types;
+        types.reserve(7);
+        types = {"Excitatory", "Inhibitory", "Modulatory", "Sensory", "Motor", "Internal"};
+        return types;
+    }, "Get list of available neuron types");
+
+    m.def("get_synapse_types", []() {
+        std::vector<std::string> types;
+        types.reserve(6);
+        types = {"Excitatory", "Inhibitory", "Modulatory", "Electrical", "GapJunction"};
+        return types;
+    }, "Get list of available synapse types");
 }
 
 } // namespace nlm
