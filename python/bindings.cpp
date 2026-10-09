@@ -347,11 +347,128 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+         .def("getConfig", &Brain::getConfig,
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
+         .def("logStatus", &Brain::logStatus,
+              "Log brain status")
+         
+         // Advanced Brain convenience methods
+         .def("quickRun", [](Brain& brain, size_t steps) {
+             for (size_t i = 0; i < steps; ++i) {
+                 brain.step(i);
+             }
+         }, py::arg("steps"), "Quick run of brain simulation for given number of steps")
+         
+         .def("runWithInput", [](Brain& brain, const SensoryInput& input, size_t steps) {
+             brain.receiveSensoryInput(input);
+             for (size_t i = 0; i < steps; ++i) {
+                 brain.step(i);
+             }
+         }, py::arg("input"), py::arg("steps"), "Run brain simulation with initial sensory input")
+         
+         .def("getBrainStats", [](const Brain& brain) {
+             std::map<std::string, size_t> stats;
+             stats["total_neurons"] = brain.getTotalNeuronCount();
+             stats["total_synapses"] = brain.getTotalSynapseCount();
+             stats["regions"] = brain.getRegionCount();
+             stats["active_neurons"] = brain.getActiveNeuronCount();
+             stats["firing_neurons"] = brain.getFiringNeuronCount();
+             stats["total_spikes"] = brain.getTotalSpikeCount();
+             stats["e_i_ratio"] = static_cast<size_t>(brain.getExcitationInhibitionRatio() * 100);
+             return stats;
+         }, "Get comprehensive brain statistics")
+         
+         .def("getPerformanceMetrics", [](const Brain& brain) {
+             return py::make_tuple(
+                 brain.getAverageFiringRate(),
+                 brain.getExcitationInhibitionRatio(),
+                 brain.getTotalSpikeCount() / static_cast<float>(std::max(size_t(1), brain.getTotalNeuronCount()))
+             );
+         }, "Get performance metrics: firing_rate, e_i_ratio, spikes_per_neuron")
+         
+         .def("isHealthy", [](const Brain& brain) {
+             // Consider brain healthy if it has reasonable activity and connectivity
+             float firingRate = brain.getAverageFiringRate();
+             size_t totalNeurons = brain.getTotalNeuronCount();
+             size_t totalSynapses = brain.getTotalSynapseCount();
+             
+             bool reasonableFiring = firingRate > 0.1f && firingRate < 100.0f;
+             bool reasonableConnectivity = totalSynapses > 0 && totalSynapses < totalNeurons * 10;
+             
+             return reasonableFiring && reasonableConnectivity;
+         }, "Check if brain is in a healthy state")
+         
+         .def("resetWithConfig", [](Brain& brain, std::shared_ptr<Config> config) {
+             // Create a new brain with the given config
+             return std::make_shared<Brain>(config);
+         }, py::arg("config"), "Reset brain with new configuration (returns new brain)")
+         
+         .def("configureSimulation", [](Brain& brain, double timestep, size_t maxSteps) {
+             auto config = brain.getConfig();
+             config->set("simulation_timestep", timestep);
+             config->set("max_simulation_steps", static_cast<int64_t>(maxSteps));
+             return true;
+         }, py::arg("timestep"), py::arg("maxSteps"), "Configure simulation parameters")
+         
+         .def("getDevelopmentStatus", [](const Brain& brain) {
+             auto config = brain.getConfig();
+             return std::make_tuple(
+                 static_cast<int>(brain.getDevelopmentalStage()),
+                 config->getOr<int64_t>("development_enabled", 0) > 0,
+                 config->getOr<int64_t>("plasticity_enabled", 1) > 0
+             );
+         }, "Get development status information")
+         
+         .def("exportForAnalysis", &Brain::save,
+              py::arg("filepath"),
+              "Export brain state to file for external analysis")
+         
+         .def("importFromFile", &Brain::load,
+              py::arg("filepath"),
+              "Import brain state from file")
+         
+         .def("getIntegrationStatus", [](const Brain& brain) {
+             std::map<std::string, bool> status;
+             
+             status["working_memory"] = brain.getWorkingMemory() != nullptr;
+             status["episodic_memory"] = brain.getEpisodicMemory() != nullptr;
+             status["prediction_system"] = brain.getPredictionSystem() != nullptr;
+             status["planner"] = brain.getPlanner() != nullptr;
+             status["concept_formation"] = brain.getConceptFormation() != nullptr;
+             status["attention"] = brain.getAttention() != nullptr;
+             status["development"] = brain.getDevelopmentSystem() != nullptr;
+             status["dopamine"] = brain.getDopamine() != nullptr;
+             status["curiosity"] = brain.getCuriosity() != nullptr;
+             status["novelty"] = brain.getNovelty() != nullptr;
+             
+             return status;
+         }, "Get integration status of all brain systems")
+         
+         .def("printSystemStatus", [](Brain& brain) {
+             auto config = brain.getConfig();
+             std::cout << "=== NLM Brain Status Report ===" << std::endl;
+             std::cout << "Phase: " << config->getOr<int64_t>("phase", 6) << std::endl;
+             std::cout << "Neurons: " << brain.getTotalNeuronCount() << std::endl;
+             std::cout << "Synapses: " << brain.getTotalSynapseCount() << std::endl;
+             std::cout << "Regions: " << brain.getRegionCount() << std::endl;
+             std::cout << "Active: " << brain.getActiveNeuronCount() << std::endl;
+             std::cout << "Firing: " << brain.getFiringNeuronCount() << std::endl;
+             std::cout << "Spikes: " << brain.getTotalSpikeCount() << std::endl;
+             std::cout << "Firing Rate: " << brain.getAverageFiringRate() << std::endl;
+             std::cout << "E/I Ratio: " << brain.getExcitationInhibitionRatio() << std::endl;
+             std::cout << "Development Stage: " << static_cast<int>(brain.getDevelopmentalStage()) << std::endl;
+             
+             // Check system integration
+             std::cout << "\nSystem Integration:" << std::endl;
+             std::cout << "  Working Memory: " << (brain.getWorkingMemory() ? "✅" : "❌") << std::endl;
+             std::cout << "  Episodic Memory: " << (brain.getEpisodicMemory() ? "✅" : "❌") << std::endl;
+             std::cout << "  Prediction System: " << (brain.getPredictionSystem() ? "✅" : "❌") << std::endl;
+             std::cout << "  Planner: " << (brain.getPlanner() ? "✅" : "❌") << std::endl;
+             std::cout << "  Concept Formation: " << (brain.getConceptFormation() ? "✅" : "❌") << std::endl;
+             std::cout << "  Attention: " << (brain.getAttention() ? "✅" : "❌") << std::endl;
+             std::cout << "  Development: " << (brain.getDevelopmentSystem() ? "✅" : "❌") << std::endl;
+         }, "Print comprehensive brain system status report")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -388,17 +505,179 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+              py::arg("enable"))
+         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+              py::arg("enable"))
+         .def("enableDevelopment", &AgentBrain::enableDevelopment,
+              py::arg("enable"))
+         .def("enableCuriosity", &AgentBrain::enableCuriosity,
+              py::arg("enable"))
+         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+         
+         // Advanced convenience methods
+         .def("enableAllFeatures", &AgentBrain::enableRewardModulation, py::arg("enable"))
+         .def("enableAllFeatures", [](AgentBrain& agent) {
+             agent.enableRewardModulation(true);
+             agent.enableStructuralPlasticity(true);
+             agent.enableDevelopment(true);
+             agent.enableCuriosity(true);
+         }, "Enable all learning features at once")
+         .def("enableAllFeatures", [](AgentBrain& agent, bool enable) {
+             agent.enableRewardModulation(enable);
+             agent.enableStructuralPlasticity(enable);
+             agent.enableDevelopment(enable);
+             agent.enableCuriosity(enable);
+         }, "Enable/disable all learning features")
+         
+         .def("getAllNeuromodulationLevels", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level")
+         .def("getAllCuriosityLevels", [](const AgentBrain& agent) {
+             return py::make_tuple(agent.getCuriosityLevel(), agent.getNoveltyLevel(), agent.getPredictionError());
+         }, "Get all curiosity-related levels")
+         
+         .def("simulateEpisode", [](AgentBrain& agent, std::shared_ptr<SimpleWorld> world, size_t numSteps) {
+             float totalReward = 0.0f;
+             for (size_t step = 0; step < numSteps; ++step) {
+                 // Get observation from world
+                 SensoryPercept percept = world->getSensoryPercept();
+                 
+                 // Process sensory input
+                 agent.processSensoryInput(percept);
+                 
+                 // Get motor command
+                 MotorCommand cmd = agent.decodeMotorCommand();
+                 
+                 // Apply action to world
+                 world->applyMotorCommand(cmd, world->getSimulationTime());
+                 
+                 // Compute reward (simplified)
+                 float reward = world->getAgentBody().health > 0 ? 0.1f : -0.1f;
+                 totalReward += reward;
+                 
+                 // Apply reward modulation
+                 agent.applyRewardModulation(reward, 0.0f);
+                 
+                 // Update development (simplified)
+                 agent.updateDevelopment(0.1f);
+             }
+             return totalReward;
+         }, py::arg("world"), py::arg("numSteps"), "Run a complete episode of simulation")
+         
+         .def("trainModel", [](AgentBrain& agent, std::shared_ptr<SimpleWorld> world, size_t numEpisodes) {
+             float totalRewards = 0.0f;
+             for (size_t episode = 0; episode < numEpisodes; ++episode) {
+                 totalRewards += agent.simulateEpisode(world, 100);
+             }
+             return totalRewards / numEpisodes;
+         }, py::arg("world"), py::arg("numEpisodes"), "Train the model over multiple episodes")
+         
+         .def("getStats", [](const AgentBrain& agent) {
+             return py::make_tuple(
+                 agent.getCuriosityLevel(),
+                 agent.getNoveltyLevel(),
+                 agent.getPredictionError(),
+                 agent.getNeuromodulationLevel(),
+                 agent.getDevelopmentalStage()
+             );
+         }, "Get comprehensive statistics about the agent's state")
+         
+         .def("resetForNewEpisode", &AgentBrain::reset,
+              "Reset agent for a new episode with fresh state")
+         
+         .def("exportBrainState", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Export the complete brain state for analysis or persistence")
+         
+         .def("setLearningRate", &AgentBrain::enableRewardModulation,
+              py::arg("enable"),
+              "Set learning rate (alias for enableRewardModulation)")
+         
+         .def("setPlasticity", &AgentBrain::enableStructuralPlasticity,
+              py::arg("enable"),
+              "Set structural plasticity (alias for enableStructuralPlasticity)")
+         
+         .def("setDevelopment", &AgentBrain::enableDevelopment,
+              py::arg("enable"),
+              "Set development mode (alias for enableDevelopment)")
+         
+         .def("setExploration", &AgentBrain::enableCuriosity,
+              py::arg("enable"),
+              "Set exploration mode (alias for enableCuriosity)")
+         
+         .def("getBrainSize", [](const AgentBrain& agent) {
+             auto brain = agent.getBrain();
+             return std::make_tuple(
+                 brain->getTotalNeuronCount(),
+                 brain->getTotalSynapseCount(),
+                 brain->getRegionCount()
+             );
+         }, "Get basic brain size statistics")
+         
+         .def("getActivityStats", [](const AgentBrain& agent) {
+             auto brain = agent.getBrain();
+             return py::make_tuple(
+                 brain->getFiringNeuronCount(),
+                 brain->getAverageFiringRate(),
+                 brain->getTotalSpikeCount(),
+                 brain->getExcitationInhibitionRatio()
+             );
+         }, "Get current neural activity statistics")
+         
+         .def("getDevelopmentalStats", [](const AgentBrain& agent) {
+             return std::make_tuple(
+                 static_cast<int>(agent.getDevelopmentalStage()),
+                 agent.getNeuromodulationLevel(),
+                 agent.getCuriosityLevel()
+             );
+         }, "Get developmental and neuromodulation statistics")
+         
+         .def("hasMemorySystems", [](const AgentBrain& agent) {
+             auto brain = agent.getBrain();
+             return std::make_tuple(
+                 brain->getWorkingMemory() != nullptr,
+                 brain->getEpisodicMemory() != nullptr,
+                 brain->getPredictionSystem() != nullptr,
+                 brain->getPlanner() != nullptr,
+                 brain->getConceptFormation() != nullptr,
+                 brain->getAttention() != nullptr
+             );
+         }, "Check which cognitive systems are available")
+         
+         .def("getMemoryStats", [](const AgentBrain& agent) {
+             auto brain = agent.getBrain();
+             std::map<std::string, size_t> stats;
+             
+             if (auto* wm = brain->getWorkingMemory()) {
+                 stats["working_memory_traces"] = wm->getActiveTraces();
+             }
+             if (auto* em = brain->getEpisodicMemory()) {
+                 stats["episodic_memory_episodes"] = em->getEpisodeCount();
+             }
+             if (auto* ps = brain->getPredictionSystem()) {
+                 stats["prediction_error"] = static_cast<size_t>(ps->getPredictionError() * 100);
+             }
+             
+             return stats;
+         }, "Get detailed memory system statistics")
+         
+         .def("printReport", [](AgentBrain& agent) {
+             auto brain = agent.getBrain();
+             std::cout << "=== NLM Agent Report ===" << std::endl;
+             std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+             std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+             std::cout << "Regions: " << brain->getRegionCount() << std::endl;
+             std::cout << "Firing: " << brain->getFiringNeuronCount() << std::endl;
+             std::cout << "Avg Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+             std::cout << "Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+             std::cout << "Neuromodulation: " << agent.getNeuromodulationLevel() << std::endl;
+             std::cout << "Curiosity: " << agent.getCuriosityLevel() << std::endl;
+             std::cout << "Novelty: " << agent.getNoveltyLevel() << std::endl;
+             std::cout << "Prediction Error: " << agent.getPredictionError() << std::endl;
+             std::cout << "Development: " << static_cast<int>(agent.getDevelopmentalStage()) << std::endl;
+         }, "Print comprehensive agent report to console")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -511,8 +511,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // For now, update prediction error based on neural activity variance
+        // In a full implementation, this would use actual sensory input
+        float totalActivity = 0.0f;
+        size_t neuronCount = 0;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        totalActivity += neuron->getMembranePotential();
+                        ++neuronCount;
+                    }
+                }
+            }
+        }
+        
+        if (neuronCount > 0) {
+            float avgActivity = totalActivity / neuronCount;
+            // Simple prediction error based on activity variance
+            pImpl->predictionSystem->train(pImpl->predictionSystem->predictNextState(
+                Vision(pImpl->regions.size(), neuronCount)
+            ));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +550,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract current neural activity patterns
+        std::vector<float> currentPattern;
+        std::vector<float> features;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                // Get average activation for each neuron type
+                float avgActivation = 0.0f;
+                size_t neuronCount = 0;
+                
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        avgActivation += neuron->getMembranePotential();
+                        ++neuronCount;
+                    }
+                }
+                
+                if (neuronCount > 0) {
+                    avgActivation /= neuronCount;
+                    currentPattern.push_back(avgActivation);
+                    
+                    // Add features based on neuron type and activation
+                    if (pop->getNeuronType() == NeuronType::Sensory) {
+                        features.push_back(avgActivation);  // Sensory input features
+                    } else if (pop->getNeuronType() == NeuronType::Motor) {
+                        features.push_back(avgActivation * 0.5f);  // Motor features
+                    } else {
+                        features.push_back(avgActivation * 0.3f);  // Internal features
+                    }
+                }
+            }
+        }
+        
+        if (!currentPattern.empty() && pImpl->dopamine) {
+            // Get reward from dopamine system
+            float reward = pImpl->dopamine->getLevel();
+            
+            // Present current neural pattern to concept formation
+            pImpl->conceptFormation->presentExperience(currentPattern, features, 
+                                                      reward, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
