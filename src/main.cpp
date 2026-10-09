@@ -1,11 +1,18 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase integrates all brain systems into a coherent artificial brain with:
+// - Working memory with persistent activity and competition
+// - Episodic memory with experience encoding and replay
+// - Associative memory with Hebbian pattern associations
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Prediction system integration
+// - Neural planner with action sequence evaluation
+// - Concept formation from experience patterns
+// - Attention with competitive selection dynamics
+// - Structural plasticity modulated by development
+// - Checkpoint save/load and brain state serialization
+// - Memory replay and consolidation for sleep/rest cycle
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,14 +42,17 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                               ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Integrated artificial brain with all systems connected.    ║
+    ║     This phase integrates:                                    ║
+    ║     - Working, episodic, and associative memory               ║
+    ║     - Neuromodulation (dopamine, curiosity, novelty)         ║
+    ║     - Prediction system                                       ║
+    ║     - Neural planning and attention                           ║
+    ║     - Concept formation                                       ║
+    ║     - Structural plasticity                                    ║
+    ║     - Development and checkpointing                           ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;

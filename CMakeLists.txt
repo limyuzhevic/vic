@@ -139,13 +139,37 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# ====================================================================
+# Python bindings
+# ====================================================================
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+
+# Python bindings for NLM
+add_library(pynlm MODULE
+    src/python_bindings/pynlm_bindings.cpp
+)
+
+target_include_directories(pynlm PRIVATE
+    src
+    ${Python3_INCLUDE_DIRS}
+    ${pybind11_INCLUDE_DIR}
+)
+
+target_link_libraries(pynlm PRIVATE
+    nlm_core
+    nlm_agent
+    nlm_world
+)
+
+set_target_properties(pynlm PROPERTIES
+    OUTPUT_NAME "pynlm"
+    PREFIX ""
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
+
+# Install Python module
+install(TARGETS pynlm
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages"
 )

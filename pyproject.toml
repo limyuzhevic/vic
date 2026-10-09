@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "cmake>=3.16"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -51,7 +51,18 @@ cmake.args = [
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+PYBIND11_PYTHON_VERSION = "3"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+# Project metadata for Python module
+[tool.pynlm]
+name = "NLM"
+description = "Neural Learning Machine - Experimental artificial developmental brain"
+version = "0.1.0"
+author = "NLM Authors"
+license = "MIT"
+documentation_url = "https://nlm.readthedocs.io"
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "artificial-intelligence"]
