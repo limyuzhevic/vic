@@ -52,6 +52,9 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get prediction error
+    float getPredictionError() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -69,49 +72,84 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== AGENT UTILITIES ==========
+    
+    // Create default agent brain interface
+    static std::shared_ptr<AgentBrain> create_default_agent_brain(std::shared_ptr<Brain> brain);
+    
+    // Process sensory input
+    void process_sensory_input(const SensoryPercept& percept);
+    
+    // Decode motor command
+    MotorCommand decode_motor_command();
+    
+    // Run single episode
+    void run_episode(int steps);
+    
+    // Run complete agent simulation
+    float run_agent_simulation(int steps);
+    
+    // Get agent performance metrics
+    std::string get_agent_metrics() const;
+    
+    // Validate agent configuration
+    bool validate_agent() const;
+    
+    // Enable all agent features
+    void enable_all_features();
+    
+    // Disable all agent features
+    void disable_all_features();
+    
+    // Check if agent is ready for simulation
+    bool is_ready() const;
+    
+    // Get agent status string
+    std::string get_status() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    MotorCommand decode_from_motor_neurons();
     
     // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand select_with_curiosity(MotorCommand default_cmd);
     
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    std::vector<Neuron*> motor_forward_;
+    std::vector<Neuron*> motor_backward_;
+    std::vector<Neuron*> motor_turn_left_;
+    std::vector<Neuron*> motor_turn_right_;
+    std::vector<Neuron*> motor_interact_;
+    std::vector<Neuron*> motor_wait_;
     
     // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    std::vector<Neuron*> sensory_vision_;
+    std::vector<Neuron*> sensory_touch_;
+    std::vector<Neuron*> sensory_internal_;
+    std::vector<Neuron*> sensory_proprioception_;
     
     // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    float dopamine_level_;
+    float novelty_level_;
+    float curiosity_level_;
+    float prediction_error_;
+    float expected_reward_;
     
     // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    double developmental_age_;
+    float plasticity_modifier_;
     
     // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    bool reward_modulation_enabled_;
+    bool structural_plasticity_enabled_;
+    bool development_enabled_;
+    bool curiosity_enabled_;
     
     // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    std::vector<float> previous_vision_;
+    float sensory_novelty_decay_;
 };
 
 } // namespace nlm

@@ -193,9 +193,41 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== CONVENIENCE METHODS ==========
+    
+    // Run a complete simulation with error handling
+    bool run_simulation(int steps);
+    
+    // Run multiple episodes with state management
+    void run_multiple_episodes(int num_episodes, int steps_per_episode);
+    
+    // Run parameter sweep for experiments
+    std::vector<std::pair<double, float>> run_parameter_sweep(
+        const std::string& param_key, const std::vector<double>& values);
+    
+    // Get comprehensive brain statistics and summary
+    std::string get_brain_summary() const;
+    
+    // Export network connectivity to CSV format
+    bool export_network(const std::string& filename) const;
+    
+    // Get detailed spiking patterns
+    std::vector<std::vector<float>> get_spiking_patterns() const;
+    
+    // Validate brain configuration and state
+    bool validate_brain() const;
+    
+    // Check memory systems integrity
+    bool check_memory_integrity() const;
+    
+    // Validate agent configuration and settings
+    bool validate_agent() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+} // namespace nlm
 
 } // namespace nlm

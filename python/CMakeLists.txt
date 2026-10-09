@@ -58,6 +58,8 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+    ${NLM_SOURCE_DIR}/core/Exceptions/NLMExceptions.cpp
+    ${NLM_SOURCE_DIR}/core/Validation/ValidationUtils.cpp
 )
 
 set(NLM_AGENT_SOURCES

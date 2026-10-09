@@ -110,6 +110,7 @@ private:
 };
 
 // Convenience macro for file/line/function info
+// Convenience macro for file/line/function info
 #define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
@@ -138,4 +139,37 @@ private:
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
 
+// Advanced logging macros for enhanced features
+#define NLM_LOG_PERFORMANCE(op, duration) do { \
+    std::chrono::duration<double> _dur(duration); \
+    nlm::Logger::getGlobal().logPerformance(_dur, #op); \
+} while(0)
+
+#define NLM_LOG_NEURAL(event, neuronId, regionId, value) do { \
+    nlm::Logger::getGlobal().logNeuralEvent(event, neuronId, regionId, value); \
+} while(0)
+
+#define NLM_LOG_SIMULATION(step, time, metrics) do { \
+    nlm::Logger::getGlobal().logSimulationStep(step, time, metrics); \
+} while(0)
+
+#define NLM_LOG_MEMORY(event, bytes, context) do { \
+    nlm::Logger::getGlobal().logMemoryEvent(event, bytes, context); \
+} while(0)
+
+#define NLM_LOG_HEALTH(check, passed, details) do { \
+    nlm::Logger::getGlobal().logHealthCheck(check, passed, details); \
+} while(0)
+
+// Advanced logging macros with categories
+#define NLM_LOG_DEBUG_CAT(msg, category) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__, category)
+#define NLM_LOG_INFO_CAT(msg, category) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__, category)
+#define NLM_LOG_WARNING_CAT(msg, category) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__, category)
+#define NLM_LOG_ERROR_CAT(msg, category) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__, category)
+#define NLM_LOG_CRITICAL_CAT(msg, category) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__, category)
+
+// Enhanced stream-style macros with categories
+#define NLM_LOG_STREAM_CAT(level, category) nlm::LogStream(level, __FILE__, __LINE__, __func__, category)
+
 } // namespace nlm
+

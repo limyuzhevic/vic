@@ -93,6 +93,33 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // ========== CONFIGURATION UTILITIES ==========
+    
+    // Configure for common task types
+    void configure_for_task(const std::string& task_type, const std::string& parameters = "");
+    
+    // Setup brain for developmental studies
+    void setup_development(double start_age, double duration);
+    
+    // Setup brain for learning experiments
+    void setup_learning(float learning_rate, int exploration_episodes);
+    
+    // Get all configuration keys
+    std::vector<std::string> getKeys() const;
+    
+    // Get configuration with type checking and validation
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key, const T& defaultValue);
+    
+    // Set multiple values from JSON string
+    bool set_from_json(const std::string& json_string);
+    
+    // Get configuration as Python-like dictionary (string->string)
+    std::map<std::string, std::string> to_map() const;
+    
+    // Validate configuration against schema
+    bool validate_configuration() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
