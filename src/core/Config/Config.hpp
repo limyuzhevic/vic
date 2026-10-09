@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "ConfigConstants.hpp"
 
 namespace nlm {
 
@@ -93,6 +94,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool isValid() const { return pImpl->isValid; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +104,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Configuration initialization
+    void initializeDefaults();
+    
+    // Helper methods
+    bool validateConfigValue(const std::string& key, const ConfigValue& value) const;
+    bool isDefaultKey(const std::string& key) const;
+    template<typename T>
+    T getDefaultValue(const std::string& key) const;
+    bool setFromString(const std::string& key, const std::string& value, ConfigSource source);
 };
 
 } // namespace nlm

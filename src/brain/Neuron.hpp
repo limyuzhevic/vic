@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "AgentBrainConstants.hpp"
 #include <vector>
 #include <array>
 
@@ -35,7 +36,7 @@ struct NeuronState {
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(Constants::NEURON_REFRACTORY_PERIOD_DEFAULT)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
