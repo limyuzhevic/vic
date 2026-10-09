@@ -87,42 +87,56 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Process each sensory modality using a unified approach
+    processVisionInput(percept.getVision());
+    processTouchInput(percept.getTouch());
+    processInternalInput(percept.getInternal());
+    processProprioceptionInput(percept.getProprioception());
+}
+
+void AgentBrain::processVisionInput(const std::vector<float>& vision) {
     // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    for (size_t i = 0; i < std::min(sensoryVision_.size(), vision.size()); ++i) {
+        Neuron* neuron = sensoryVision_[i];
+        if (neuron) {
+            float current = vision[i] * 5.0f;  // Scale factor for vision intensity
+            neuron->injectCurrent(current);
         }
     }
-    
+}
+
+void AgentBrain::processTouchInput(const std::vector<float>& touch) {
     // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+    for (size_t i = 0; i < std::min(sensoryTouch_.size(), touch.size()); ++i) {
+        Neuron* neuron = sensoryTouch_[i];
+        if (neuron) {
             float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+            neuron->injectCurrent(current);
         }
     }
-    
+}
+
+void AgentBrain::processInternalInput(const std::vector<float>& internal) {
     // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    for (size_t i = 0; i < std::min(sensoryInternal_.size(), internal.size()); ++i) {
+        Neuron* neuron = sensoryInternal_[i];
+        if (neuron) {
+            float current = (internal[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            neuron->injectCurrent(current);
         }
     }
-    
+}
+
+void AgentBrain::processProprioceptionInput(const std::vector<float>& proprioception) {
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    for (size_t i = 0; i < std::min(sensoryProprioception_.size(), proprioception.size()); ++i) {
+        Neuron* neuron = sensoryProprioception_[i];
+        if (neuron) {
+            float current = (proprioception[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            neuron->injectCurrent(current);
         }
     }
+}
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {

@@ -1,15 +1,58 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <optional>
+#include <variant>
+#include <stdexcept>
+#include <string_view>
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
 
 namespace nlm {
+
+// Custom exception types
+class BrainException : public std::runtime_error {
+public:
+    explicit BrainException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigError : public BrainException {
+public:
+    explicit ConfigError(const std::string& message) : BrainException("Configuration error: " + message) {}
+};
+
+class InitializationError : public BrainException {
+public:
+    explicit InitializationError(const std::string& message) : BrainException("Initialization error: " + message) {}
+};
+
+class OperationError : public BrainException {
+public:
+    explicit OperationError(const std::string& message) : BrainException("Operation error: " + message) {}
+};
+
+// Helper function for validation
+inline void validatePositive(const std::string& name, double value, double min = 0.0) {
+    if (value < min) {
+        throw std::invalid_argument(name + " must be >= " + std::to_string(min) + ", got " + std::to_string(value));
+    }
+}
+
+inline void validateNonEmpty(const std::string& name, const std::string& value) {
+    if (value.empty()) {
+        throw std::invalid_argument(name + " cannot be empty");
+    }
+}
 
 // Forward declarations
 class Config;

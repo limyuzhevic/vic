@@ -27,6 +27,16 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Custom exception types for better error handling
+    py::register_exception<nlm::BrainException>(m, "BrainError",
+        py::module_local(), "Exception thrown by NLM Brain operations");
+    
+    py::register_exception<nlm::ConfigError>(m, "ConfigError",
+        py::module_local(), "Exception thrown by NLM configuration operations");
+    
+    py::register_exception<nlm::InitializationError>(m, "InitializationError",
+        py::module_local(), "Exception thrown during NLM initialization");
+    
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
@@ -142,16 +152,17 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Enhanced Pythonic Config class with improved API
+    py::class_<Config>(m, "Config")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON or simple key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (simple key=value format)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -162,7 +173,181 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Enhanced convenience methods
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set an integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a float configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a boolean configuration value")
+        .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get an integer configuration value, or return default if not set")
+        .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a float configuration value, or return default if not set")
+        .def("getOr", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a boolean configuration value, or return default if not set")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value"),
+            "Get a string configuration value, or return default if not set")
+        
+        // Enhanced Pythonic convenience methods
+        .def("getFloat", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (!val.has_value()) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" not found");
+            }
+            return *val;
+        }, py::arg("key"),
+            "Get a float configuration value (convenience method)")
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (!val.has_value()) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" not found");
+            }
+            return *val;
+        }, py::arg("key"),
+            "Get an integer configuration value (convenience method)")
+        .def("getString", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (!val.has_value()) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" not found");
+            }
+            return *val;
+        }, py::arg("key"),
+            "Get a string configuration value (convenience method)")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (!val.has_value()) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" not found");
+            }
+            return *val;
+        }, py::arg("key"),
+            "Get a boolean configuration value (convenience method)")
+        
+        // Enhanced parameter validation helper
+        .def("validateParam", [](Config& self, const std::string& key, double min, double max) {
+            if (!self.has(key)) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" is not set");
+            }
+            auto val = self.get<double>(key);
+            if (!val.has_value()) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" is not a number");
+            }
+            double value = *val;
+            if (value < min || value > max) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" value " + 
+                                    std::to_string(value) + " is outside valid range [" + 
+                                    std::to_string(min) + ", " + std::to_string(max) + "]");
+            }
+            return value;
+        }, py::arg("key"), py::arg("min"), py::arg("max"),
+            "Validate that a configuration value is within the specified range")
+        
+        // Type validation helper
+        .def("validateType", [](Config& self, const std::string& key, const std::string& expectedType) {
+            if (!self.has(key)) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" not found");
+            }
+            
+            if (expectedType == "int" || expectedType == "integer") {
+                auto val = self.get<int>(key);
+                if (!val.has_value()) {
+                    throw nlm::ConfigError("Configuration key \"" + key + "\" is not an integer");
+                }
+            } else if (expectedType == "float" || expectedType == "double" || expectedType == "number") {
+                auto val = self.get<double>(key);
+                if (!val.has_value()) {
+                    throw nlm::ConfigError("Configuration key \"" + key + "\" is not a number");
+                }
+            } else if (expectedType == "bool" || expectedType == "boolean") {
+                auto val = self.get<bool>(key);
+                if (!val.has_value()) {
+                    throw nlm::ConfigError("Configuration key \"" + key + "\" is not a boolean");
+                }
+            } else if (expectedType == "string") {
+                auto val = self.get<std::string>(key);
+                if (!val.has_value()) {
+                    throw nlm::ConfigError("Configuration key \"" + key + "\" is not a string");
+                }
+            } else {
+                throw nlm::ConfigError("Unsupported expected type \"" + expectedType + "\"");
+            }
+        }, py::arg("key"), py::arg("expected_type"),
+            "Validate that a configuration value is of the expected type")
+        
+        // Enhanced get method with type detection and better error handling
+        .def("getWithValidation", [](Config& self, const std::string& key) {
+            if (!self.has(key)) {
+                throw nlm::ConfigError("Configuration key \"" + key + "\" not found");
+            }
+            
+            // Try common types in order: int, double, string, bool
+            auto intVal = self.get<int>(key);
+            if (intVal.has_value()) return *intVal;
+            
+            auto doubleVal = self.get<double>(key);
+            if (doubleVal.has_value()) return *doubleVal;
+            
+            auto stringVal = self.get<std::string>(key);
+            if (stringVal.has_value()) return *stringVal;
+            
+            auto boolVal = self.get<bool>(key);
+            if (boolVal.has_value()) return *boolVal;
+            
+            throw nlm::ConfigError("Configuration key \"" + key + "\" has no compatible value type");
+        }, py::arg("key"),
+            "Get configuration value with enhanced error handling and type detection")
+        
+        // Python properties for frequently accessed attributes
+        .def_property_readonly("config_keys", &Config::getKeys,
+                              "Get all configuration keys (Python property)")
+        .def("is_empty", [](Config& self) {
+            return self.getKeys().empty();
+        }, "Check if config is empty (returns True if no keys)")
+        .def("key_count", [](Config& self) {
+            return self.getKeys().size();
+        }, "Get the number of configuration keys (Python property)")
+        .def_property_readonly("has_data", [](Config& self) {
+            return !self.getKeys().empty();
+        }, "Check if config has any data (Python property)")
+        
+        // Configuration statistics and metadata
+        .def("has_keys", &Config::has, py::arg("key"),
+             "Check if a specific key exists")
+        .def("get_summary", &Config::summary,
+             "Get configuration summary (Python property)")
+        
+        // Set methods with type safety
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set an integer configuration value (type-safe)")
+        .def("setFloat", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a float configuration value (type-safe)")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a boolean configuration value (type-safe)")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+            "Set a string configuration value (type-safe)");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

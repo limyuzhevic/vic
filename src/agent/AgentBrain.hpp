@@ -76,6 +76,13 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for sensory processing (reduces code duplication)
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprioception);
+    void computeNovelty(const std::vector<float>& vision);
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
