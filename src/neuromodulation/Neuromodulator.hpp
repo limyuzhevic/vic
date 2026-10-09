@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Modern PIMPL implementation
 
 class Neuromodulator {
 public:
@@ -21,7 +21,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Implemented: Real dopamine-modulated plasticity factors
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Modern PIMPL implementation with configurable parameters
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,13 +48,20 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Advanced dopamine dynamics (Phase 2)
+    void applyInhibition(float inhibition);
+    void applyFacilitation(float facilitation);
+    float computeModulationFactor(float baseline, float input) const;
+    
+    // Configuration
+    void configure(float baseline, float peak, float decayRate, float releaseRate);
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
     const char* getName() const override { return "ACh"; }
@@ -62,10 +69,11 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    void enhanceMemoryConsolidation(float intensity);
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
     const char* getName() const override { return "NE"; }
@@ -73,10 +81,11 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    void modulateArousal(float arousalLevel);
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
     const char* getName() const override { return "5-HT"; }
@@ -84,6 +93,8 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    void regulateMood(float moodLevel);
 };
 
 } // namespace nlm

@@ -139,13 +139,9 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
+    // Unified memory system access
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========

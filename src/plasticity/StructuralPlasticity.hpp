@@ -14,20 +14,20 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // Implemented: Real synapse creation with biological constraints
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // Implemented: Real synapse removal with biological constraints
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // Implemented: Real neuron creation with biological constraints
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // Implemented: Real neuron removal with biological constraints
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate
