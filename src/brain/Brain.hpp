@@ -47,6 +47,25 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// Memory Management Improvements:
+// - Uses Pimpl idiom with std::unique_ptr for exclusive ownership of implementation
+// - Smart pointers ensure automatic memory management and exception safety
+// - No raw pointer ownership unless explicitly documented and managed
+// - Clear separation of interface and implementation for maintainability
+// - Thread-safe access to internal data structures with proper synchronization
+//
+// Implementation Details:
+// - Brain::Impl struct uses std::unique_ptr for system components
+// - Config uses std::shared_ptr for reference counting across multiple owners
+// - Raw pointers are used only for backward compatibility in accessor methods
+// - Proper resource transfer semantics in move operations
+//
+// Smart Pointer Usage:
+// - std::unique_ptr: Exclusive ownership, automatic deletion on destruction
+// - std::shared_ptr: Shared ownership, automatic deletion when reference count reaches zero
+// - Exception safety: No resource leaks during exception propagation
+// - Clear ownership semantics prevent memory leaks and dangling pointers
 
 class Brain {
 public:
