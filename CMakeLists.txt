@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -119,13 +119,38 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# New unified CLI executable
+add_executable(nlm_cli
+    src/cli/nlm_cli.cpp
+    src/cli/CLICommand.cpp
+    src/cli/CLIParser.cpp
+    src/cli/HelpSystem.cpp
+    src/cli/commands/BrainCreateCommand.cpp
+    src/cli/commands/BrainInitializeCommand.cpp
+    src/cli/commands/BrainStepCommand.cpp
+    src/cli/commands/BrainSaveCommand.cpp
+    src/cli/commands/BrainLoadCommand.cpp
+    src/cli/commands/BrainResetCommand.cpp
+    src/cli/commands/AgentEnableCommand.cpp
+    src/cli/commands/ConfigShowCommand.cpp
+    src/cli/commands/ConfigSetCommand.cpp
+    src/cli/commands/ConfigValidateCommand.cpp
+    src/cli/commands/ExperimentRunCommand.cpp
+    src/cli/commands/ExperimentStatusCommand.cpp
+    src/cli/commands/MonitorBrainCommand.cpp
+    src/cli/commands/MonitorAgentCommand.cpp
+    src/cli/commands/HelpCommand.cpp
+    src/cli/commands/VersionCommand.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
