@@ -2,39 +2,42 @@
 // Phase 2: Real Neural Computation Tests
 
 #include <iostream>
-#include <cassert>
 
 // Forward declarations of test functions
 namespace test_types {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_config {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_random {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_clock {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_neuron {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_synapse {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_stdp {
-    void runAll();
+    std::vector<TestResult> runAllTests();
 }
 
 namespace test_brain {
-    void runAll();
+    std::vector<TestResult> runAllTests();
+}
+
+namespace test_neural_dynamics {
+    std::vector<TestResult> runAllTests();
 }
 
 int main() {
@@ -45,86 +48,76 @@ int main() {
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
     
-    bool allPassed = true;
+    std::vector<TestResult> allResults;
     
     std::cout << "Running Types tests..." << std::endl;
-    try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto typesResults = test_types::runAllTests();
+    allResults.insert(allResults.end(), typesResults.begin(), typesResults.end());
+    std::cout << "  PASSED: " << typesResults.size() << " tests" << std::endl;
     
     std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto configResults = test_config::runAllTests();
+    allResults.insert(allResults.end(), configResults.begin(), configResults.end());
+    std::cout << "  PASSED: " << configResults.size() << " tests" << std::endl;
     
     std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto randomResults = test_random::runAllTests();
+    allResults.insert(allResults.end(), randomResults.begin(), randomResults.end());
+    std::cout << "  PASSED: " << randomResults.size() << " tests" << std::endl;
     
     std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto clockResults = test_clock::runAllTests();
+    allResults.insert(allResults.end(), clockResults.begin(), clockResults.end());
+    std::cout << "  PASSED: " << clockResults.size() << " tests" << std::endl;
     
     std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto neuronResults = test_neuron::runAllTests();
+    allResults.insert(allResults.end(), neuronResults.begin(), neuronResults.end());
+    std::cout << "  PASSED: " << neuronResults.size() << " tests" << std::endl;
     
     std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto synapseResults = test_synapse::runAllTests();
+    allResults.insert(allResults.end(), synapseResults.begin(), synapseResults.end());
+    std::cout << "  PASSED: " << synapseResults.size() << " tests" << std::endl;
     
     std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    auto stdpResults = test_stdp::runAllTests();
+    allResults.insert(allResults.end(), stdpResults.begin(), stdpResults.end());
+    std::cout << "  PASSED: " << stdpResults.size() << " tests" << std::endl;
     
     std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+    auto brainResults = test_brain::runAllTests();
+    allResults.insert(allResults.end(), brainResults.begin(), brainResults.end());
+    std::cout << "  PASSED: " << brainResults.size() << " tests" << std::endl;
+    
+    std::cout << "Running Neural Dynamics tests..." << std::endl;
+    auto neuralDynamicsResults = test_neural_dynamics::runAllTests();
+    allResults.insert(allResults.end(), neuralDynamicsResults.begin(), neuralDynamicsResults.end());
+    std::cout << "  PASSED: " << neuralDynamicsResults.size() << " tests" << std::endl;
+    
+    std::cout << std::endl;
+    printTestSummary(allResults);
+    
+    if (allResults.empty()) {
+        std::cout << "=== No tests found ===" << std::endl;
+        return 1;
+    }
+    
+    int failedCount = 0;
+    for (const auto& result : allResults) {
+        if (!result.passed) {
+            failedCount++;
+        }
     }
     
     std::cout << std::endl;
-    if (allPassed) {
+    if (failedCount == 0) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "Total tests: " << allResults.size() << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "Failed: " << failedCount << " out of " << allResults.size() << std::endl;
         return 1;
     }
 }

@@ -1,46 +1,40 @@
 // Random Tests
 #include "core/Random/Random.hpp"
-#include <cassert>
+#include "nlm/test_framework.h"
 #include <iostream>
 #include <cmath>
 
 namespace test_random {
 
-void testRandomGeneratorCreation() {
+TEST_CASE(testRandomGeneratorCreation) {
     nlm::RandomGenerator rng1(42);
     nlm::RandomGenerator rng2(42);
     
     // Same seed should produce same sequence
     for (int i = 0; i < 10; ++i) {
-        assert(rng1.uniformInt(0, 100) == rng2.uniformInt(0, 100));
+        ASSERT_EQ(rng1.uniformInt(0, 100), rng2.uniformInt(0, 100));
     }
-    
-    std::cout << "    testRandomGeneratorCreation passed" << std::endl;
 }
 
-void testUniformInt() {
+TEST_CASE(testUniformInt) {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
         uint32_t val = rng.uniformInt(5, 10);
-        assert(val >= 5 && val <= 10);
+        ASSERT_TRUE(val >= 5 && val <= 10);
     }
-    
-    std::cout << "    testUniformInt passed" << std::endl;
 }
 
-void testUniformReal() {
+TEST_CASE(testUniformReal) {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
         double val = rng.uniformReal(0.0, 1.0);
-        assert(val >= 0.0 && val < 1.0);
+        ASSERT_TRUE(val >= 0.0 && val < 1.0);
     }
-    
-    std::cout << "    testUniformReal passed" << std::endl;
 }
 
-void testNormal() {
+TEST_CASE(testNormal) {
     nlm::RandomGenerator rng(42);
     
     double sum = 0.0;
@@ -52,12 +46,10 @@ void testNormal() {
     double mean = sum / samples;
     
     // Mean should be close to 0
-    assert(std::abs(mean) < 0.1);
-    
-    std::cout << "    testNormal passed" << std::endl;
+    ASSERT_TRUE(std::abs(mean) < 0.1);
 }
 
-void testBernoulli() {
+TEST_CASE(testBernoulli) {
     nlm::RandomGenerator rng(42);
     
     int trueCount = 0;
@@ -70,33 +62,27 @@ void testBernoulli() {
     
     // Should be roughly 30%
     double ratio = static_cast<double>(trueCount) / samples;
-    assert(ratio > 0.25 && ratio < 0.35);
-    
-    std::cout << "    testBernoulli passed" << std::endl;
+    ASSERT_TRUE(ratio > 0.25 && ratio < 0.35);
 }
 
-void testRandomBool() {
+TEST_CASE(testRandomBool) {
     nlm::RandomGenerator rng(42);
     
     bool val = rng.randomBool();
     // Just check it doesn't crash
-    assert(true || false);  // Always true
-    
-    std::cout << "    testRandomBool passed" << std::endl;
+    ASSERT_TRUE(true || false);  // Always true
 }
 
-void testPickRandomIndex() {
+TEST_CASE(testPickRandomIndex) {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
         uint64_t idx = rng.pickRandomIndex(10);
-        assert(idx < 10);
+        ASSERT_LT(idx, 10);
     }
-    
-    std::cout << "    testPickRandomIndex passed" << std::endl;
 }
 
-void testShuffle() {
+TEST_CASE(testShuffle) {
     nlm::RandomGenerator rng(42);
     
     std::vector<int> vec = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -105,17 +91,15 @@ void testShuffle() {
     rng.shuffle(vec);
     
     // Should have same elements but possibly different order
-    assert(vec.size() == vecCopy.size());
+    ASSERT_EQ(vec.size(), vecCopy.size());
     
     // Sort and compare
     std::sort(vec.begin(), vec.end());
     std::sort(vecCopy.begin(), vecCopy.end());
-    assert(vec == vecCopy);
-    
-    std::cout << "    testShuffle passed" << std::endl;
+    ASSERT_EQ(vec, vecCopy);
 }
 
-void testSeed() {
+TEST_CASE(testSeed) {
     nlm::RandomGenerator rng;
     
     rng.seed(12345);
@@ -124,21 +108,17 @@ void testSeed() {
     rng.seed(12345);
     uint32_t val2 = rng.uniformInt(0, 1000);
     
-    assert(val1 == val2);
-    
-    std::cout << "    testSeed passed" << std::endl;
+    ASSERT_EQ(val1, val2);
 }
 
-void runAll() {
-    testRandomGeneratorCreation();
-    testUniformInt();
-    testUniformReal();
-    testNormal();
-    testBernoulli();
-    testRandomBool();
-    testPickRandomIndex();
-    testShuffle();
-    testSeed();
+std::vector<TestResult> runAllTests() {
+    return test_random::runAllTests();
 }
 
 } // namespace test_random
+
+// Simple test runner for backward compatibility
+void runAll() {
+    auto results = test_random::runAllTests();
+    printTestSummary(results);
+}

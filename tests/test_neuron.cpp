@@ -1,137 +1,119 @@
 // Neuron Tests
 #include "brain/Neuron.hpp"
 #include "core/Random/Random.hpp"
-#include <cassert>
+#include "nlm/test_framework.h"
 #include <iostream>
 
 namespace test_neuron {
 
-void testNeuronCreation() {
+TEST_CASE(testNeuronCreation) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    assert(neuron.getId() == nlm::NeuronId(1));
-    assert(neuron.getType() == nlm::NeuronType::Internal);
-    
-    std::cout << "    testNeuronCreation passed" << std::endl;
+    ASSERT_EQ(neuron.getId(), nlm::NeuronId(1));
+    ASSERT_EQ(neuron.getType(), nlm::NeuronType::Internal);
 }
 
-void testNeuronType() {
+TEST_CASE(testNeuronType) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
     neuron.setType(nlm::NeuronType::Excitatory);
-    assert(neuron.getType() == nlm::NeuronType::Excitatory);
+    ASSERT_EQ(neuron.getType(), nlm::NeuronType::Excitatory);
     
     neuron.setType(nlm::NeuronType::Inhibitory);
-    assert(neuron.getType() == nlm::NeuronType::Inhibitory);
-    
-    std::cout << "    testNeuronType passed" << std::endl;
+    ASSERT_EQ(neuron.getType(), nlm::NeuronType::Inhibitory);
 }
 
-void testMembranePotential() {
+TEST_CASE(testMembranePotential) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    assert(neuron.getMembranePotential() == -70.0f);  // Default value
+    ASSERT_EQ(neuron.getMembranePotential(), -70.0f);  // Default value
     
     neuron.setMembranePotential(-65.0f);
-    assert(neuron.getMembranePotential() == -65.0f);
+    ASSERT_EQ(neuron.getMembranePotential(), -65.0f);
     
     neuron.addToMembranePotential(5.0f);
-    assert(neuron.getMembranePotential() == -60.0f);
-    
-    std::cout << "    testMembranePotential passed" << std::endl;
+    ASSERT_EQ(neuron.getMembranePotential(), -60.0f);
 }
 
-void testFiringState() {
+TEST_CASE(testFiringState) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    assert(!neuron.isFiring());
-    assert(!neuron.isRefractory());
+    ASSERT_FALSE(neuron.isFiring());
+    ASSERT_FALSE(neuron.isRefractory());
     
     neuron.setFiringState(nlm::FiringState::Active);
-    assert(neuron.isFiring());
+    ASSERT_TRUE(neuron.isFiring());
     
     neuron.setRefractoryPeriod(10);
-    assert(neuron.isRefractory());
-    assert(!neuron.isFiring());
-    
-    std::cout << "    testFiringState passed" << std::endl;
+    ASSERT_TRUE(neuron.isRefractory());
+    ASSERT_FALSE(neuron.isFiring());
 }
 
-void testRefractoryDecrement() {
+TEST_CASE(testRefractoryDecrement) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
     neuron.setRefractoryPeriod(5);
-    assert(neuron.isRefractory());
+    ASSERT_TRUE(neuron.isRefractory());
     
     neuron.decrementRefractory();
-    assert(neuron.isRefractory());
+    ASSERT_TRUE(neuron.isRefractory());
     
     for (int i = 0; i < 4; ++i) {
         neuron.decrementRefractory();
     }
-    assert(!neuron.isRefractory());
-    
-    std::cout << "    testRefractoryDecrement passed" << std::endl;
+    ASSERT_FALSE(neuron.isRefractory());
 }
 
-void testCurrentInjection() {
+TEST_CASE(testCurrentInjection) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    assert(neuron.getTotalCurrent() == 0.0f);
+    ASSERT_EQ(neuron.getTotalCurrent(), 0.0f);
     
     neuron.injectCurrent(5.0f);
-    assert(neuron.getTotalCurrent() == 5.0f);
+    ASSERT_EQ(neuron.getTotalCurrent(), 5.0f);
     
     neuron.clearTotalCurrent();
-    assert(neuron.getTotalCurrent() == 0.0f);
-    
-    std::cout << "    testCurrentInjection passed" << std::endl;
+    ASSERT_EQ(neuron.getTotalCurrent(), 0.0f);
 }
 
-void testSynapticInput() {
+TEST_CASE(testSynapticInput) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
     neuron.receiveExcitatoryInput(5.0f);
-    assert(neuron.getTotalCurrent() == 5.0f);
+    ASSERT_EQ(neuron.getTotalCurrent(), 5.0f);
     
     neuron.clearTotalCurrent();
     neuron.receiveInhibitoryInput(3.0f);
-    assert(neuron.getTotalCurrent() == -3.0f);
-    
-    std::cout << "    testSynapticInput passed" << std::endl;
+    ASSERT_EQ(neuron.getTotalCurrent(), -3.0f);
 }
 
-void testSpikeHistory() {
+TEST_CASE(testSpikeHistory) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    assert(neuron.getSpikeHistory().empty());
+    ASSERT_TRUE(neuron.getSpikeHistory().empty());
     
     neuron.recordSpike(0.1);
     neuron.recordSpike(0.2);
     neuron.recordSpike(0.3);
     
-    assert(neuron.getSpikeHistory().size() == 3);
+    ASSERT_EQ(neuron.getSpikeHistory().size(), 3);
     
     neuron.clearSpikeHistory();
-    assert(neuron.getSpikeHistory().empty());
-    
-    std::cout << "    testSpikeHistory passed" << std::endl;
+    ASSERT_TRUE(neuron.getSpikeHistory().empty());
 }
 
-void testRandomInitialization() {
+TEST_CASE(testRandomInitialization) {
     nlm::RandomGenerator rng(42);
     nlm::Neuron neuron(nlm::NeuronId(1));
     
     neuron.initializeRandom(rng);
     
     // Just verify it doesn't crash and values are in reasonable range
-    assert(neuron.getMembranePotential() < -60.0f && neuron.getMembranePotential() > -80.0f);
-    assert(neuron.getThreshold() < -50.0f && neuron.getThreshold() > -60.0f);
-    
-    std::cout << "    testRandomInitialization passed" << std::endl;
+    ASSERT_TRUE(neuron.getMembranePotential() < -60.0f && neuron.getMembranePotential() > -80.0f);
+    ASSERT_TRUE(neuron.getThreshold() < -50.0f && neuron.getThreshold() > -60.0f);
 }
 
-void testReset() {
+TEST_CASE(testReset) {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
     neuron.setMembranePotential(-60.0f);
@@ -140,24 +122,19 @@ void testReset() {
     
     neuron.reset();
     
-    assert(neuron.getMembranePotential() == -70.0f);
-    assert(neuron.getTotalCurrent() == 0.0f);
-    assert(neuron.getSpikeHistory().empty());
-    
-    std::cout << "    testReset passed" << std::endl;
+    ASSERT_EQ(neuron.getMembranePotential(), -70.0f);
+    ASSERT_EQ(neuron.getTotalCurrent(), 0.0f);
+    ASSERT_TRUE(neuron.getSpikeHistory().empty());
 }
 
-void runAll() {
-    testNeuronCreation();
-    testNeuronType();
-    testMembranePotential();
-    testFiringState();
-    testRefractoryDecrement();
-    testCurrentInjection();
-    testSynapticInput();
-    testSpikeHistory();
-    testRandomInitialization();
-    testReset();
+std::vector<TestResult> runAllTests() {
+    return testNeuron::runAllTests();
 }
 
 } // namespace test_neuron
+
+// Simple test runner for backward compatibility
+void runAll() {
+    auto results = test_neuron::runAllTests();
+    printTestSummary(results);
+}

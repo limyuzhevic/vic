@@ -1,99 +1,82 @@
 // Types Tests
 #include "core/Types/Types.hpp"
-#include <cassert>
+#include "nlm/test_framework.h"
 #include <iostream>
 
 namespace test_types {
 
-void testNeuronId() {
+TEST_CASE(testNeuronId) {
     nlm::NeuronId id1(1);
     nlm::NeuronId id2(2);
     nlm::NeuronId id3(1);
     
-    assert(id1 == id3);
-    assert(id1 != id2);
-    assert(id1 < id2);
-    assert(id2 > id1);
-    assert(id1.index() == 1);
-    
-    std::cout << "    testNeuronId passed" << std::endl;
+    ASSERT_EQ(id1, id3);
+    ASSERT_NE(id1, id2);
+    ASSERT_GT(id2, id1);
+    ASSERT_LT(id1, id2);
+    ASSERT_EQ(id1.index(), 1);
 }
 
-void testSynapseId() {
+TEST_CASE(testSynapseId) {
     nlm::SynapseId id1(100);
     nlm::SynapseId id2(200);
     
-    assert(id1 != id2);
-    assert(id1 < id2);
-    
-    std::cout << "    testSynapseId passed" << std::endl;
+    ASSERT_NE(id1, id2);
+    ASSERT_LT(id1, id2);
 }
 
-void testRegionId() {
+TEST_CASE(testRegionId) {
     nlm::RegionId id1(1);
     nlm::RegionId id2(2);
     
-    assert(id1 != id2);
-    
-    std::cout << "    testRegionId passed" << std::endl;
+    ASSERT_NE(id1, id2);
 }
 
-void testPopulationId() {
+TEST_CASE(testPopulationId) {
     nlm::PopulationId id1(1);
     nlm::PopulationId id2(2);
     
-    assert(id1 != id2);
-    
-    std::cout << "    testPopulationId passed" << std::endl;
+    ASSERT_NE(id1, id2);
 }
 
-void testNeuronType() {
-    assert(nlm::NeuronType::Excitatory != nlm::NeuronType::Inhibitory);
-    assert(nlm::NeuronType::Sensory != nlm::NeuronType::Motor);
-    
-    std::cout << "    testNeuronType passed" << std::endl;
+TEST_CASE(testNeuronType) {
+    ASSERT_NE(nlm::NeuronType::Excitatory, nlm::NeuronType::Inhibitory);
+    ASSERT_NE(nlm::NeuronType::Sensory, nlm::NeuronType::Motor);
 }
 
-void testSynapseType() {
-    assert(nlm::SynapseType::Excitatory != nlm::SynapseType::Inhibitory);
-    
-    std::cout << "    testSynapseType passed" << std::endl;
+TEST_CASE(testSynapseType) {
+    ASSERT_NE(nlm::SynapseType::Excitatory, nlm::SynapseType::Inhibitory);
 }
 
-void testPlasticityFlags() {
+TEST_CASE(testPlasticityFlags) {
     nlm::PlasticityFlags flags;
-    assert(!flags.hebbian);
-    assert(!flags.stdp);
-    assert(!flags.reward_modulated);
+    ASSERT_FALSE(flags.hebbian);
+    ASSERT_FALSE(flags.stdp);
+    ASSERT_FALSE(flags.reward_modulated);
     
     flags.hebbian = true;
-    assert(flags.hebbian);
-    
-    std::cout << "    testPlasticityFlags passed" << std::endl;
+    ASSERT_TRUE(flags.hebbian);
 }
 
-void testSpikeEvent() {
+TEST_CASE(testSpikeEvent) {
     nlm::SpikeEvent event;
     event.source_neuron = nlm::NeuronId(1);
     event.timestamp = 0.5;
     event.step = 500;
     
-    assert(event.source_neuron.index() == 1);
-    assert(event.timestamp == 0.5);
-    assert(event.step == 500);
-    
-    std::cout << "    testSpikeEvent passed" << std::endl;
+    ASSERT_EQ(event.source_neuron.index(), 1);
+    ASSERT_FLOAT_EQ(event.timestamp, 0.5, 0.001f);
+    ASSERT_EQ(event.step, 500);
 }
 
-void runAll() {
-    testNeuronId();
-    testSynapseId();
-    testRegionId();
-    testPopulationId();
-    testNeuronType();
-    testSynapseType();
-    testPlasticityFlags();
-    testSpikeEvent();
+std::vector<TestResult> runAllTests() {
+    return test_types::runAllTests();
 }
 
 } // namespace test_types
+
+// Simple test runner for backward compatibility
+void runAll() {
+    auto results = test_types::runAllTests();
+    printTestSummary(results);
+}
