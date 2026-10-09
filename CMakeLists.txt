@@ -1,3 +1,6 @@
+# CMake configuration for NLM (熙然) - Neural Learning Machine
+# Phase 6: Final Integration
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -85,6 +88,11 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance
+    src/performance/Timer.cpp
+    src/performance/Profiler.cpp
+    src/performance/PerformanceAnalyzer.cpp
+    src/performance/PerformanceMonitor.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -92,11 +100,31 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Visualization
+add_library(nlm_visualization STATIC
+    src/visualization/VisualizationInterface.cpp
+)
+
+target_include_directories(nlm_visualization PUBLIC src)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
+
+# Performance
+add_library(nlm_performance STATIC
+    src/performance/Timer.cpp
+    src/performance/Profiler.cpp
+    src/performance/PerformanceAnalyzer.cpp
+    src/performance/PerformanceMonitor.cpp
+)
+
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +132,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +140,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,26 +148,30 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+
+target_link_libraries(nlm PUBLIC nlm_core nlm_performance nlm_visualization)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_performance nlm_visualization)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance nlm_visualization)
 
 # Testing
 enable_testing()

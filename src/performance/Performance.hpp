@@ -1,86 +1,261 @@
-#pragma once
-
-/**
- * Performance Infrastructure
- * 
- * Phase 5 introduces comprehensive performance optimization for large-scale neural simulation:
- * 
- * 1. Memory Pool Allocators
- *    - Pre-allocated neuron and synapse pools
- *    - Reduced allocation overhead
- *    - Better cache locality
- * 
- * 2. Event Queue Optimization
- *    - Lock-free ring buffers for spike events
- *    - Time-bucketed delayed spikes
- *    - Priority queues for time-sensitive events
- * 
- * 3. Structure-of-Arrays (SoA) Data Layout
- *    - Contiguous memory for neuron states
- *    - Better SIMD vectorization
- *    - Improved cache utilization
- * 
- * 4. Sparse Connectivity
- *    - Adjacency lists instead of dense matrices
- *    - Efficient synapse lookup
- *    - Memory-efficient storage for large networks
- * 
- * 5. Multithreading Support
- *    - Parallel neural population updates
- *    - Thread-local neuron processing
- *    - Synchronized spike processing
- * 
- * This infrastructure is designed to scale from 10k to 100M+ neurons.
- */
-
-#ifndef NLM_PERFORMANCE_HPP
-#define NLM_PERFORMANCE_HPP
-
-// Configure performance features based on build settings
-#ifdef NLM_PERFORMANCE_ENABLED
-    #define NLM_USE_MEMORY_POOL 1
-    #define NLM_USE_SOA 1
-    #define NLM_USE_EVENT_QUEUE 1
-    #define NLM_USE_SPARE_CONNECTIVITY 1
-    #define NLM_USE_MULTITHREADING 1
-    #define NLM_USE_SIMD 1
-#else
-    #define NLM_USE_MEMORY_POOL 0
-    #define NLM_USE_SOA 0
-    #define NLM_USE_EVENT_QUEUE 0
-    #define NLM_USE_SPARE_CONNECTIVITY 0
-    #define NLM_USE_MULTITHREADING 0
-    #define NLM_USE_SIMD 0
-#endif
-
-// SIMD configuration
-#ifdef NLM_SIMD_AVX2
-    #define NLM_SIMD_WIDTH 8  // AVX2: 8 float32
-#elif defined(NLM_SIMD_AVX512)
-    #define NLM_SIMD_WIDTH 16 // AVX512: 16 float32
-#elif defined(NLM_SIMD_SSE)
-    #define NLM_SIMD_WIDTH 4  // SSE: 4 float32
-#else
-    #define NLM_SIMD_WIDTH 1  // Scalar
-#endif
-
-// Multithreading configuration
-#ifdef NLM_THREAD_COUNT
-    #define NLM_NUM_THREADS NLM_THREAD_COUNT
-#else
-    #define NLM_NUM_THREADS 1
-#endif
-
-// Memory pool configuration
-#define NLM_MEMORY_POOL_PAGE_SIZE 4096
-#define NLM_MAX_POOL_SIZE (1024 * 1024)  // Max objects per pool
+#include <string>
+#include <vector>
+#include <memory>
+#include <chrono>
+#include <map>
+#include <functional>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
 
 namespace nlm {
 
-// Forward declarations
-class Neuron;
-class Synapse;
+// Performance measurement and profiling tools
+// Phase 6: Advanced profiling for optimization and analysis
+
+class Timer {
+public:
+    Timer() : startTime(), elapsedTime(0.0), running(false) {}
+    
+    void start() {
+        startTime = std::chrono::high_resolution_clock::now();
+        running = true;
+    }
+    
+    void stop() {
+        if (running) {
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+            elapsedTime += duration.count() / 1000.0; // Convert to milliseconds
+            running = false;
+        }
+    }
+    
+    void reset() {
+        elapsedTime = 0.0;
+        running = false;
+    }
+    
+    double getElapsedTime() const { return elapsedTime; }
+    bool isRunning() const { return running; }
+    
+    // RAII-style timing
+    class ScopedTimer {
+    public:
+        explicit ScopedTimer(Timer& timer) : timer(timer) {
+            timer.start();
+        }
+        
+        ~ScopedTimer() {
+            timer.stop();
+        }
+        
+        double getElapsedTime() const {
+            return timer.getElapsedTime();
+        }
+        
+    private:
+        Timer& timer;
+    };
+    
+private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+    double elapsedTime;
+    bool running;
+};
+
+class Profiler {
+public:
+    struct ProfileData {
+        std::string name;
+        double totalTime;
+        double minTime;
+        double maxTime;
+        size_t callCount;
+        double averageTime;
+        
+        ProfileData() : totalTime(0), minTime(0), maxTime(0), callCount(0), averageTime(0) {}
+    };
+    
+    using ProfileCallback = std::function<void(const ProfileData&)>;
+    
+public:
+    Profiler() = default;
+    
+    // Start profiling a section
+    void startProfile(const std::string& name);
+    
+    // End profiling a section
+    void stopProfile(const std::string& name);
+    
+    // Get profile data
+    const ProfileData* getProfile(const std::string& name) const;
+    const std::map<std::string, ProfileData>& getAllProfiles() const;
+    
+    // Clear all profile data
+    void clear();
+    
+    // Get profiling statistics
+    double getTotalTime() const;
+    size_t getProfileCount() const;
+    
+    // Export profiling data
+    std::string exportProfileData() const;
+    void exportProfileToFile(const std::string& filepath) const;
+    
+    // Register callback for profile updates
+    void registerCallback(ProfileCallback callback);
+    
+    // Get current active profiles
+    std::vector<std::string> getActiveProfiles() const;
+    
+    // Merge with another profiler
+    void merge(const Profiler& other);
+    
+    // Reset and start new profiling session
+    void resetSession();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+class PerformanceAnalyzer {
+public:
+    struct BenchmarkResult {
+        std::string testName;
+        double executionTime;
+        double memoryUsage;
+        size_t operationsPerSecond;
+        std::map<std::string, double> metrics;
+        
+        BenchmarkResult() : executionTime(0), memoryUsage(0), operationsPerSecond(0) {}
+        BenchmarkResult(const std::string& name) : testName(name), executionTime(0), memoryUsage(0), operationsPerSecond(0) {}
+    };
+    
+    using BenchmarkFunction = std::function<void()>;
+    
+public:
+    PerformanceAnalyzer() = default;
+    
+    // Run a benchmark test
+    BenchmarkResult runBenchmark(const std::string& name, BenchmarkFunction benchmark, 
+                                 size_t iterations = 100, bool warmUp = true);
+    
+    // Run a comparison benchmark
+    std::vector<BenchmarkResult> runComparisonBenchmark(
+        const std::vector<std::pair<std::string, BenchmarkFunction>>& benchmarks,
+        size_t iterations = 100);
+    
+    // Profile brain components
+    void profileBrainComponents(std::shared_ptr<class Brain> brain);
+    
+    // Profile simulation performance
+    void profileSimulation(const std::string& testName, std::shared_ptr<class Brain> brain,
+                          SimulationStep steps, Timestamp timestep = 0.001);
+    
+    // Profile memory usage
+    double measureMemoryUsage() const;
+    
+    // Get performance recommendations
+    std::vector<std::string> getPerformanceRecommendations() const;
+    
+    // Export analysis results
+    std::string exportAnalysis() const;
+    void exportAnalysisToFile(const std::string& filepath) const;
+    
+    // Set analysis parameters
+    void setWarmUpIterations(size_t iterations) { warmUpIterations_ = iterations; }
+    void setBenchmarkIterations(size_t iterations) { benchmarkIterations_ = iterations; }
+    void setMemorySamplingInterval(size_t interval) { memorySamplingInterval_ = interval; }
+    
+private:
+    size_t warmUpIterations_ = 10;
+    size_t benchmarkIterations_ = 100;
+    size_t memorySamplingInterval_ = 1000;
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+class PerformanceMonitor {
+public:
+    struct SystemMetrics {
+        double cpuUsage;
+        double memoryUsage;
+        double diskUsage;
+        std::vector<double> processMetrics;
+        double timestamp;
+        
+        SystemMetrics() : cpuUsage(0), memoryUsage(0), diskUsage(0), timestamp(0) {}
+    };
+    
+    struct NeuralMetrics {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        size_t totalSpikeCount;
+        double lastUpdateTime;
+        
+        NeuralMetrics() : totalNeurons(0), totalSynapses(0), activeNeurons(0), 
+                         firingNeurons(0), averageFiringRate(0), 
+                         excitationInhibitionRatio(0), totalSpikeCount(0), 
+                         lastUpdateTime(0) {}
+    };
+    
+public:
+    PerformanceMonitor() = default;
+    
+    // Start monitoring
+    void startMonitoring(size_t samplingInterval = 100);
+    
+    // Stop monitoring
+    void stopMonitoring();
+    
+    // Get latest system metrics
+    SystemMetrics getSystemMetrics() const;
+    
+    // Get latest neural metrics
+    NeuralMetrics getNeuralMetrics() const;
+    
+    // Get monitoring history
+    const std::vector<SystemMetrics>& getSystemHistory() const { return systemHistory_; }
+    const std::vector<NeuralMetrics>& getNeuralHistory() const { return neuralHistory_; }
+    
+    // Record a system snapshot
+    void recordSystemSnapshot();
+    
+    // Record neural snapshot from brain
+    void recordNeuralSnapshot(std::shared_ptr<class Brain> brain);
+    
+    // Calculate statistics
+    double getAverageCpuUsage() const;
+    double getMaxCpuUsage() const;
+    double getAverageMemoryUsage() const;
+    double getMaxMemoryUsage() const;
+    
+    // Generate performance report
+    std::string generatePerformanceReport() const;
+    
+    // Export monitoring data
+    std::string exportMonitoringData() const;
+    void exportMonitoringToFile(const std::string& filepath) const;
+    
+    // Clear history
+    void clearHistory();
+    
+private:
+    size_t samplingInterval_;
+    bool monitoring_ = false;
+    
+    mutable std::vector<SystemMetrics> systemHistory_;
+    mutable std::vector<NeuralMetrics> neuralHistory_;
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
 
 } // namespace nlm
-
-#endif // NLM_PERFORMANCE_HPP

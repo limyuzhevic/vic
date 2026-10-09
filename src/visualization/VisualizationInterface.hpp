@@ -3,11 +3,15 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <chrono>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+class NetworkGraph;
+class ActivityPlotter;
+
+// Advanced visualization interface for debugging and analysis
+// Phase 6: Real visualization with network graphs and activity plots
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -19,7 +23,7 @@ public:
     // Update visualization data
     void update();
     
-    // Render current state
+    // Render current state to console
     void render();
     
     // Close visualization
@@ -28,21 +32,33 @@ public:
     // Check if visualization is active
     bool isActive() const;
     
-    // Set update rate
+    // Set update rate (frames per second)
     void setUpdateRate(double hz);
     double getUpdateRate() const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Enable/disable specific visualization components
+    void enableNetwork(bool enable);
+    void enableActivity(bool enable);
+    void enableWeights(bool enable);
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    // Toggle auto layout updates
+    void setAutoLayout(bool autoLayout);
     
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    // Add data to visualization
+    void visualizeNetwork(const NetworkGraph& graph);
+    void visualizeActivity(const ActivityPlotter& plotter);
     
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    // Add individual events
+    void addSpikeEvent(double time, int neuronId, float amplitude = 1.0f);
+    void addTimeSeries(const std::string& name, const std::vector<float>& values, const std::string& color = "");
+    
+    // Update visualization from brain state
+    void updateFromBrain(const class Brain& brain);
+    
+    // Performance measurement
+    void startFrameTimer();
+    void endFrameTimer();
+    double getAverageFrameTime() const;
     
 private:
     struct Impl;
