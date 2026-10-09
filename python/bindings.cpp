@@ -207,7 +207,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + " parameters=" + std::to_string(action.getParameters().size()) + ">";
+        });
+    
+    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "")
+        .def_readwrite("reward", &ActionResult::reward)
+        .def_readwrite("success", &ActionResult::success)
+        .def_readwrite("message", &ActionResult::message)
+        .def("__repr__", [](const ActionResult& result) {
+            std::string successStr = result.success ? "SUCCESS" : "FAILURE";
+            return "<ActionResult: reward=" + std::to_string(result.reward) + 
+                   " " + successStr + ">";
+        });
+    
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
