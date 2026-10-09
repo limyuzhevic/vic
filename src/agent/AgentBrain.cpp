@@ -20,7 +20,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups using constants
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -33,18 +33,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        // Use constants for distribution
+                        switch (idx % NeuralConstants::MOTOR_ACTIONS) {
+                            case NeuralConstants::MOTOR_FORWARD: motorForward_.push_back(n); break;
+                            case NeuralConstants::MOTOR_BACKWARD: motorBackward_.push_back(n); break;
+                            case NeuralConstants::MOTOR_TURN_LEFT: motorTurnLeft_.push_back(n); break;
+                            case NeuralConstants::MOTOR_TURN_RIGHT: motorTurnRight_.push_back(n); break;
+                            case NeuralConstants::MOTOR_INTERACT: motorInteract_.push_back(n); break;
+                            case NeuralConstants::MOTOR_WAIT: motorWait_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
+                        // Distribute sensory neurons using constants
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
@@ -91,8 +92,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Inject current proportional to vision intensity using constant
+            float current = vision[i] * NeuralConstants::CURRENT_INJECTION_STRENGTH;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +102,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * NeuralConstants::CURRENT_INJECTION_WEAK;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -135,8 +136,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Normalize
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Decay and update using constant
+        noveltyLevel_ *= NeuralConstants::NOVELTY_DECAY;
         
         // Store for next time
         previousVision_ = vision;

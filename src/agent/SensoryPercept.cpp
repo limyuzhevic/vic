@@ -1,17 +1,17 @@
-#include "SensoryPercept.hpp"
+#include "core/Types/Constants.hpp"
 
 namespace nlm {
 
 SensoryPercept::SensoryPercept()
-    : visionWidth_(16)
-    , visionHeight_(16)
+    : visionWidth_(NeuralConstants::VISION_WIDTH)
+    , visionHeight_(NeuralConstants::VISION_HEIGHT)
     , timestamp_(0.0)
 {
-    vision_.resize(16 * 16, 0.0f);
-    touch_.resize(8, 0.0f);
-    internal_.resize(4, 0.0f);
-    proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    vision_.resize(NeuralConstants::VISION_WIDTH * NeuralConstants::VISION_HEIGHT, 0.0f);
+    touch_.resize(NeuralConstants::TOUCH_SENSORS, 0.0f);
+    internal_.resize(NeuralConstants::INTERNAL_SIGNALS, 0.0f);
+    proprioception_.resize(NeuralConstants::PROPRIOCEPTION_SENSORS, 0.0f);
+    audio_.resize(NeuralConstants::AUDIO_CHANNELS, 0.0f);
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
