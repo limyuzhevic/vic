@@ -75,8 +75,8 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Current concepts discovered by concept formation
+    std::vector<size_t> currentConcepts;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -511,8 +511,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory context
+        // The prediction system tracks expected sensory patterns and computes prediction errors
+        // This helps the brain anticipate what will happen next
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(predictionError);
+        }
+        
+        // Apply prediction error to dopamine for reward prediction
+        if (pImpl->dopamine) {
+            float dopamineFromPrediction = predictionError * 0.1f;  // Scale prediction error to dopamine signal
+            pImpl->dopamine->update(dopamineFromPrediction);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +542,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form higher-level concepts
+        // Concept formation identifies recurring patterns in neural activity
+        // and creates abstract representations that can be used for planning and reasoning
+        
+        // Get current neural activity patterns
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> activations;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        activeNeurons.push_back(neuron->getId());
+                        activations.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with current activity
+        pImpl->conceptFormation->update(activeNeurons, activations);
+        
+        // Get new concepts and make them available
+        auto currentConcepts = pImpl->conceptFormation->getCurrentConcepts();
+        if (!currentConcepts.empty()) {
+            // Concepts can be used for planning, attention, and decision making
+            // For now, we just store them for later use
+            pImpl->currentConcepts = currentConcepts;
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1047,8 +1089,33 @@ DevelopmentalStage Brain::getDevelopmentalStage() const {
     return pImpl->developmentalStage;
 }
 
+DevelopmentalStage Brain::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
+}
+
+// ========== CURRENT CONCEPTS ==========
+
+// Get current concepts discovered by concept formation
+std::vector<size_t> Brain::getCurrentConcepts() const {
+    return pImpl->currentConcepts;
+}
+
+void Brain::setCurrentConcepts(const std::vector<size_t>& concepts) {
+    pImpl->currentConcepts = concepts;
+}
+
+// Check if current concepts are available
+bool Brain::hasCurrentConcepts() const {
+    return !pImpl->currentConcepts.empty();
+}
+
+// Clear current concepts
+void Brain::clearCurrentConcepts() {
+    pImpl->currentConcepts.clear();
 }
 
 // ========== NEUROMODULATION SYSTEMS ==========

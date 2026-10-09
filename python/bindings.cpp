@@ -347,74 +347,229 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+              "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+              "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+              py::arg("stage"), "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    // Add advanced brain methods
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add advanced configuration options
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set default advanced configuration
+        config->set("brain.neuron_count", static_cast<int64_t>(2000));
+        config->set("brain.synapse_density", 0.15f);
+        config->set("brain.connection_probability", 0.05f);
+        config->set("brain.initial_weight_mean", 0.5f);
+        config->set("brain.initial_weight_std", 0.1f);
+        config->set("brain.v_thresh", -50.0f);
+        config->set("brain.v_rest", -70.0f);
+        config->set("brain.v_reset", -75.0f);
+        config->set("brain.tau_mem", 20.0f);
+        config->set("brain.tau_ref", 2.0f);
+        
+        // Enable all advanced features
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.stdp.tau_plus", 20.0f);
+        config->set("plasticity.stdp.tau_minus", 20.0f);
+        
+        config->set("plasticity.hebbian.enable", true);
+        
+        config->set("plasticity.structural.enable", true);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.0002f);
+        config->set("plasticity.structural.pruning_rate", 0.00002f);
+        
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        return config;
+    }, "Create an advanced configuration with optimized parameters");
+
+    // Add memory management commands
+    m.def("saveBrain", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        return brain->save(filename);
+    }, py::arg("brain"), py::arg("filename"), "Save brain state to checkpoint file");
+
+    m.def("loadBrain", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        return brain->load(filename);
+    }, py::arg("brain"), py::arg("filename"), "Load brain state from checkpoint file");
+
+    // Add advanced batch processing
+    m.def("runBatchSimulation", [](std::shared_ptr<Brain> brain,
+                                  std::shared_ptr<SimpleWorld> world,
+                                  std::shared_ptr<AgentBrain> agent,
+                                  size_t numSteps,
+                                  bool enableLearning = true) {
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+        }
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward if learning is enabled
+            if (enableLearning) {
+                float reward = 0.0f;
+                auto internal = percept.getInternal();
+                if (!internal.empty()) {
+                    reward = internal[0];
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Log progress periodically
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                         << brain->getFiringNeuronCount() << " firing neurons, "
+                         << brain->getTotalSpikeCount() << " total spikes" << std::endl;
+            }
+        }
+        
+        std::cout << "Batch simulation completed!" << std::endl;
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("numSteps"), py::arg("enableLearning") = true,
+        "Run a batch simulation with brain, world, and agent");
+
+    // Add performance profiling
+    m.def("profileBrainPerformance", [](std::shared_ptr<Brain> brain,
+                                        const std::string& description = "Performance Profile") {
+        
+        std::cout << "=== " << description << " ===" << std::endl;
+        std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Firing Neurons: " << brain->getFiringNeuronCount() << std::endl;
+        std::cout << "Average Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+        std::cout << "Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        std::cout << "Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        // Log brain status
+        brain->logStatus();
+        
+        return true;
+    }, py::arg("brain"), py::arg("description") = "Performance Profile",
+        "Profile brain performance and log statistics");
+
+    // Add experiment control
+    m.def("runMultiStepExperiment", [](std::shared_ptr<Brain> brain,
+                                      std::shared_ptr<SimpleWorld> world,
+                                      std::shared_ptr<AgentBrain> agent,
+                                      const std::vector<std::function<void(size_t, std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>)>>& checkpoints,
+                                      size_t numSteps) {
+        
+        // Enable all subsystems for experiment
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = 0.0f;
+            auto internal = percept.getInternal();
+            if (!internal.empty()) {
+                reward = internal[0];
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1);
+            
+            // Run any checkpoint functions
+            for (auto& checkpoint : checkpoints) {
+                checkpoint(step, brain, world, agent);
+            }
+            
+            if (step % 200 == 0) {
+                std::cout << "Step " << step << "/" << numSteps << std::endl;
+            }
+        }
+        
+        std::cout << "Multi-step experiment completed!" << std::endl;
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("checkpoints"), py::arg("numSteps"),
+        "Run a multi-step experiment with checkpoint functions");
+
+    // Add utility functions for advanced users
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neurons"] = brain->getTotalNeuronCount();
+        stats["synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Get brain statistics as dictionary");
+
+    m.def("benchmarkSimulation", [](std::shared_ptr<Brain> brain,
+                                   size_t numSteps = 1000,
+                                   size_t warmupSteps = 100) {
+        
+        std::cout << "Benchmarking simulation performance..." << std::endl;
+        
+        // Warmup
+        for (size_t step = 0; step < warmupSteps; ++step) {
+            brain->step(step);
+        }
+        
+        // Benchmark
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t step = warmupSteps; step < warmupSteps + numSteps; ++step) {
+            brain->step(step);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        double stepsPerSecond = numSteps / (duration.count() / 1000.0);
+        
+        std::cout << "Steps per second: " << stepsPerSecond << std::endl;
+        std::cout << "Total spikes in benchmark: " << brain->getTotalSpikeCount() << std::endl;
+        
+        return stepsPerSecond;
+    }, py::arg("brain"), py::arg("numSteps") = 1000, py::arg("warmupSteps") = 100,
+        "Benchmark brain simulation performance and return steps per second");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
