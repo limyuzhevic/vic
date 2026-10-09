@@ -18,51 +18,22 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+# NLM — 熙然
+
+**An Experimental Artificial Developmental Brain**
+
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+This is the actual current phase of the project. The codebase implements real spiking neural computation with:
 
-### Phase 6 Integration Achievements
+- Leaky Integrate-and-Fire (LIF) neurons
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity
+- Structural plasticity (synaptogenesis/pruning)
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+**NOTE**: While the documentation references Phase 6 achievements, the actual implemented code is at Phase 2. The project has been developed incrementally with many systems planned but not yet implemented.
 
 ## Building
 
@@ -75,12 +46,16 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Current Demo (Phase 2 Real Neural Computation)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the Phase 2 real neural computation demo demonstrating:
+- LIF neuron dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
 
 ## Project Structure
 
@@ -94,22 +69,20 @@ NLM/
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit (reference only)
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   ├── brain/                    # Neural components
+│   ├── core/                     # Core utilities
+│   ├── cognition/               # Cognitive systems (partial)
+│   ├── development/             # Developmental system (partial)
+│   ├── neuromodulation/         # Neuromodulators (partial)
+│   ├── memory/                  # Memory systems (partial)
+│   ├── prediction/              # Prediction systems (partial)
+│   ├── sensory/                 # Sensory processing
+│   ├── motor/                   # Motor system
+│   ├── environment/             # Environment interface
+│   ├── experiments/             # Experiment framework (partial)
+│   └── visualization/           # Visualization
 ├── tests/
 └── configs/
 ```
@@ -121,20 +94,20 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Current - Complete)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
 
-### Phase 3 (Complete)
+### Phase 3 (Planned)
 - World interaction loop
 - Sensory input and motor output
 - Reward prediction error
 - Developmental stages
 - Novelty and curiosity
 
-### Phase 4 (Complete)
+### Phase 4 (Planned)
 - Neural prediction system
 - Working memory
 - Episodic-like memory
@@ -145,14 +118,14 @@ NLM/
 - Social learning
 - Continual learning
 
-### Phase 5 (Complete)
+### Phase 5 (Planned)
 - Performance optimizations
 - Memory pools and event queues
 - SIMD vectorization
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (Planned - Final Integration)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics

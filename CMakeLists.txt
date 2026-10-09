@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# nlohmann/json library
+find_package(nlohmann_json REQUIRED)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -29,6 +32,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Math utilities
+    src/math/MathUtilities.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -65,6 +70,8 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/SelfModel.cpp
+    src/cognition/SocialLearning.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
@@ -90,7 +97,11 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${nlohmann_json_INCLUDE_DIRS}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/math>
 )
+
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -121,11 +132,17 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Phase 2 demo executable (original real neural computation demo)
 add_executable(nlm
-    src/main.cpp
+    src/main_phase2.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Advanced CLI executable
+add_executable(nlm_advanced_cli
+    src/main_cli.cpp
+)
+target_link_libraries(nlm_advanced_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
