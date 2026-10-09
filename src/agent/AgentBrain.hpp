@@ -9,6 +9,36 @@
 
 namespace nlm {
 
+// Configuration constants for AgentBrain
+namespace {
+    // Motor group constants
+    constexpr size_t motorGroupCount = 6;
+    constexpr size_t motorActionCount = 7;
+    
+    // Sensory group constants
+    constexpr size_t sensoryGroupCount = 4;
+    
+    // Development stage constants
+    constexpr double developmentStageInitialDuration = 60.0;      // ~1 minute
+    constexpr double developmentStageCriticalPeriodDuration = 240.0;  // ~5 minutes
+    constexpr double developmentStageMaturationDuration = 600.0; // ~15 minutes
+    
+    // Scaling constants for neural activity
+    constexpr float visionScaleFactor = 5.0f;
+    constexpr float touchScaleFactor = 8.0f;
+    constexpr float internalScaleFactor = 5.0f;
+    constexpr float proprioScaleFactor = 3.0f;
+    
+    // Neuromodulation constants
+    constexpr float sensoryNoveltyDecayFactor = 0.99f;
+    constexpr float curiosityNoveltyFactor = 2.0f;
+    constexpr float curiosityErrorFactor = 0.5f;
+    constexpr float curiosityThreshold = 0.3f;
+    constexpr float curiosityExploreMaxChance = 0.3f;
+    constexpr float minimumActionThreshold = 0.5f;
+    constexpr float eligibilityThreshold = 0.001f;
+}
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
