@@ -138,18 +138,24 @@ public:
     float getAverageFiringRate() const;
     
     // ========== MEMORY SYSTEMS ==========
-    
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
-    
+
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
+
+    // Semantic memory - knowledge and facts
+    SemanticMemory* getSemanticMemory();
+
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
+
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
+
     // ========== PREDICTION SYSTEM ==========
-    
+
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
@@ -187,11 +193,48 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Expert utility functions for expert users
+
+    // Expert brain inspection and debugging tools
+    void expertBrainInspection(std::ostream& output) const;
     
-    // Logging
-    void logStatus() const;
+    // Memory system analysis tools
+    void expertMemoryAnalysis(std::ostream& output) const;
+    
+    // Neuromodulator control tools
+    void expertNeuromodulatorControl(const Config& config, std::ostream& output) const;
+    
+    // Development stage management tools
+    void expertDevelopmentStageManagement(uint64_t targetStage, std::ostream& output) const;
+    
+    // Performance profiling tools
+    void expertPerformanceProfiling(uint64_t steps, std::ostream& output) const;
+    
+    // Expert configuration tools
+    void expertConfigurationDisplay(const Config& config, std::ostream& output) const;
+    
+    // Export/import utilities
+    void exportConnectivityGraph(const std::string& filepath) const;
+    void exportMemoryState(const std::string& filepath) const;
+    void importMemoryState(const std::string& filepath);
+    void exportBrainStateWithMetadata(const std::string& filepath, const std::string& description) const;
+    void importBrainStateWithMetadata(const std::string& filepath);
+    
+    // Expert analysis tools
+    std::string generateExpertReport() const;
+    void runAdvancedExperiment(uint64_t steps, const std::vector<float>& inputPattern);
+    
+    // Debugging and analysis tools
+    void analyzeSynapticConnections(std::ostream& output) const;
+    void analyzeMemorySystemHealth(std::ostream& output) const;
+    void analyzePredictionSystem(std::ostream& output) const;
+    void analyzeCognitionSystem(std::ostream& output) const;
+    
+    // Performance optimization
+    void optimizeForExpertPerformance();
+    
+    // Utility functions
+    float countConnectionsByWeight(float minWeight = 0.0f, float maxWeight = 1.0f) const;
     
 private:
     struct Impl;
