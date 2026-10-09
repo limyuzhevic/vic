@@ -102,6 +102,51 @@ brain.step(0)
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
 
+## New: Standard Configuration Helper
+
+```python
+import pynlm
+
+# Create a brain with sensible defaults for most use cases
+brain = pynlm.createBrain(pynlm.createStandardConfig())
+brain.initialize()
+```
+
+## New: Complete Simulation Convenience Function
+
+```python
+import pynlm
+
+# Create and configure everything
+config = pynlm.createStandardConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run complete simulation using convenience function
+pynlm.runCompleteSimulation(brain, world, agent, 1000)
+```
+
+## New: Brain from Configuration File
+
+```python
+import pynlm
+
+# Create brain from JSON configuration file
+brain = pynlm.createBrainWithConfig("my_config.json")
+brain.initialize()
+```
+
 ---
 
 ## Common Patterns

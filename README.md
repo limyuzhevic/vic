@@ -82,36 +82,109 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+## Python Bindings (pynlm)
 
+NLM includes Python bindings that expose the C++ neural simulation framework to Python, making it accessible for research and development.
+
+### Quick Start (Copy & Paste)
+
+```python
+import pynlm
+
+# Create and initialize
+brain = pynlm.createBrain(pynlm.createStandardConfig())
+brain.initialize()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+    
+print(f"Simulation complete! Neurons: {brain.getTotalNeuronCount()}, Spikes: {brain.getTotalSpikeCount()}")
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+### Key Improvements in Python Bindings
+
+#### 1. Enhanced Documentation
+- Comprehensive docstrings for all classes and methods
+- Detailed parameter descriptions and usage examples
+- Architectural explanations for complex components
+
+#### 2. Advanced Configuration Management
+- `createStandardConfig()`: Creates configuration with sensible defaults
+- `createBrainWithConfig(filepath)`: Create brain from JSON configuration file
+- Enhanced error handling and validation
+
+#### 3. Convenience Functions
+- `runCompleteSimulation(brain, world, agent, numSteps)`: Full brain-world-agent integration
+- `runAgentEpisode(agent, world, maxSteps, verbose)`: Complete agent episodes
+- `benchmarkBrainPerformance(brain, numSteps, warmupSteps)`: Performance analysis
+
+#### 4. Complete Example
+
+```python
+import pynlm
+
+# Create and configure everything
+config = pynlm.createStandardConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run complete simulation using convenience function
+pynlm.runCompleteSimulation(brain, world, agent, 1000)
+```
+
+### Installation
+
+#### From Source (Recommended for Development)
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
+#### Using pyproject.toml (Modern Python Packaging)
+
+```bash
+# Install with scikit-build-core (used automatically by pip)
+pip install .
+
+# Build only (without installing)
+pip install build
+python -m build
+
+# Install specific build from wheel
+pip install dist/*.whl
+```
+
+### Verifying Installation
+
+```python
+import pynlm
+
+# Check version
+print(pynlm.__version__)
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
 
 ## Phase Summary
