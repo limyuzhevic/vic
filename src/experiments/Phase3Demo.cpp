@@ -5,6 +5,7 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../common/CommonUtils.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -20,9 +21,7 @@ public:
     ~Phase3Demo() {}
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
-        std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
-        std::cout << "===========================================\n\n";
+        OutputManager::printHeader("NLM PHASE 3 - WORLD INTERACTION DEMO");
         
         // Create configuration
         auto config = std::make_shared<Config>();

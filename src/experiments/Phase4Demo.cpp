@@ -13,38 +13,117 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
+#include "common/CommonUtils.hpp"
 
 using namespace nlm;
 
 void printHeader(const std::string& title) {
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "  " << title << "\n";
-    std::cout << std::string(60, '=') << "\n";
+    OutputManager::printHeader(title);
 }
 
 void printResult(const std::string& name, float value, float max = 1.0f) {
-    std::cout << "  " << std::left << std::setw(30) << name << ": ";
-    std::cout << std::fixed << std::setprecision(3) << value;
-    if (max > 0) {
-        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
-    }
-    std::cout << "\n";
+    OutputManager::printResult(name, value, max);
 }
 
 void printSection(const std::string& title) {
-    std::cout << "\n--- " << title << " ---\n";
+    OutputManager::printSection(title);
+}
+
+ExecutionMode parseMode(const std::string& modeStr) {
+    std::string lower = modeStr;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    if (lower == "test") return ExecutionMode::TEST;
+    if (lower == "run") return ExecutionMode::RUN;
+    if (lower == "benchmark") return ExecutionMode::BENCHMARK;
+    if (lower == "help") return ExecutionMode::HELP;
+    if (lower == "version") return ExecutionMode::VERSION;
+    
+    return ExecutionMode::UNKNOWN;
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
+    OutputManager::printHeader("NLM Phase 4: Emerging Cognition");
     
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    // Parse command line arguments using CommonUtils framework
+    std::vector<std::string> allowedFlags = {"help", "version", "verbose", "quiet", "config", "output", "log-level", "mode", "trials"};
+    std::map<std::string, std::string> flagDescriptions = {
+        {"help", "Show help message"},
+        {"version", "Show version information"},
+        {"verbose", "Enable verbose output"},
+        {"quiet", "Suppress non-essential output"},
+        {"config", "Configuration file"},
+        {"output", "Output file"},
+        {"log-level", "Log level"},
+        {"mode", "Execution mode"},
+        {"trials", "Number of trials"}
+    };
+    
+    CLIArgs args = CLIUtils::parseArgs(argc, argv, allowedFlags, flagDescriptions);
+    
+    // Handle help and version requests
+    if (args.help) {
+        std::cout << "Usage: nlm_phase4_demo [options]\n\n";
+        std::cout << "NLM Phase 4: Emerging Cognition\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help, -h           Show this help message\n";
+        std::cout << "  --version, -v        Show version information\n";
+        std::cout << "  --config <file>      Load configuration from file\n";
+        std::cout << "  --output <file>      Write output to file\n";
+        std::cout << "  --log-level <level>  Set log level (DEBUG, INFO, WARNING, ERROR)\n";
+        std::cout << "  --mode <mode>        Execution mode (test, run, benchmark)\n";
+        std::cout << "  --verbose, -V        Enable verbose output\n";
+        std::cout << "  --quiet, -q          Suppress non-essential output\n";
+        std::cout << "  --trials <n>         Number of trials (default: 50)\n\n";
+        return 0;
     }
+    
+    if (args.version) {
+        std::cout << "NLM Phase 4: Emerging Cognition\n";
+        std::cout << "Version: 2.0.0\n";
+        std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n";
+        return 0;
+    }
+    
+    // Set output format
+    OutputManager::setOutputFormat(OutputFormat::CONSOLE);
+    if (!args.outputFile.empty()) {
+        OutputManager::setOutputFile(args.outputFile);
+    }
+    
+    // Initialize logging system
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Set log level from args
+    if (!args.logLevel.empty()) {
+        std::string level = args.logLevel;
+        std::transform(level.begin(), level.end(), level.begin(), ::tolower);
+        if (level == "debug") consoleLogger->setLevel(LogLevel::Debug);
+        else if (level == "warning") consoleLogger->setLevel(LogLevel::Warning);
+        else if (level == "error") consoleLogger->setLevel(LogLevel::Error);
+        else consoleLogger->setLevel(LogLevel::Info); // Default
+    }
+    
+    // Parse trials
+    size_t numTrials = 50;
+    if (args.customArgs.count("trials")) {
+        numTrials = static_cast<size_t>(std::atoi(args.customArgs["trials"].c_str()));
+    }
+    
+    // Determine execution mode
+    ExecutionMode mode = ExecutionMode::RUN; // Default
+    if (!args.mode.empty()) {
+        mode = parseMode(args.mode);
+        if (mode == ExecutionMode::UNKNOWN) {
+            OutputManager::printWarning("Unknown mode '" + args.mode + "', using default");
+        }
+    }
+    
+    OutputManager::printInfo("Execution mode: " + std::to_string(static_cast<int>(mode)));
+    OutputManager::printInfo("Number of trials: " + std::to_string(numTrials));
     
     // Create configuration
     auto config = std::make_shared<Config>();
@@ -57,10 +136,10 @@ int main(int argc, char* argv[]) {
     config->set("stdp_ltd_weight", 0.012f);
     
     // Create brain
-    std::cout << "Initializing brain...\n";
+    OutputManager::printInfo("Initializing brain...");
     auto brain = std::make_shared<Brain>(config);
     if (!brain->initialize()) {
-        std::cerr << "Failed to initialize brain!\n";
+        OutputManager::printError("Failed to initialize brain!");
         return 1;
     }
     
@@ -78,9 +157,9 @@ int main(int argc, char* argv[]) {
         
         float improvement = results.predictionErrorInitial - results.predictionErrorFinal;
         if (improvement > 0) {
-            std::cout << "  [SUCCESS] Prediction improved through experience!\n";
+            OutputManager::printSuccess("Prediction improved through experience!");
         } else {
-            std::cout << "  [INFO] No significant prediction improvement yet.\n";
+            OutputManager::printInfo("No significant prediction improvement yet.");
         }
     }
     
@@ -117,7 +196,7 @@ int main(int argc, char* argv[]) {
         printResult("Generalization Ability", results.generalizationAbility);
         
         if (results.conceptsFormed > 0) {
-            std::cout << "  [SUCCESS] Concepts emerged from repeated experience!\n";
+            OutputManager::printSuccess("Concepts emerged from repeated experience!");
         }
     }
     
@@ -131,7 +210,7 @@ int main(int argc, char* argv[]) {
         printResult("Distraction Resistance", results.distractionResistance);
         
         if (results.attentionSelectivity > 0.5f) {
-            std::cout << "  [SUCCESS] Selective attention emerged!\n";
+            OutputManager::printSuccess("Selective attention emerged!");
         }
     }
     
@@ -145,7 +224,7 @@ int main(int argc, char* argv[]) {
         printResult("Planning Confidence", results.planningConfidence);
         
         if (results.planningAccuracy > 0.4f) {
-            std::cout << "  [SUCCESS] Planning ability demonstrated!\n";
+            OutputManager::printSuccess("Planning ability demonstrated!");
         }
     }
     
@@ -159,7 +238,7 @@ int main(int argc, char* argv[]) {
         printResult("Body Awareness", results.bodyAwareness);
         
         if (results.selfPredictionAccuracy > 0.3f) {
-            std::cout << "  [SUCCESS] Self-model developing!\n";
+            OutputManager::printSuccess("Self-model developing!");
         }
     }
     
@@ -173,7 +252,7 @@ int main(int argc, char* argv[]) {
         printResult("Observations from Others", results.observationsFromOthers);
         
         if (results.imitationAccuracy > 0.2f) {
-            std::cout << "  [SUCCESS] Social learning observed!\n";
+            OutputManager::printSuccess("Social learning observed!");
         }
     }
     
@@ -203,23 +282,23 @@ int main(int argc, char* argv[]) {
     // Final summary
     printHeader("PHASE 4 SUMMARY");
     
-    std::cout << "\nPhase 4 demonstrates:\n";
-    std::cout << "  - Temporal prediction: Learning relationships between events\n";
-    std::cout << "  - Working memory: Maintaining information across delays\n";
-    std::cout << "  - Episodic memory: Storing and recalling experiences\n";
-    std::cout << "  - Concept formation: Discovering patterns without labels\n";
-    std::cout << "  - Neural attention: Selective processing through competition\n";
-    std::cout << "  - Multi-step planning: Using predictions to select actions\n";
-    std::cout << "  - Self-model: Learning body schema and action consequences\n";
-    std::cout << "  - Social learning: Observing and imitating others\n";
-    std::cout << "  - Continual learning: Adapting to new tasks\n";
+    OutputManager::printInfo("\nPhase 4 demonstrates:");
+    OutputManager::printInfo("  - Temporal prediction: Learning relationships between events");
+    OutputManager::printInfo("  - Working memory: Maintaining information across delays");
+    OutputManager::printInfo("  - Episodic memory: Storing and recalling experiences");
+    OutputManager::printInfo("  - Concept formation: Discovering patterns without labels");
+    OutputManager::printInfo("  - Neural attention: Selective processing through competition");
+    OutputManager::printInfo("  - Multi-step planning: Using predictions to select actions");
+    OutputManager::printInfo("  - Self-model: Learning body schema and action consequences");
+    OutputManager::printInfo("  - Social learning: Observing and imitating others");
+    OutputManager::printInfo("  - Continual learning: Adapting to new tasks");
     
-    std::cout << "\nAll mechanisms emerge from neural dynamics and plasticity.\n";
-    std::cout << "No predefined concepts, rules, or symbolic AI were used.\n";
+    OutputManager::printInfo("\nAll mechanisms emerge from neural dynamics and plasticity.");
+    OutputManager::printInfo("No predefined concepts, rules, or symbolic AI were used.");
     
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "Phase 4 Complete!\n";
-    std::cout << std::string(60, '=') << "\n";
+    OutputManager::printInfo("\n" + std::string(60, '='));
+    OutputManager::printInfo("Phase 4 Complete!");
+    OutputManager::printInfo(std::string(60, '='));
     
     return 0;
 }

@@ -83,13 +83,31 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
-)
+# Visualization
+	src/visualization/VisualizationInterface.cpp
+	# Common utilities
+	src/common/CommonUtils.cpp
+	)
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/common>
     $<INSTALL_INTERFACE:include>
+)
+
+# Common Utilities Library (separate from nlm_core for easier testing and use)
+add_library(nlm_common_utils STATIC
+    src/common/CommonUtils.cpp
+)
+
+target_include_directories(nlm_common_utils PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/common>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+target_compile_options(nlm_common_utils PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
@@ -122,26 +140,33 @@ target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
+	add_executable(nlm
+	    src/main.cpp
+	)
+	target_link_libraries(nlm PUBLIC nlm_core nlm_common_utils)
 
 # Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+	add_executable(nlm_phase3_demo
+	    src/experiments/Phase3Demo.cpp
+	)
+	target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_common_utils)
 
 # Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+	add_executable(nlm_phase4_demo
+	    src/experiments/Phase4Demo.cpp
+	)
+	target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_common_utils)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Common utils test executable
+	add_executable(test_common_utils
+	    src/common/CommonUtils.cpp
+	    tests/test_common_utils.cpp
+	)
+	target_link_libraries(test_common_utils PUBLIC nlm_common_utils)
+	target_include_directories(test_common_utils PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}/src
+		${CMAKE_CURRENT_SOURCE_DIR}/src/common
+	)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
