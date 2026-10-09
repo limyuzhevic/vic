@@ -58,6 +58,11 @@ void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
     // TODO PHASE 2: Implement real synaptic input
     // PLACEHOLDER: Simple additive input
+    if (!neuron || !synapse) {
+        NLM_LOG_WARNING("Null neuron or synapse in applySpikeInput");
+        return;
+    }
+    
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);

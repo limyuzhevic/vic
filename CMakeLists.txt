@@ -141,10 +141,35 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 
 # Testing
 enable_testing()
+
+# Core test executable
+add_executable(nlm_test
+    tests/test_brain.cpp
+    tests/test_config.cpp
+    tests/test_synapse.cpp
+    tests/test_neuron.cpp
+    tests/test_clock.cpp
+    tests/test_main.cpp
+    tests/test_random.cpp
+    tests/test_types.cpp
+    tests/test_stdp.cpp
+    src/tests/TestCodeQuality.cpp
+)
+target_link_libraries(nlm_test PUBLIC nlm_core)
+
+add_test(NAME nlm_test COMMAND nlm_test)
+
+# Add the tests directory for additional test targets
 add_subdirectory(tests)
 
+# CLI interface (advanced user interface)
+add_executable(nlm_cli
+    src/cli/CommandLineInterface.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_cli
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
