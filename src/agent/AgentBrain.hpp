@@ -4,15 +4,18 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding, now with cognitive integration
 class AgentBrain {
 public:
+    // Constructors
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
@@ -69,6 +72,20 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Cognitive integration
+    void initializeCognitiveSystems();
+    size_t presentExperience(const std::vector<float>& pattern, const std::vector<float>& features, float reward, SimulationStep time);
+    size_t getConceptForPattern(const std::vector<float>& pattern, float threshold = 0.7f) const;
+    void applyConceptsToPlanning();
+    void recordSelfAction(ActionType action, const std::vector<float>& beforeState, const std::vector<float>& afterState);
+    std::vector<float> predictActionConsequence(ActionType action, const std::vector<float>& currentState);
+    
+    // Integration with world simulation
+    void updateDevelopmentAndLearning(double timestep);
+    
+    // Enhanced motor command with cognitive factors
+    MotorCommand decodeMotorCommandWithCognitiveFactors();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -92,6 +109,11 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
+    // Cognitive system pointers
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<SelfModel> selfModel_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    
     // Neuromodulation state
     float dopamineLevel_;
     float noveltyLevel_;
@@ -112,6 +134,10 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // State tracking for cognitive integration
+    std::vector<float> currentPerceptFeatures_;
+    size_t currentConceptId_;
 };
 
 } // namespace nlm

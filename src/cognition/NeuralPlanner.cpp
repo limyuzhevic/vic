@@ -16,6 +16,7 @@ NeuralPlanner::NeuralPlanner()
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , selfModel_(nullptr)
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
@@ -25,6 +26,13 @@ NeuralPlanner::~NeuralPlanner() = default;
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Initialize self-model with the same brain
+    if (brain_) {
+        selfModel_ = std::make_unique<SelfModel>();
+        selfModel_->initialize(brain_);
+    }
+    
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
@@ -145,28 +153,20 @@ std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size
     return result;
 }
 
-float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionQuality_.size()) return 0.0f;
+float NeuralPlanner::computeSimilarity(const std::vector<float>& a,
+                                       const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.empty()) return 0.0f;
     
-    // Base value from experience
-    float baseValue = actionQuality_[actionIdx];
-    
-    // Bonus for approaching goal (if goal is defined)
-    float goalBonus = 0.0f;
-    if (!currentGoal_.empty() && state.size() == currentGoal_.size()) {
-        float stateGoalSim = 0.0f, stateNorm = 0.0f, goalNorm = 0.0f;
-        for (size_t i = 0; i < state.size(); ++i) {
-            stateGoalSim += state[i] * currentGoal_[i];
-            stateNorm += state[i] * state[i];
-            goalNorm += currentGoal_[i] * currentGoal_[i];
-        }
-        if (stateNorm > 0.0001f && goalNorm > 0.0001f) {
-            goalBonus = stateGoalSim / (std::sqrt(stateNorm) * std::sqrt(goalNorm));
-        }
+    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
     }
     
-    return baseValue * 0.7f + goalBonus * 0.3f;
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    
+    return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,
@@ -335,7 +335,7 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                               const std::vector<float>& afterState,
                                               ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated

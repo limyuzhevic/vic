@@ -49,21 +49,6 @@ public:
     Config();
     ~Config();
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
     // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
@@ -92,6 +77,25 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Advanced CLI and configuration management
+    bool generateConfigTemplate(const std::string& filepath) const;
+    bool validateConfigFile(const std::string& filepath) const;
+    std::vector<std::string> getOptimizationSuggestions() const;
+    std::vector<std::string> getValidationWarnings() const;
+    std::string getConfigurationRecommendations() const;
+    
+    // Configuration presets
+    bool savePreset(const std::string& name, const std::map<std::string, ConfigValue>& values);
+    std::map<std::string, ConfigValue> loadPreset(const std::string& name) const;
+    std::vector<std::string> getAvailablePresets() const;
+    
+    // Configuration comparison
+    bool compareWith(const Config& otherConfig) const;
+    std::string generateDiffReport(const Config& otherConfig) const;
+    
+    // Validation and checking
+    bool validate() const;
     
 private:
     struct Impl;

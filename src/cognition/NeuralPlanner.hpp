@@ -74,6 +74,14 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Get self-model confidence for an action
+    float getSelfModelConfidence(ActionType action) const {
+        if (selfModel_) {
+            return selfModel_->getSelfModelConfidence(action);
+        }
+        return 0.0f;
+    }
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -96,6 +104,9 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Self-model for confidence computation
+    std::unique_ptr<SelfModel> selfModel_;
 };
 
 // SelfModel: Represents the agent's internal model of itself
@@ -129,7 +140,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 

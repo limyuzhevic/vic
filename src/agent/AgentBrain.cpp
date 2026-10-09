@@ -19,7 +19,13 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , currentConceptId_(0)
 {
+    // Initialize cognitive systems
+    neuralPlanner_ = std::make_unique<NeuralPlanner>();
+    selfModel_ = std::make_unique<SelfModel>();
+    conceptFormation_ = std::make_unique<ConceptFormation>();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -68,6 +74,13 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Initialize cognitive systems with brain reference
+    if (brain_) {
+        neuralPlanner_->initialize(brain_.get());
+        selfModel_->initialize(brain_.get());
+        conceptFormation_->initialize(brain_.get());
+    }
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
@@ -83,6 +96,17 @@ size_t AgentBrain::getMotorOutputSize() const {
     // One motor neuron per action
     return 6;
 }
+
+void AgentBrain::initializeCognitiveSystems() {
+    // Initialize cognitive systems with brain reference
+    if (brain_) {
+        neuralPlanner_->initialize(brain_.get());
+        selfModel_->initialize(brain_.get());
+        conceptFormation_->initialize(brain_.get());
+    }
+}
+
+// Other methods implementations continue here
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
@@ -345,6 +369,120 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset cognitive systems
+    if (neuralPlanner_) neuralPlanner_->clearCache();
+    if (selfModel_) selfModel_->clear();
+    if (conceptFormation_) conceptFormation_->clear();
+}
+
+// Cognitive integration methods
+void AgentBrain::initializeCognitiveSystems() {
+    // Initialize cognitive systems with brain reference
+    if (brain_) {
+        neuralPlanner_->initialize(brain_.get());
+        selfModel_->initialize(brain_.get());
+        conceptFormation_->initialize(brain_.get());
+    }
+}
+
+size_t AgentBrain::presentExperience(const std::vector<float>& pattern,
+                                   const std::vector<float>& features,
+                                   float reward,
+                                   SimulationStep time) {
+    // Present to concept formation system for learning
+    return conceptFormation_->presentExperience(pattern, features, reward, time);
+}
+
+size_t AgentBrain::getConceptForPattern(const std::vector<float>& pattern,
+                                       float threshold) const {
+    return conceptFormation_->getMatchingConcept(pattern, threshold);
+}
+
+void AgentBrain::recordSelfAction(ActionType action,
+                                 const std::vector<float>& beforeState,
+                                 const std::vector<float>& afterState) {
+    // Record action-effect relationship in self-model
+    selfModel_->recordSelfAction(action, beforeState, afterState);
+}
+
+std::vector<float> AgentBrain::predictActionConsequence(ActionType action,
+                                                       const std::vector<float>& currentState) {
+    // Use self-model to predict action consequences
+    return selfModel_->predictActionConsequence(action, currentState);
+}
+
+void AgentBrain::applyConceptsToPlanning() {
+    // Apply learned concepts to influence planning
+    if (neuralPlanner_ && conceptFormation_) {
+        size_t conceptId = conceptFormation_->getMatchingConcept(currentPerceptFeatures_);
+        if (conceptId > 0) {
+            // Update planner with concept knowledge
+            auto concept = conceptFormation_->getConcept(conceptId);
+            if (concept) {
+                // Use concept information to influence planning
+                // This could update the planner's knowledge base
+                // or adjust planning heuristics based on learned patterns
+            }
+        }
+    }
+}
+
+void AgentBrain::updateDevelopmentAndLearning(double timestep) {
+    // Update development system
+    updateDevelopment(timestep);
+    
+    // Update cognitive systems based on development
+    if (brain_ && developmentalAge_ > 60.0) {
+        // Maturation - cognitive systems become more sophisticated
+        neuralPlanner_->setPlanningDepth(std::min(5, neuralPlanner_->getPlanningDepth() + 1));
+    }
+    
+    // Extract features from current percept for concept formation
+    extractFeaturesFromPercept(brain_->getCurrentSensoryPercept());
+    
+    // Present experience to concept formation system
+    size_t conceptId = presentExperience(currentPerceptFeatures_, std::vector<float>(), 
+                                       brain_->getCurrentReward(), 
+                                       brain_->getCurrentStep());
+    currentConceptId_ = conceptId;
+    
+    // Apply concepts to planning
+    applyConceptsToPlanning();
+}
+
+MotorCommand AgentBrain::decodeMotorCommandWithCognitiveFactors() {
+    // Decode primary motor command
+    MotorCommand baseCommand = decodeMotorCommand();
+    
+    // Apply cognitive factors
+    if (neuralPlanner_ && neuralPlanner_->getCurrentGoal().size() > 0) {
+        // Use planner to refine action
+        return neuralPlanner_->planAction(currentPerceptFeatures_);
+    }
+    
+    return baseCommand;
+}
+
+// Helper method to extract features from sensory percept
+void AgentBrain::extractFeaturesFromPercept(const SensoryPercept& percept) {
+    currentPerceptFeatures_.clear();
+    
+    // Add vision features
+    const auto& vision = percept.getVision();
+    currentPerceptFeatures_.insert(currentPerceptFeatures_.end(), vision.begin(), vision.end());
+    
+    // Add touch features
+    const auto& touch = percept.getTouch();
+    currentPerceptFeatures_.insert(currentPerceptFeatures_.end(), touch.begin(), touch.end());
+    
+    // Add internal features
+    const auto& internal = percept.getInternal();
+    currentPerceptFeatures_.insert(currentPerceptFeatures_.end(), internal.begin(), internal.end());
+    
+    // Add proprioception features
+    const auto& proprio = percept.getProprioception();
+    currentPerceptFeatures_.insert(currentPerceptFeatures_.end(), proprio.begin(), proprio.end());
 }
 
 } // namespace nlm

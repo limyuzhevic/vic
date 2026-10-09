@@ -1,11 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
-#include <unordered_map>
+#include "../neuromodulation/Neuromodulator.hpp"
 
 namespace nlm {
 
@@ -62,17 +55,16 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
     // Get overall memory activity level
     float getMemoryActivity() const;
+
+    // Configuration for improved maintenance mechanisms
+    void setMinActivationForMaintenance(float minActivation) { minActivationForMaintenance_ = minActivation; }
+    void setSpontaneousReactivationThreshold(float threshold) { spontaneousReactivationThreshold_ = threshold; }
+    void setNeuromodulationStabilizationFactor(float factor) { neuromodulationStabilizationFactor_ = factor; }
+
+    // Get current neuromodulation level
+    float getCurrentNeuromodulationLevel() const;
 
 private:
     // Create recurrent connection for maintenance
@@ -84,23 +76,56 @@ private:
     // Decay weak memory traces
     void decayWeakTraces();
 
+    // Strengthen connections between co-activated neurons (Hebbian-like)
+    void strengthenCoActivationConnections();
+
+    // Spontaneous reactivation for dormant memory traces
+    void spontaneousReactivation();
+
+    // Apply neuromodulatory stabilization to memory traces
+    void applyNeuromodulatoryStabilization();
+
+    // Prioritize important memory traces based on activation history
+    void prioritizeImportantTraces();
+
+    // Evict least important traces to maintain capacity
+    void evictLeastImportantTraces();
+
+    // Compute activity-dependent decay rate
+    float computeActivityDependentDecayRate() const;
+
+    // Get importance score for a memory trace
+    float getTraceImportance(size_t traceIndex) const;
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
+    float minActivationForMaintenance_;  // Minimum activation for maintenance
+    float spontaneousReactivationThreshold_;  // Activation below which spontaneous reactivation occurs
+    float neuromodulationStabilizationFactor_;  // Neuromodulation effect on stabilization
     
     // Memory content
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
     
+    // Activity history for importance computation
+    std::vector<float> activityHistory_;
+    
+    // Trace importance scores for capacity management
+    std::vector<float> traceImportance_;
+    
     // Active memory traces
     std::vector<size_t> activeTraces_;
     
-    // Recurrent connections for maintenance
+    // Recurrent connections for maintenance (bidirectional for stronger maintenance)
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    
+    // Co-activation history for Hebbian-like strengthening
+    std::unordered_map<uint64_t, float> coActivationHistory_; // Key: neuron pair hash, Value: co-activation strength
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
