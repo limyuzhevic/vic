@@ -75,12 +75,35 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Demo (Comprehensive Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm_phase6_demo [options]
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive Phase 6 integration test verifying all brain systems are connected.
+
+**Options include:**
+- `-h, --help` - Show help message
+- `-v, --version` - Show version information
+- `-c, --config FILE` - Configuration file
+- `-e, --episodes N` - Number of demo episodes
+- `-s, --steps N` - Steps per episode
+- `-t, --trials N` - Number of trials for each experiment
+- `-m, --mode MODE` - Demo mode: auto, demo, test, debug, profile
+- `-l, --load FILE` - Load brain state from checkpoint
+- `-S, --save FILE` - Save brain state to checkpoint
+- `-o, --output FILE` - Output results to file
+- `--output-format FMT` - Output format: text, json, csv
+
+### Phase 3 Demo
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+### Phase 4 Demo
+```bash
+./nlm_phase4_demo [num_trials]
+```
 
 ## Project Structure
 
@@ -88,30 +111,25 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── configs/
+│   └── default.cfg
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
 │   ├── cognition/      # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── experiments/   # Experiment framework
 │   └── visualization/  # Visualization
 ├── tests/
-└── configs/
+└── docs/
 ```
 
 ## Phase Summary

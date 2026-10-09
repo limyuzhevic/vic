@@ -5,14 +5,14 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with plugin system"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "plugin", "extension"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -33,6 +33,7 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "jinja>=3.0",
 ]
 
 [project.urls]
@@ -55,3 +56,22 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+# Plugin system configuration
+[tool.pynlm]
+plugin_directory = "plugins"
+default_plugins = []
+enable_extension_points = true
+
+# Python extension points
+[tool.pynlm.extension-points]
+neuron = "pynlm.neuron_extension"
+synapse = "pynlm.synapse_extension"
+plasticity = "pynlm.plasticity_extension"
+memory = "pynlm.memory_extension"
+neuromodulation = "pynlm.neuromodulation_extension"
+
+# Python package information
+[project.scripts]
+nlm-python = "pynlm.main:main"
+nlm-plugin = "pynlm.plugin_manager:main"
