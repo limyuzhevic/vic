@@ -100,6 +100,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper functions
+    static ConfigValue jsonToConfigValue(const nlohmann::json& jsonVal);
+    static nlohmann::json configValueToJson(const ConfigValue& value);
+    bool loadFromSimpleFormat(const std::string& filepath);
 };
 
 } // namespace nlm
+
+// Include nlohmann/json.hpp
+#include <nlohmann/json.hpp>
