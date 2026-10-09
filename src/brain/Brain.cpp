@@ -437,6 +437,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // Apply dopamine effects on attention
+        if (dopamineLevel > 0.5f) {
+            // Higher dopamine increases attention and vigilance
+            // Inject current to internal neurons for enhanced attention
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Internal) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            neuron->injectCurrent(dopamineLevel * 0.2f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Apply dopamine effects on memory consolidation
+        // Higher dopamine enhances memory consolidation during rest
+        if (dopamineLevel > 0.3f && !pImpl->isResting) {
+            // Schedule memory consolidation
+            pImpl->isResting = true;
+            // Consolidate recent episodic memories
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->consolidate(dopamineLevel * 0.3f);
+            }
+        }
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -444,6 +470,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply dopamine effects on memory encoding
+    if (pImpl->dopamine && pImpl->dopamine->getLevel() > 0.7f) {
+        // High dopamine enhances new memory encoding
+        // Boost working memory storage capacity temporarily
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->boostCapacity(0.5f);
+        }
     }
     
     for (auto& region : pImpl->regions) {
@@ -511,8 +546,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Predict next sensory input based on current neural activity
+        // Update prediction error signals for learning
+        // Use episodic memory for temporal context
+        if (pImpl->episodicMemory) {
+            auto recentEp = pImpl->episodicMemory->getRecentEpisodes(3);
+            pImpl->predictionSystem->updateWithContext(this, pImpl->timestep, recentEp);
+        } else {
+            pImpl->predictionSystem->update(this, pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,15 +566,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Use episodic memory to guide attention
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
+            auto recentEp = pImpl->episodicMemory->getRecentEpisodes(5);
+            pImpl->attention->updateWithMemoryContext(recentEp);
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use working memory traces and episodic memory for concept learning
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            // Get working memory traces
+            std::vector<float> wmTrace = pImpl->workingMemory->retrieve();
+            // Get recent episodes for context
+            std::vector<const EpisodicMemoryItem*> recentEp = 
+                pImpl->episodicMemory->getRecentEpisodes(1);
+            // Concept formation uses both current activity and historical context
+            pImpl->conceptFormation->update(this, pImpl->timestep, 
+                                          wmTrace, recentEp);
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Apply neural planning ==========
+    if (pImpl->planner) {
+        // Use planner to evaluate potential action sequences
+        // Consider current context and learned predictions
+        // Integrate episodic memory for experience-based planning
+        if (pImpl->episodicMemory) {
+            auto relevantEp = pImpl->episodicMemory->getRecentEpisodes(5);
+            pImpl->planner->updateWithContext(this, pImpl->timestep, relevantEp);
+        } else {
+            pImpl->planner->update(this, pImpl->timestep);
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -896,8 +967,38 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // For each synapse in the checkpoint, restore its properties
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Restore synapse properties
+                    syn->setWeight(synapseData.weight[synapseIdx]);
+                    syn->setDelay(synapseData.delay[synapseIdx]);
+                    syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                    syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                    syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                    syn->setShortTermDepression(synapseData.shortTermDepression[synapseIdx]);
+                    syn->setShortTermFacilitation(synapseData.shortTermFacilitation[synapseIdx]);
+                    
+                    // Restore plasticity flags
+                    syn->setPlasticityFlags(
+                        synapseData.plasticityFlags[synapseIdx] & 0x01, // stdp
+                        synapseData.plasticityFlags[synapseIdx] & 0x02, // hebbian
+                        synapseData.plasticityFlags[synapseIdx] & 0x04, // structural
+                        synapseData.plasticityFlags[synapseIdx] & 0x08  // neuromodulated
+                    );
+                    
+                    synapseIdx++;
+                }
+            }
+        }
+        
+        // Restore inter-region connections
+        // These would need to be restored based on checkpoint data
+        // For now, we'll keep existing inter-region connections
+        
+        NLM_LOG_INFO("Successfully restored " + std::to_string(synapseIdx) + " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

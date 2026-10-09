@@ -48,6 +48,15 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Configuration
+    void setBaseline(float baseline);
+    void setPeak(float peak);
+    void setDecayRate(float decayRate);
+    void setReleaseRate(float releaseRate);
+    
+    // State management
+    void reset();
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -62,6 +71,9 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Memory consolidation effects
+    void setConsolidationFactor(float factor) {}
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +85,9 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Arousal effects
+    void setArousalLevel(float level) {}
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +99,9 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Social behavior effects
+    void setSocialBehaviorFactor(float factor) {}
 };
 
 } // namespace nlm
