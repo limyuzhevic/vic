@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <limits>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,14 +21,96 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception hierarchy for Python users
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMConfigurationError : public NLMError {
+public:
+    explicit NLMConfigurationError(const std::string& msg) : NLMError("Configuration Error: " + msg) {}
+};
+
+class NLMSimulationError : public NLMError {
+public:
+    explicit NLMSimulationError(const std::string& msg) : NLMError("Simulation Error: " + msg) {}
+};
+
+class NLMMemoryError : public NLMError {
+public:
+    explicit NLMMemoryError(const std::string& msg) : NLMError("Memory Error: " + msg) {}
+};
+
+// Python property descriptor for read-only attributes
+template<typename T>
+class ReadOnlyProperty {
+private:
+    T (AgentBrain::*getter)() const;
+public:
+    ReadOnlyProperty(T (AgentBrain::*g)() const) : getter(g) {}
+    
+    template<typename Owner>
+    py::object get(Owner& self) const {
+        return py::cast((self.*getter)());
+    }
+};
+
+// Context manager for automatic resource cleanup
+class BrainContextManager {
+private:
+    std::shared_ptr<Brain> brain_;
+    bool initialized_;
+public:
+    BrainContextManager(std::shared_ptr<Brain> brain) : brain_(brain), initialized_(false) {}
+    
+    void __enter__() {
+        if (brain_ && !initialized_) {
+            brain_->initialize();
+            initialized_ = true;
+        }
+    }
+    
+    void __exit__(int, int, int) {
+        if (brain_) {
+            brain_->reset();
+            initialized_ = false;
+        }
+    }
+    
+    std::shared_ptr<Brain> getBrain() { return brain_; }
+};
+
+// Helper function for validation
+template<typename T>
+T validateRange(const T& value, const T& min, const T& max, const std::string& name) {
+    if (value < min || value > max) {
+        throw NLMConfigurationError(
+            name + " must be between " + std::to_string(min) + " and " + std::to_string(max) +
+            ", got " + std::to_string(value)
+        );
+    }
+    return value;
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides a Pythonic interface to the NLM neural simulation framework,
+        making it easy to create and run neural network simulations in Python.
     )pbdoc";
 
+    // Register custom exceptions
+    py::register_exception<NLMError>(m, "NLMError");
+    py::register_exception<NLMConfigurationError>(m, "NLMConfigurationError");
+    py::register_exception<NLMSimulationError>(m, "NLMSimulationError");
+    py::register_exception<NLMMemoryError>(m, "NLMMemoryError");
+    
+    // Register the standard runtime error for backward compatibility
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
