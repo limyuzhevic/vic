@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <system_error>
 
 namespace nlm {
 
@@ -29,6 +31,32 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Error types for configuration operations
+enum class ConfigErrorType {
+    None,
+    FileNotFound,
+    PermissionDenied,
+    JsonParseError,
+    FileWriteError,
+    InvalidKey,
+    TypeMismatch,
+    OutOfRange,
+    ValidationError,
+    InvalidInput,
+    MemoryError
+};
+
+class ConfigError : public std::runtime_error {
+public:
+    ConfigError(const std::string& message, ConfigErrorType type = ConfigErrorType::None)
+        : std::runtime_error(message), errorType_(type) {}
+    
+    ConfigErrorType getType() const noexcept { return errorType_; }
+    
+private:
+    ConfigErrorType errorType_;
 };
 
 // Configuration entry
@@ -93,13 +121,29 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling methods
+    std::string getLastError() const noexcept;
+    void clearLastError();
+    void enableErrorReporting(bool enable);
+    
+    // Validation methods
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    bool validateAgainstSchema() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::string lastError_;
+    bool errorReportingEnabled_;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    void validateInput(const std::string& key, const ConfigValue& value) const;
+    void logOperation(const std::string& operation, const std::string& key, 
+                      bool success, const std::string& details = "");
 };
 
 } // namespace nlm

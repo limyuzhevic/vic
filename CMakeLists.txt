@@ -18,8 +18,8 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Find nlohmann/json (header-only library)
+find_package(nlohmann_json 3.2.0 REQUIRED)
 
 # Core library
 add_library(nlm_core STATIC
