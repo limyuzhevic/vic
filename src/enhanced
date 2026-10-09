@@ -1,0 +1,206 @@
+#pragma once
+
+#include "Brain.hpp"
+#include "AgentBrain.hpp"
+#include "SimpleWorld.hpp"
+#include <string>
+#include <map>
+#include <vector>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
+#include <numeric>
+#include <cmath>
+
+namespace nlm {
+
+// Forward declarations
+class EnhancedBrain;
+
+// Enhanced Configuration Builder
+class ConfigBuilder {
+public:
+    static std::shared_ptr<Config> createBrainConfig(
+        size_t neuronCount = 1000,
+        size_t regionCount = 1,
+        float connectionProbability = 0.1f,
+        uint64_t randomSeed = 42u);
+    
+    static std::shared_ptr<Config> createAdvancedConfig(
+        const std::string& name = "NLM_Advanced",
+        const std::map<std::string, std::string>& customParams = {});
+};
+
+// Context Manager for automatic resource management
+class EnhancedBrainContext {
+public:
+    EnhancedBrainContext(EnhancedBrain* brain);
+    ~EnhancedBrainContext();
+    
+    void step(SimulationStep step);
+    EnhancedBrain* getBrain();
+    
+private:
+    EnhancedBrain* brain_;
+};
+
+// Enhanced Brain Class with additional functionality
+class EnhancedBrain : public Brain {
+public:
+    EnhancedBrain(std::shared_ptr<Config> config);
+    
+    // Get enhanced statistics
+    std::vector<float> getFiringStatistics() const;
+    
+    // Analyze connectivity and provide insights
+    std::string analyzeConnectivity() const;
+    
+    // Get sensory neurons (placeholder - in real implementation would return actual IDs)
+    std::vector<NeuronId> getSensoryNeuronIds() const;
+    
+    // Enhanced statistics convenience methods
+    std::string getConnectivityReport() const {
+        return analyzeConnectivity();
+    }
+    
+    std::vector<float> getStatisticalSummary() const {
+        return getFiringStatistics();
+    }
+};
+
+// Enhanced AgentBrain Class
+class EnhancedAgentBrain : public AgentBrain {
+public:
+    EnhancedAgentBrain(EnhancedBrain* brain);
+    
+    void enableAllFeatures(bool enable);
+    
+    // Get comprehensive advanced statistics
+    std::map<std::string, std::string> getAdvancedStats() const;
+    
+private:
+    EnhancedBrain* enhancedBrainPtr_;
+};
+
+// Enhanced Simulation Runner
+class SimulationRunner {
+public:
+    struct SimulationMetrics {
+        size_t steps = 0;
+        float totalReward = 0.0f;
+        float avgFiringRate = 0.0f;
+        size_t maxFiringNeurons = 0;
+        size_t totalSpikes = 0;
+        std::chrono::milliseconds wallClockTime = std::chrono::milliseconds(0);
+        std::vector<float> firingRateHistory;
+        std::vector<float> rewardHistory;
+        std::vector<float> neuromodulationHistory;
+        
+        // Helper methods
+        float getAverageFiringRate() const {
+            return avgFiringRate;
+        }
+        
+        float getTotalReward() const {
+            return totalReward;
+        }
+        
+        size_t getMaxFiringNeurons() const {
+            return maxFiringNeurons;
+        }
+    };
+    
+    static SimulationMetrics runEpisode(
+        EnhancedBrain* brain,
+        SimpleWorld* world,
+        EnhancedAgentBrain* agent,
+        size_t stepsPerEpisode,
+        bool enableMonitoring = true);
+    
+    static std::vector<SimulationMetrics> runMultipleEpisodes(
+        EnhancedBrain* brain,
+        SimpleWorld* world,
+        EnhancedAgentBrain* agent,
+        size_t numEpisodes,
+        size_t stepsPerEpisode,
+        bool enableMonitoring = true);
+};
+
+// Memory Management Utilities
+class MemoryManager {
+public:
+    static void clearAllMemory(EnhancedBrain* brain);
+    static size_t getMemoryUsage(EnhancedBrain* brain);
+    static void optimizeMemory(EnhancedBrain* brain, float retentionRate = 0.3f);
+    
+    // Convenience methods
+    static void reset(EnhancedBrain* brain) {
+        clearAllMemory(brain);
+    }
+    
+    static size_t getUsage(EnhancedBrain* brain) {
+        return getMemoryUsage(brain);
+    }
+};
+
+// Performance Monitoring and Profiling
+class PerformanceProfiler {
+public:
+    struct PerformanceStats {
+        std::chrono::high_resolution_clock::time_point startTime;
+        size_t stepsCompleted = 0;
+        size_t totalSpikeCount = 0;
+        float totalCPUUsage = 0.0f;
+        size_t memoryUsage = 0;
+        float avgStepTime = 0.0f;
+        std::vector<float> stepTimes;
+        std::map<std::string, float> customMetrics;
+        
+        // Helper methods
+        float getAverageStepTime() const {
+            return avgStepTime;
+        }
+        
+        size_t getStepsCompleted() const {
+            return stepsCompleted;
+        }
+        
+        float getTotalSpikeCount() const {
+            return static_cast<float>(totalSpikeCount);
+        }
+    };
+    
+    static PerformanceStats startProfiling();
+    static void recordStep(PerformanceStats& stats, EnhancedBrain* brain);
+    static std::string generateReport(const PerformanceStats& stats);
+    
+    // Convenience methods
+    static PerformanceStats start() {
+        return startProfiling();
+    }
+    
+    static void record(EnhancedBrain* brain) {
+        static PerformanceStats stats = startProfiling();
+        recordStep(stats, brain);
+    }
+};
+
+// Neural Network Analysis Utilities
+class NeuralNetworkUtils {
+public:
+    static std::vector<float> computeFiringStatistics(EnhancedBrain* brain);
+    static std::string analyzeConnectivity(EnhancedBrain* brain);
+    static std::vector<NeuronId> getSensoryNeurons(EnhancedBrain* brain);
+    
+    // Convenience methods
+    static std::string getConnectivityAnalysis(EnhancedBrain* brain) {
+        return analyzeConnectivity(brain);
+    }
+    
+    static std::vector<float> getStatisticalData(EnhancedBrain* brain) {
+        return computeFiringStatistics(brain);
+    }
+};
+
+} // namespace nlm
