@@ -43,7 +43,6 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
 class Config {
 public:
     Config();
@@ -93,6 +92,45 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation and error handling
+    bool validateConfig() const;
+    std::string getValidationErrors() const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    // Configuration parameter metadata and descriptions
+    struct ParameterInfo {
+        std::string name;
+        std::string description;
+        ConfigValue defaultValue;
+        ConfigSource defaultSource;
+        std::vector<std::string> validValues; // For enum/string parameters
+        bool required;
+        float minValue; // For numeric parameters
+        float maxValue; // For numeric parameters
+        
+        ParameterInfo() : name(), description(), defaultValue(), defaultSource(ConfigSource::Default),
+                         required(false), minValue(std::numeric_limits<float>::lowest()),
+                         maxValue(std::numeric_limits<float>::max()) {}
+        
+        ParameterInfo(const std::string& n, const std::string& desc, const ConfigValue& def,
+                     ConfigSource src, bool req = false, float min = std::numeric_limits<float>::lowest(),
+                     float max = std::numeric_limits<float>::max())
+            : name(n), description(desc), defaultValue(def), defaultSource(src), required(req),
+              minValue(min), maxValue(max) {}
+    };
+    
+    // Get parameter information
+    static const std::vector<ParameterInfo>& getParameterInfos();
+    
+    // Get parameter info for a specific key
+    static ParameterInfo getParameterInfo(const std::string& key);
+    
+    // Check if configuration has sensible defaults
+    bool hasSensibleDefaults() const;
+    
+    // Suggest improvements for problematic configuration
+    std::vector<std::string> getConfigurationSuggestions() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +138,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isValidName(const std::string& key);
+    static bool isValidValue(const std::string& key, const ConfigValue& value);
+    static std::string getTypeName(const ConfigValue& value);
 };
 
 } // namespace nlm

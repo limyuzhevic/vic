@@ -1,30 +1,64 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
-
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
-#include <memory>
 #include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <cstdlib>
+
+void printHelpAndExit();
+
+void printHelpAndExit() {
+    std::cout << R"(
+NLM — Neural Learning Machine Phase 2 (熙然)
+Usage: nlm [options]
+
+Standard Options:
+  --help, -h              Show this help message
+  --config=FILE           Load configuration from FILE
+  --config FILE           Load configuration from FILE
+  --full                  Run full demonstration (complex)
+  --minidemo              Run minimal demonstration (quick)
+  --benchmark             Run performance benchmark
+
+Advanced Options:
+  --neuron=COUNT          Override neuron count
+  --region=COUNT          Override region count  
+  --rate=RATE             Override connection probability
+  --no-plasticity         Disable plasticity and neuromodulation
+  --no-cognition          Disable prediction learning and cognitive functions
+
+Configuration File Variables (see configs/default.cfg):
+  random_seed             Random seed for reproducible experiments
+  simulation_timestep     Simulation timestep in seconds
+  neuron_count            Number of neurons in the brain
+  region_count            Number of brain regions
+  connection_probability  Connection probability for random connectivity
+  stdp_ltp_weight         STDP long-term potentiation weight
+  stdp_ltd_weight         STDP long-term depression weight
+  stdp_tau                STDP time constant
+  hebbian_learning_rate   Hebbian learning rate
+  synaptogenesis_rate     Structural plasticity synaptogenesis rate
+  pruning_rate            Structural plasticity pruning rate
+  dopamine_level          Neuromodulation dopamine level
+  curiosity_level        Neuromodulation curiosity level
+  novelty_threshold       Novelty detection threshold
+  enable_structural_plasticity      Enable/disable structural plasticity
+  enable_neuromodulation           Enable/disable neuromodulation
+  enable_prediction_learning       Enable/disable prediction learning
+  enable_cognitive_functions       Enable/disable cognitive functions
+
+Examples:
+  nlm                          # Run standard demo
+  nlm --minidemo               # Quick demonstration
+  nlm --neuron=200             # Smaller network for testing
+  nlm --config myconfig.cfg     # Custom configuration
+  nlm --no-plasticity           # Run without plasticity
+
+All configuration values can be overridden via command line arguments:
+  --key=value  or  --key value
+
+For more information: https://github.com/your-repo/nlm
+
+)" << std::endl;
+    exit(0);
+}
 
 using namespace nlm;
 
@@ -326,18 +360,34 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Display help if requested
+    bool showHelp = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+            break;
+        }
+    }
+    
+    if (showHelp) {
+        printHelpAndExit();
+        return 0;
+    }
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 2: Enhanced Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Neuromodulation and cognitive functions");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -365,22 +415,188 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
+
+    // Set default values for Phase 2 with enhanced defaults
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+
+    // Hebbian plasticity parameters
+    config->set("hebbian_learning_rate", 0.01f, ConfigSource::Default);
+
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+
+    // Neuromodulation parameters
+    config->set("dopamine_level", 0.1f, ConfigSource::Default);
+    config->set("curiosity_level", 0.5f, ConfigSource::Default);
+    config->set("novelty_threshold", 0.05f, ConfigSource::Default);
+
+    // Advanced simulation features
+    config->set("enable_structural_plasticity", true, ConfigSource::Default);
+    config->set("enable_neuromodulation", true, ConfigSource::Default);
+    config->set("enable_prediction_learning", true, ConfigSource::Default);
+    config->set("enable_cognitive_functions", true, ConfigSource::Default);
+
+    // Enhanced command-line processing for advanced usage
+    std::cout << "Processing advanced command-line options...\n" << std::endl;
+    
+    // Handle special simulation modes
+    bool runFullDemo = false;
+    bool runMinidemo = false;
+    bool runBenchmark = false;
+    std::string configPath = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Configuration file
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configPath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configPath = argv[++i];
+            }
+        }
+        
+        // Simulation modes
+        if (arg == "--full") {
+            runFullDemo = true;
+        } else if (arg == "--minidemo") {
+            runMinidemo = true;
+        } else if (arg == "--benchmark") {
+            runBenchmark = true;
+        }
+        
+        // Override parameters
+        else if (arg.substr(0, 7) == "--neuron") {
+            if (arg.find('=') != std::string::npos) {
+                int neurons = std::stoi(arg.substr(arg.find('=') + 1));
+                config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 8) == "--region") {
+            if (arg.find('=') != std::string::npos) {
+                int regions = std::stoi(arg.substr(arg.find('=') + 1));
+                config->set("region_count", static_cast<int64_t>(regions), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 5) == "--rate") {
+            if (arg.find('=') != std::string::npos) {
+                float rate = std::stof(arg.substr(arg.find('=') + 1));
+                config->set("connection_probability", rate, ConfigSource::CommandLine);
+            }
+        }
+        
+        // Feature toggles
+        else if (arg == "--no-plasticity") {
+            config->set("enable_structural_plasticity", false, ConfigSource::CommandLine);
+            config->set("enable_neuromodulation", false, ConfigSource::CommandLine);
+        }
+        else if (arg == "--no-cognition") {
+            config->set("enable_prediction_learning", false, ConfigSource::CommandLine);
+            config->set("enable_cognitive_functions", false, ConfigSource::CommandLine);
+        }
+    }
+    
+    // Load configuration from specified file
+    if (configPath != "configs/default.cfg") {
+        if (config->loadFromFile(configPath)) {
+            NLM_LOG_INFO("Loaded advanced configuration from: " + configPath);
+        } else {
+            NLM_LOG_WARNING("Failed to load configuration from: " + configPath + ". Using defaults.");
+        }
+    }
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Enhanced Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  enable_structural_plasticity: " + std::to_string(config->getOr<bool>("enable_structural_plasticity", true)));
+    NLM_LOG_INFO("  enable_neuromodulation: " + std::to_string(config->getOr<bool>("enable_neuromodulation", true)));
+    NLM_LOG_INFO("");
+
+    // Enhanced command-line processing for advanced usage
+    std::cout << "Processing advanced command-line options...\n" << std::endl;
+    
+    // Handle special simulation modes
+    bool runFullDemo = false;
+    bool runMinidemo = false;
+    bool runBenchmark = false;
+    std::string configPath = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Configuration file
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configPath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configPath = argv[++i];
+            }
+        }
+        
+        // Simulation modes
+        if (arg == "--full") {
+            runFullDemo = true;
+        } else if (arg == "--minidemo") {
+            runMinidemo = true;
+        } else if (arg == "--benchmark") {
+            runBenchmark = true;
+        }
+        
+        // Override parameters
+        else if (arg.substr(0, 7) == "--neuron") {
+            if (arg.find('=') != std::string::npos) {
+                int neurons = std::stoi(arg.substr(arg.find('=') + 1));
+                config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 8) == "--region") {
+            if (arg.find('=') != std::string::npos) {
+                int regions = std::stoi(arg.substr(arg.find('=') + 1));
+                config->set("region_count", static_cast<int64_t>(regions), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg.substr(0, 5) == "--rate") {
+            if (arg.find('=') != std::string::npos) {
+                float rate = std::stof(arg.substr(arg.find('=') + 1));
+                config->set("connection_probability", rate, ConfigSource::CommandLine);
+            }
+        }
+        
+        // Feature toggles
+        else if (arg == "--no-plasticity") {
+            config->set("enable_structural_plasticity", false, ConfigSource::CommandLine);
+            config->set("enable_neuromodulation", false, ConfigSource::CommandLine);
+        }
+        else if (arg == "--no-cognition") {
+            config->set("enable_prediction_learning", false, ConfigSource::CommandLine);
+            config->set("enable_cognitive_functions", false, ConfigSource::CommandLine);
+        }
+    }
+    
+    // Load configuration from specified file
+    if (configPath != "configs/default.cfg") {
+        if (config->loadFromFile(configPath)) {
+            NLM_LOG_INFO("Loaded advanced configuration from: " + configPath);
+        } else {
+            NLM_LOG_WARNING("Failed to load configuration from: " + configPath + ". Using defaults.");
+        }
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -446,4 +662,63 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Help function for advanced usage
+void printHelpAndExit();
+
+void printHelpAndExit() {
+    std::cout << R"(
+NLM — Neural Learning Machine Phase 2 (熙然)
+Usage: nlm [options]
+
+Standard Options:
+  --help, -h              Show this help message
+  --config=FILE           Load configuration from FILE
+  --config FILE           Load configuration from FILE
+  --full                  Run full demonstration (complex)
+  --minidemo              Run minimal demonstration (quick)
+  --benchmark             Run performance benchmark
+
+Advanced Options:
+  --neuron=COUNT          Override neuron count
+  --region=COUNT          Override region count  
+  --rate=RATE             Override connection probability
+  --no-plasticity         Disable plasticity and neuromodulation
+  --no-cognition          Disable prediction learning and cognitive functions
+
+Configuration File Variables (see configs/default.cfg):
+  random_seed             Random seed for reproducible experiments
+  simulation_timestep     Simulation timestep in seconds
+  neuron_count            Number of neurons in the brain
+  region_count            Number of brain regions
+  connection_probability  Connection probability for random connectivity
+  stdp_ltp_weight         STDP long-term potentiation weight
+  stdp_ltd_weight         STDP long-term depression weight
+  stdp_tau                STDP time constant
+  hebbian_learning_rate   Hebbian learning rate
+  synaptogenesis_rate     Structural plasticity synaptogenesis rate
+  pruning_rate            Structural plasticity pruning rate
+  dopamine_level          Neuromodulation dopamine level
+  curiosity_level        Neuromodulation curiosity level
+  novelty_threshold       Novelty detection threshold
+  enable_structural_plasticity      Enable/disable structural plasticity
+  enable_neuromodulation           Enable/disable neuromodulation
+  enable_prediction_learning       Enable/disable prediction learning
+  enable_cognitive_functions       Enable/disable cognitive functions
+
+Examples:
+  nlm                          # Run standard demo
+  nlm --minidemo               # Quick demonstration
+  nlm --neuron=200             # Smaller network for testing
+  nlm --config myconfig.cfg     # Custom configuration
+  nlm --no-plasticity           # Run without plasticity
+
+All configuration values can be overridden via command line arguments:
+  --key=value  or  --key value
+
+For more information: https://github.com/your-repo/nlm
+
+)" << std::endl;
+    exit(0);
 }
