@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/Vision.hpp"
+#include "../sensory/VisionProcessor.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -19,6 +21,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , visionProcessor_(std::make_unique<VisionProcessor>())
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -87,12 +90,43 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Vision input processing with VisionProcessor
     const auto& vision = percept.getVision();
+    
+    // Create Vision object from percept data
+    // Current world generates 16-element vision data (4x4 grayscale image)
+    size_t visionWidth = static_cast<size_t>(std::sqrt(vision.size()));
+    size_t visionHeight = visionWidth;
+    size_t visionChannels = 1;  // Grayscale
+    
+    nlm::Vision visionInput(visionWidth, visionHeight, visionChannels);
+    visionInput.setData(vision);
+    
+    // Process vision with VisionProcessor to extract features
+    visionProcessor_->process(visionInput);
+    
+    // Get processed features from VisionProcessor
+    const auto& processedFeatures = visionProcessor_->getFeatures();
+    
+    // Use processed features to drive sensory neurons
+    // Map processed features to sensoryVision_ neurons
+    for (size_t i = 0; i < sensoryVision_.size() && i < processedFeatures.size(); ++i) {
+        if (sensoryVision_[i]) {
+            // Inject current proportional to processed feature value
+            // Features are typically normalized, so scale appropriately
+            float current = processedFeatures[i] * 10.0f;  // Enhanced scaling for features
+            sensoryVision_[i]->injectCurrent(current);
+        }
+    }
+    
+    // Also provide raw vision input as a backup for simplicity
+    // This ensures the agent still gets some vision input even if processing fails
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Use a blend of processed features and raw input
+            float featureContribution = (i < processedFeatures.size()) ? processedFeatures[i] * 5.0f : 0.0f;
+            float rawContribution = vision[i] * 2.0f;  // Lower weight for raw input
+            float current = featureContribution + rawContribution;
             sensoryVision_[i]->injectCurrent(current);
         }
     }

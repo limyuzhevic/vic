@@ -298,6 +298,75 @@ Early development has higher plasticity ("critical periods") that decreases with
 - Plasticity rates decrease with age
 - Synaptogenesis higher early, pruning higher later
 
+## Phase 5: Scaling + Research Platform
+
+### Performance Infrastructure
+- **Memory Pools**: Pre-allocated neuron/synapse pools
+- **Event Queues**: Lock-free ring buffers, time-bucketed delayed spikes
+- **Sparse Connectivity**: Adjacency list connectivity
+- **Parallel Processing**: Thread pool, parallel for, parallel neural processor
+- **SIMD Vectorization**: Vectorized LIF updates
+- **OptimizedBrain**: High-performance brain interface
+
+### Research Infrastructure
+- **CheckpointSystem**: Robust state serialization
+- **AblationSystem**: Mechanism ablation framework
+- **ScalingBenchmark**: Automated scaling experiments
+- **Phase5Experiment**: Lifetime learning experiments
+
+### Biological Fidelity Improvements
+- **Adaptive neuron models**: Parameters that adapt based on context
+- **Short-term plasticity**: Facilitation/depression mechanisms
+- **Configurable inhibitory circuits**: Balanced excitation/inhibition
+- **Homeostatic plasticity**: Stability maintenance mechanisms
+
+### Scalability
+- **Event-driven processing**: Skip inactive neurons
+- **Sparse connectivity representation**: Efficient storage
+- **SoA neuron state layout**: Cache-friendly access
+- **Multithreading support**: Parallel neural computation
+- **SIMD vectorization**: Vectorized neural updates
+- **Memory-efficient synapse storage**: Compressed representations
+
+## Phase 6: Future Directions
+
+### Potential Directions
+- **GPU acceleration**: Large-scale simulation capabilities
+- **Distributed simulation**: Across multiple machines
+- **More detailed neuron models**: Hodgkin-Huxley dynamics
+- **Calcium-based plasticity mechanisms**: Molecular-level plasticity
+- **Glial cell interactions**: Support functions for neurons
+- **Anatomically constrained connectivity**: Realistic brain connectivity
+- **Reinforcement learning integration**: Reward-based learning enhancements
+- **Hierarchical planning structures**: Multi-level action planning
+
+## Anti-Transformer Reminder
+
+Throughout all phases, NLM must NEVER become:
+- A transformer architecture
+- An LLM
+- A pretrained model
+- A conventional deep learning system
+- "LLM + memory"
+- "LLM + tools"
+
+The architecture must always be based on:
+- Individual neurons
+- Synapses
+- Spike-based communication
+- Neural plasticity
+- Developmental processes
+
+If at any point the architecture begins to resemble a transformer, it should be redirected or the project renamed to clarify it is no longer NLM.
+
+## Version History
+
+- v0.1.0 (Phase 1): Initial skeleton release
+- v0.2.0 (Phase 2): Working neural core with real spiking dynamics
+- v0.3.0 (Phase 3): World interaction and developmental mechanisms
+- v0.4.0 (Phase 4): Emerging cognition - prediction, memory, attention, planning, self-model, social learning
+- v0.5.0 (Phase 5): Scaling + Research Platform - performance optimizations, biological fidelity, lifelong learning
+
 ## What NLM is NOT
 
 NLM is NOT:
@@ -309,11 +378,24 @@ NLM is NOT:
 - A pretrained AI system
 
 NLM IS:
-- A computational exploration of brain-inspired architecture
-- A testbed for developmental learning hypotheses
-- A research platform for artificial neural systems
+- A computational exploration of developmental learning principles
+- An investigation of whether prediction can emerge from spiking dynamics
+- A test of whether concepts can form without predefined labels
+- A study of whether planning can arise from predictive mechanisms
+- An exploration of whether self-models can develop through sensorimotor learning
+- A testbed for neural architecture hypotheses
 - An educational tool for understanding neural computation
-- An investigation of whether cognition can emerge from spiking dynamics
+- A research platform with explicit approximations
+- A project that acknowledges its limitations honestly
+
+## Acknowledging Uncertainty
+
+We acknowledge that:
+1. Biological brains are far more complex than any current simulation
+2. Our understanding of the brain is incomplete
+3. Many approximations are necessary for computational tractability
+4. Claims of "brain-like" behavior should be critically examined
+5. Phase 4 does not claim human-like intelligence, consciousness, or genuine understanding
 
 ## Acknowledging Uncertainty
 

@@ -189,4 +189,40 @@ constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
+// Forward declarations for exception types
+class NLMException;
+class ConfigException;
+class NeuronException;
+class SynapseException;
+class MemoryException;
+class SimulationException;
+class ValidationException;
+
+// Error severity levels
+enum class ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+    Critical,
+    Fatal
+};
+
+// Error context structure for detailed error reporting
+struct ErrorContext {
+    ErrorCode code;
+    ErrorCategory category;
+    ErrorSeverity severity;
+    std::string message;
+    std::string file;
+    int line;
+    std::string function;
+    std::map<std::string, std::string> metadata;
+    
+    ErrorContext(ErrorCode c, const std::string& msg) 
+        : code(c), message(msg), line(0) {}
+    
+    ErrorContext(ErrorCode c, ErrorCategory cat, ErrorSeverity sev, const std::string& msg)
+        : code(c), category(cat), severity(sev), message(msg), line(0) {}
+};
+
 } // namespace nlm

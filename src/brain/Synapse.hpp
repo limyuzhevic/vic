@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Errors/Errors.hpp"
+#include <vector>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -9,11 +12,10 @@ class Neuron;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
-
 class Synapse {
 public:
     // Create synapse with IDs
-    Synapse(SynapseId id, NeuronId source, NeuronId destination);
+    Synapse(SynapseId id, NeuronId source, NeuronId destination) throw(SynapseException);
     
     ~Synapse();
     
@@ -32,16 +34,16 @@ public:
     
     // Weight
     SynapticWeight getWeight() const;
-    void setWeight(SynapticWeight weight);
-    void addToWeight(SynapticWeight delta);
+    void setWeight(SynapticWeight weight) throw(SynapseException);
+    void addToWeight(SynapticWeight delta) throw(SynapseException);
     
     // Delay (in simulation steps)
     Delay getDelay() const;
-    void setDelay(Delay delay);
+    void setDelay(Delay delay) throw(SynapseException);
     
     // Type
     SynapseType getType() const;
-    void setType(SynapseType type);
+    void setType(SynapseType type) throw(SynapseException);
     
     // Excitatory/Inhibitory
     bool isExcitatory() const;
@@ -59,30 +61,42 @@ public:
     PlasticityFlags& getPlasticityFlags();
     
     // Enable/disable plasticity rules
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) throw(SynapseException);
     
     // Eligibility trace (for reward-modulated learning)
     float getEligibilityTrace() const;
-    void setEligibilityTrace(float trace);
-    void decayEligibilityTrace(float decayRate);
+    void setEligibilityTrace(float trace) throw(SynapseException);
+    void decayEligibilityTrace(float decayRate) throw(SynapseException);
     
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    void setEfficacy(float efficacy) throw(SynapseException);
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    void step(Timestamp currentTime) throw(SynapseException);
     
     // Reset to initial state
-    void reset();
+    void reset() throw(SynapseException);
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(class RandomGenerator& rng) throw(SynapseException);
+    
+    // Validation methods
+    void validateState() const throw(SynapseException);
+    void validateWeight(SynapticWeight weight) const throw(SynapseException);
+    void validateDelay(Delay delay) const throw(SynapseException);
+    void validateTimestamp(Timestamp timestamp) const throw(SynapseException);
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Private helper methods
+    static constexpr SynapticWeight MIN_WEIGHT = -1.0f;
+    static constexpr SynapticWeight MAX_WEIGHT = 1.0f;
+    static constexpr Delay MIN_DELAY = 0;
+    static constexpr Delay MAX_DELAY = 10000;
 };
 
 } // namespace nlm

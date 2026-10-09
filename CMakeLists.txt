@@ -25,6 +25,7 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
+    src/core/Errors/Errors.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
@@ -75,16 +76,24 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
+    # Physics (Phase 4-6 enhanced)
+    src/physics/PhysicsSystem.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    
+    # Environment (Phase 4-6 enhanced)
+    src/environment/Environment.cpp
+    src/environment/Observation.cpp
+    src/environment/Action.cpp
+    src/environment/EnvironmentStateManager.cpp
+    src/environment/WeatherSystem.cpp
+    src/environment/ResourceSystem.cpp
+    src/environment/HazardSystem.cpp
+    src/environment/RealEnvironment.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

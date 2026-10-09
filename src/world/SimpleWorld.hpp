@@ -2,6 +2,7 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../environment/RealEnvironment.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,6 +29,7 @@ struct WorldObject {
 
 // Simple 2D world for NLM development
 // Provides sensory experience without semantic labels
+// Now uses RealEnvironment for realistic physics and environmental simulation
 class SimpleWorld {
 public:
     SimpleWorld();
@@ -66,7 +68,7 @@ public:
     // Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
     
-    // World dimensions
+    // Get world dimensions
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
     
@@ -83,6 +85,10 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
+    // Compute reward based on brain state and neuromodulation
+    // Integrates outcome reward, prediction error, and novelty signals
+    float computeReward(const class NeuralRegion& region);
+    
 private:
     // Generate vision from current view
     void generateVision();
@@ -92,6 +98,12 @@ private:
     
     // Interact with nearby objects
     ActionResult interact();
+    
+    // Convert between WorldObject and RigidBody
+    std::shared_ptr<RigidBody> convertToRigidBody(const WorldObject& obj) const;
+    
+    // Convert RigidBody to WorldObject
+    WorldObject convertToWorldObject(const RigidBody& body) const;
     
     // World geometry
     float width_;
@@ -124,6 +136,9 @@ private:
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Real environment for physics and environmental simulation
+    std::unique_ptr<RealEnvironment> realEnv_;
 };
 
 } // namespace nlm

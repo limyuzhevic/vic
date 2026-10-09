@@ -1,4 +1,11 @@
 #include "SimpleWorld.hpp"
+#include "../core/Types/Types.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/Reward.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -30,6 +37,9 @@ SimpleWorld::SimpleWorld()
     , rngState_(42)
 {
     agent_.reset();
+    // Initialize RealEnvironment
+    realEnv_.reset(new RealEnvironment());
+    realEnv_->initialize(width_, height_);
 }
 
 SimpleWorld::~SimpleWorld() = default;
@@ -39,11 +49,21 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    // Reconfigure RealEnvironment
+    if (realEnv_) {
+        realEnv_->reset();
+    }
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
     rngSeed_ = seed;
     rngState_ = seed;
+    
+    // Re-seed RealEnvironment
+    if (realEnv_) {
+        realEnv_->reset();
+    }
 }
 
 void SimpleWorld::reset() {
@@ -70,46 +90,74 @@ void SimpleWorld::reset() {
         objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
     }
     
+    // Reset RealEnvironment with agent position
+    if (realEnv_) {
+        realEnv_->setAgentStart(agent_.x, agent_.y);
+        realEnv_->reset();
+    }
+    
     generateVision();
 }
 
 void SimpleWorld::setAgentStart(float x, float y) {
     agent_.x = x;
     agent_.y = y;
+    
+    // Update RealEnvironment
+    if (realEnv_) {
+        realEnv_->setAgentStart(x, y);
+    }
 }
 
 void SimpleWorld::update(double timestep) {
     simTime_ += timestep;
     
-    // Apply velocity to position
-    agent_.x += agent_.velocityX * timestep;
-    agent_.y += agent_.velocityY * timestep;
-    
-    // Apply angular velocity to orientation
-    agent_.orientation += agent_.angularVelocity * timestep;
-    
-    // Normalize orientation to [-PI, PI]
-    while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
-    while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
-    
-    // Boundary collision
-    if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
-    if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
-    
-    // Energy decay
-    agent_.energy -= energyDecayRate_;
-    if (agent_.energy < 0.0f) agent_.energy = 0.0f;
-    
-    // Update age
-    agent_.age += timestep;
-    
-    // Generate vision
-    generateVision();
-    
-    // Check collisions
-    checkCollisions();
+    // Update RealEnvironment (which handles all physics and environmental simulation)
+    if (realEnv_) {
+        realEnv_->update(timestep);
+        
+        // Update agent from RealEnvironment
+        const AgentBody& envAgent = realEnv_->getAgentBody();
+        agent_.x = envAgent.x;
+        agent_.y = envAgent.y;
+        agent_.orientation = envAgent.orientation;
+        agent_.velocityX = envAgent.velocityX;
+        agent_.velocityY = envAgent.velocityY;
+        agent_.angularVelocity = envAgent.angularVelocity;
+        agent_.energy = envAgent.energy;
+        agent_.health = envAgent.health;
+        agent_.age = envAgent.age;
+        agent_.isMoving = envAgent.isMoving;
+        agent_.isTurning = envAgent.isTurning;
+        agent_.lastActionTime = envAgent.lastActionTime;
+    } else {
+        // Fallback to old physics simulation
+        agent_.x += agent_.velocityX * timestep;
+        agent_.y += agent_.velocityY * timestep;
+        agent_.orientation += agent_.angularVelocity * timestep;
+        
+        while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
+        while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
+        
+        // Boundary collision
+        if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
+        if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
+        if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
+        if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+        
+        // Energy decay
+        agent_.energy -= energyDecayRate_;
+        if (agent_.energy < 0.0f) agent_.energy = 0.0f;
+        
+        // Update age
+        agent_.age += timestep;
+        
+        // Generate vision
+        generateVision();
+        
+        // Check collisions
+        checkCollisions();
+    }
 }
 
 uint64_t SimpleWorld::nextRandom() {
@@ -117,6 +165,36 @@ uint64_t SimpleWorld::nextRandom() {
 }
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
+    // If RealEnvironment is available, delegate to it
+    if (realEnv_) {
+        // Convert current agent state to RealEnvironment
+        realEnv_->setAgentStart(agent_.x, agent_.y);
+        
+        // Apply motor command through RealEnvironment
+        ActionResult result = realEnv_->applyMotorCommand(cmd, currentTime);
+        
+        // Update agent from RealEnvironment
+        const AgentBody& envAgent = realEnv_->getAgentBody();
+        agent_.x = envAgent.x;
+        agent_.y = envAgent.y;
+        agent_.orientation = envAgent.orientation;
+        agent_.velocityX = envAgent.velocityX;
+        agent_.velocityY = envAgent.velocityY;
+        agent_.angularVelocity = envAgent.angularVelocity;
+        agent_.energy = envAgent.energy;
+        agent_.health = envAgent.health;
+        agent_.age = envAgent.age;
+        agent_.isMoving = envAgent.isMoving;
+        agent_.isTurning = envAgent.isTurning;
+        agent_.lastActionTime = envAgent.lastActionTime;
+        
+        // Update sensory percept from RealEnvironment
+        sensory_ = realEnv_->getSensoryPercept();
+        
+        return result;
+    }
+    
+    // Fallback to old implementation
     ActionResult result;
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
@@ -261,6 +339,17 @@ bool SimpleWorld::isValidPosition(float x, float y) const {
     if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
         return false;
     }
+    
+    // Check for objects
+    if (getObjectAt(x, y) != nullptr) {
+        return false;
+    }
+    
+    // Use RealEnvironment for hazard checking if available
+    if (realEnv_) {
+        return realEnv_->isSafePosition(x, y, 0.3f);
+    }
+    
     return true;
 }
 
@@ -398,6 +487,26 @@ void SimpleWorld::checkCollisions() {
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
     }
+}
+
+float SimpleWorld::computeReward(const NeuralRegion& region) {
+    // This now delegates to RealEnvironment which has comprehensive reward calculation
+    if (realEnv_) {
+        // For now, return a simple reward based on agent energy and health
+        float baseReward = (agent_.energy / maxEnergy_) * 0.5f + (agent_.health / 100.0f) * 0.5f;
+        
+        // Apply environmental stress
+        float stress = 0.0f;
+        if (realEnv_->getWeatherSystem()) {
+            // Add stress based on environmental conditions
+            stress = realEnv_->getEnvironmentalStress();
+        }
+        
+        return baseReward - stress * 0.3f;
+    }
+    
+    NLM_LOG_WARNING("SimpleWorld::computeReward - RealEnvironment not available");
+    return 0.0f;
 }
 
 } // namespace nlm

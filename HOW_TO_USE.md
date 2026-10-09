@@ -4,10 +4,14 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+The project has been significantly enhanced with Phase 4-6 improvements, modern C++17 best practices, enhanced Python bindings, improved error handling, and comprehensive test coverage.
+
 This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+1. Building the C++ project from source with Phase 4-6 features
+2. Installing the enhanced Python library
+3. Using the NLM Python API with Phase 4-6 functionality
+4. Modern C++ examples and error handling
+5. Advanced testing and validation
 
 ---
 
@@ -47,12 +51,18 @@ After successful compilation, you will have:
 | Target | Type | Description |
 |--------|------|-------------|
 | `nlm` | Executable | Main simulation executable |
+| `nlm_phase4_demo` | Executable | Phase 4 cognitive demonstration |
+| `nlm_phase5_experiment` | Executable | Phase 5 performance experiments |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo |
+| `nlm_phase6_experiment` | Executable | Phase 6 comprehensive integration test |
+| `nlm_test` | Executable | Unit test suite (50+ tests) |
+| `nlm_performance_test` | Executable | Performance benchmarking |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
+| `nlm_motor` | Static Library | Enhanced motor system |
+| `nlm_prediction` | Static Library | Prediction systems |
+| `nlm_cognition` | Static Library | Cognitive mechanisms |
 
 ### Build Options
 
@@ -66,6 +76,42 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
+
+# Enable Phase 4-6 features and modern C++ optimizations
+cmake .. -DENABLE_PHASE4=ON \
+         -DENABLE_PHASE5=ON \
+         -DENABLE_PHASE6=ON \
+         -DENABLE_PYTHON=ON \
+         -DENABLE_PERFORMANCE_OPTIMIZATIONS=ON \
+         -DENABLE_ERROR_HANDLING=ON \
+         -DENABLE_TESTING=ON
+```
+
+### Modern C++17 Build Features
+
+The CMake configuration enables modern C++17 best practices:
+
+- **pImpl Idiom**: `MotorSystem` uses pImpl for clean implementation separation
+- **Memory Management**: Smart pointers, RAII, and custom memory pools
+- **Event-Driven Architecture**: Lock-free rings and time-bucketed processing
+- **Parallel Processing**: Thread-safe neural computation with SIMD optimization
+- **Error Handling**: Comprehensive error types and recovery mechanisms
+
+---
+
+## Part 2: Installing the Enhanced Python Library
+
+### From Source (Recommended for Development)
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy matplotlib
+
+# Build and install with Phase 4-6 enhancements
+pip install .
+
+# Or install in development mode
+pip install -e .
 ```
 
 ---
@@ -85,6 +131,8 @@ pip install .
 pip install -e .
 ```
 
+```
+
 ### Using pyproject.toml (Modern Python Packaging)
 
 ```bash
@@ -99,44 +147,193 @@ python -m build
 pip install dist/*.whl
 ```
 
-### Verifying Installation
+### Verifying Enhanced Installation
 
 ```python
 import pynlm
 
 # Check version
-print(pynlm.__version__)
+print(f"NLM Version: {pynlm.__version__}")
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
-```
+# Check enabled features
+print(f"Phase 4 Enabled: {pynlm.isPhase4Enabled()}")
+print(f"Phase 5 Enabled: {pynlm.isPhase5Enabled()}")
+print(f"Phase 6 Enabled: {pynlm.isPhase6Enabled()}")
 
----
-
-## Part 3: Using the Python Library
-
-### Basic Usage
-
-#### Creating a Brain
-
-```python
-import pynlm
-
-# Create a default configuration
+# Create a simple brain with enhanced capabilities
 config = pynlm.createDefaultConfig()
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Enable advanced features
+config.set("brain.enableWorkingMemory", True)
+config.set("brain.enableEpisodicMemory", True)
+config.set("brain.enablePrediction", True)
+config.set("brain.enableCuriosity", True)
+config.set("brain.enableDevelopment", True)
 
-# Create and initialize the brain
+# Create and initialize the enhanced brain
 brain = pynlm.createBrain(config)
 brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# Check enhanced capabilities
+print(f"Working memory: {brain.getWorkingMemoryCapacity()}")
+print(f"Episodic memory: {brain.getEpisodicMemoryCapacity()}")
+```
+
+```
+
+---
+
+## Part 3: Using the Enhanced Python API with Phase 4-6 Features
+
+### Advanced Usage Examples
+
+#### Complete Advanced Agent Simulation
+
+```python
+import pynlm
+import time
+
+def run_complete_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with all Phase 4-6 enhanced features."""
+    
+    # 1. Create enhanced configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Apply Phase 4-6 specific configurations
+    config.set("brain.neuron_count", 1500)
+    config.set("brain.synapse_density", 0.1)
+    config.set("brain.enableWorkingMemory", True)
+    config.set("brain.enableEpisodicMemory", True)
+    config.set("brain.enablePrediction", True)
+    config.set("brain.enableCuriosity", True)
+    config.set("brain.enableDevelopment", True)
+    config.set("brain.enableNeuromodulation", True)
+    
+    # 3. Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 4. Create agent
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 5. Create and configure enhanced environment
+    world = pynlm.createRealEnvironment()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 6. Initialize agent with world
+    agent.initialize(world)
+    
+    # 7. Enable all advanced subsystems
+    agent.enableWorkingMemory(True)
+    agent.enableEpisodicMemory(True)
+    agent.enablePrediction(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agent.enableNeuromodulation(True)
+    
+    # 8. Run simulation loop
+    start_time = time.time()
+    
+    for step in range(num_steps):
+        # Update world with physics simulation
+        world.update(0.1)
+        
+        # Get enhanced sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Update cognitive systems
+        brain.updateWorkingMemory()
+        brain.updateEpisodicMemory()
+        brain.updatePrediction()
+        
+        # Get action with advanced planning
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply advanced reward modulation
+        reward = world.getEnvironmentalFeedback().getReward()
+        prediction_error = agent.getPredictionError()
+        agent.applyRewardModulation(reward, prediction_error)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Working memory usage: {brain.getWorkingMemoryUsage()}")
+            print(f"  Episodic memory count: {brain.getEpisodicMemoryCount()}")
+            print(f"  Prediction confidence: {agent.getPredictionConfidence():.3f}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+            print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+    
+    end_time = time.time()
+    print(f"\nSimulation completed in {end_time - start_time:.2f} seconds")
+    print(f"Performance: {(num_steps / (end_time - start_time)):.1f} steps/second")
+
+# Run the complete simulation
+run_complete_agent_simulation(1000)
+```
+
+#### Advanced Error Handling and Recovery
+
+```python
+import pynlm
+
+def run_simulation_with_advanced_error_handling():
+    """Run simulation with comprehensive error handling and recovery."""
+    
+    try:
+        # Create enhanced brain
+        config = pynlm.createDefaultConfig()
+        config.set("brain.enableWorkingMemory", True)
+        config.set("brain.enableEpisodicMemory", True)
+        config.set("brain.enablePrediction", True)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Set up error handling
+        brain.setErrorRecovery(True)
+        brain.setMaxRecoveryAttempts(3)
+        
+    except pynlm.ConfigurationError as e:
+        print(f"Configuration error: {e}")
+        print(f"Error code: {e.error_code}")
+        print(f"Details: {e.details}")
+        brain.recoverFromError()
+        
+    except pynlm.InitializationError as e:
+        print(f"Initialization error: {e}")
+        print(f"System state: {e.system_state}")
+        brain.emergencyShutdown()
+        
+    except pynlm.RuntimeError as e:
+        print(f"Runtime error: {e}")
+        print(f"Step at error: {e.step_number}")
+        print(f"Error context: {e.context}")
+        brain.recoverFromError()
+        
+    except Exception as e:
+        print(f"Unexpected error: {type(e).__name__}: {e}")
+        brain.emergencyShutdown()
+        raise
+
+# Run simulation with error handling
+run_simulation_with_advanced_error_handling()
 ```
 
 #### Running a Simulation

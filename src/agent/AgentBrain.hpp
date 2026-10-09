@@ -4,6 +4,8 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../sensory/Vision.hpp"
+#include "../sensory/VisionProcessor.hpp"
 #include <memory>
 #include <vector>
 
@@ -91,6 +93,9 @@ private:
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    
+    // Vision processor for advanced visual processing
+    std::unique_ptr<VisionProcessor> visionProcessor_;
     
     // Neuromodulation state
     float dopamineLevel_;
