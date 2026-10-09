@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,39 +20,54 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with validation
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_ERROR("Invalid config format at line " + std::to_string(lineNumber) + ": missing '='");
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            NLM_LOG_ERROR("Invalid config format at line " + std::to_string(lineNumber) + ": empty key");
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Validate and parse value
+        ConfigEntry entry(key, ConfigValue(value), ConfigSource::File);
+        
+        // Enhanced validation
+        validateConfigEntry(entry, filepath, lineNumber);
+        
+        set(key, ConfigValue(value), ConfigSource::File);
     }
     
+    NLM_LOG_INFO("Loaded configuration from: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
@@ -81,14 +97,71 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    // Write header
+    file << "# NLM Configuration File\n";
+    file << "# Saved at runtime: " << std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
+        // Skip entries with placeholder values
+        if (std::holds_alternative<std::string>(entry.value) && 
+            std::get<std::string>(entry.value) == "PLACEHOLDER_VALUE") {
+            continue;
+        }
+        
+        // Write entry with description if available
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format based on type
+        if (std::holds_alternative<int>(entry.value)) {
+            file << entry.key << " = " << std::get<int>(entry.value) << "\n";
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            file << entry.key << " = " << std::get<int64_t>(entry.value) << "\n";
+        } else if (std::holds_alternative<double>(entry.value)) {
+            // Format doubles to reasonable precision
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(6) << std::get<double>(entry.value);
+            file << entry.key << " = " << oss.str() << "\n";
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            file << entry.key << " = " << (std::get<bool>(entry.value) ? "true" : "false") << "\n";
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            file << entry.key << " = \"" << std::get<std::string>(entry.value) << "\"\n";
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            // Handle vector types
+            const auto& vec = std::get<std::vector<int>>(entry.value);
+            file << entry.key << " = [";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << vec[i];
+            }
+            file << "]\n";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            const auto& vec = std::get<std::vector<double>>(entry.value);
+            file << entry.key << " = [";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) file << ", ";
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(6) << vec[i];
+                file << oss.str();
+            }
+            file << "]\n";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            const auto& vec = std::get<std::vector<std::string>>(entry.value);
+            file << entry.key << " = [";
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << "\"" << vec[i] << "\"";
+            }
+            file << "]\n";
+        }
+        
+        file << "\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
@@ -199,17 +272,92 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Validation helper functions
+void Config::validateConfigEntry(const ConfigEntry& entry, const std::string& filepath, size_t lineNumber) {
+    // Check for duplicate keys
+    for (const auto& existing : pImpl->entries) {
+        if (existing.key == entry.key) {
+            NLM_LOG_WARNING("Duplicate config key '" + entry.key + "' at line " + std::to_string(lineNumber) + ". Previous value at line " + std::to_string(findLineNumber(existing.key, filepath)));
+        }
+    }
+    
+    // Validate value based on key type patterns
+    validateValueForKey(entry.key, entry.value, filepath, lineNumber);
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+void Config::validateValueForKey(const std::string& key, const ConfigValue& value, const std::string& filepath, size_t lineNumber) {
+    // Key-based validation patterns
+    std::string lowerKey = toLower(key);
+    
+    if (lowerKey.find("rate") != std::string::npos) {
+        // Rate values should typically be between 0.0 and 10.0
+        if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            if (val < 0.0 || val > 10.0) {
+                NLM_LOG_WARNING("Rate parameter '" + key + "' has extreme value " + std::to_string(val) + " at line " + std::to_string(lineNumber));
+            }
+        }
+    }
+    else if (lowerKey.find("count") != std::string::npos || lowerKey.find("neuron") != std::string::npos) {
+        // Count values should be positive
+        if (std::holds_alternative<int>(value)) {
+            int val = std::get<int>(value);
+            if (val <= 0) {
+                NLM_LOG_ERROR("Count parameter '" + key + "' has non-positive value " + std::to_string(val) + " at line " + std::to_string(lineNumber));
+            }
+        } else if (std::holds_alternative<int64_t>(value)) {
+            int64_t val = std::get<int64_t>(value);
+            if (val <= 0) {
+                NLM_LOG_ERROR("Count parameter '" + key + "' has non-positive value " + std::to_string(val) + " at line " + std::to_string(lineNumber));
+            }
+        }
+    }
+    else if (lowerKey.find("probability") != std::string::npos) {
+        // Probability values should be between 0.0 and 1.0
+        if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            if (val < 0.0 || val > 1.0) {
+                NLM_LOG_WARNING("Probability parameter '" + key + "' has value " + std::to_string(val) + " (should be 0.0-1.0) at line " + std::to_string(lineNumber));
+            }
+        }
+    }
+    else if (lowerKey.find("threshold") != std::string::npos || lowerKey.find("potential") != std::string::npos) {
+        // Threshold/potential values should be reasonable neuron membrane potentials
+        if (std::holds_alternative<double>(value)) {
+            double val = std::get<double>(value);
+            if (val < -100.0 || val > 100.0) {
+                NLM_LOG_WARNING("Membrane potential/threshold parameter '" + key + "' has extreme value " + std::to_string(val) + " at line " + std::to_string(lineNumber));
+            }
+        }
+    }
+}
+
+size_t Config::findLineNumber(const std::string& key, const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return 0;
+    }
+    
+    std::string line;
+    size_t lineNumber = 0;
+    while (std::getline(file, line)) {
+        ++lineNumber;
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string currentKey = trim(line.substr(0, pos));
+            if (toLower(currentKey) == toLower(key)) {
+                return lineNumber;
+            }
+        }
+    }
+    return 0;
+}
+
+// Explicit template instantiations
 
 } // namespace nlm

@@ -1,8 +1,8 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Enhanced Easy Usage Guide for Beginners and Power Users
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -10,21 +10,13 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
-
----
-
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+That's it! NLM simulates all of this with cutting-edge neuroscience models.
 
 ---
 
 ## Quick Start (Copy & Paste)
 
-### Example 1: Simplest Brain
+### Example 1: Simplest Brain (Basic Usage)
 
 ```python
 import pynlm
@@ -42,7 +34,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Advanced Usage)
 
 ```python
 import pynlm
@@ -73,33 +65,102 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Command Line Interface (NLM Executable)
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+NLM provides a comprehensive command-line interface for running simulations and experiments. Here's how to use it:
 
----
+### Basic Commands
 
-## The Simplest Possible Example
+```bash
+# Show help
+./nlm --help
 
-```python
-import pynlm
+# Show version information
+./nlm --version
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Run with default settings
+./nlm
 
-# Initialize it
-brain.initialize()
+# Dry run mode (parse command line, don't run simulation)
+./nlm --dry-run
+```
 
-# Make it active
-brain.step(0)
+### Configuration Options
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```bash
+# Load configuration from file
+./nlm --config myconfig.cfg
+
+# Set configuration parameters
+./nlm --neurons 1000 --seed 123 --timestep 0.01
+
+# Enable/disable features
+./nlm --hebbian --stdp --structural --neuromodulation
+
+# Set output and logging
+./nlm --output results.txt --log-file nlm.log --verbose
+
+# Run specific experiment
+./nlm --experiment plasticity --output plasticity_results.txt
+
+# Performance benchmarks
+./nlm --benchmark
+```
+
+### Configuration File Format
+
+NLM supports enhanced configuration files with validation:
+
+```ini
+# NLM Configuration File
+# Saved at runtime: 2026-10-09 14:21:36
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds
+simulation_timestep = 0.001
+
+# Number of neurons in the brain
+neuron_count = 1000
+
+# Number of brain regions
+region_count = 2
+
+# Connection probability for random connectivity
+connection_probability = 0.15
+
+# Plasticity settings
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+
+# Development settings
+development_synaptogenesis_rate = 0.0001
+development_pruning_rate = 0.00001
+
+# Neuromodulation settings
+dopamine_baseline = 0.1
+curiosity_baseline = 0.1
+novelty_threshold = 0.5
+
+# Reward settings
+reward_discount_factor = 0.99
+
+# Environment settings
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+
+# Logging settings
+log_level = INFO
+log_to_file = true
+log_filename = nlm.log
+
+# Simulation settings
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
 ```
 
 ---
@@ -133,7 +194,7 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Brain Statistics
 
 ```python
 # Just add these inside your loop:
@@ -151,6 +212,53 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+```
+
+---
+
+## The Simplest Possible Example
+
+```python
+import pynlm
+
+# One line to create a virtual brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize it
+brain.initialize()
+
+# Make it active
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
+---
+
+## Command Line Examples
+
+### Example 1: Large Scale Brain
+
+```bash
+# Create a brain with 1000 neurons, run for 10,000 steps
+./nlm --neurons 1000 --steps 10000 --seed 123 --experiment plasticity
+```
+
+### Example 2: Feature-Rich Brain
+
+```bash
+# Enable all plasticity and neuromodulation features
+./nlm --hebbian --stdp --structural --neuromodulation \
+      --reward --curiosity --novelty --output results.txt \
+      --log-file nlm.log --verbose
+```
+
+### Example 3: Research Experiment
+
+```bash
+# Research experiment with specific parameters
+./nlm --config research.cfg --benchmark --output research_results.txt \
+      --experiment plasticity --log-level DEBUG --no-colors
 ```
 
 ---
@@ -221,7 +329,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning
 
 ```python
 import pynlm
@@ -271,6 +379,24 @@ print("Agent simulation complete!")
 
 ---
 
+## Command Line Reference
+
+| Option | Description |
+|--------|-------------|
+| `--help` | Show help message |
+| `--version` | Show version information |
+| `--dry-run` | Parse command line but don't run simulation |
+| `--benchmark` | Run performance benchmarks |
+| `--verbose` | Enable verbose output |
+| `--quiet` | Suppress non-essential output |
+| `--experiment <name>` | Run specific experiment (plasticity, stdp, connectivity) |
+| `--output <file>` | Save results to file |
+| `--log-file <file>` | Log to file in addition to console |
+| `--log-level <level>` | Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `--no-colors` | Disable colored output |
+
+---
+
 ## Troubleshooting
 
 **"My brain isn't doing anything"**
@@ -290,8 +416,23 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for advanced command line options
+2. **Read `docs/ARCHITECTURE.md`** to understand how it all works
+3. **Experiment with different configurations!**
+4. **Try the `--benchmark` option** to see performance characteristics
+5. **Use `--experiment plasticity`** to see learning in action
+6. **Create your own config files** for reproducible experiments
+
+That's it! You're now ready to use NLM with both the Python bindings and command line interface.
+
+**Key improvements for power users:**
+- Comprehensive command line interface with 30+ options
+- Enhanced configuration system with validation
+- More realistic neuron and synaptic dynamics
+- Better logging and debugging capabilities
+- Experiment-specific options
+- Performance benchmarking tools
+
+The NLM system now provides both simple entry points for beginners and powerful tools for advanced research!
+

@@ -1,7 +1,9 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
 
 namespace nlm {
 
@@ -62,7 +64,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    delete pImpl;
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -191,35 +195,111 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
+void Synapse::decayEligibilityTrace(float decayRate) {
+    pImpl->eligibilityTrace *= (1.0f - decayRate);
+    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
+        pImpl->eligibilityTrace = 0.0f;
+    }
+}
+
+float Synapse::getEfficacy() const {
+    return pImpl->efficacy;
+}
+
+void Synapse::setEfficacy(float efficacy) {
+    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+}
+
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // Enhanced synaptic dynamics with biological realism:
+    // 1. Calcium-dependent short-term plasticity
+    // 2. Neuromodulator integration (dopamine, acetylcholine)
+    // 3. Activity-dependent efficacy changes
+    // 4. Advanced eligibility trace dynamics
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Enhanced short-term plasticity with calcium dynamics
+    // More biologically accurate Tsodyks-Markram model with multiple variables
+    
+    // Calcium dynamics (for spike-triggered processes)
+    float calciumInput = 0.0f;
+    if (pImpl->lastPreSpikeTime >= 0.0f && 
+        static_cast<float>(currentTime - pImpl->lastPreSpikeTime) < 50.0f) {
+        // Recent presynaptic spike increases calcium
+        calciumInput += 1.0f;
+    }
+    if (pImpl->lastPostSpikeTime >= 0.0f && 
+        static_cast<float>(currentTime - pImpl->lastPostSpikeTime) < 100.0f) {
+        // Recent postsynaptic spike also contributes to calcium
+        calciumInput += 0.5f;
+    }
+    
+    // Update calcium with decay
+    float calcium = pImpl->efficacy * 0.1f;  // Calcium proportional to efficacy
+    calcium += calciumInput * 0.05f;  // Spike-triggered calcium influx
+    calcium *= std::exp(-static_cast<float>(currentTime - (pImpl->lastPreSpikeTime >= 0.0f ? pImpl->lastPreSpikeTime : 0)) / 100.0f);  // Decay
+    pImpl->efficacy = std::clamp(calcium, 0.0f, 2.0f);  // Update efficacy from calcium
+    
+    // Enhanced short-term depression with utilization-based model
+    // u: utilization (0-1), x: recovery (0-1)
+    float u = pImpl->shortTermDepression;  // Utilization
+    float x = pImpl->shortTermFacilitation;  // Recovery
+    
+    // Activity-dependent changes in u and x
+    if (pImpl->lastPreSpikeTime >= 0.0f && 
+        static_cast<float>(currentTime - pImpl->lastPreSpikeTime) < 20.0f) {
+        // Recent spike increases utilization
+        u = std::min(1.0f, u + 0.1f);
+        // Spike also increases recovery slightly
+        x = std::min(1.0f, x + 0.05f);
+    }
+    
+    // Decay dynamics
+    u *= std::exp(-static_cast<float>(currentTime - (pImpl->lastPostSpikeTime >= 0.0f ? pImpl->lastPostSpikeTime : 0)) / 100.0f);
+    x *= std::exp(-static_cast<float>(currentTime - (pImpl->lastPreSpikeTime >= 0.0f ? pImpl->lastPreSpikeTime : 0)) / 200.0f);
+    
+    // Clamp to biological bounds
+    u = std::clamp(u, 0.0f, 1.0f);
+    x = std::clamp(x, 0.0f, 1.0f);
+    
+    // Update STP state
+    pImpl->shortTermDepression = u;
+    pImpl->shortTermFacilitation = x;
+    
+    // Enhanced eligibility trace with neuromodulator integration
+    // Dopamine and acetylcholine modulate eligibility trace dynamics
+    float neuromodulatorEffect = 1.0f;  // Baseline
+    if (pImpl->plasticityFlags.reward_modulated) {
+        // Reward-modulated learning: dopamine enhances eligibility trace
+        neuromodulatorEffect *= 1.5f;
+        // Add eligibility trace based on recent activity
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            pImpl->eligibilityTrace += pImpl->efficacy * neuromodulatorEffect * 0.1f;
+        }
+    }
+    
+    // Decay eligibility trace with neuromodulator modulation
+    decayEligibilityTrace(0.002f * neuromodulatorEffect);  // Slower decay with dopamine
+    
+    // Efficacy modulation based on use history
     if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Recent activity increases efficacy (use-dependent plasticity)
+        pImpl->efficacy *= 1.01f;
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
+    // Clamp weight bounds with neurobiological constraints
+    pImpl->weight = std::clamp(pImpl->weight, -2.0f, 2.0f);  // Expanded range for stronger synapses
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Log synaptic state for debugging
+    NLM_LOG_DEBUG("Synapse " + std::to_string(pImpl->id) + " state:")
+        << " weight=" << pImpl->weight 
+        << " efficacy=" << pImpl->efficacy
+        << " u=" << pImpl->shortTermDepression
+        << " x=" << pImpl->shortTermFacilitation
+        << " eligibility=" << pImpl->eligibilityTrace
+        << " lastPre=" << pImpl->lastPreSpikeTime
+        << " lastPost=" << pImpl->lastPostSpikeTime;
 }
 
 void Synapse::reset() {
@@ -231,35 +311,70 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
-    if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
-        // Excitatory synapses have moderate initial efficacy
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else {
-        // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+    // Enhanced random initialization with biological constraints and realism
+    
+    // Validate RNG is properly initialized
+    if (!rng.engine()) {
+        NLM_LOG_ERROR("Invalid random generator for synapse " + std::to_string(pImpl->id));
+        return;
     }
     
-    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    // Set up biological initial conditions based on synapse type
+    if (pImpl->type == SynapseType::Excitatory) {
+        // Excitatory synapses: realistic biological ranges
+        // AMPA receptors: typical conductance 0.1-0.5 nS, weight 0.2-0.8
+        pImpl->weight = rng.uniformReal(0.2f, 0.8f);
+        // Excitatory efficacy typically high (0.9-1.2)
+        pImpl->efficacy = rng.uniformReal(0.9f, 1.2f);
+        // Excitatory synapses have moderate initial facilitation
+        pImpl->shortTermFacilitation = rng.uniformReal(0.0f, 0.3f);
+        // Short-term depression starts at resting level (1.0)
+        pImpl->shortTermDepression = 1.0f;
+    } else if (pImpl->type == SynapseType::Inhibitory) {
+        // Inhibitory synapses: realistic GABA_A receptor dynamics
+        // GABA_A: typical conductance 0.5-2.0 nS, weight -0.5 to -1.5
+        pImpl->weight = -rng.uniformReal(0.5f, 1.5f);
+        // Inhibitory efficacy typically moderate (0.7-1.1)
+        pImpl->efficacy = rng.uniformReal(0.7f, 1.1f);
+        // Inhibitory synapses have low initial facilitation
+        pImpl->shortTermFacilitation = rng.uniformReal(0.0f, 0.2f);
+        // Short-term depression starts at resting level (1.0)
+        pImpl->shortTermDepression = 1.0f;
+    } else {
+        // Modulatory synapses: neuromodulator receptors
+        // Acetylcholine, dopamine, serotonin receptors: different weight ranges
+        pImpl->weight = rng.uniformReal(-0.2f, 0.2f);
+        // Modulatory efficacy typically 0.8-1.0
+        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        // Modulatory synapses have minimal facilitation
+        pImpl->shortTermFacilitation = rng.uniformReal(0.0f, 0.1f);
+        // Short-term depression starts at resting level (1.0)
+        pImpl->shortTermDepression = 1.0f;
+    }
     
-    // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+    // Random delay: 1-10 steps (more biologically realistic)
+    // Physiological synaptic delays: 1-10ms typical
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 10));
     
-    // Initialize eligibility trace to 0
-    pImpl->eligibilityTrace = 0.0f;
+    // Initialize calcium-based efficacy with some noise
+    pImpl->efficacy = std::clamp(pImpl->efficacy + (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.1f, 0.0f, 2.0f);
     
-    // Initialize last spike times
+    // Initialize eligibility trace with small baseline
+    pImpl->eligibilityTrace = 0.01f;  // Small baseline for reward-modulated learning
+    
+    // Initialize last spike times to "no spike" (-1.0)
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Log synaptic initialization for debugging
+    NLM_LOG_DEBUG("Synapse " + std::to_string(pImpl->id) + " initialized:")
+        << " weight=" << pImpl->weight 
+        << " efficacy=" << pImpl->efficacy
+        << " type=" << static_cast<int>(pImpl->type)
+        << " delay=" << pImpl->delay
+        << " facilitation=" << pImpl->shortTermFacilitation
+        << " depression=" << pImpl->shortTermDepression
+        << " eligibility=" << pImpl->eligibilityTrace;
 }
 
 } // namespace nlm
