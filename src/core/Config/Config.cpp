@@ -1,8 +1,10 @@
+// Config.cpp - Implementation of NLM configuration system
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,16 +21,32 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to open the configuration file
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Try to get more detailed error information
+        std::error_code ec;
+        if (!std::filesystem::exists(filepath, ec)) {
+            logConfigError("Configuration file does not exist", filepath);
+        } else if (std::filesystem::is_directory(filepath, ec)) {
+            logConfigError("Path is a directory, not a file", filepath);
+        } else {
+            logConfigError("Cannot open configuration file", filepath);
+            if (ec) {
+                logConfigError("System error: " + ec.message(), filepath);
+            }
+        }
         return false;
     }
     
+    NLM_LOG_INFO("Successfully opened configuration file: " + filepath);
+    
     std::string line;
+    int lineNum = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,8 +66,24 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            if (key.empty()) {
+                logConfigError("Empty key on line " + std::to_string(lineNum), filepath);
+                hasErrors = true;
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Loaded config: " + key + " = " + value + " (line " + std::to_string(lineNum) + ")");
+        } else if (!line.empty()) {
+            logConfigError("Invalid format on line " + std::to_string(lineNum) + ": expected key=value", filepath);
+            hasErrors = true;
         }
+    }
+    
+    if (hasErrors) {
+        NLM_LOG_WARNING("Configuration file loaded with errors (see above messages)");
+    } else {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
     }
     
     return true;
@@ -199,17 +233,9 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Helper function for logging configuration errors
+void logConfigError(const std::string& message, const std::string& context) {
+    std::cerr << "[Config ERROR] " << context << ": " << message << std::endl;
+}
 
 } // namespace nlm

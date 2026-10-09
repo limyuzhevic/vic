@@ -90,16 +90,8 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Log error messages
+    static void logError(const std::string& message, const std::string& context = "");
 };
 
 } // namespace nlm

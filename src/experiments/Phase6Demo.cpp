@@ -15,8 +15,13 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    // Initialize logging with proper API
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    Logger::getGlobal().setLevel(LogLevel::Info);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
