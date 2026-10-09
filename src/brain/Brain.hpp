@@ -1,3 +1,4 @@
+// Brain.hpp - Improved Brain class without Pimpl pattern
 #pragma once
 
 #include "../core/Types/Types.hpp"
@@ -8,6 +9,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -28,6 +31,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -47,6 +51,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// IMPROVED VERSION: Removed Pimpl pattern for better debuggability and maintainability
 
 class Brain {
 public:
@@ -192,10 +197,84 @@ public:
     
     // Logging
     void logStatus() const;
-    
+
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Integrated memory systems
+    std::unique_ptr<NeuralWorkingMemory> workingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    
+    // Prediction system
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    
+    // Cognition systems
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attention;
+    
+    // Development system
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+    // Neuromodulation systems
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
+    std::unique_ptr<Novelty> novelty;
+    
+    // Phase 2: Real neural computation components
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Configuration
+    std::shared_ptr<Config> config;
+    
+    // Random generator
+    std::unique_ptr<RandomGenerator> rng;
+    
+    // Neural regions and connections
+    std::vector<std::unique_ptr<NeuralRegion>> regions;
+    std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Simulation parameters
+    TimestepDuration timestep;
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    
+    // Statistics
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    
+    // Sensory neurons for input injection
+    std::vector<Neuron*> sensoryNeurons;
+    std::vector<Neuron*> motorNeurons;
+    
+    // Integration state
+    bool isResting;  // For sleep/rest cycle
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    
+    // Checkpoint system
+    std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Development state
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+    
+    // Helper methods
+    void initializeMemorySystems();
+    void initializePlasticitySystems();
+    void initializeNeuromodulationSystems();
+    void registerEventHandlers();
+    void configureSTDPParameters();
+    void configureStructuralPlasticityParameters();
+    void createRegions(size_t neuronCount, size_t regionCount, float connectionProbability);
+    void initializeConnectivity(float connectionProbability);
+    void resetNeuronsForReplay(const std::vector<const EpisodicMemoryItem*>& episodes);
 };
 
 } // namespace nlm
+
+// BRAIN.HPP END
