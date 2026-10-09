@@ -403,23 +403,163 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    
+    // Convenience function: Create and initialize a complete agent system
+    m.def("createAndInitializeAgent", [](std::shared_ptr<Config> config, 
+                                        std::shared_ptr<SimpleWorld> world,
+                                        bool enableLearning = true,
+                                        bool enableDevelopment = true,
+                                        bool enableCuriosity = true) -> std::shared_ptr<AgentBrain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable subsystems based on flags
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+        }
+        if (enableDevelopment) {
+            agent->enableDevelopment(true);
+        }
+        if (enableCuriosity) {
+            agent->enableCuriosity(true);
+        }
+        
+        return agent;
+    }, py::arg("config"), py::arg("world"), 
+          py::arg("enableLearning") = true,
+          py::arg("enableDevelopment") = true,
+          py::arg("enableCuriosity") = true,
+          "Create and initialize a complete agent system with world integration");
+    
+    // Convenience function: Run a complete simulation episode
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain,
+                         std::shared_ptr<AgentBrain> agent,
+                         std::shared_ptr<SimpleWorld> world,
+                         size_t numSteps,
+                         bool printProgress = false) {
+        brain->reset();
+        brain->initialize();
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Get action and execute
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            auto reward = percept.getInternal()[0];
+            agent->applyRewardModulation(reward, 0.0);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            if (printProgress && step % 100 == 0) {
+                py::print("Step " + std::to_string(step) + ": " +
+                         "Neurons firing: " + std::to_string(brain->getFiringNeuronCount()) + ", " +
+                         "Curiosity: " + std::to_string(agent->getCuriosityLevel()) + ", " +
+                         "Novelty: " + std::to_string(agent->getNoveltyLevel()));
+            }
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+          py::arg("numSteps") = 1000,
+          py::arg("printProgress") = false,
+          "Run a complete agent simulation episode");
+    
+    // Convenience function: Create a simple world with default settings
+    m.def("createWorld", [](size_t width, size_t height, 
+                          size_t visionWidth, size_t visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20,
+          py::arg("height") = 20,
+          py::arg("visionWidth") = 8,
+          py::arg("visionHeight") = 8,
+          "Create a simple world with default settings");
+    
+    // Convenience function: Create a brain with common optimization settings
+    m.def("createOptimizedBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Set optimized parameters for fast simulation
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.05f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
+    }, "Create a brain with optimized parameters for faster simulation");
+    
+    // Memory system convenience functions
+    m.def("getMemoryStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, py::object> stats;
+        
+        if (auto* workingMem = brain->getWorkingMemory()) {
+            stats["working_memory_traces"] = workingMem->getActiveTraces();
+            stats["working_memory_capacity"] = workingMem->getCapacity();
+            stats["working_memory_current_size"] = workingMem->getCurrentSize();
+        }
+        
+        if (auto* episodicMem = brain->getEpisodicMemory()) {
+            stats["episodic_memory_episodes"] = episodicMem->getEpisodeCount();
+            stats["episodic_memory_max_episodes"] = episodicMem->getMaxEpisodes();
+        }
+        
+        if (auto* associativeMem = brain->getAssociativeMemory()) {
+            stats["associative_memory_patterns"] = associativeMem->getPatternCount();
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive statistics about memory systems");
+    
+    // Development stage convenience functions
+    m.def("getDevelopmentInfo", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, py::object> info;
+        
+        auto stage = brain->getDevelopmentalStage();
+        info["developmental_stage"] = static_cast<int>(stage);
+        info["stage_name"] = getDevelopmentalStageName(stage);
+        
+        if (auto* devSystem = brain->getDevelopmentSystem()) {
+            info["developmental_age"] = devSystem->getDevelopmentalAge();
+            info["plasticity_modifier"] = devSystem->getPlasticityModifier();
+        }
+        
+// Helper function to convert developmental stage to string
+    m.def("getDevelopmentalStageName", &getDevelopmentalStageName,
+          py::arg("stage"), "Get human-readable name for developmental stage");
+    
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+    
+    m.def("getDevelopmentalStageName", [](DevelopmentalStage stage) {
+        switch (stage) {
+            case DevelopmentalStage::Initial: return "Initial";
+            case DevelopmentalStage::CriticalPeriod: return "Critical Period";
+            case DevelopmentalStage::Maturation: return "Maturation";
+            case DevelopmentalStage::Adult: return "Adult";
+            case DevelopmentalStage::Aging: return "Aging";
+            default: return "Unknown";
+        }
+    }, py::arg("stage"), "Get human-readable name for developmental stage");
 
 } // namespace nlm

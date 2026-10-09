@@ -488,25 +488,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons with their activations
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
+                            episode.neurons.push_back(neuron->getId());
+                            episode.values.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
                         }
                     }
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store sensory state if available
+            if (!pImpl->sensoryNeurons.empty()) {
+                episode.metadata = "sensory_state=";
+                for (auto* sensoryNeuron : pImpl->sensoryNeurons) {
+                    episode.metadata += std::to_string(sensoryNeuron->getState().membranePotential) + " ";
+                }
+            }
+            
+            // Store developmental stage
+            episode.metadata += "dev_stage=" + std::to_string(static_cast<int>(pImpl->developmentalStage));
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
+    }
+    
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
     }
     
     // ========== STEP 8: Update prediction system ==========
@@ -1049,6 +1061,18 @@ DevelopmentalStage Brain::getDevelopmentalStage() const {
 
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
+}
+
+// Helper function to convert developmental stage to string
+std::string getDevelopmentalStageName(DevelopmentalStage stage) {
+    switch (stage) {
+        case DevelopmentalStage::Initial: return "Initial";
+        case DevelopmentalStage::CriticalPeriod: return "Critical Period";
+        case DevelopmentalStage::Maturation: return "Maturation";
+        case DevelopmentalStage::Adult: return "Adult";
+        case DevelopmentalStage::Aging: return "Aging";
+        default: return "Unknown";
+    }
 }
 
 // ========== NEUROMODULATION SYSTEMS ==========

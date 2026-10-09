@@ -47,6 +47,7 @@ struct EpisodicMemoryItem {
     std::vector<NeuronId> neurons;
     std::vector<float> values;
     std::string metadata;
+    float reward = 0.0f;  // Reward value associated with this episode
     
     EpisodicMemoryItem() : timestamp(0) {}
 };
