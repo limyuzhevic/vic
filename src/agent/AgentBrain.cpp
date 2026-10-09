@@ -1,12 +1,14 @@
 #include "AgentBrain.hpp"
+#include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
+AgentBrain::AgentBrain(std::shared_ptr<Config> config)
+    : brain_(nullptr)
+    , config_(config)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -20,6 +22,21 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Load configuration values with defaults for backward compatibility
+    auto getOr = [&](const std::string& key, auto defaultValue) {
+        if (config_ && config_->has(key)) {
+            return config_->getOr<typename std::decay<decltype(defaultValue)>::type>(key, defaultValue);
+        }
+        return defaultValue;
+    };
+    
+    // Load neuromodulation parameters
+    sensoryNoveltyDecay_ = getOr("working_memory_decay_rate", 0.99f);
+    curiosityEnabled_ = getOr("curiosity_enabled", true);
+    developmentEnabled_ = getOr("development_enabled", true);
+    structuralPlasticityEnabled_ = getOr("structural_plasticity_enabled", true);
+    rewardModulationEnabled_ = getOr("reward_modulation_enabled", true);
+}
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {

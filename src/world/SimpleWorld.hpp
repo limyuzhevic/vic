@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/Config/Config.hpp"
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
 #include <memory>
@@ -30,11 +31,21 @@ struct WorldObject {
 // Provides sensory experience without semantic labels
 class SimpleWorld {
 public:
-    SimpleWorld();
+    SimpleWorld(std::shared_ptr<Config> config = nullptr);
     ~SimpleWorld();
+    
+    // Disable copying
+    SimpleWorld(const SimpleWorld&) = delete;
+    SimpleWorld& operator=(const SimpleWorld&) = delete;
+    
+    // Enable moving
+    SimpleWorld(SimpleWorld&&) noexcept = default;
+    SimpleWorld& operator=(SimpleWorld&&) noexcept = default;
     
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
+    void configureFromConfig();
+    void setRandomSeed(uint64_t seed);
     
     // Reset world to initial state
     void reset();
@@ -70,28 +81,29 @@ public:
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
     
-    // Energy settings
+    // Get vision dimensions
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
+    
+    // Get energy parameters
     float getMaxEnergy() const { return maxEnergy_; }
-    void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
-    void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
     
-    // Time
-    double getSimulationTime() const { return simTime_; }
+    // Get object placement parameters
+    size_t getNumResourceObjects() const { return numResourceObjects_; }
+    size_t getNumHazardObjects() const { return numHazardObjects_; }
     
-    // Seed for reproducibility
-    void setRandomSeed(uint64_t seed);
-    uint64_t getRandomSeed() const { return rngSeed_; }
+    // Simulation control
+    void setSimTime(double time) { simTime_ = time; }
+    double getSimTime() const { return simTime_; }
+    
+    // Random number generation
+    uint64_t nextRandom();
     
 private:
-    // Generate vision from current view
-    void generateVision();
-    
-    // Check for collisions
-    void checkCollisions();
-    
-    // Interact with nearby objects
-    ActionResult interact();
+    // Core configuration
+    std::shared_ptr<Config> config_;
     
     // World geometry
     float width_;
@@ -115,15 +127,25 @@ private:
     float energyDecayRate_;
     float resourceEnergyGain_;
     
-    // Simulation time
+    // Object placement configuration
+    size_t numResourceObjects_;
+    size_t numHazardObjects_;
+    
+    // Simulation state
     double simTime_;
     
-    // Random seed
+    // Random seed and state
     uint64_t rngSeed_;
-    
-    // Simple RNG state
     uint64_t rngState_;
-    uint64_t nextRandom();
+    
+    // Generate vision from current view
+    void generateVision();
+    
+    // Check for collisions
+    void checkCollisions();
+    
+    // Interact with nearby objects
+    ActionResult interact();
 };
 
 } // namespace nlm

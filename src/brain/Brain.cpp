@@ -242,9 +242,11 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
+// Initialize prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
+
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
@@ -1112,6 +1114,881 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+void Brain::configureCustomTopology(const CustomTopology::TopologyConfig& config) {
+    // Implement custom neural topology configuration
+    // This allows users to define custom network architectures with different connection patterns
+    
+    NLM_LOG_INFO("Configuring custom neural topology...");
+    
+    // Clear existing regions
+    pImpl->regions.clear();
+    
+    // Create regions based on topology configuration
+    for (size_t i = 0; i < config.numRegions; ++i) {
+        auto regionId = addRegion("CustomRegion_" + std::to_string(i + 1));
+        auto* region = getRegion(regionId);
+        
+        if (region) {
+            // Add neurons to region
+            for (size_t j = 0; j < config.neuronsPerRegion; ++j) {
+                NeuronId neuronId = region->addNeuron();
+                
+                // Set neuron type based on position in network
+                NeuronType neuronType = NeuronType::Internal;
+                if (j < config.neuronsPerRegion / 4) {
+                    neuronType = NeuronType::Sensory;
+                } else if (j < 3 * config.neuronsPerRegion / 4) {
+                    neuronType = NeuronType::Internal;
+                } else {
+                    neuronType = NeuronType::Motor;
+                }
+                
+                region->getPopulation(region->getPopulationId(neuronId))->setNeuronType(neuronType);
+            }
+        }
+    }
+    
+    // Apply connection pattern based on topology configuration
+    switch (config.pattern) {
+        case CustomTopology::ConnectionPattern::Dense:
+            // Implement dense connectivity
+            for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+                auto* region = getRegion(RegionId(i + 1));
+                if (region) {
+                    region->initializeDenseConnectivity(*pImpl->rng);
+                }
+            }
+            break;
+            
+        case CustomTopology::ConnectionPattern::Sparse:
+            // Implement sparse connectivity
+            for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+                auto* region = getRegion(RegionId(i + 1));
+                if (region) {
+                    region->initializeRandomConnectivity(*pImpl->rng, config.connectionProbability, 0.2f, 0.1f);
+                }
+            }
+            break;
+            
+        case CustomTopology::ConnectionPattern::Clustered:
+            // Implement clustered connectivity
+            // Create clusters and connect within clusters
+            break;
+            
+        case CustomTopology::ConnectionPattern::SmallWorld:
+            // Implement small-world connectivity
+            // Combine high local connectivity with occasional long-range connections
+            break;
+            
+        case CustomTopology::ConnectionPattern::Ring:
+            // Implement ring connectivity
+            // Connect neurons in a ring pattern
+            break;
+            
+        case CustomTopology::ConnectionPattern::Grid:
+            // Implement grid connectivity
+            // Create 2D grid structure
+            break;
+            
+        case CustomTopology::ConnectionPattern::Hierarchical:
+            // Implement hierarchical connectivity
+            // Create multi-level hierarchical structure
+            break;
+    }
+    
+    // Apply custom connections if specified
+    for (const auto& customConnection : config.customConnections) {
+        NeuronId source = NeuronId(customConnection.first);
+        NeuronId target = NeuronId(customConnection.second);
+        
+        // Find source and target neurons
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == source) {
+                    for (auto& otherRegion : pImpl->regions) {
+                        auto otherNeurons = otherRegion->getAllNeurons();
+                        for (auto* otherNeuron : otherNeurons) {
+                            if (otherNeuron->getId() == target) {
+                                // Create synapse
+                                region->addSynapse(neuron, otherNeuron, 0.1f, 1);
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Custom neural topology configuration complete");
+}
+
+void Brain::configureAdvancedPlasticity(const CustomPlasticityRule::PlasticityParams& params) {
+    // Configure advanced plasticity rules
+    
+    NLM_LOG_INFO("Configuring advanced plasticity rule...");
+    
+    // Store plasticity parameters
+    pImpl->plasticityParams = params;
+    
+    // Configure STDP with advanced parameters
+    if (pImpl->stdp) {
+        pImpl->stdp->setLTPWeight(params.learningRate);
+        pImpl->stdp->setLTDWeight(params.learningRate * 1.2f); // LTD typically stronger
+        pImpl->stdp->setTau(params.stdpTauPre);
+    }
+    
+    // Configure Hebbian learning with advanced parameters
+    if (pImpl->hebbian) {
+        pImpl->hebbian->setLearningRate(params.hebbianAlpha);
+    }
+    
+    // Configure structural plasticity
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setSynaptogenesisRate(params.homeostaticRate * 0.01f);
+        pImpl->structuralPlasticity->setPruningRate(params.homeostaticRate * 0.001f);
+    }
+    
+    // Enable/disable plasticity components
+    pImpl->enableSTDP = params.enableDepression;
+    pImpl->enableHebbian = params.enableHebbian;
+    pImpl->enableRewardModulated = true; // Always enable reward modulation with advanced plasticity
+    
+    NLM_LOG_INFO("Advanced plasticity configuration complete");
+}
+
+void Brain::configureMemoryReplay(size_t replayInterval, size_t consolidationInterval, 
+                                 const std::vector<NeuronId>& neuronsToReplay) {
+    // Configure memory replay and consolidation
+    
+    NLM_LOG_INFO("Configuring memory replay system...");
+    
+    // Set replay and consolidation intervals
+    pImpl->replayInterval = replayInterval;
+    pImpl->consolidationInterval = consolidationInterval;
+    pImpl->neuronsToReplay = neuronsToReplay;
+    
+    // Configure working memory replay
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setReplayNeurons(neuronsToReplay);
+        pImpl->workingMemory->setReplayInterval(replayInterval);
+    }
+    
+    // Configure episodic memory replay
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->setReplayNeurons(neuronsToReplay);
+        pImpl->episodicMemory->setConsolidationInterval(consolidationInterval);
+    }
+    
+    // Configure episodic memory consolidation
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->setConsolidationThreshold(0.3f); // Lower threshold for more frequent consolidation
+        pImpl->episodicMemory->setConsolidationStrength(1.0f);
+    }
+    
+    NLM_LOG_INFO("Memory replay configuration complete");
+}
+
+void Brain::configureCustomReward(const CustomRewardImpl::RewardConfig& config) {
+    // Configure custom reward functions
+    
+    NLM_LOG_INFO("Configuring custom reward system...");
+    
+    // Store reward configuration
+    pImpl->rewardConfig = config;
+    
+    // Configure dopamine for reward signaling
+    if (pImpl->dopamine) {
+        // Configure dopamine based on reward function type
+        if (config.functionType == "complex") {
+            pImpl->dopamine->setPeak(2.0f); // Higher peak for complex rewards
+        } else if (config.functionType == "intrinsic") {
+            pImpl->dopamine->setPeak(0.5f); // Lower peak for intrinsic motivation
+        }
+    }
+    
+    // Configure novelty for exploration bonus
+    if (pImpl->novelty) {
+        pImpl->novelty->setWeight(config.intrinsicWeight);
+    }
+    
+    // Configure curiosity for exploration
+    if (pImpl->curiosity) {
+        pImpl->curiosity->setWeight(config.extrinsicWeight);
+    }
+    
+    NLM_LOG_INFO("Custom reward configuration complete");
+}
+
+void Brain::enableParallelProcessing(const ParallelManagerImpl::ParallelConfig& config) {
+    // Enable parallel processing for large-scale simulations
+    
+    NLM_LOG_INFO("Enabling parallel processing...");
+    
+    // Store parallel processing configuration
+    pImpl->parallelConfig = config;
+    
+    // Configure parallel processing for neural computation
+    if (pImpl->parallelConfig.enableParallelProcessing) {
+        pImpl->parallelNeuralProcessor = std::make_unique<ParallelNeuralProcessor>(config.numCores);
+        
+        // Enable parallel neuron processing
+        pImpl->parallelNeuralProcessor->enableNeuronProcessing(true);
+        
+        // Configure parallel spike processing
+        if (config.enableSpikingQueue) {
+            pImpl->parallelNeuralProcessor->enableSpikingProcessing(true);
+        }
+        
+        // Enable parallel plasticity updates
+        pImpl->parallelNeuralProcessor->enablePlasticityProcessing(true);
+    }
+    
+    // Enable parallel memory processing
+    if (config.enableParallelMemoryProcessing) {
+        pImpl->parallelMemoryProcessor = std::make_unique<ParallelMemoryProcessor>(config.numCores);
+        pImpl->parallelMemoryProcessor->enableWorkingMemoryProcessing(true);
+        pImpl->parallelMemoryProcessor->enableEpisodicMemoryProcessing(true);
+    }
+    
+    NLM_LOG_INFO("Parallel processing enabled");
+}
+
+void Brain::enablePerformanceProfiler(bool enable) {
+    // Enable/disable performance profiler
+    
+    NLM_LOG_INFO("Configuring performance profiler...");
+    
+    // Set profiler enabled state
+    pImpl->profilerEnabled = enable;
+    
+    // Start/stop performance monitoring
+    if (enable) {
+        pImpl->performanceProfiler = std::make_unique<PerformanceProfilerImpl>();
+        pImpl->performanceProfiler->start();
+        pImpl->performanceProfiler->enableDetailedLogging(true);
+    } else if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->stop();
+    }
+    
+    NLM_LOG_INFO("Performance profiler " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void Brain::logAdvancedMetrics() {
+    // Log advanced metrics for power users
+    
+    NLM_LOG_INFO("=== Advanced Metrics ===");
+    
+    // Log neural activity metrics
+    NLM_LOG_INFO("Neural Activity Metrics:");
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(getTotalSpikeCount()));
+    NLM_LOG_INFO("  Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("  Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(getAverageFiringRate()));
+    NLM_LOG_INFO("  Excitation/Inhibition ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Log memory metrics
+    NLM_LOG_INFO("Memory Metrics:");
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("  Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    }
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("  Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+        NLM_LOG_INFO("  Memory replay scheduled: " + std::to_string(pImpl->episodicMemory->isReplayScheduled()));
+    }
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("  Associative memory strength: " + std::to_string(pImpl->associativeMemory->getStrength()));
+    }
+    
+    // Log neuromodulation metrics
+    NLM_LOG_INFO("Neuromodulation Metrics:");
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("  Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+        NLM_LOG_INFO("  Dopamine plasticity factor: " + std::to_string(pImpl->dopamine->getPlasticityFactor()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("  Novelty detection: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("  Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("  Prediction error: " + std::to_string(pImpl->predictionError->getLevel()));
+    }
+    
+    // Log plasticity metrics
+    NLM_LOG_INFO("Plasticity Metrics:");
+    if (pImpl->stdp) {
+        NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(pImpl->stdp->getLTPWeight()));
+        NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(pImpl->stdp->getLTDWeight()));
+    }
+    if (pImpl->hebbian) {
+        NLM_LOG_INFO("  Hebbian learning rate: " + std::to_string(pImpl->hebbian->getLearningRate()));
+    }
+    if (pImpl->structuralPlasticity) {
+        NLM_LOG_INFO("  Synaptogenesis rate: " + std::to_string(pImpl->structuralPlasticity->getSynaptogenesisRate()));
+        NLM_LOG_INFO("  Pruning rate: " + std::to_string(pImpl->structuralPlasticity->getPruningRate()));
+    }
+    
+    // Log prediction metrics
+    NLM_LOG_INFO("Prediction Metrics:");
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("  Prediction error: " + std::to_string(pImpl->predictionSystem->getPredictionError()));
+        NLM_LOG_INFO("  Prediction confidence: " + std::to_string(pImpl->predictionSystem->getConfidence()));
+    }
+    
+    // Log concept formation metrics
+    NLM_LOG_INFO("Concept Formation Metrics:");
+    if (pImpl->conceptFormation) {
+        NLM_LOG_INFO("  Concepts discovered: " + std::to_string(pImpl->conceptFormation->getConceptCount()));
+        if (pImpl->conceptFormation->getConceptCount() > 0) {
+            NLM_LOG_INFO("  Most stable concept ID: " + std::to_string(
+                pImpl->conceptFormation->getConcept(1)->avgStability));
+        }
+    }
+    
+    // Log development metrics
+    NLM_LOG_INFO("Development Metrics:");
+    NLM_LOG_INFO("  Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
+    // Log performance metrics if profiler is enabled
+    if (pImpl->profilerEnabled && pImpl->performanceProfiler) {
+        NLM_LOG_INFO("Performance Metrics (Profiler Enabled):");
+        auto stats = pImpl->performanceProfiler->getCurrentStats();
+        NLM_LOG_INFO("  CPU utilization: " + std::to_string(stats.cpuUsage) + "%");
+        NLM_LOG_INFO("  Memory usage: " + std::to_string(stats.memoryUsage) + " MB");
+        NLM_LOG_INFO("  Simulation time: " + std::to_string(stats.simulationTime * 1000) + " ms");
+        NLM_LOG_INFO("  Spike processing time: " + std::to_string(stats.spikeProcessingTime * 1000) + " ms");
+        NLM_LOG_INFO("  Plasticity time: " + std::to_string(stats.plasticityTime * 1000) + " ms");
+    }
+    
+    NLM_LOG_INFO("=== Advanced Metrics Complete ===");
+}
+
+// Static methods for advanced features
+std::shared_ptr<CustomTopology::TopologyConfig> Brain::createSparseTopology(size_t numRegions, float connectionProb) {
+    auto config = std::make_shared<CustomTopology::TopologyConfig>();
+    config->numRegions = numRegions;
+    config->neuronsPerRegion = 1000;
+    config->pattern = CustomTopology::ConnectionPattern::Sparse;
+    config->connectionProbability = connectionProb;
+    config->clusterProbability = 0.0f;
+    config->rewireProbability = 0.0f;
+    config->directed = false;
+    return config;
+}
+
+std::shared_ptr<CustomTopology::TopologyConfig> Brain::createClusteredTopology(size_t numRegions, 
+                                                                                   size_t clusterSize, 
+                                                                                   float interClusterProb,
+                                                                                   float intraClusterProb) {
+    auto config = std::make_shared<CustomTopology::TopologyConfig>();
+    config->numRegions = numRegions;
+    config->neuronsPerRegion = clusterSize;
+    config->pattern = CustomTopology::ConnectionPattern::Clustered;
+    config->connectionProbability = 0.0f;
+    config->clusterProbability = 0.0f;
+    config->rewireProbability = interClusterProb;
+    config->directed = false;
+    return config;
+}
+
+std::shared_ptr<CustomTopology::TopologyConfig> Brain::createSmallWorldTopology(size_t numRegions,
+                                                                                    float connectionProb,
+                                                                                    float rewireProb) {
+    auto config = std::make_shared<CustomTopology::TopologyConfig>();
+    config->numRegions = numRegions;
+    config->neuronsPerRegion = 1000;
+    config->pattern = CustomTopology::ConnectionPattern::SmallWorld;
+    config->connectionProbability = connectionProb;
+    config->clusterProbability = 0.0f;
+    config->rewireProbability = rewireProb;
+    config->directed = false;
+    return config;
+}
+
+std::shared_ptr<CustomPlasticityRule::PlasticityParams> Brain::createSTDPParams(float ltpRate, float ltdRate, float tau) {
+    auto params = std::make_shared<CustomPlasticityRule::PlasticityParams>();
+    params->type = CustomPlasticityRule::RuleType::STDP;
+    params->learningRate = ltpRate;
+    params->stdpTauPre = tau;
+    params->stdpTauPost = tau;
+    params->hebbianAlpha = 0.0f;
+    params->homeostaticTarget = 5.0f;
+    params->homeostaticRate = 0.01f;
+    params->neuromodulatorWeight = 0.5f;
+    params->enableDepression = true;
+    params->enableHebbian = false;
+    return params;
+}
+
+std::shared_ptr<CustomPlasticityRule::PlasticityParams> Brain::createHebbianParams(float learningRate) {
+    auto params = std::make_shared<CustomPlasticityRule::PlasticityParams>();
+    params->type = CustomPlasticityRule::RuleType::Hebbian;
+    params->learningRate = learningRate;
+    params->stdpTauPre = 0.0f;
+    params->stdpTauPost = 0.0f;
+    params->hebbianAlpha = learningRate;
+    params->homeostaticTarget = 5.0f;
+    params->homeostaticRate = 0.01f;
+    params->neuromodulatorWeight = 0.0f;
+    params->enableDepression = false;
+    params->enableHebbian = true;
+    return params;
+}
+
+std::shared_ptr<ParallelManagerImpl::ParallelConfig> Brain::createParallelConfig(size_t numCores, bool enableSharedMemory) {
+    auto config = std::make_shared<ParallelManagerImpl::ParallelConfig>();
+    config->numCores = numCores;
+    config->neuronsPerCore = 10000;
+    config->enableSharedMemory = enableSharedMemory;
+    config->enableTaskQueue = true;
+    config->enableSpikingQueue = true;
+    config->spikeQueueSize = 10000;
+    config->loadBalanceThreshold = 0.7f;
+    config->enableDynamicScheduling = true;
+    config->schedulingInterval = 0.1f;
+    config->enableMemoryPool = true;
+    config->memoryPoolSize = 100 * 1024 * 1024; // 100 MB
+    config->enableSIMD = true;
+    return config;
+}
+
+std::shared_ptr<PerformanceProfilerImpl::ProfileData> Brain::getPerformanceData() {
+    auto profileData = std::make_shared<PerformanceProfilerImpl::ProfileData>();
+    
+    if (pImpl->performanceProfiler) {
+        *profileData = pImpl->performanceProfiler->getCurrentStats();
+    } else {
+        // Initialize with default values
+        profileData->cpuUsage = 0.0f;
+        profileData->memoryUsage = 0.0f;
+        profileData->simulationTime = 0.0f;
+        profileData->spikeProcessingTime = 0.0f;
+        profileData->plasticityTime = 0.0f;
+        profileData->memoryAccessTime = 0.0f;
+        profileData->neuronUpdateTime = 0.0f;
+        profileData->spikesProcessed = getTotalSpikeCount();
+        profileData->neuronsUpdated = getActiveNeuronCount();
+        profileData->cacheHitRate = 0.0f;
+        profileData->memoryPoolUsage = 0.0f;
+        profileData->customMetrics = std::map<std::string, float>();
+    }
+    
+    return profileData;
+}
+
+void Brain::configureExperimentalCondition(const AdvancedExperimentImpl::ExperimentalCondition& condition) {
+    // Configure experimental condition for advanced experiments
+    
+    NLM_LOG_INFO("Configuring experimental condition: " + condition.name);
+    
+    // Store experimental condition
+    pImpl->experimentalCondition = condition;
+    
+    // Apply experimental manipulations
+    for (const auto& manipulation : condition.manipulations) {
+        NLM_LOG_INFO("Experimental manipulation enabled: " + manipulation.first);
+    }
+    
+    // Configure reward functions
+    if (condition.useDynamicRewards) {
+        // Enable dynamic reward computation
+        pImpl->dynamicRewardsEnabled = true;
+        NLM_LOG_INFO("Dynamic reward computation enabled");
+    }
+    
+    // Configure advanced logging
+    if (condition.enableAdvancedLogging) {
+        pImpl->advancedLoggingEnabled = true;
+        NLM_LOG_INFO("Advanced logging enabled");
+    }
+    
+    // Configure cross-modal memory integration
+    if (condition.enableCrossModalIntegration) {
+        pImpl->crossModalMemoryEnabled = true;
+        NLM_LOG_INFO("Cross-modal memory integration enabled");
+    }
+    
+    // Configure memory interference management
+    if (condition.enableMemoryInterferenceManagement) {
+        pImpl->memoryInterferenceManagementEnabled = true;
+        NLM_LOG_INFO("Memory interference management enabled");
+        NLM_LOG_INFO("Interference management strategy: " + condition.interferenceManagementStrategy);
+    }
+    
+    NLM_LOG_INFO("Experimental condition configuration complete");
+}
+
+void Brain::configureNeuromodulation(std::map<AdvancedNeuromodulationImpl::NeuromodulatorType, 
+                            AdvancedNeuromodulationImpl::Neuromodulator> neuromodulators) {
+    // Configure multiple neuromodulators with complex interactions
+    
+    NLM_LOG_INFO("Configuring advanced neuromodulation system...");
+    
+    // Store neuromodulators
+    pImpl->advancedNeuromodulation = std::make_unique<AdvancedNeuromodulationImpl>();
+    
+    // Add neuromodulators
+    for (const auto& pair : neuromodulators) {
+        pImpl->advancedNeuromodulation->addNeuromodulator(pair.first, pair.second);
+    }
+    
+    // Configure interaction weights
+    // Default: moderate interactions between all neuromodulators
+    for (const auto& sourceType : AdvancedNeuromodulationImpl::getAllTypes()) {
+        for (const auto& targetType : AdvancedNeuromodulationImpl::getAllTypes()) {
+            if (sourceType != targetType) {
+                float weight = 0.1f; // Default interaction weight
+                pImpl->advancedNeuromodulation->setInteractionWeight(sourceType, targetType, weight);
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Advanced neuromodulation configuration complete");
+}
+
+void Brain::configureMemorySystem(const std::map<std::string, std::any>& config) {
+    // Configure memory systems with advanced features
+    
+    NLM_LOG_INFO("Configuring advanced memory system...");
+    
+    // Configure working memory
+    if (config.find("working_memory_capacity") != config.end()) {
+        auto capacity = std::any_cast<size_t>(config.at("working_memory_capacity"));
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->setCapacity(capacity);
+        }
+    }
+    
+    if (config.find("working_memory_decay") != config.end()) {
+        auto decay = std::any_cast<float>(config.at("working_memory_decay"));
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->setDecayRate(decay);
+        }
+    }
+    
+    // Configure episodic memory
+    if (config.find("episodic_memory_capacity") != config.end()) {
+        auto capacity = std::any_cast<size_t>(config.at("episodic_memory_capacity"));
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->setMaxEpisodes(capacity);
+        }
+    }
+    
+    if (config.find("episodic_memory_replay_interval") != config.end()) {
+        auto interval = std::any_cast<size_t>(config.at("episodic_memory_replay_interval"));
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->setReplayInterval(interval);
+        }
+    }
+    
+    if (config.find("episodic_memory_consolidation_interval") != config.end()) {
+        auto interval = std::any_cast<size_t>(config.at("episodic_memory_consolidation_interval"));
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->setConsolidationInterval(interval);
+        }
+    }
+    
+    // Configure associative memory
+    if (config.find("associative_memory_strength") != config.end()) {
+        auto strength = std::any_cast<float>(config.at("associative_memory_strength"));
+        if (pImpl->associativeMemory) {
+            pImpl->associativeMemory->setStrength(strength);
+        }
+    }
+    
+    if (config.find("associative_memory_forgetting") != config.end()) {
+        auto forgetting = std::any_cast<float>(config.at("associative_memory_forgetting"));
+        if (pImpl->associativeMemory) {
+            pImpl->associativeMemory->setForgettingRate(forgetting);
+        }
+    }
+    
+    NLM_LOG_INFO("Advanced memory system configuration complete");
+}
+
+void Brain::enableCrossModalIntegration(bool enable) {
+    // Enable/disable cross-modal memory integration
+    
+    pImpl->crossModalMemoryEnabled = enable;
+    
+    if (enable) {
+        NLM_LOG_INFO("Cross-modal memory integration enabled");
+        
+        // Initialize cross-modal memory system
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            pImpl->workingMemory->enableCrossModalProcessing(true);
+            pImpl->episodicMemory->enableCrossModalProcessing(true);
+        }
+    } else {
+        NLM_LOG_INFO("Cross-modal memory integration disabled");
+        
+        // Disable cross-modal memory system
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            pImpl->workingMemory->enableCrossModalProcessing(false);
+            pImpl->episodicMemory->enableCrossModalProcessing(false);
+        }
+    }
+}
+
+void Brain::enableMemoryInterferenceManagement(bool enable, const std::string& strategy) {
+    // Enable/disable memory interference management
+    
+    pImpl->memoryInterferenceManagementEnabled = enable;
+    pImpl->interferenceManagementStrategy = strategy;
+    
+    if (enable) {
+        NLM_LOG_INFO("Memory interference management enabled (strategy: " + strategy + ")");
+        
+        // Initialize interference management system
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            pImpl->workingMemory->enableInterferenceManagement(true);
+            pImpl->episodicMemory->enableInterferenceManagement(true);
+            pImpl->episodicMemory->setInterferenceManagementStrategy(strategy);
+        }
+    } else {
+        NLM_LOG_INFO("Memory interference management disabled");
+        
+        // Disable interference management system
+        if (pImpl->workingMemory && pImpl->episodicMemory) {
+            pImpl->workingMemory->enableInterferenceManagement(false);
+            pImpl->episodicMemory->enableInterferenceManagement(false);
+        }
+    }
+}
+
+void Brain::setInterferenceManagementStrategy(const std::string& strategy) {
+    // Set interference management strategy
+    
+    pImpl->interferenceManagementStrategy = strategy;
+    
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->setInterferenceManagementStrategy(strategy);
+    }
+    
+    NLM_LOG_INFO("Interference management strategy set to: " + strategy);
+}
+
+std::map<std::string, float> Brain::getInterferenceManagementStats() {
+    // Get interference management statistics
+    
+    std::map<std::string, float> stats;
+    
+    if (pImpl->episodicMemory) {
+        stats = pImpl->episodicMemory->getInterferenceManagementStats();
+    }
+    
+    return stats;
+}
+
+void Brain::configureAdvancedPrediction(const AdvancedPredictionConfig& config) {
+    // Configure advanced prediction system
+    
+    NLM_LOG_INFO("Configuring advanced prediction system...");
+    
+    // Configure prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->configure(config);
+    }
+    
+    // Configure prediction neurons
+    configurePredictionNeurons(config.predictionNeurons);
+    
+    NLM_LOG_INFO("Advanced prediction configuration complete");
+}
+
+void Brain::configurePredictionNeurons(const std::vector<PredictionNeuronConfig>& neurons) {
+    // Configure prediction neurons for advanced prediction
+    
+    NLM_LOG_INFO("Configuring prediction neurons...");
+    
+    for (const auto& neuronConfig : neurons) {
+        // Find or create prediction neuron
+        auto* neuron = findNeuronByType(NeuronType::Internal);
+        if (neuron) {
+            // Configure prediction neuron
+            neuron->setPredictionEnabled(true);
+            neuron->setPredictionStrength(neuronConfig.predictionStrength);
+            neuron->setPredictionTimeConstant(neuronConfig.timeConstant);
+            neuron->setPredictionWeight(neuronConfig.weight);
+        }
+    }
+    
+    NLM_LOG_INFO("Prediction neurons configuration complete");
+}
+
+Neuron* Brain::findNeuronByType(NeuronType type) {
+    // Find neuron by type
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (auto* neuron : pop->getNeurons()) {
+                    return neuron;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+void Brain::exportAdvancedMetrics(const std::string& filepath) {
+    // Export advanced metrics to file
+    
+    NLM_LOG_INFO("Exporting advanced metrics to: " + filepath);
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for exporting advanced metrics: " + filepath);
+        return;
+    }
+    
+    // Export neural metrics
+    file << "=== Neural Metrics ===" << std::endl;
+    file << "Total spikes: " << getTotalSpikeCount() << std::endl;
+    file << "Active neurons: " << getActiveNeuronCount() << std::endl;
+    file << "Firing neurons: " << getFiringNeuronCount() << std::endl;
+    file << "Average firing rate: " << getAverageFiringRate() << std::endl;
+    file << "E/I ratio: " << getExcitationInhibitionRatio() << std::endl;
+    
+    // Export memory metrics
+    file << "\n=== Memory Metrics ===" << std::endl;
+    if (pImpl->workingMemory) {
+        file << "Working memory traces: " << pImpl->workingMemory->getActiveTraces() << std::endl;
+    }
+    if (pImpl->episodicMemory) {
+        file << "Episodic memory episodes: " << pImpl->episodicMemory->getEpisodeCount() << std::endl;
+        file << "Memory replay scheduled: " << (pImpl->episodicMemory->isReplayScheduled() ? "yes" : "no") << std::endl;
+    }
+    if (pImpl->associativeMemory) {
+        file << "Associative memory strength: " << pImpl->associativeMemory->getStrength() << std::endl;
+    }
+    
+    // Export neuromodulation metrics
+    file << "\n=== Neuromodulation Metrics ===" << std::endl;
+    if (pImpl->dopamine) {
+        file << "Dopamine level: " << pImpl->dopamine->getLevel() << std::endl;
+        file << "Dopamine plasticity factor: " << pImpl->dopamine->getPlasticityFactor() << std::endl;
+    }
+    if (pImpl->novelty) {
+        file << "Novelty detection: " << pImpl->novelty->getLevel() << std::endl;
+    }
+    if (pImpl->curiosity) {
+        file << "Curiosity level: " << pImpl->curiosity->getLevel() << std::endl;
+    }
+    if (pImpl->predictionError) {
+        file << "Prediction error: " << pImpl->predictionError->getLevel() << std::endl;
+    }
+    
+    // Export plasticity metrics
+    file << "\n=== Plasticity Metrics ===" << std::endl;
+    if (pImpl->stdp) {
+        file << "STDP LTP weight: " << pImpl->stdp->getLTPWeight() << std::endl;
+        file << "STDP LTD weight: " << pImpl->stdp->getLTDWeight() << std::endl;
+    }
+    if (pImpl->hebbian) {
+        file << "Hebbian learning rate: " << pImpl->hebbian->getLearningRate() << std::endl;
+    }
+    if (pImpl->structuralPlasticity) {
+        file << "Synaptogenesis rate: " << pImpl->structuralPlasticity->getSynaptogenesisRate() << std::endl;
+        file << "Pruning rate: " << pImpl->structuralPlasticity->getPruningRate() << std::endl;
+    }
+    
+    // Export prediction metrics
+    file << "\n=== Prediction Metrics ===" << std::endl;
+    if (pImpl->predictionSystem) {
+        file << "Prediction error: " << pImpl->predictionSystem->getPredictionError() << std::endl;
+        file << "Prediction confidence: " << pImpl->predictionSystem->getConfidence() << std::endl;
+    }
+    
+    // Export concept formation metrics
+    file << "\n=== Concept Formation Metrics ===" << std::endl;
+    if (pImpl->conceptFormation) {
+        file << "Concepts discovered: " << pImpl->conceptFormation->getConceptCount() << std::endl;
+    }
+    
+    // Export performance metrics if available
+    if (pImpl->performanceProfiler) {
+        file << "\n=== Performance Metrics ===" << std::endl;
+        auto stats = pImpl->performanceProfiler->getCurrentStats();
+        file << "CPU utilization: " << stats.cpuUsage << "%" << std::endl;
+        file << "Memory usage: " << stats.memoryUsage << " MB" << std::endl;
+        file << "Simulation time: " << stats.simulationTime * 1000 << " ms" << std::endl;
+        file << "Spike processing time: " << stats.spikeProcessingTime * 1000 << " ms" << std::endl;
+        file << "Plasticity time: " << stats.plasticityTime * 1000 << " ms" << std::endl;
+    }
+    
+    file.close();
+    
+    NLM_LOG_INFO("Advanced metrics exported successfully to: " + filepath);
+}
+
+std::string Brain::exportAdvancedMetricsToString() {
+    // Export advanced metrics to string (JSON format)
+    
+    std::ostringstream oss;
+    
+    oss << "{\n";
+    
+    // Neural metrics
+    oss << "  \"neural_metrics\": {\n";
+    oss << "    \"total_spikes\": " << getTotalSpikeCount() << ",\n";
+    oss << "    \"active_neurons\": " << getActiveNeuronCount() << ",\n";
+    oss << "    \"firing_neurons\": " << getFiringNeuronCount() << ",\n";
+    oss << "    \"average_firing_rate\": " << getAverageFiringRate() << ",\n";
+    oss << "    \"excitation_inhibition_ratio\": " << getExcitationInhibitionRatio() << "\n";
+    oss << "  },\n";
+    
+    // Memory metrics
+    oss << "  \"memory_metrics\": {\n";
+    if (pImpl->workingMemory) {
+        oss << "    \"working_memory_traces\": " << pImpl->workingMemory->getActiveTraces() << ",\n";
+    }
+    if (pImpl->episodicMemory) {
+        oss << "    \"episodic_memory_episodes\": " << pImpl->episodicMemory->getEpisodeCount() << ",\n";
+        oss << "    \"memory_replay_scheduled\": " << (pImpl->episodicMemory->isReplayScheduled() ? "true" : "false") << ",\n";
+    }
+    if (pImpl->associativeMemory) {
+        oss << "    \"associative_memory_strength\": " << pImpl->associativeMemory->getStrength() << "\n";
+    }
+    oss << "  },\n";
+    
+    // Neuromodulation metrics
+    oss << "  \"neuromodulation_metrics\": {\n";
+    if (pImpl->dopamine) {
+        oss << "    \"dopamine_level\": " << pImpl->dopamine->getLevel() << ",\n";
+        oss << "    \"dopamine_plasticity_factor\": " << pImpl->dopamine->getPlasticityFactor() << ",\n";
+    }
+    if (pImpl->novelty) {
+        oss << "    \"novelty_detection\": " << pImpl->novelty->getLevel() << ",\n";
+    }
+    if (pImpl->curiosity) {
+        oss << "    \"curiosity_level\": " << pImpl->curiosity->getLevel() << ",\n";
+    }
+    if (pImpl->predictionError) {
+        oss << "    \"prediction_error\": " << pImpl->predictionError->getLevel() << "\n";
+    }
+    oss << "  },\n";
+    
+    // Performance metrics if available
+    if (pImpl->performanceProfiler) {
+        oss << "  \"performance_metrics\": {\n";
+        auto stats = pImpl->performanceProfiler->getCurrentStats();
+        oss << "    \"cpu_utilization\": " << stats.cpuUsage << ",\n";
+        oss << "    \"memory_usage\": " << stats.memoryUsage << ",\n";
+        oss << "    \"simulation_time\": " << stats.simulationTime << ",\n";
+        oss << "    \"spike_processing_time\": " << stats.spikeProcessingTime << ",\n";
+        oss << "    \"plasticity_time\": " << stats.plasticityTime << "\n";
+        oss << "  }\n";
+    }
+    
+    oss << "}\n";
+    
+    return oss.str();
 }
 
 } // namespace nlm

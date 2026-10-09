@@ -1,4 +1,5 @@
 #include "SimpleWorld.hpp"
+#include "../core/Config/Config.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -17,19 +18,33 @@ static float urand(uint64_t& state, float min, float max) {
     return min + normalized * (max - min);
 }
 
-SimpleWorld::SimpleWorld()
-    : width_(20.0f)
-    , height_(20.0f)
-    , visionWidth_(16)
-    , visionHeight_(16)
-    , maxEnergy_(100.0f)
-    , energyDecayRate_(0.01f)
-    , resourceEnergyGain_(30.0f)
+SimpleWorld::SimpleWorld(std::shared_ptr<Config> config)
+    : config_(config)
     , simTime_(0.0)
-    , rngSeed_(42)
-    , rngState_(42)
 {
+    // Load configuration values with defaults for backward compatibility
+    auto getOr = [&](const std::string& key, auto defaultValue) {
+        if (config_ && config_->has(key)) {
+            return config_->getOr<typename std::decay<decltype(defaultValue)>::type>(key, defaultValue);
+        }
+        return defaultValue;
+    };
+    
+    width_ = getOr("world_width", 20.0f);
+    height_ = getOr("world_height", 20.0f);
+    visionWidth_ = getOr("vision_width", 16);
+    visionHeight_ = getOr("vision_height", 16);
+    maxEnergy_ = getOr("max_energy", 100.0f);
+    energyDecayRate_ = getOr("energy_decay_rate", 0.01f);
+    resourceEnergyGain_ = getOr("resource_energy_gain", 30.0f);
+    rngSeed_ = getOr("random_seed", 42);
+    
+    // Load object placement parameters
+    numResourceObjects_ = getOr("num_resource_objects", 5);
+    numHazardObjects_ = getOr("num_hazard_objects", 3);
+    
     agent_.reset();
+    rngState_ = rngSeed_;
 }
 
 SimpleWorld::~SimpleWorld() = default;
@@ -39,11 +54,45 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    // Update config if it exists
+    if (config_) {
+        config_->set("world_width", width, nlm::ConfigSource::Runtime);
+        config_->set("world_height", height, nlm::ConfigSource::Runtime);
+        config_->set("vision_width", static_cast<int64_t>(visionWidth), nlm::ConfigSource::Runtime);
+        config_->set("vision_height", static_cast<int64_t>(visionHeight), nlm::ConfigSource::Runtime);
+    }
+}
+
+void SimpleWorld::configureFromConfig() {
+    if (!config_) return;
+    
+    auto getOr = [&](const std::string& key, auto defaultValue) {
+        if (config_ && config_->has(key)) {
+            return config_->getOr<typename std::decay<decltype(defaultValue)>::type>(key, defaultValue);
+        }
+        return defaultValue;
+    };
+    
+    width_ = getOr("world_width", 20.0f);
+    height_ = getOr("world_height", 20.0f);
+    visionWidth_ = getOr("vision_width", 16);
+    visionHeight_ = getOr("vision_height", 16);
+    maxEnergy_ = getOr("max_energy", 100.0f);
+    energyDecayRate_ = getOr("energy_decay_rate", 0.01f);
+    resourceEnergyGain_ = getOr("resource_energy_gain", 30.0f);
+    numResourceObjects_ = getOr("num_resource_objects", 5);
+    numHazardObjects_ = getOr("num_hazard_objects", 3);
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
     rngSeed_ = seed;
     rngState_ = seed;
+    
+    // Update config if it exists
+    if (config_) {
+        config_->set("random_seed", seed, nlm::ConfigSource::Runtime);
+    }
 }
 
 void SimpleWorld::reset() {
@@ -56,15 +105,15 @@ void SimpleWorld::reset() {
     
     objects_.clear();
     
-    // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
+    // Place some resource objects (positive reward when touched) - using config values
+    for (int i = 0; i < numResourceObjects_; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
         objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
     }
     
-    // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
+    // Place some hazard objects (negative reward when touched) - using config values
+    for (int i = 0; i < numHazardObjects_; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
         objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);

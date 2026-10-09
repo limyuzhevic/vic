@@ -1,17 +1,35 @@
 #include "SensoryPercept.hpp"
+#include "../core/Config/Config.hpp"
 
 namespace nlm {
 
-SensoryPercept::SensoryPercept()
-    : visionWidth_(16)
-    , visionHeight_(16)
+SensoryPercept::SensoryPercept(std::shared_ptr<Config> config)
+    : config_(config)
     , timestamp_(0.0)
 {
-    vision_.resize(16 * 16, 0.0f);
-    touch_.resize(8, 0.0f);
-    internal_.resize(4, 0.0f);
-    proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // Load configuration values with defaults
+    auto getOr = [&](const std::string& key, auto defaultValue) {
+        if (config_ && config_->has(key)) {
+            return config_->getOr<typename std::decay<decltype(defaultValue)>::type>(key, defaultValue);
+        }
+        return defaultValue;
+    };
+    
+    // Get vision dimensions from config
+    visionWidth_ = getOr("vision_width", 16);
+    visionHeight_ = getOr("vision_height", 16);
+    vision_.resize(visionWidth_ * visionHeight_, 0.0f);
+    
+    // Get sensor counts from config
+    touchCount_ = getOr("vision_touch_count", 8);
+    internalCount_ = getOr("vision_internal_count", 4);
+    proprioceptionCount_ = getOr("vision_proprioception_count", 6);
+    audioCount_ = getOr("vision_audio_count", 0);
+    
+    touch_.resize(touchCount_, 0.0f);
+    internal_.resize(internalCount_, 0.0f);
+    proprioception_.resize(proprioceptionCount_, 0.0f);
+    audio_.resize(audioCount_, 0.0f);
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
