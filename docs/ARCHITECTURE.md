@@ -50,7 +50,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 
 ## Core Components
 
-### 1. Core Layer
+### 1. Core Utilities
 - **Types**: Strongly-typed identifiers (NeuronId, SynapseId, etc.)
 - **Config**: Configuration management system
 - **Random**: Deterministic random number generator
@@ -126,6 +126,18 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **ExperimentRunner**: Experiment execution
 - **Metrics**: Data analysis
 - **Phase4Experiment**: Phase 4 cognitive experiments
+
+### 14. Visualization Layer
+- **VisualizationInterface**: Visualization system interface
+
+### 15. Agent Layer
+- **SensoryPercept**: Sensory perception data
+- **AgentBrain**: Agent-brain interface
+- **AgentBody**: Agent physical representation
+
+### 16. World Layer
+- **SimpleWorld**: Simple 2D world simulation
+- **WorldObject**: World object representation
 
 ## Data Flow
 

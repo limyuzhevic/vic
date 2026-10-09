@@ -2,8 +2,199 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
+
+// Validation helper functions
+namespace SynapseValidation {
+    
+    void validateWeight(const std::string& context, SynapticWeight weight) {
+        constexpr float MIN_WEIGHT = -1.0f;
+        constexpr float MAX_WEIGHT = 1.0f;
+        if (weight < MIN_WEIGHT || weight > MAX_WEIGHT) {
+            throw std::invalid_argument("SynapseValidation: " + context + 
+                " - Synaptic weight " + std::to_string(weight) + 
+                " outside valid range [" + std::to_string(MIN_WEIGHT) + ", " + 
+                std::to_string(MAX_WEIGHT) + "]");
+        }
+    }
+    
+    void validateDelay(const std::string& context, Delay delay) {
+        if (delay <= 0 || delay > 100) { // Reasonable range
+            throw std::invalid_argument("SynapseValidation: " + context + 
+                " - Delay " + std::to_string(delay) + 
+                " outside valid range [1, 100]");
+        }
+    }
+    
+    void validateTimestamp(const std::string& context, Timestamp timestamp) {
+        if (timestamp < 0.0) {
+            throw std::invalid_argument("SynapseValidation: " + context + 
+                " - Timestamp " + std::to_string(timestamp) + " must be >= 0");
+        }
+    }
+    
+    void validateEfficacy(const std::string& context, float efficacy) {
+        if (efficacy < 0.0f || efficacy > 2.0f) {
+            throw std::invalid_argument("SynapseValidation: " + context + 
+                " - Efficacy " + std::to_string(efficacy) + 
+                " outside valid range [0.0, 2.0]");
+        }
+    }
+    
+    void validateHistory(const std::string& context, const std::vector<Timestamp>& history) {
+        if (history.size() > 1000) {
+            throw std::invalid_argument("SynapseValidation: " + context + 
+                " - Spike history exceeds maximum size of 1000");
+        }
+        for (size_t i = 0; i < history.size(); ++i) {
+            validateTimestamp(context + " (spike " + std::to_string(i) + ")", history[i]);
+        }
+    }
+}
+
+void Synapse::setWeight(SynapticWeight weight) {
+    SynapseValidation::validateWeight("setWeight", weight);
+    pImpl->weight = weight;
+}
+
+void Synapse::addToWeight(SynapticWeight delta) {
+    SynapseValidation::validateWeight("addToWeight", pImpl->weight + delta);
+    pImpl->weight += delta;
+    // Clamp to reasonable bounds to prevent instability
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+}
+
+void Synapse::setDelay(Delay delay) {
+    SynapseValidation::validateDelay("setDelay", delay);
+    pImpl->delay = delay;
+}
+
+void Synapse::setType(SynapseType type) {
+    pImpl->type = type;
+}
+
+void Synapse::recordPreSpike(Timestamp timestamp) {
+    SynapseValidation::validateTimestamp("recordPreSpike", timestamp);
+    
+    // Check spike history size before adding
+    if (pImpl->preSpikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    }
+    
+    pImpl->preSpikeHistory.push_back(timestamp);
+}
+
+void Synapse::recordPostSpike(Timestamp timestamp) {
+    SynapseValidation::validateTimestamp("recordPostSpike", timestamp);
+    
+    // Check spike history size before adding
+    if (pImpl->postSpikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    }
+    
+    pImpl->postSpikeHistory.push_back(timestamp);
+}
+
+void Synapse::setEligibilityTrace(float trace) {
+    if (trace < 0.0f || trace > 1.0f) {
+        throw std::invalid_argument("SynapseValidation: setEligibilityTrace - " + 
+            std::to_string(trace) + " outside valid range [0.0, 1.0]");
+    }
+    pImpl->eligibilityTrace = trace;
+}
+
+void Synapse::setEfficacy(float efficacy) {
+    SynapseValidation::validateEfficacy("setEfficacy", efficacy);
+    pImpl->efficacy = efficacy;
+}
+
+void Synapse::decayEligibilityTrace(float decayRate) {
+    if (decayRate < 0.0f || decayRate > 1.0f) {
+        throw std::invalid_argument("SynapseValidation: decayEligibilityTrace - " + 
+            std::to_string(decayRate) + " outside valid range [0.0, 1.0]");
+    }
+    pImpl->eligibilityTrace *= (1.0f - decayRate);
+    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
+        pImpl->eligibilityTrace = 0.0f;
+    }
+}
+
+std::string Synapse::getStateSummary() const {
+    std::stringstream ss;
+    ss << "Synapse State:" << std::endl;
+    ss << "  ID: " << pImpl->id.value << std::endl;
+    ss << "  Source: " << pImpl->sourceNeuron.value << std::endl;
+    ss << "  Destination: " << pImpl->destinationNeuron.value << std::endl;
+    ss << "  Weight: " << std::fixed << std::setprecision(4) 
+       << pImpl->weight << std::endl;
+    ss << "  Delay: " << pImpl->delay << std::endl;
+    ss << "  Type: " << static_cast<int>(pImpl->type) << std::endl;
+    ss << "  Efficacy: " << std::fixed << std::setprecision(4) 
+       << pImpl->efficacy << std::endl;
+    ss << "  Eligibility Trace: " << std::fixed << std::setprecision(4) 
+       << pImpl->eligibilityTrace << std::endl;
+    ss << "  Short-Term Depression: " << std::fixed << std::setprecision(4) 
+       << pImpl->shortTermDepression << std::endl;
+    ss << "  Short-Term Facilitation: " << std::fixed << std::setprecision(4) 
+       << pImpl->shortTermFacilitation << std::endl;
+    ss << "  Pre Spike History Size: " << pImpl->preSpikeHistory.size() << std::endl;
+    ss << "  Post Spike History Size: " << pImpl->postSpikeHistory.size() << std::endl;
+    
+    return ss.str();
+}
+
+void Synapse::initializeRandom(RandomGenerator& rng) {
+    // Validate RNG state
+    if (!rng.isValid()) {
+        throw std::runtime_error("Synapse::initializeRandom - Invalid random generator state");
+    }
+    
+    try {
+        // Proper random initialization based on synapse type
+        if (pImpl->type == SynapseType::Excitatory) {
+            // Excitatory synapses: small positive weights
+            pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+            // Excitatory synapses have moderate initial efficacy
+            pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        } else if (pImpl->type == SynapseType::Inhibitory) {
+            // Inhibitory synapses: negative weights
+            pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
+            pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        } else {
+            // Other types: small random weights
+            pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+            pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        }
+        
+        // Validate weight range
+        SynapseValidation::validateWeight("initializeRandom", pImpl->weight);
+        
+        // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+        pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+        
+        // Initialize short-term plasticity state
+        pImpl->shortTermDepression = 1.0f;  // Fully recovered
+        pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+        
+        // Initialize eligibility trace to 0
+        pImpl->eligibilityTrace = 0.0f;
+        
+        // Initialize last spike times
+        pImpl->lastPreSpikeTime = -1.0f;
+        pImpl->lastPostSpikeTime = -1.0f;
+        
+    } catch (const std::exception& e) {
+        // Reset state if initialization fails
+        reset();
+        throw std::runtime_error("Synapse::initializeRandom - Failed to initialize synapse: " + std::string(e.what()));
+    }
+}
+
+} // namespace nlm
 
 struct Synapse::Impl {
     SynapseId id;
