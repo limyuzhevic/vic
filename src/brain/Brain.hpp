@@ -106,6 +106,18 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
+    // Put brain to sleep for memory consolidation
+    // This puts the brain in a resting state where it can consolidate memories
+    // without processing new input
+    void sleep();
+    
+    // Wake up from sleep
+    // This resumes normal processing after memory consolidation
+    void wake();
+    
+    // Check if brain is currently resting (in sleep)
+    bool isResting() const;
+    
     // Reset brain state
     void reset();
     

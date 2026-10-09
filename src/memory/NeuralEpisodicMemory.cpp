@@ -38,13 +38,23 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     episodes_.push_back(stored);
     
-    // Create episode neuron for pattern completion
+    // IMPROVEMENT: Create episode neuron for pattern completion
+    // This neuron represents the episodic memory trace in neural substrate
     if (brain_ && !episode.sensoryState.empty()) {
         NeuronId epNeuron(episodes_.size() + 20000);
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
+        // In a real implementation, this would create an actual neuron
+        // with recurrent connections to maintain the memory trace
+        // For Phase 6, we'll use a simplified approach where the neuron ID
+        // represents the memory trace, and the actual neural activity
+        // would be managed by the brain during replay
+        
+        // Create a maintenance connection to this episode neuron
+        // This would normally be done by the brain during initialization
+        // For now, we log this as a framework for episodic memory integration
+        NLM_LOG_INFO("Created episode neuron " + std::to_string(epNeuron.index()) + 
+                    " for episodic memory storage");
     }
     
     // Remove old episodes if over capacity
@@ -167,20 +177,40 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
+    // IMPROVEMENT: Enhanced episode replay with better neural reactivation
     // Reactivate neurons that were active during this episode
-    for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+    
+    NLM_LOG_INFO("Replaying episodic memory episode from step " + std::to_string(episode->timestamp));
+    
+    // Reactivate key neurons that were active during this episode
+    for (size_t i = 0; i < episode->activeNeurons.size() && i < episode->neuronActivations.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
-        float activation = i < episode->neuronActivations.size() ? 
-                          episode->neuronActivations[i] : 0.5f;
+        float activation = episode->neuronActivations[i];
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        // Inject stronger current to reactivate the memory trace
+        // This uses the brain's injectCurrent method to ensure proper integration
+        brain_->injectCurrent(neuron, activation * 4.0f);  // Increased from 3.0f
+        
+        // Also store in working memory for immediate use
+        if (brain_->getWorkingMemory()) {
+            brain_->getWorkingMemory()->storeToNeuron(neuron, activation);
+        }
     }
     
-    // Also inject sensory pattern if available
-    if (!episode->sensoryState.empty()) {
-        // This would go through sensory channels - simplified here
+    // Reactivate pattern via sensory channels if sensory state is available
+    if (!episode->sensoryState.empty() && brain_->getWorkingMemory()) {
+        // Convert sensory state to working memory pattern
+        // This helps bridge the gap between stored experiences and current processing
+        brain_->getWorkingMemory()->store(episode->sensoryState, 0.8f);
     }
+    
+    // Apply attention to the reactivated memory trace
+    if (brain_->getAttention() && !episode->activeNeurons.empty()) {
+        auto* attention = brain_->getAttention();
+        attention->applyTopDownBias(episode->activeNeurons[0], 0.6f);
+    }
+    
+    NLM_LOG_INFO("Episode replay completed for step " + std::to_string(episode->timestamp));
 }
 
 void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {

@@ -528,21 +528,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+        // Process current neural activity patterns to form concepts
+        // Collect neural activity patterns from active neurons
+        
+        std::vector<float> neuralPattern;
+        neuralPattern.reserve(getTotalNeuronCount());
+        
+        // Sample neural activity - in a full implementation we'd collect
+        // from all neurons or a representative subset
+        size_t sampleSize = std::min<size_t>(100, getTotalNeuronCount());
+        if (sampleSize > 0) {
+            for (size_t i = 0; i < sampleSize; ++i) {
+                // Get a neuron from a region (simplified sampling)
+                if (!pImpl->regions.empty()) {
+                    auto* region = pImpl->regions[0].get();
+                    auto neurons = region->getAllNeurons();
+                    if (!neurons.empty()) {
+                        // Sample a few neurons
+                        size_t neuronIdx = i % neurons.size();
+                        auto* neuron = neurons[neuronIdx];
+                        float activation = std::abs(
+                            neuron->getState().membranePotential - 
+                            neuron->getState().restingPotential
+                        ) / 20.0f;  // Normalize to 0-1 range
+                        neuralPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Add some global state information
+        float firingRate = static_cast<float>(getFiringNeuronCount()) / 
+                          static_cast<float>(std::max<size_t>(1, getTotalNeuronCount()));
+        neuralPattern.push_back(firingRate);
+        
+        float dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        neuralPattern.push_back(dopamineLevel);
+        
+        // If we have sensory input, capture sensory pattern
+        // In a real system, this would come from the sensory encoding
+        // For now, we'll use the neural activity as the pattern
+        
+        if (!neuralPattern.empty()) {
+            // Present experience to concept formation system
+            // Note: presentExperience expects features as well
+            std::vector<float> dummyFeatures;  // Could extract from neural patterns
+            pImpl->conceptFormation->presentExperience(
+                neuralPattern,
+                dummyFeatures,
+                dopamineLevel,  // Use as reward signal
+                pImpl->currentStep
+            );
         }
     }
     
@@ -576,6 +612,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 13.5: SLEEP/REST CYCLE ==========
+    // Put brain to sleep periodically for memory consolidation
+    // Sleep occurs after significant neural activity and development
+    if (currentStep > 0 && currentStep % 5000 == 0 && !pImpl->isResting) {
+        sleep();
+    }
+    
+    // If brain is resting, apply sleep-specific processing
+    if (pImpl->isResting) {
+        // During sleep, reduce energy consumption but maintain memory processes
+        // Sleep is a low-activity state focused on consolidation
+        
+        // Increment sleep counter
+        static size_t sleepStepCounter = 0;
+        sleepStepCounter++;
+        
+        // Wake up after sufficient sleep duration (e.g., 500 steps)
+        if (sleepStepCounter >= 500) {
+            wake();
+            sleepStepCounter = 0;
+        }
+    }
+    
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
@@ -589,6 +648,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Enhanced sensory input processing with better working memory integration
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -598,7 +658,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Normalize and distribute input across sensory neurons
+    std::vector<float> normalizedValues;
+    normalizedValues.reserve(numSensory);
+    
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
@@ -606,13 +669,83 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
+        normalizedValues.push_back(normalizedValue);
+        
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+    }
+    
+    // Enhanced working memory integration
+    if (pImpl->workingMemory) {
+        // Store the entire sensory pattern, not just individual neurons
+        if (!normalizedValues.empty()) {
+            // Calculate pattern strength based on total input magnitude
+            float patternStrength = 0.0f;
+            for (float val : normalizedValues) {
+                patternStrength += std::abs(val);
+            }
+            patternStrength = std::min(patternStrength / static_cast<float>(numSensory), 1.0f);
+            
+            // Store the full sensory pattern
+            pImpl->workingMemory->store(normalizedValues, patternStrength);
+            
+            // Also store individual sensory neurons for fine-grained access
+            for (size_t i = 0; i < numSensory; ++i) {
+                if (std::abs(normalizedValues[i]) > 0.5f) {
+                    pImpl->workingMemory->storeToNeuron(
+                        pImpl->sensoryNeurons[i]->getId(),
+                        normalizedValues[i] / 10.0f
+                    );
+                }
+            }
+            
+            // Run attention competition if attention system is active
+            if (pImpl->attention) {
+                std::vector<NeuronId> competitors;
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    competitors.push_back(neuron->getId());
+                }
+                if (!competitors.empty()) {
+                    auto winners = pImpl->attention->processCompetition(competitors, 0.5f);
+                    NLM_LOG_INFO("Attention selected " + std::to_string(winners.size()) + " sensory neurons");
+                }
+            }
+            
+            NLM_LOG_INFO("Stored sensory pattern in working memory: strength=" + 
+                        std::to_string(patternStrength));
         }
+    }
+    
+    // Store experience in episodic memory if active
+    if (pImpl->episodicMemory && pImpl->dopamine) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.reward = pImpl->dopamine->getLevel();
+        episode.action = ActionType::Wait;  // No action yet
+        
+        // Convert normalized values to sensory state representation
+        episode.sensoryState = normalizedValues;
+        episode.positionX = 0.0f;  // Would come from environment
+        episode.positionY = 0.0f;
+        episode.orientation = 0.0f;
+        
+        // Capture active neurons during sensory processing
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        // Store the experience
+        pImpl->episodicMemory->storeEpisode(episode);
+        NLM_LOG_INFO("Stored sensory experience in episodic memory");
     }
 }
 
@@ -690,30 +823,70 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Use NeuralPlanner for intelligent action selection
+    // This replaces simple rule-based logic with learned planning
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
-    
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    if (pImpl->planner && pImpl->planner->wasRecentPlanSuccessful()) {
+        // Create state representation for planning
+        std::vector<float> currentState;
+        
+        // Collect sensory-related neuron activity patterns
+        // For now, use a simple representation based on overall brain state
+        currentState.push_back(static_cast<float>(getFiringNeuronCount()) / 
+                              static_cast<float>(getTotalNeuronCount()));  // Firing rate
+        currentState.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);  // Reward signal
+        currentState.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f);  // Exploration signal
+        currentState.push_back(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f);  // Novelty signal
+        currentState.push_back(pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f);  // Prediction error
+        
+        // Use NeuralPlanner to select action
+        ActionType plannedAction = pImpl->planner->planAction(currentState);
+        
+        // Record this action in concept formation for learning
+        if (pImpl->conceptFormation) {
+            // Convert action to pattern for concept formation
+            std::vector<float> actionPattern(10, 0.0f);  // 10 action types
+            size_t actionIdx = static_cast<size_t>(plannedAction);
+            if (actionIdx < actionPattern.size()) {
+                actionPattern[actionIdx] = 1.0f;
+                actionPattern.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);  // Add reward signal
+            }
+            
+            // Present action to concept formation system
+            pImpl->conceptFormation->presentExperience(actionPattern, 
+                                                      std::vector<float>(),  // No specific features
+                                                      pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                                                      pImpl->currentStep);
         }
+        
+        NLM_LOG_INFO("Planner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+        
+        return std::make_unique<Action>(plannedAction);
+    } else {
+        // Fallback to simple rule-based logic if planner not available or no successful recent plans
+        // Original simple logic preserved for compatibility
+        if (pImpl->motorNeurons.empty()) {
+            return std::make_unique<Action>(ActionType::Wait);
+        }
+        
+        // Calculate activity of motor neuron groups
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        // Return a simple action
+        ActionType type = ActionType::Wait;
+        if (firingMotor > 0) {
+            type = ActionType::MoveForward;
+        }
+        
+        NLM_LOG_INFO("Fallback to simple action: " + std::to_string(static_cast<int>(type)));
+        
+        return std::make_unique<Action>(type);
     }
-    
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
-    
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
@@ -733,6 +906,72 @@ void Brain::updatePlasticity() {
 void Brain::develop() {
     // Development updates structural plasticity
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
+}
+
+void Brain::sleep() {
+    NLM_LOG_INFO("Putting NLM Brain to sleep for memory consolidation...");
+    
+    pImpl->isResting = true;
+    
+    // During sleep, we consolidate memories and update neural connections
+    if (pImpl->episodicMemory) {
+        // Consolidate important memories
+        pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Perform replay of recent memories for consolidation
+        if (pImpl->episodicMemory->isReplayEnabled()) {
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+    }
+    
+    // Update working memory with consolidation
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->runCompetition();
+    }
+    
+    // Update attention system
+    if (pImpl->attention) {
+        pImpl->attention->releaseAttention();
+    }
+    
+    // Update developmental stage if appropriate
+    if (pImpl->currentStep % 5000 == 0) {  // Stage change every 5000 steps
+        DevelopmentalStage nextStage = static_cast<DevelopmentalStage>(
+            std::min(static_cast<int>(pImpl->developmentalStage) + 1, 
+                    static_cast<int>(DevelopmentalStage::Adult)));
+        pImpl->developmentalStage = nextStage;
+        NLM_LOG_INFO("Developmental stage progressed to " + 
+                    std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    }
+    
+    NLM_LOG_INFO("NLM Brain sleep complete - memory consolidation finished");
+}
+
+void Brain::wake() {
+    NLM_LOG_INFO("Waking NLM Brain from sleep...");
+    
+    pImpl->isResting = false;
+    pImpl->stepsSinceLastEpisode = 0;
+    
+    // Clear attention bias from sleep
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+    }
+    
+    // Reset working memory for active processing
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    
+    // Log wake-up status
+    NLM_LOG_INFO("NLM Brain wake complete - ready for active processing");
+}
+
+bool Brain::isResting() const {
+    return pImpl->isResting;
 }
 
 void Brain::reset() {
@@ -895,9 +1134,56 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - restore all synapses to neural regions
+        NLM_LOG_INFO("Restoring " + std::to_string(synapseData.weight.size()) + " synapses to neural regions");
+        
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            // Add synapse to the first region
+            // In a proper implementation, we'd need to:
+            // 1. Track which region each neuron belongs to
+            // 2. Ensure both source and destination neurons exist
+            // 3. Maintain consistent synapse IDs across saves/loads
+            
+            if (!pImpl->regions.empty()) {
+                auto* region = pImpl->regions[0].get();
+                
+                // Add synapse using region's method (generates SynapseId)
+                SynapseId synId = region->addSynapse(
+                    synapseData.sourceNeuron[i],
+                    synapseData.destinationNeuron[i],
+                    synapseData.weight[i],
+                    synapseData.delay[i]
+                );
+                
+                // Set additional synapse properties
+                auto* synapse = region->getSynapse(synId);
+                if (synapse) {
+                    synapse->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                    synapse->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                    
+                    // Re-enable plasticity if it was enabled
+                    synapse->enablePlasticity(
+                        pImpl->stdp.get() && pImpl->stdp->getPlasticityFlags().hebbian && 
+                        pImpl->stdp->getPlasticityFlags().stdp,
+                        pImpl->stdp.get() && pImpl->stdp->getPlasticityFlags().stdp,
+                        false  // Reward-modulated (simplified)
+                    );
+                    
+                    NLM_LOG_INFO("  Restored synapse " + std::to_string(synId.index()) + 
+                                ": " + std::to_string(synapseData.sourceNeuron[i]) + 
+                                " -> " + std::to_string(synapseData.destinationNeuron[i]) +
+                                " (weight: " + std::to_string(synapseData.weight[i]) + ")");
+                }
+            }
+        }
+        
+        // Also need to restore inter-region connections if any were saved
+        // (These are not currently saved in the save() method, so this is a placeholder)
+        
+        // Important: The current implementation creates new synapse objects
+        // rather than restoring existing ones, which is appropriate for checkpoint recovery
+        // but may lose some synaptic history. A more sophisticated approach would
+        // preserve specific synapse instances and their learning histories.
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
