@@ -511,8 +511,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // This enables predictive coding and error-based learning
+        
+        // Get current working memory state for prediction
+        if (pImpl->workingMemory) {
+            // Predict next sensory state based on working memory
+            auto predictedState = pImpl->workingMemory->predictNextState(currentStep);
+            
+            // Get actual sensory state (simplified - using neural activity)
+            auto actualState = pImpl->workingMemory->getCurrentState();
+            
+            // Compute prediction error
+            float predictionError = pImpl->predictionSystem->computePredictionError(predictedState, actualState);
+            
+            // Update prediction system with error
+            pImpl->predictionSystem->update(predictionError, currentTime);
+            
+            // Store prediction error in dopamine system for reward modulation
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setPredictionError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +546,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== STEP 9: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation would process current neural activity patterns to form concepts
+        // This requires integration with working memory and attention
+        
+        if (pImpl->workingMemory && pImpl->attention) {
+            // Get the attended working memory representations
+            auto attendedNeurons = pImpl->workingMemory->getAttentionNeurons();
+            auto attentionWeight = pImpl->attention->getAttentionWeight();
+            
+            // Form concepts from attended patterns
+            pImpl->conceptFormation->processCurrentExperience(
+                attendedNeurons, attentionWeight, currentTime);
+                
+            // Update concept formation with new sensory input
+            if (pImpl->sensoryNeurons.size() > 0) {
+                pImpl->conceptFormation->updateWithSensoryInput(
+                    pImpl->sensoryNeurons[0]->getId(), currentTime);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
