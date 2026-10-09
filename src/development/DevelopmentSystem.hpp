@@ -1,55 +1,47 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
+#include "../brain/Neuron.hpp"
+#include "../brain/Synapse.hpp"
 #include "../brain/Brain.hpp"
-#include <functional>
+#include <memory>
 
 namespace nlm {
 
-// Forward declarations
-class RandomGenerator;
-
-// Development system: orchestrates neural development
-// Implements developmental stages, plasticity modulation, and structural changes
-
 class DevelopmentSystem {
 public:
-    DevelopmentSystem();
-    ~DevelopmentSystem();
+    DevelopmentSystem(Brain* brain,
+                     DevelopmentSystem* developmentSystemPtr,
+                     StructuralPlasticity* structuralPlasticity);
     
-    // Get current developmental stage
-    DevelopmentalStage getStage() const;
-    void setStage(DevelopmentalStage stage);
+    // Update developmental effects with current simulation state
+    void updateDevelopment(double timestep, const RandomGenerator& rng);
     
-    // Advance developmental stage
-    void advanceStage();
+    // Apply developmental stage effects on plasticity rates
+    void applyDevelopmentalStageEffects();
     
-    // Get stage name
-    const char* getStageName() const;
+    // Update structural plasticity based on developmental stage
+    void updateStructuralPlasticity(SimulationStep currentStep, 
+                                   const RandomGenerator& rng);
     
-    // Update development (simple version)
-    void update(Brain* brain, SimulationStep currentStep);
+    // Get current developmental stage and effects
+    DevelopmentalStage getDevelopmentalStage() const;
+    float getPlasticityModulation() const;
+    float getSynaptogenesisRate() const;
+    float getPruningRate() const;
     
-    // Update development with full parameters
-    void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
-    
-    // Get plasticity modifier for current stage
-    float getPlasticityModifier() const;
-    
-    // Get critical period info
-    bool isCriticalPeriod() const;
-    float getCriticalPeriodProgress() const;
-    
-    // Get developmental age (in simulation time)
-    double getDevelopmentalAge() const { return age_; }
-    
-    // Set developmental age
-    void setDevelopmentalAge(double age) { age_ = age; }
+    // Development control
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    void advanceDevelopment(double timeElapsed);
+    bool isDevelopmentEnabled() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
-    double age_;
+    Brain* brain;
+    DevelopmentSystem* developmentSystemPtr;
+    StructuralPlasticity* structuralPlasticity;
+    
+    // State tracking
+    DevelopmentalStage currentStage;
+    double developmentTime;
+    float plasticityModulation;
+    bool developmentEnabled;
 };
-
-} // namespace nlm

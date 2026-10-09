@@ -1,119 +1,108 @@
 #include "DevelopmentSystem.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
+#include <algorithm>
 
 namespace nlm {
 
-struct DevelopmentSystem::Impl {
-    DevelopmentalStage stage;
-    SimulationStep stageStartStep;
-    SimulationStep stepsInCurrentStage;
-    double stageAge;  // Age since entering current stage
+DevelopmentSystem::DevelopmentSystem(Brain* brain,
+                                     DevelopmentSystem* developmentSystemPtr,
+                                     StructuralPlasticity* structuralPlasticity)
+    : brain(brain), developmentSystemPtr(developmentSystemPtr),
+      structuralPlasticity(structuralPlasticity), currentStage(DevelopmentalStage::Initial),
+      developmentTime(0.0), plasticityModulation(1.0f), developmentEnabled(true) {
+}
+
+void DevelopmentSystem::updateDevelopment(double timestep, const RandomGenerator& rng) {
+    developmentTime += timestep;
     
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
-};
-
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
-
-DevelopmentSystem::~DevelopmentSystem() = default;
-
-DevelopmentalStage DevelopmentSystem::getStage() const {
-    return pImpl->stage;
+    // Update developmental stage based on accumulated time
+    if (developmentEnabled) {
+        // Simplified developmental stage progression
+        if (developmentTime < 100.0) {
+            currentStage = DevelopmentalStage::Initial;
+        } else if (developmentTime < 500.0) {
+            currentStage = DevelopmentalStage::CriticalPeriod;
+        } else if (developmentTime < 1000.0) {
+            currentStage = DevelopmentalStage::Maturation;
+        } else {
+            currentStage = DevelopmentalStage::Adult;
+        }
+        
+        // Apply developmental stage effects
+        applyDevelopmentalStageEffects();
+        
+        // Update structural plasticity
+        updateStructuralPlasticity(0, rng); // Using currentStep = 0 as placeholder
+    }
 }
 
-void DevelopmentSystem::setStage(DevelopmentalStage stage) {
-    pImpl->stage = stage;
-    pImpl->stageAge = 0.0;
-}
-
-void DevelopmentSystem::advanceStage() {
-    switch (pImpl->stage) {
+void DevelopmentSystem::applyDevelopmentalStageEffects() {
+    // Set plasticity modulation based on developmental stage
+    switch (currentStage) {
         case DevelopmentalStage::Initial:
-            pImpl->stage = DevelopmentalStage::CriticalPeriod;
+            plasticityModulation = 1.0f;  // High plasticity
             break;
         case DevelopmentalStage::CriticalPeriod:
-            pImpl->stage = DevelopmentalStage::Maturation;
+            plasticityModulation = 0.8f;
             break;
         case DevelopmentalStage::Maturation:
-            pImpl->stage = DevelopmentalStage::Adult;
+            plasticityModulation = 0.5f;
             break;
         case DevelopmentalStage::Adult:
-            pImpl->stage = DevelopmentalStage::Aging;
+            plasticityModulation = 0.2f;  // Stable
             break;
         case DevelopmentalStage::Aging:
-            // Already at final stage
+            plasticityModulation = 0.1f;  // Reduced plasticity
             break;
     }
-    pImpl->stepsInCurrentStage = 0;
-    pImpl->stageAge = 0.0;
-    NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
-}
-
-const char* DevelopmentSystem::getStageName() const {
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial: return "Initial";
-        case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
-        case DevelopmentalStage::Maturation: return "Maturation";
-        case DevelopmentalStage::Adult: return "Adult";
-        case DevelopmentalStage::Aging: return "Aging";
-        default: return "Unknown";
-    }
-}
-
-void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
-    ++pImpl->stepsInCurrentStage;
-    age_ += 0.001;  // Approximate timestep
-    pImpl->stageAge += 0.001;
     
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
-        advanceStage();
+    // Update structural plasticity rates
+    if (structuralPlasticity) {
+        float synaptogenesisRate = 0.0001f * plasticityModulation;
+        float pruningRate = 0.00001f * (2.0f - plasticityModulation);
+        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        structuralPlasticity->setPruningRate(pruningRate);
     }
 }
 
-void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
-    age_ += dt;
-    pImpl->stageAge += dt;
-    ++pImpl->stepsInCurrentStage;
-    
-    // Auto-advance stage based on developmental age
-    // These thresholds are in simulation seconds
-    if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && age_ > 360.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
-        advanceStage();
+void DevelopmentSystem::updateStructuralPlasticity(SimulationStep currentStep, 
+                                                   const RandomGenerator& rng) {
+    if (structuralPlasticity) {
+        structuralPlasticity->update(brain, rng);
     }
 }
 
-float DevelopmentSystem::getPlasticityModifier() const {
-    // Higher plasticity in early stages, lower in later stages
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial: return 1.0f;
-        case DevelopmentalStage::CriticalPeriod: return 0.8f;
-        case DevelopmentalStage::Maturation: return 0.5f;
-        case DevelopmentalStage::Adult: return 0.2f;
-        case DevelopmentalStage::Aging: return 0.1f;
-        default: return 0.5f;
+DevelopmentalStage DevelopmentSystem::getDevelopmentalStage() const {
+    return currentStage;
+}
+
+float DevelopmentSystem::getPlasticityModulation() const {
+    return plasticityModulation;
+}
+
+float DevelopmentSystem::getSynaptogenesisRate() const {
+    return structuralPlasticity ? structuralPlasticity->getSynaptogenesisRate() : 0.0f;
+}
+
+float DevelopmentSystem::getPruningRate() const {
+    return structuralPlasticity ? structuralPlasticity->getPruningRate() : 0.0f;
+}
+
+void DevelopmentSystem::setDevelopmentalStage(DevelopmentalStage stage) {
+    currentStage = stage;
+    applyDevelopmentalStageEffects();
+}
+
+void DevelopmentSystem::advanceDevelopment(double timeElapsed) {
+    developmentTime += timeElapsed;
+    if (developmentEnabled) {
+        applyDevelopmentalStageEffects();
     }
 }
 
-bool DevelopmentSystem::isCriticalPeriod() const {
-    return pImpl->stage == DevelopmentalStage::CriticalPeriod;
-}
-
-float DevelopmentSystem::getCriticalPeriodProgress() const {
-    if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
-        return 0.0f;
-    }
-    // Progress through critical period (0 to 1)
-    return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+bool DevelopmentSystem::isDevelopmentEnabled() const {
+    return developmentEnabled;
 }
 
 } // namespace nlm

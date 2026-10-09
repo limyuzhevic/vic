@@ -35,6 +35,17 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainStepProcessor.cpp
+    # Neural processing
+    src/neural/NeuralProcessor.cpp
+    # Plasticity management
+    src/plasticity/PlasticityManager.cpp
+    # Memory systems
+    src/memory/MemorySystem.cpp
+    # Cognition systems
+    src/cognition/CognitionSystem.cpp
+    # Development systems
+    src/development/DevelopmentSystem.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
