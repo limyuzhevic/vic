@@ -29,6 +29,10 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Agent
+    src/agent/AgentBrain.cpp
+    src/agent/SensoryPercept.cpp
+    src/agent/AdvancedConfig.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -133,6 +137,20 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
+# Performance profiling
+add_library(nlm_performance STATIC
+    src/performance/Profiler.cpp
+)
+
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
+# Advanced tutorials
+add_library(nlm_tutorials STATIC
+    src/tutorials/AdvancedTutorials.cpp
+)
+
+target_link_libraries(nlm_tutorials PUBLIC nlm_core nlm_performance)
+
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
@@ -144,7 +162,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_performance nlm_tutorials
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

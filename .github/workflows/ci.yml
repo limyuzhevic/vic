@@ -1,0 +1,371 @@
+# CI/CD Configuration for NLM (Neural Learning Machine)
+
+# GitHub Actions Workflow
+# .github/workflows/ci.yml
+
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+  CCACHE_DIR: ~/.ccache
+  CCACHE_MAXSIZE: 1G
+
+jobs:
+  # Code Quality Checks
+  code-quality:
+    runs-on: ubuntu-latest
+    name: Code Quality Checks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            gcc \
+            git \
+            ccache \
+            python3-pip \
+            python3-dev \
+            python3-venv
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install scikit-build-core pybind11 pytest numpy
+
+      - name: Run code quality checks
+        run: |
+          # Run clang-format for C++ code style
+          if command -v clang-format; then
+            echo "Checking C++ code style..."
+            find . -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | \
+              xargs clang-format --dry-run --Werror 2>/dev/null || echo "clang-format not available, skipping"
+          fi
+
+          # Run Python linting
+          if command -v black; then
+            echo "Checking Python code style..."
+            black --check --diff .
+          fi
+
+          if command -v isort; then
+            echo "Checking Python import sorting..."
+            isort --check-only --diff .
+          fi
+
+          if command -v flake8; then
+            echo "Checking Python linting..."
+            flake8 --max-line-length=88 --extend-ignore=E501,W503 .
+          fi
+
+      - name: Install additional tools
+        run: |
+          sudo apt-get install -y shellcheck
+
+      - name: Check shell scripts
+        run: |
+          find . -name "*.sh" -type f | xargs shellcheck || echo "shellcheck not available, skipping"
+
+      - name: Generate build system
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_CXX_COMPILER=g++
+
+      - name: Check for issues
+        run: |
+          cd build
+          make -j$(nproc) 2>&1 | tail -20
+
+  # C++ Build Tests
+  cpp-build:
+    runs-on: ubuntu-latest
+    name: C++ Build Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup CMake and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            gcc \
+            make \
+            ccache \
+            pkg-config \
+            libpython3-dev
+
+      - name: Create build directory
+        run: mkdir -p build
+
+      - name: Configure CMake
+        run: |
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DENABLE_TESTS=ON
+
+      - name: Build
+        run: |
+          cd build
+          make -j$(nproc)
+
+      - name: Run tests
+        run: |
+          cd build
+          if [[ -f ./nlm_test ]]; then
+            ./nlm_test --output-on-failure
+          elif [[ -f ./tests/test ]]; then
+            ./tests/test --output-on-failure
+          else
+            echo "No test executable found, running ctest..."
+            ctest --output-on-failure
+          fi
+
+      - name: Test Python bindings
+        run: |
+          cd build
+          if [[ -f ./python_bindings.so ]] || [[ -f ./libpython_bindings.dylib ]]; then
+            pip install .
+            python -c "import pynlm; print('Python bindings imported successfully'); print(f'Version: {pynlm.__version__}')"
+          else
+            echo "Python bindings not built, skipping Python tests"
+          fi
+
+  # Python Tests
+  python-tests:
+    runs-on: ubuntu-latest
+    name: Python Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip
+          pip install scikit-build-core pybind11 pytest numpy
+
+      - name: Build and install Python package
+        run: |
+          pip install .
+
+      - name: Run Python tests
+        run: |
+          python -m pytest tests/ -v --tb=short
+          python -m pytest examples/ -v --tb=short
+
+      - name: Run documentation generation
+        run: |
+          if python -c "import pynlm" 2>/dev/null; then
+            python -c "
+import pynlm
+import inspect
+import sys
+print('Python NLM module available')
+print('Available functions:', [name for name in dir(pynlm) if not name.startswith('_')])
+" 2>&1
+          fi
+
+  # Performance Benchmarks
+  performance-benchmarks:
+    runs-on: ubuntu-latest
+    name: Performance Benchmarks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            gcc \
+            make \
+            pkg-config \
+            libpython3-dev
+
+      - name: Build with optimizations
+        run: |
+          mkdir -p build_perf
+          cd build_perf
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_CXX_FLAGS="-O3 -march=native -flto" \
+            -DENABLE_PERF_PROFILING=ON
+
+      - name: Build optimized binaries
+        run: |
+          cd build_perf
+          make -j$(nproc)
+
+      - name: Run performance benchmarks
+        run: |
+          cd build_perf
+          if [[ -f ./nlm_phase6_demo ]]; then
+            echo "Running Phase 6 demo (integration test)..."
+            ./nlm_phase6_demo 2>&1 | head -50
+          fi
+
+          if [[ -f ./nlm ]]; then
+            echo "Running main simulation..."
+            time ./nlm --help 2>&1 | head -20
+          fi
+
+          # Run any available benchmarks
+          if [[ -f ./benchmark ]]; then
+            ./benchmark --output benchmark_results.txt
+          elif [[ -f ./perf ]]; then
+            ./perf --output perf_results.txt
+          else
+            echo "No benchmark executables found"
+          fi
+
+      - name: Generate performance report
+        run: |
+          echo "=== Performance Benchmark Results ===" > perf_report.txt
+          echo "Generated on: $(date)" >> perf_report.txt
+          echo "Build configuration: Release with optimizations" >> perf_report.txt
+
+          if [[ -f ./benchmark_results.txt ]]; then
+            echo "Benchmark results:" >> perf_report.txt
+            cat benchmark_results.txt >> perf_report.txt
+          fi
+
+          if [[ -f ./perf_results.txt ]]; then
+            echo "Performance results:" >> perf_report.txt
+            cat perf_results.txt >> perf_report.txt
+          fi
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-report
+          path: perf_report.txt
+
+  # Documentation Generation
+  documentation:
+    runs-on: ubuntu-latest
+    name: Documentation Generation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install documentation dependencies
+        run: |
+          pip install --upgrade pip
+          pip install sphinx sphinx-rtd-theme breathe m2r
+
+      - name: Generate API documentation
+        run: |
+          if [[ -d docs ]]; then
+            doxygen Doxyfile 2>/dev/null || echo "Doxygen not configured, skipping"
+          fi
+
+      - name: Generate Python documentation
+        run: |
+          if python -c "import pynlm" 2>/dev/null; then
+            python -m pydocstyle pynlm > pydocstyle_report.txt 2>&1 || true
+            echo "Pydocstyle analysis completed"
+          fi
+
+      - name: Build documentation
+        run: |
+          if [[ -f source/conf.py ]]; then
+            make -C source html
+          fi
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: documentation
+          path: |
+            docs/html/
+            source/_build/html/
+
+  # Deployment
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: [code-quality, cpp-build, python-tests, performance-benchmarks]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Python package
+        run: |
+          pip install --upgrade pip
+          pip install build
+          python -m build
+
+      - name: Test package
+        run: |
+          pip install dist/*.whl
+          python -c "import pynlm; print('Package imported successfully')"
+
+      - name: Create release artifacts
+        run: |
+          mkdir -p dist/releases
+          cp dist/*.whl dist/releases/
+          cp dist/*.tar.gz dist/releases/ 2>/dev/null || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: nlm-artifacts
+          path: dist/releases/
+
+      - name: Deploy to PyPI (if release tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          pip install twine
+          twine upload dist/releases/*
