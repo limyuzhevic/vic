@@ -90,8 +90,41 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validation
+    struct ValidationResult {
+        bool valid;
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        ValidationResult() : valid(true) {}
+        
+        void addError(const std::string& error) {
+            valid = false;
+            errors.push_back(error);
+        }
+        
+        void addWarning(const std::string& warning) {
+            warnings.push_back(warning);
+        }
+    };
+    
+    // Validate configuration against rules
+    ValidationResult validate(const std::vector<std::pair<std::string, std::string>>& rules) const;
+    
+    // Validate specific configuration values
+    ValidationResult validateValue(const std::string& key, const std::string& typeName) const;
+    
+    // Get validation errors/warnings for common configurations
+    static ValidationResult validateCommonConfigs(const std::vector<std::string>& configKeys);
+    
+    // Check if configuration is complete for basic operation
+    bool isComplete() const;
+    
+    // Get list of required configuration keys
+    static std::vector<std::string> getRequiredConfigKeys();
+    
+    // Get validation warnings for current configuration
+    std::vector<std::string> getValidationWarnings() const;
     
 private:
     struct Impl;
