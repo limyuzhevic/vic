@@ -1,24 +1,29 @@
-cmake_minimum_required(VERSION 3.16)
+# Integration Tests CMake Configuration
+# 
+# This CMakeLists.txt builds the integration test executable (nlm_integration_test)
+# which includes comprehensive system-wide integration tests for the NLM neural network simulation framework.
 
-# Test configuration
+# Integration Test Configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# Create test executable
-add_executable(nlm_test
-    test_main.cpp
-    test_types.cpp
-    test_config.cpp
-    test_random.cpp
-    test_clock.cpp
-    test_neuron.cpp
-    test_synapse.cpp
-    test_stdp.cpp
-    test_brain.cpp
+# Create integration test executable
+add_executable(nlm_integration_test
+    IntegrationTestMain.cpp
+    IntegrationTests.cpp
+    IntegrationTestRunner.cpp
+    
+    # Integration test framework
+    IntegrationTestFramework.hpp
+    EndToEndTests.hpp
+    CrossComponentTests.hpp
+    PerformanceTests.hpp
+    StressTests.hpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
+target_link_libraries(nlm_integration_test PRIVATE nlm_core nlm_agent nlm_world)
+target_compile_features(nlm_integration_test PRIVATE cxx_std_20)
 
 # Enable testing
 enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_integration_test COMMAND nlm_integration_test)

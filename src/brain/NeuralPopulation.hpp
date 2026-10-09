@@ -8,11 +8,11 @@
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
+// Uses unique_ptr for automatic memory management and clear ownership semantics
 
 class NeuralPopulation {
 public:
-    // Create population with ID and size
+    // Create population with ID and size - auto-creates neurons with proper IDs
     NeuralPopulation(PopulationId id, size_t size);
     
     ~NeuralPopulation();
@@ -34,11 +34,18 @@ public:
     Neuron* getNeuron(NeuronIndex index);
     const Neuron* getNeuron(NeuronIndex index) const;
     
-    // Add neuron to population
+    // Add neuron to population - takes ownership of unique_ptr
+    void addNeuron(std::unique_ptr<Neuron> neuron);
+    
+    // Legacy method for backward compatibility - transfers ownership of raw pointer
+    // DEPRECATED: Prefer addNeuron(std::unique_ptr<Neuron>) instead
     void addNeuron(Neuron* neuron);
     
-    // Get all neurons
+    // Get all neurons - returns pointers for backward compatibility
     const std::vector<Neuron*>& getNeurons() const;
+    
+    // Get smart pointers to neurons
+    const std::vector<std::unique_ptr<Neuron>>& getNeuronSmartPtrs() const;
     
     // Population type (all neurons in population share same type)
     NeuronType getNeuronType() const;

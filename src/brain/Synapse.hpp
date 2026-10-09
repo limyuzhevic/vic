@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "SynapseBaseClasses.hpp"
+#include <vector>
 
 namespace nlm {
 

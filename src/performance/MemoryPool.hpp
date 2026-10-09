@@ -1,20 +1,25 @@
 #pragma once
 
 /**
- * MemoryPool - Lock-free memory pool for neurons and synapses
+ * MemoryPool - Enhanced lock-free memory pool with dynamic resizing and memory pressure monitoring
  * 
- * Provides pre-allocated object pools to reduce allocation overhead during simulation.
- * Each pool manages objects of a single type with fixed size.
+ * Phase 5 enhanced memory pool with dynamic resizing, memory pressure monitoring,
+ * and adaptive allocation strategies for large-scale neural simulations.
  * 
  * Features:
  * - Lock-free allocation and deallocation
+ * - Dynamic block resizing based on usage patterns
+ * - Memory pressure monitoring and adaptive allocation
  * - Pre-allocated memory blocks
  * - Memory-efficient slab allocation
  * - Thread-safe operations
+ * - Cache line alignment optimization
+ * - Real-time memory usage statistics
  * 
  * Biological motivation:
  * - Like biological neural systems that maintain fixed numbers of neurons/synapses
  * - Reduces "allocation" overhead similar to how biological systems don't constantly create/destroy neurons
+ * - Adaptive capacity management mimicking homeostatic mechanisms
  */
 
 #include <cstddef>
@@ -24,8 +29,155 @@
 #include <atomic>
 #include <array>
 #include <optional>
+#include <chrono>
+#include <functional>
+#include <thread>
+#include <unordered_map>
 
 namespace nlm {
+
+/**
+ * Memory pressure levels for triggering adaptive allocation
+ */
+enum class MemoryPressureLevel {
+    Normal = 0,      // Normal memory usage (< 50%)
+    Moderate = 1,    // Moderate pressure (50-75%)
+    High = 2,        // High pressure (75-90%)
+    Critical = 3,    // Critical pressure (> 90%)
+    Exhausted = 4    // Memory exhausted (> 95%)
+};
+
+/**
+ * Memory allocation callback for pressure notifications
+ */
+using MemoryPressureCallback = std::function<void(MemoryPressureLevel level, float utilizationRatio)>;
+
+/**
+ * Memory statistics for monitoring and analysis
+ */
+struct MemoryStats {
+    size_t allocatedCount;      // Number of allocated objects
+    size_t availableCount;      // Number of available objects
+    size_t totalBlocks;         // Total memory blocks
+    size_t activeBlocks;        // Active memory blocks
+    size_t memoryUsageBytes;    // Current memory usage in bytes
+    float utilizationRatio;     // Memory utilization ratio (0.0 - 1.0)
+    uint64_t lastAllocationTime; // Timestamp of last allocation
+    uint64_t lastDeallocationTime; // Timestamp of last deallocation
+    
+    MemoryStats() : allocatedCount(0), availableCount(0), totalBlocks(0), 
+                   activeBlocks(0), memoryUsageBytes(0), utilizationRatio(0.0),
+                   lastAllocationTime(0), lastDeallocationTime(0) {}
+};
+
+/**
+ * Adaptive memory pool configuration
+ */
+struct MemoryPoolConfig {
+    size_t initialBlockSize;          // Initial number of objects per block
+    size_t maxBlockSize;              // Maximum objects per block
+    size_t maxTotalObjects;           // Maximum total objects in pool
+    float targetUtilization;          // Target utilization ratio (0.6 - 0.9)
+    uint64_t resizeCheckInterval;     // Interval between resize checks (in allocations)
+    uint32_t highPressureThreshold;   // Utilization threshold for high pressure (e.g., 90% = 900)
+    uint32_t criticalPressureThreshold; // Utilization threshold for critical pressure (e.g., 95% = 950)
+    bool enableAutoResize;            // Enable automatic resizing
+    
+    MemoryPoolConfig()
+        : initialBlockSize(1024), maxBlockSize(4096), maxTotalObjects(1024 * 1024),
+          targetUtilization(0.75), resizeCheckInterval(1000), highPressureThreshold(900),
+          criticalPressureThreshold(950), enableAutoResize(true) {}
+};
+
+/**
+ * MemoryPoolStatisticsCollector - Collects and analyzes memory usage statistics
+ */
+class MemoryPoolStatisticsCollector {
+public:
+    MemoryPoolStatisticsCollector();
+    ~MemoryPoolStatisticsCollector();
+    
+    /**
+     * Update statistics with current pool state
+     */
+    void update(const MemoryStats& stats);
+    
+    /**
+     * Get memory pressure level based on current utilization
+     */
+    MemoryPressureLevel getMemoryPressure(float utilizationRatio) const;
+    
+    /**
+     * Get average utilization over time window
+     */
+    float getAverageUtilization(uint32_t timeWindowMs = 1000) const;
+    
+    /**
+     * Check if memory should be resized based on statistics
+     */
+    bool shouldResize(uint64_t currentAllocationCount, uint32_t checkInterval) const;
+    
+    /**
+     * Calculate optimal block size for given utilization
+     */
+    size_t calculateOptimalBlockSize(size_t currentBlockSize, float currentUtilization) const;
+    
+    /**
+     * Get historical peak utilization
+     */
+    float getPeakUtilization() const { return peakUtilization_; }
+    
+    /**
+     * Get historical average utilization
+     */
+    float getHistoricalAverageUtilization() const { return averageUtilization_; }
+    
+    /**
+     * Reset statistics
+     */
+    void reset();
+    
+    /**
+     * Set memory pressure callback
+     */
+    void setPressureCallback(MemoryPressureCallback callback) {
+        pressureCallback_ = callback;
+    }
+    
+    /**
+     * Get current memory pressure level
+     */
+    MemoryPressureLevel getCurrentPressureLevel() const { return currentPressureLevel_; }
+    
+    /**
+     * Check if pressure level has changed
+     */
+    bool hasPressureChanged() const { return pressureChanged_; }
+    
+    /**
+     * Clear pressure change flag
+     */
+    void clearPressureChanged() { pressureChanged_ = false; }
+
+private:
+    mutable std::mutex mutex_;
+    
+    struct UsageSample {
+        uint64_t timestamp;    // Sample timestamp
+        float utilization;     // Utilization ratio at time of sample
+        size_t allocatedCount; // Allocated count at time of sample
+    };
+    
+    std::vector<UsageSample> usageHistory_;
+    size_t maxHistorySamples_;
+    
+    float peakUtilization_;
+    float averageUtilization_;
+    float currentAverageUtil_;
+    MemoryPressureLevel currentPressureLevel_;
+    bool pressureChanged_;
+    MemoryPressureCallback pressureCallback_;
+};
 
 /**
  * Lock-free stack node for memory pool free list

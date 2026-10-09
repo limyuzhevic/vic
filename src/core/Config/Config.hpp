@@ -55,11 +55,15 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file with format detection
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from specific format files
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -79,6 +83,8 @@ public:
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
+    template<typename T>
+    bool has(const std::string& key) const;
     bool has(const std::string& key) const;
     
     // Remove key
@@ -100,6 +106,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection and parsing helpers
+    static std::string detectFileFormat(const std::string& filepath);
+    static void to_json(nlohmann::json& j, const ConfigValue& cv);
+    static void from_json(const nlohmann::json& j, ConfigValue& cv);
 };
 
 } // namespace nlm

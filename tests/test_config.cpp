@@ -1,14 +1,14 @@
-// Config Tests
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_config {
 
 void testConfigCreation() {
     nlm::Config config;
     assert(!config.has("test"));
-    
     std::cout << "    testConfigCreation passed" << std::endl;
 }
 
@@ -78,12 +78,38 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testFileIO() {
+    nlm::Config config;
+    
+    // Set some values
+    config.set("test_string", std::string("test value"), nlm::ConfigSource::Runtime);
+    config.set("test_int", 123, nlm::ConfigSource::Runtime);
+    config.set("test_bool", false, nlm::ConfigSource::Runtime);
+    config.set("test_double", 2.718, nlm::ConfigSource::Runtime);
+    
+    // Save to file
+    assert(config.saveToFile("test_config.cfg"));
+    
+    // Clear and reload
+    config.clear();
+    assert(config.loadFromFile("test_config.cfg"));
+    
+    // Verify values were loaded
+    assert(config.get<std::string>("test_string").value() == "test value");
+    assert(config.get<int>("test_int").value() == 123);
+    assert(config.get<bool>("test_bool").value() == false);
+    assert(config.get<double>("test_double").value() == 2.718);
+    
+    std::cout << "    testFileIO passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testFileIO();
 }
 
 } // namespace test_config
