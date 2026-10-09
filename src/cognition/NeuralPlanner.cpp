@@ -241,15 +241,33 @@ void NeuralPlanner::clearCache() {
     // Clear any planning cache
 }
 
-bool NeuralPlanner::wasRecentPlanSuccessful() const {
-    if (recentPlanSuccess_.empty()) return true;  // No data
+PlanningCandidate NeuralPlanner::generateActionSequence(const std::vector<float>& currentState) {
+    // Generate action sequences and evaluate them
+    auto sequences = generateActionSequences(planningDepth_);
     
-    size_t successCount = 0;
-    for (bool success : recentPlanSuccess_) {
-        if (success) ++successCount;
+    if (sequences.empty()) {
+        PlanningCandidate result;
+        result.actions.push_back(ActionType::Wait);
+        result.expectedReward = -1000.0f;
+        result.confidence = 0.0f;
+        result.depth = 0;
+        return result;
     }
     
-    return successCount > recentPlanSuccess_.size() / 2;
+    // Evaluate the first sequence as the action sequence
+    auto firstSequence = sequences[0];
+    PlanningCandidate result = evaluateSequence(firstSequence, currentState);
+    
+    // If no good sequence found, return wait action
+    if (result.expectedReward < -500.0f) {
+        result.actions.clear();
+        result.predictedStates.clear();
+        result.actions.push_back(ActionType::Wait);
+        result.expectedReward = -1000.0f;
+        result.confidence = 0.0f;
+    }
+    
+    return result;
 }
 
 // SelfModel Implementation
@@ -335,7 +353,7 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                               const std::vector<float>& afterState,
                                               ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated

@@ -78,11 +78,8 @@ private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
 
-    // Evaluate single action from state
-    float evaluateAction(ActionType action, const std::vector<float>& state);
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Generate single action sequence given current state
+    PlanningCandidate generateActionSequence(const std::vector<float>& currentState);
 
     Brain* brain_;
     size_t planningDepth_;

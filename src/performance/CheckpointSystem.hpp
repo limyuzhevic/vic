@@ -175,8 +175,255 @@ struct SynapseCheckpointData {
 };
 
 /**
- * Checkpoint reader
+ * Memory system state for checkpointing
  */
+struct MemoryCheckpointData {
+    // Working memory: active neural traces
+    std::vector<uint64_t> workingMemoryNeurons;
+    std::vector<float> workingMemoryActivations;
+    std::vector<double> workingMemoryTimestamps;
+    std::vector<size_t> workingMemoryTraceIds;
+    
+    // Episodic memory: stored experiences
+    std::vector<uint64_t> episodicMemoryIds;
+    std::vector<double> episodicMemoryTimestamps;
+    std::vector<float> episodicMemoryRewards;
+    std::vector<float> episodicMemoryEnergies;
+    std::vector<std::vector<uint64_t>> episodicMemoryNeurons;
+    std::vector<std::vector<float>> episodicMemoryActivations;
+    std::vector<float> episodicMemoryPositionX;
+    std::vector<float> episodicMemoryPositionY;
+    std::vector<float> episodicMemoryOrientation;
+    std::vector<uint32_t> episodicMemoryActions;
+    std::vector<std::vector<float>> episodicMemorySensoryStates;
+    std::vector<std::vector<float>> episodicMemoryResultingStates;
+    std::vector<std::vector<float>> episodicMemoryResultingRewards;
+    std::vector<size_t> episodicMemoryAges;
+    
+    // Associative memory: pattern relationships
+    std::vector<std::vector<uint64_t>> associativePatternNeurons;
+    std::vector<std::vector<float>> associativePatternActivations;
+    std::vector<std::vector<std::pair<size_t, size_t>>> associativeConnections;
+    std::vector<std::vector<float>> associativeStrengths;
+};
+
+/**
+ * Neuromodulation system state for checkpointing
+ */
+struct NeuromodulationCheckpointData {
+    // Dopamine
+    float dopamineLevel;
+    float dopamineBaselineLevel;
+    float dopamineReceptorActivation;
+    float dopamineExcitabilityModulation;
+    float dopamineWorkingMemoryModulation;
+    float dopamineEligibilityTraceModulation;
+    float dopamineAttentionModulation;
+    float dopamineLearningRateModulation;
+    float dopaminePlasticityFactor;
+    
+    // Acetylcholine
+    float acetylcholineLevel;
+    float acetylcholineBaselineLevel;
+    float acetylcholineReceptorActivation;
+    float acetylcholineExcitabilityModulation;
+    float acetylcholineWorkingMemoryModulation;
+    float acetylcholineEligibilityTraceModulation;
+    float acetylcholineAttentionModulation;
+    float acetylcholineLearningRateModulation;
+    float acetylcholinePlasticityFactor;
+    
+    // Norepinephrine
+    float norepinephrineLevel;
+    float norepinephrineBaselineLevel;
+    float norepinephrineReceptorActivation;
+    float norepinephrineExcitabilityModulation;
+    float norepinephrineWorkingMemoryModulation;
+    float norepinephrineEligibilityTraceModulation;
+    float norepinephrineAttentionModulation;
+    float norepinephrineLearningRateModulation;
+    float norepinephrinePlasticityFactor;
+    
+    // Serotonin
+    float serotoninLevel;
+    float serotoninBaselineLevel;
+    float serotoninReceptorActivation;
+    float serotoninExcitabilityModulation;
+    float serotoninWorkingMemoryModulation;
+    float serotoninEligibilityTraceModulation;
+    float serotoninAttentionModulation;
+    float serotoninLearningRateModulation;
+    float serotoninPlasticityFactor;
+    
+    // Curiosity
+    float curiosityLevel;
+    float curiosityBaselineLevel;
+    float curiosityReceptorActivation;
+    float curiosityExcitabilityModulation;
+    float curiosityWorkingMemoryModulation;
+    float curiosityEligibilityTraceModulation;
+    float curiosityAttentionModulation;
+    float curiosityLearningRateModulation;
+    float curiosityPlasticityFactor;
+    
+    // Novelty
+    float noveltyLevel;
+    float noveltyBaselineLevel;
+    float noveltyReceptorActivation;
+    float noveltyExcitabilityModulation;
+    float noveltyWorkingMemoryModulation;
+    float noveltyEligibilityTraceModulation;
+    float noveltyAttentionModulation;
+    float noveltyLearningRateModulation;
+    float noveltyPlasticityFactor;
+    
+    // PredictionError
+    float predictionErrorLevel;
+    float predictionErrorBaselineLevel;
+    float predictionErrorReceptorActivation;
+    float predictionErrorExcitabilityModulation;
+    float predictionErrorWorkingMemoryModulation;
+    float predictionErrorEligibilityTraceModulation;
+    float predictionErrorAttentionModulation;
+    float predictionErrorLearningRateModulation;
+    float predictionErrorPlasticityFactor;
+};
+
+/**
+ * Development system state for checkpointing
+ */
+struct DevelopmentCheckpointData {
+    // Developmental stage
+    uint32_t developmentalStage;
+    
+    // Developmental age
+    double developmentalAge;
+    
+    // Plasticity modifier
+    float plasticityModifier;
+    
+    // Critical period info
+    bool criticalPeriod;
+    float criticalPeriodProgress;
+    
+    // Stage-specific parameters
+    float synaptogenesisRate;
+    float pruningRate;
+    float maturationRate;
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionCheckpointData {
+    // Prediction system metrics
+    std::vector<float> predictionAccuracy;
+    std::vector<float> predictionConfidence;
+    std::vector<float> predictionErrors;
+    std::vector<float> predictionExpectations;
+    
+    // Forward model state
+    std::vector<std::vector<float>> forwardModelWeights;
+    std::vector<std::vector<float>> forwardModelBiases;
+    std::vector<float> predictionErrorHistory;
+    std::vector<float> predictionLevel;
+    
+    // Action prediction
+    std::vector<float> predictedRewards;
+    std::vector<float> predictedValues;
+    std::vector<std::vector<float>> actionPredictions;
+};
+
+/**
+ * Attention system state for checkpointing
+ */
+struct AttentionCheckpointData {
+    // Attention parameters
+    float inhibitionStrength;
+    float excitationStrength;
+    float competitionThreshold;
+    
+    // Attention state
+    std::vector<uint32_t> attendedRegions;
+    std::vector<uint64_t> attentionWinners;
+    std::vector<float> neuronSalience;
+    std::vector<float> topDownBias;
+    std::vector<float> bottomUpSalience;
+    
+    // Attention dynamics
+    std::vector<double> attentionTimestamps;
+    std::vector<float> attentionLevels;
+};
+
+/**
+ * Spike history for checkpointing
+ */
+struct SpikeHistoryCheckpointData {
+    // Recent spike events
+    std::vector<uint64_t> spikeSourceNeurons;
+    std::vector<double> spikeTimestamps;
+    std::vector<uint64_t> spikeSteps;
+    std::vector<uint32_t> spikeRegionIds;
+    std::vector<uint32_t> spikePopulationIds;
+    
+    // Delayed spike events
+    std::vector<uint64_t> delayedSourceNeurons;
+    std::vector<uint64_t> delayedDestinationNeurons;
+    std::vector<uint64_t> delayedSynapseIds;
+    std::vector<float> delayedWeights;
+    std::vector<uint32_t> delayedDeliverySteps;
+    std::vector<double> delayedDeliveryTimes;
+    
+    // Pre and post spike history for plasticity
+    std::vector<std::vector<double>> preSpikeHistory;
+    std::vector<std::vector<double>> postSpikeHistory;
+};
+
+/**
+ * Random generator state for checkpointing
+ */
+struct RandomStateCheckpointData {
+    // Random engine state
+    uint64_t seed;
+    
+    // Underlying engine state (MT19937 state)
+    std::vector<uint32_t> mtState;
+    int32_t mtPosition;
+    
+    // Statistical properties for validation
+    std::vector<double> recentValues;
+    std::vector<double> statisticalMoments;
+};
+
+/**
+ * Simulation state for checkpointing
+ */
+struct SimulationStateCheckpointData {
+    // Simulation clock
+    uint64_t step;
+    double simulationTime;
+    double timestep;
+    
+    // Statistics
+    uint64_t totalSpikesThisStep;
+    uint64_t totalSpikesTotal;
+    
+    // State flags
+    bool isResting;
+    size_t stepsSinceLastEpisode;
+    
+    // Integration intervals
+    size_t replayInterval;
+    size_t consolidationInterval;
+    
+    // Environment simulation state
+    std::vector<float> environmentState;
+    std::vector<float> worldParameters;
+};
+
+/**
+     * Checkpoint reader
+     */
 class CheckpointReader {
 public:
     CheckpointReader();
@@ -212,6 +459,14 @@ public:
      */
     bool readNeurons(NeuronCheckpointData& data);
     bool readSynapses(SynapseCheckpointData& data);
+    bool readMemory(MemoryCheckpointData& data);
+    bool readNeuromodulation(NeuromodulationCheckpointData& data);
+    bool readDevelopment(DevelopmentCheckpointData& data);
+    bool readPrediction(PredictionCheckpointData& data);
+    bool readAttention(AttentionCheckpointData& data);
+    bool readSpikeHistory(SpikeHistoryCheckpointData& data);
+    bool readRandomState(RandomStateCheckpointData& data);
+    bool readSimulationState(SimulationStateCheckpointData& data);
     
     /**
      * Read raw section data
@@ -275,13 +530,21 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
      */
     bool writeNeurons(const NeuronCheckpointData& data);
     bool writeSynapses(const SynapseCheckpointData& data);
+    bool writeMemory(const MemoryCheckpointData& data);
+    bool writeNeuromodulation(const NeuromodulationCheckpointData& data);
+    bool writeDevelopment(const DevelopmentCheckpointData& data);
+    bool writePrediction(const PredictionCheckpointData& data);
+    bool writeAttention(const AttentionCheckpointData& data);
+    bool writeSpikeHistory(const SpikeHistoryCheckpointData& data);
+    bool writeRandomState(const RandomStateCheckpointData& data);
+    bool writeSimulationState(const SimulationStateCheckpointData& data);
     
     /**
      * Write raw section data

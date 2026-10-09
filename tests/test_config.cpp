@@ -2,6 +2,9 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace test_config {
 
@@ -78,12 +81,162 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+// New JSON-related tests
+void testJsonSaveToFile() {
+    nlm::Config config;
+    
+    // Set up test data
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
+    config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
+    config.set("bool_value", true, nlm::ConfigSource::Runtime);
+    
+    std::string testFile = "test_config.json";
+    bool saveResult = config.saveToFile(testFile);
+    assert(saveResult);
+    
+    // Verify file exists
+    assert(std::filesystem::exists(testFile));
+    
+    // Clean up
+    std::filesystem::remove(testFile);
+    
+    std::cout << "    testJsonSaveToFile passed" << std::endl;
+}
+
+void testJsonLoadFromFile() {
+    nlm::Config config;
+    
+    // Create test file with JSON content
+    std::string testFile = "test_config.json";
+    std::ofstream file(testFile);
+    file << R"({
+        "config": {
+            "int_value": 100,
+            "double_value": 2.718,
+            "string_value": "test_string",
+            "bool_value": false,
+            "int_vector": [1, 2, 3],
+            "double_vector": [1.1, 2.2, 3.3],
+            "string_vector": ["a", "b", "c"]
+        }
+    })";
+    file.close();
+    
+    // Load the file
+    bool loadResult = config.loadFromFile(testFile);
+    assert(loadResult);
+    
+    // Verify loaded values
+    assert(config.getOr<int>("int_value", 0) == 100);
+    assert(config.getOr<double>("double_value", 0.0) > 2.717 && config.getOr<double>("double_value", 0.0) < 2.719);
+    assert(config.getOr<std::string>("string_value", "") == "test_string");
+    assert(config.getOr<bool>("bool_value", true) == false);
+    
+    // Verify vector types
+    auto intVector = config.get<std::vector<int>>("int_vector");
+    assert(intVector.has_value());
+    assert(intVector->size() == 3);
+    
+    auto doubleVector = config.get<std::vector<double>>("double_vector");
+    assert(doubleVector.has_value());
+    assert(doubleVector->size() == 3);
+    
+    auto stringVector = config.get<std::vector<std::string>>("string_vector");
+    assert(stringVector.has_value());
+    assert(stringVector->size() == 3);
+    
+    // Clean up
+    std::filesystem::remove(testFile);
+    
+    std::cout << "    testJsonLoadFromFile passed" << std::endl;
+}
+
+void testJsonLoadFromString() {
+    nlm::Config config;
+    
+    std::string jsonString = R"({
+        "config": {
+            "int_value": 200,
+            "string_value": "from_json_string"
+        }
+    })";
+    
+    bool loadResult = config.loadFromJsonString(jsonString);
+    assert(loadResult);
+    
+    assert(config.getOr<int>("int_value", 0) == 200);
+    assert(config.getOr<std::string>("string_value", "") == "from_json_string");
+    
+    std::cout << "    testJsonLoadFromString passed" << std::endl;
+}
+
+void testJsonSaveToString() {
+    nlm::Config config;
+    
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    config.set("string_value", "test_value", nlm::ConfigSource::Runtime);
+    
+    std::string jsonString = config.saveToJsonString();
+    assert(!jsonString.empty());
+    
+    // Verify it's valid JSON
+    nlohmann::json j = nlohmann::json::parse(jsonString);
+    assert(j.contains("config"));
+    assert(j["config"]["int_value"] == 42);
+    assert(j["config"]["string_value"] == "test_value");
+    
+    std::cout << "    testJsonSaveToString passed" << std::endl;
+}
+
+void testConfigValueTypes() {
+    nlm::Config config;
+    
+    // Test all ConfigValue types
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    assert(config.getOr<int>("int_value", 0) == 42);
+    
+    config.set("int64_value", static_cast<int64_t>(9223372036854775807), nlm::ConfigSource::Runtime);
+    assert(config.getOr<int64_t>("int64_value", 0) == 9223372036854775807LL);
+    
+    config.set("double_value", 3.14159, nlm::ConfigSource::Runtime);
+    assert(config.getOr<double>("double_value", 0.0) > 3.14 && config.getOr<double>("double_value", 0.0) < 3.15);
+    
+    config.set("bool_value", true, nlm::ConfigSource::Runtime);
+    assert(config.getOr<bool>("bool_value", false) == true);
+    
+    config.set("string_value", "test_string", nlm::ConfigSource::Runtime);
+    assert(config.getOr<std::string>("string_value", "") == "test_string");
+    
+    // Test vectors
+    config.set("int_vector", std::vector<int>{1, 2, 3}, nlm::ConfigSource::Runtime);
+    auto intVector = config.get<std::vector<int>>("int_vector");
+    assert(intVector.has_value() && intVector->size() == 3);
+    
+    config.set("double_vector", std::vector<double>{1.1, 2.2, 3.3}, nlm::ConfigSource::Runtime);
+    auto doubleVector = config.get<std::vector<double>>("double_vector");
+    assert(doubleVector.has_value() && doubleVector->size() == 3);
+    
+    config.set("string_vector", std::vector<std::string>{"a", "b", "c"}, nlm::ConfigSource::Runtime);
+    auto stringVector = config.get<std::vector<std::string>>("string_vector");
+    assert(stringVector.has_value() && stringVector->size() == 3);
+    
+    std::cout << "    testConfigValueTypes passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    
+    // New JSON tests
+    testJsonSaveToFile();
+    testJsonLoadFromFile();
+    testJsonLoadFromString();
+    testJsonSaveToString();
+    testConfigValueTypes();
 }
 
 } // namespace test_config

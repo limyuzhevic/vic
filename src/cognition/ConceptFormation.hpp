@@ -107,6 +107,9 @@ public:
     // Measure concept stability (0-1)
     float getConceptStability(size_t conceptId) const;
 
+    // Get active concepts (those with sufficient stability)
+    std::vector<size_t> getActiveConcepts() const;
+
     // Get number of concepts discovered
     size_t getConceptCount() const { return concepts_.size(); }
 

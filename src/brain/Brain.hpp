@@ -193,6 +193,64 @@ public:
     // Logging
     void logStatus() const;
     
+    // CLI-related methods for configuration control
+    bool applyCliConfig(const std::string& key, const std::string& value);
+    bool loadCheckpoint(const std::string& filepath);
+    bool saveCheckpoint(const std::string& filepath) const;
+    void listAvailableCheckpoints();
+    bool validateConfig() const;
+    std::string exportConfig() const;
+    bool importConfig(const std::string& configJson);
+    
+    // Neuromodulation control
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
+    void setCuriosityIntensity(float intensity);
+    
+    // Memory control
+    void setMemoryCapacity(size_t capacity);
+    void setEpisodicMemorySize(size_t size);
+    void setWorkingMemorySize(size_t size);
+    void disableAllMemory();
+    
+    // Development stage control
+    void setDevelopmentalStage(const std::string& stage);
+    void setCriticalPeriodDuration(double duration);
+    void setPlasticityRate(double rate);
+    
+    // Performance control
+    void setNeuronCount(size_t count);
+    void setRegionCount(size_t count);
+    void setConnectionProbability(float probability);
+    void setMaxMemory(size_t maxMemory);
+    void setThreadCount(size_t count);
+    
+    // Specialized mode control
+    void enterSleepMode();
+    void setReplayMode(const std::string& episodeFile);
+    void enableAblationMode();
+    void setExperimentMode(const std::string& modeName);
+    
+    // Export options
+    bool exportBrainState(const std::string& filepath) const;
+    bool exportBehaviorLog(const std::string& filepath) const;
+    bool exportNeuralActivity(const std::string& filepath) const;
+    bool exportSimulationData(const std::string& filepath) const;
+    
+    // Debug and profiling
+    void enableDebugMode();
+    void enableTestMode();
+    void enableBenchmarkMode();
+    void enableProfilingMode();
+    void enableReplayMode();
+    
+    // Status and statistics
+    std::string getSystemStatus() const;
+    std::string getPerformanceMetrics() const;
+    std::string getMemoryUsage() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

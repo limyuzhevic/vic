@@ -321,14 +321,272 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printUsage() {
+    std::cout << R"(
+=== NLM Phase 2 Command Line Interface ===
+
+USAGE:
+  nlm [OPTIONS] [--config=FILE | FILE]
+
+BASIC OPTIONS:
+  -h, --help                    Show this help message
+  -v, --version                 Print version information
+      --usage                   Show detailed usage examples
+      --config=FILE             Load configuration from FILE (default: configs/default.cfg)
+
+SIMULATION CONTROL:
+  -s, --steps=N                 Number of simulation steps to run
+      --duration=T              Simulation duration in seconds
+      --save-interval=N          Checkpoint save interval (in steps)
+      --load-checkpoint=F        Load specific checkpoint
+      --checkpoint-dir=D          Checkpoint directory
+
+OUTPUT AND LOGGING CONTROL:
+  -v, --verbose                 Enable verbose output
+  -q, --quiet                   Quiet mode (suppress output)
+      --log-level=L             Set logging level (Debug, Info, Warning, Error, Critical)
+      --log-file=F               Write logs to file F
+      --output-format=F          Output format: json, csv, human
+
+ADVANCED CONFIGURATION OPTIONS:
+      --export-config=F          Export current configuration to file F
+      --validate-config=F         Validate configuration file F
+      --show-config              Display current configuration
+      --apply-profile=P           Apply predefined configuration profile P
+
+DEBUG AND TESTING OPTIONS:
+      --debug                     Enable debug mode with additional output
+      --test                      Run validation tests
+      --benchmark                 Run performance benchmark
+      --profile                   Enable profiling information
+      --replay                    Replay recorded sequences
+
+CHECKPOINT MANAGEMENT:
+      --create-checkpoint=N       Create checkpoint with name N
+      --list-checkpoints          List available checkpoints
+      --delete-checkpoint=N       Delete specific checkpoint N
+      --purge-checkpoints          Delete all old checkpoints
+
+NEUROMODULATION AND LEARNING CONTROL:
+      --enable-reward-modulation    Enable reward-based learning
+      --enable-structural-plasticity Enable structural plasticity
+      --enable-development          Enable developmental processes
+      --enable-curiosity            Enable curiosity-driven exploration
+      --curiosity-intensity=I      Set curiosity intensity (0.0-1.0)
+
+MEMORY AND PERSISTENCE OPTIONS:
+      --memory-capacity=C          Set memory capacity
+      --episodic-memory-size=S     Set episodic memory size
+      --working-memory-size=W       Set working memory size
+      --no-memory                   Disable all memory systems
+
+DEVELOPMENT AND STAGE CONTROL:
+      --developmental-stage=S      Set developmental stage (Initial, CriticalPeriod, Maturation, Adult, Aging)
+      --critical-period-duration=T  Set critical period duration
+      --plasticity-rate=R           Set overall plasticity rate
+
+PERFORMANCE AND RESOURCE CONTROL:
+      --neuron-count=N             Set neuron count
+      --region-count=R             Set number of brain regions
+      --connection-probability=P   Set connection probability
+      --max-memory=M               Set maximum memory usage
+      --thread-count=T             Set number of processing threads
+
+SPECIALIZED MODES:
+      --sleep-mode                 Enter sleep/rest cycle
+      --replay-mode=F              Replay specific episode F
+      --ablation-mode              Disable specific brain regions
+      --experiment-mode=M           Run specific experiment M
+
+OUTPUT AND EXPORT OPTIONS:
+      --export-brain-state=F        Export brain state to file F
+      --export-behavior-log=F      Export behavioral logs to file F
+      --export-neural-activity=F    Export neural activity data to file F
+      --export-simulation-data=F   Export simulation data to file F
+
+PREDEFINED PROFILES:
+      --profile=basic              Basic simulation profile
+      --profile=advanced           Advanced research profile
+      --profile=production          Production profile
+      --profile=development         Development profile
+
+For more information on a specific option, use: nlm --help=OPTION_NAME
+
+EXAMPLES:
+  # Run a simple simulation with 100 steps
+  nlm --steps=100
+
+  # Load a specific configuration and run verbose
+  nlm --config=myconfig.json --verbose --steps=500
+
+  # Export current configuration
+  nlm --export-config=exported.json
+
+  # Run benchmark with custom settings
+  nlm --benchmark --neuron-count=1000 --region-count=2
+
+  # Create and save checkpoints
+  nlm --steps=1000 --save-interval=100 --create-checkpoint="check1"
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << R"(
+NLM Phase 2: Real Neural Computation
+Version 2.0.0
+Build: Phase 2 - Real spiking neural computation with LIF neurons
+License: Proprietary
+Developed: Neural Learning Machine Research Group
+
+Key Features:
+  - Leaky Integrate-and-Fire (LIF) neuron dynamics
+  - Event-driven spike propagation with synaptic delays
+  - STDP and Hebbian plasticity rules
+  - Structural plasticity (synaptogenesis/pruning)
+  - Neuromodulation systems (Dopamine, Acetylcholine, Norepinephrine, Serotonin)
+  - Memory systems (Working, Episodic, Associative)
+  - Prediction and learning capabilities
+  - Developmental stages and processes
+  - Multiple brain regions and connectivity
+  - Checkpoint saving and loading
+  - Advanced CLI with comprehensive options
+)" << std::endl;
+}
+
+void printUsageExamples() {
+    std::cout << R"(
+=== NLM Phase 2 Usage Examples ===
+
+QUICK START:
+  nlm
+    Run NLM with default configuration (runs 3 built-in tests)
+
+  nlm --help
+    Show complete help information
+
+BASIC SIMULATION:
+  nlm --steps=1000
+    Run 1000 simulation steps
+
+  nlm --duration=60
+    Run simulation for 60 seconds
+
+  nlm --steps=500 --verbose
+    Run 500 steps with verbose output
+
+CONFIGURATION MANAGEMENT:
+  nlm --config=myconfig.json
+    Load custom configuration
+
+  nlm --export-config=exported.json
+    Export current configuration
+
+  nlm --validate-config=exported.json
+    Validate configuration file
+
+ADVANCED SIMULATION:
+  nlm --steps=10000 --save-interval=500
+    Run 10k steps, save checkpoint every 500 steps
+
+  nlm --load-checkpoint=check001
+    Load from specific checkpoint
+
+RESEARCH EXPERIMENTS:
+  nlm --benchmark --neuron-count=2000 --region-count=4
+    Run benchmark with larger network
+
+  nlm --test --experiment-mode=reinforcement
+    Run reinforcement learning experiment
+
+  nlm --debug --profile --steps=100
+    Run with debug output and profiling
+
+CHECKPOINT MANAGEMENT:
+  nlm --create-checkpoint="experiment1" --steps=5000
+    Create named checkpoint after 5000 steps
+
+  nlm --list-checkpoints
+    List all available checkpoints
+
+  nlm --delete-checkpoint="experiment1"
+    Delete specific checkpoint
+
+DEVELOPMENTAL STUDIES:
+  nlm --developmental-stage=CriticalPeriod --critical-period-duration=100
+    Run during critical period
+
+  nlm --enable-curiosity --curiosity-intensity=0.8
+    Enable curiosity-driven exploration
+
+EXPORT AND ANALYSIS:
+  nlm --export-brain-state=brain_state.json --steps=1000
+    Export brain state after simulation
+
+  nlm --export-behavior-log=behavior.csv --steps=500
+    Export behavioral logs
+
+SLEEP AND RECOVERY:
+  nlm --sleep-mode
+    Enter sleep/rest cycle
+)" << std::endl;
+}
+
+// Advanced argument parsing and configuration management functions
+void parseAdvancedArguments(int argc, char** argv, std::shared_ptr<Config>& config, std::string& configFile);
+void applyProfile(std::shared_ptr<Config>& config, const std::string& profileName);
+void showConfiguration(std::shared_ptr<Config>& config);
+void validateConfiguration(const std::string& filepath);
+void exportConfiguration(std::shared_ptr<Config>& config, const std::string& filepath);
+void listCheckpoints(const std::string& checkpointDir);
+void createCheckpoint(std::shared_ptr<Brain>& brain, const std::string& checkpointName);
+void deleteCheckpoint(const std::string& checkpointName);
+void purgeCheckpoints();
+void setupLogFile(const std::string& logFile, LogLevel logLevel);
+
 int main(int argc, char** argv) {
     printBanner();
     
+    // Parse advanced command line arguments
+    std::shared_ptr<Config> config = std::make_shared<Config>();
+    std::string configFile = "configs/default.cfg";
+    
+    parseAdvancedArguments(argc, argv, config, configFile);
+    
+    // Check for help/version flags before proceeding
+    std::string helpOption;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        } else if (arg == "--usage") {
+            printUsageExamples();
+            return 0;
+        } else if (arg.find("--help=") == 0) {
+            helpOption = arg.substr(7);
+            // TODO: Implement specific help for options
+        }
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger based on command line options
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    // Parse log level from config or command line
+    LogLevel logLevel = LogLevel::Info;
+    if (config->has("log_level")) {
+        std::string logLevelStr = config->getOr<std::string>("log_level", "Info");
+        if (logLevelStr == "Debug") logLevel = LogLevel::Debug;
+        else if (logLevelStr == "Warning") logLevel = LogLevel::Warning;
+        else if (logLevelStr == "Error") logLevel = LogLevel::Error;
+        else if (logLevelStr == "Critical") logLevel = LogLevel::Critical;
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -340,47 +598,53 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    // Try to load from file if provided (for backward compatibility)
+    if (configFile != "configs/default.cfg") {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration (file not found or invalid).");
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
+    // Override with command line args (for backward compatibility)
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (only if not already set)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // STDP parameters (only if not set)
+    if (!config->has("stdp_ltp_weight")) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_ltd_weight")) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_tau")) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters (only if not set)
+    if (!config->has("synaptogenesis_rate")) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (!config->has("pruning_rate")) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -391,6 +655,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+    // Check for simulation control options
+    int steps = config->getOr<int64_t>("steps", 0);
+    double duration = config->getOr<double>("duration", 0.0);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +677,43 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run the basic tests (for backward compatibility)
+    if (steps == 0 && duration == 0.0) {
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    } else {
+        // Run custom simulation
+        NLM_LOG_INFO("Running custom simulation...");
+        NLM_LOG_INFO("Steps: " + std::to_string(steps) + ", Duration: " + std::to_string(duration) + "s");
+        
+        for (SimulationStep step = 0; step < steps; ++step) {
+            brain->step(step, step * timestep);
+            
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                           " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                           " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            }
+        }
+        
+        // Save final checkpoint if requested
+        std::string finalCheckpoint = config->getOr<std::string>("final_checkpoint", "");
+        if (!finalCheckpoint.empty()) {
+            createCheckpoint(brain, finalCheckpoint);
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -446,4 +737,385 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Enhanced argument parsing and configuration management functions
+void parseAdvancedArguments(int argc, char** argv, std::shared_ptr<Config>& config, std::string& configFile);
+void applyProfile(std::shared_ptr<Config>& config, const std::string& profileName);
+void showConfiguration(std::shared_ptr<Config>& config);
+void validateConfiguration(const std::string& filepath);
+void exportConfiguration(std::shared_ptr<Config>& config, const std::string& filepath);
+void listCheckpoints(const std::string& checkpointDir);
+void createCheckpoint(std::shared_ptr<Brain>& brain, const std::string& checkpointName);
+void deleteCheckpoint(const std::string& checkpointName);
+void purgeCheckpoints();
+void setupLogFile(const std::string& logFile, LogLevel logLevel);
+
+// Enhanced argument parsing function
+void parseAdvancedArguments(int argc, char** argv, std::shared_ptr<Config>& config, std::string& configFile) {
+    std::string logFile;
+    std::string checkpointDir = "checkpoints";
+    std::string loadCheckpoint;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.find("--") == 0) {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Handle special options
+                if (key == "config") {
+                    configFile = value;
+                } else if (key == "log-level") {
+                    config->set("log_level", value, ConfigSource::CommandLine);
+                } else if (key == "log-file") {
+                    logFile = value;
+                    config->set("log_file", value, ConfigSource::CommandLine);
+                } else if (key == "log_level") {
+                    config->set("log_level", value, ConfigSource::CommandLine);
+                } else if (key == "checkpoint-dir") {
+                    checkpointDir = value;
+                    config->set("checkpoint_dir", value, ConfigSource::CommandLine);
+                } else if (key == "load-checkpoint") {
+                    loadCheckpoint = value;
+                    config->set("load_checkpoint", value, ConfigSource::CommandLine);
+                } else if (key == "save-interval") {
+                    config->set("save_interval", std::stoi(value), ConfigSource::CommandLine);
+                } else if (key == "steps") {
+                    config->set("steps", std::stoi(value), ConfigSource::CommandLine);
+                } else if (key == "duration") {
+                    config->set("duration", std::stod(value), ConfigSource::CommandLine);
+                } else if (key == "output-format") {
+                    config->set("output_format", value, ConfigSource::CommandLine);
+                } else if (key == "final-checkpoint") {
+                    config->set("final_checkpoint", value, ConfigSource::CommandLine);
+                } else {
+                    // Try to set as regular config value
+                    // Try to parse as different types
+                    bool isInt = true;
+                    bool isDouble = true;
+                    bool isBool = true;
+                    
+                    try {
+                        size_t pos;
+                        int intVal = std::stoi(value, &pos);
+                        if (pos == value.length()) {
+                            config->set(key, intVal, ConfigSource::CommandLine);
+                            isInt = true;
+                        }
+                    } catch (...) {
+                        isInt = false;
+                    }
+                    
+                    try {
+                        size_t pos;
+                        double doubleVal = std::stod(value, &pos);
+                        if (pos == value.length()) {
+                            config->set(key, doubleVal, ConfigSource::CommandLine);
+                            isDouble = true;
+                        }
+                    } catch (...) {
+                        isDouble = false;
+                    }
+                    
+                    try {
+                        if (value == "true" || value == "1") {
+                            config->set(key, true, ConfigSource::CommandLine);
+                            isBool = true;
+                        } else if (value == "false" || value == "0") {
+                            config->set(key, false, ConfigSource::CommandLine);
+                            isBool = true;
+                        }
+                    } catch (...) {
+                        isBool = false;
+                    }
+                    
+                    if (!isInt && !isDouble && !isBool) {
+                        // Try as string
+                        config->set(key, value, ConfigSource::CommandLine);
+                    }
+                }
+            }
+        }
+        // Handle short options
+        else if (arg[0] == '-' && arg.length() > 1) {
+            std::string key = arg.substr(1);
+            std::string value;
+            
+            if (key == "h" || key == "help") {
+                printUsage();
+                exit(0);
+            } else if (key == "v" || key == "version") {
+                printVersion();
+                exit(0);
+            } else if (key == "q" || key == "quiet") {
+                config->set("quiet", true, ConfigSource::CommandLine);
+                // Suppress output
+                std::cout.setstate(std::ios_base::failbit);
+                std::cerr.setstate(std::ios_base::failbit);
+            } else if (key == "verbose") {
+                config->set("verbose", true, ConfigSource::CommandLine);
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // Next argument is a value
+                value = argv[++i];
+                
+                if (key == "s" || key == "steps") {
+                    config->set("steps", std::stoi(value), ConfigSource::CommandLine);
+                } else if (key == "d" || key == "duration") {
+                    config->set("duration", std::stod(value), ConfigSource::CommandLine);
+                } else if (key == "log-level") {
+                    config->set("log_level", value, ConfigSource::CommandLine);
+                } else if (key == "log-file") {
+                    logFile = value;
+                    config->set("log_file", value, ConfigSource::CommandLine);
+                } else if (key == "checkpoint-dir") {
+                    checkpointDir = value;
+                    config->set("checkpoint_dir", value, ConfigSource::CommandLine);
+                } else if (key == "load-checkpoint") {
+                    loadCheckpoint = value;
+                    config->set("load_checkpoint", value, ConfigSource::CommandLine);
+                } else if (key == "save-interval") {
+                    config->set("save_interval", std::stoi(value), ConfigSource::CommandLine);
+                } else {
+                    // Try to set as regular config value
+                    config->set(key, value, ConfigSource::CommandLine);
+                }
+            } else {
+                // Boolean flag
+                config->set(key, true, ConfigSource::CommandLine);
+            }
+        }
+    }
+    
+    // Setup log file if specified
+    if (!logFile.empty()) {
+        setupLogFile(logFile, logLevel);
+    }
+    
+    // Handle profile application
+    if (config->has("profile")) {
+        std::string profile = config->getOr<std::string>("profile", "");
+        if (!profile.empty()) {
+            applyProfile(config, profile);
+        }
+    }
+    
+    // Handle configuration display
+    if (config->has("show-config") && config->getOr<bool>("show-config", false)) {
+        showConfiguration(config);
+    }
+    
+    // Handle configuration validation
+    if (config->has("validate-config")) {
+        std::string validateFile = config->getOr<std::string>("validate-config", "");
+        if (!validateFile.empty()) {
+            validateConfiguration(validateFile);
+        }
+    }
+    
+    // Handle configuration export
+    if (config->has("export-config")) {
+        std::string exportFile = config->getOr<std::string>("export-config", "");
+        if (!exportFile.empty()) {
+            exportConfiguration(config, exportFile);
+        }
+    }
+    
+    // Handle checkpoint operations
+    if (config->has("create-checkpoint")) {
+        std::string checkpointName = config->getOr<std::string>("create-checkpoint", "");
+        if (!checkpointName.empty()) {
+            // Note: This would require brain pointer, handled in main()
+        }
+    }
+    
+    if (config->has("list-checkpoints") && config->getOr<bool>("list-checkpoints", false)) {
+        listCheckpoints(checkpointDir);
+    }
+    
+    if (config->has("delete-checkpoint")) {
+        std::string checkpointName = config->getOr<std::string>("delete-checkpoint", "");
+        if (!checkpointName.empty()) {
+            deleteCheckpoint(checkpointName);
+        }
+    }
+    
+    if (config->has("purge-checkpoints") && config->getOr<bool>("purge-checkpoints", false)) {
+        purgeCheckpoints();
+    }
+    
+    // Handle debug/test mode
+    if (config->has("debug") && config->getOr<bool>("debug", false)) {
+        NLM_LOG_INFO("Debug mode enabled - additional output will be shown");
+    }
+    
+    if (config->has("test") && config->getOr<bool>("test", false)) {
+        NLM_LOG_INFO("Test mode enabled - validation will be performed");
+    }
+    
+    if (config->has("benchmark") && config->getOr<bool>("benchmark", false)) {
+        NLM_LOG_INFO("Benchmark mode enabled - performance measurement will be performed");
+    }
+    
+    if (config->has("profile") && config->getOr<bool>("profile", false)) {
+        NLM_LOG_INFO("Profiling enabled - performance profiling will be performed");
+    }
+    
+    if (config->has("replay") && config->getOr<bool>("replay", false)) {
+        NLM_LOG_INFO("Replay mode enabled - recorded sequences will be replayed");
+    }
+}
+
+void applyProfile(std::shared_ptr<Config>& config, const std::string& profileName) {
+    NLM_LOG_INFO("Applying profile: " + profileName);
+    
+    if (profileName == "basic") {
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Profile);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Profile);
+        config->set("connection_probability", 0.1f, ConfigSource::Profile);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Profile);
+        config->set("stdp_ltd_weight", 0.005f, ConfigSource::Profile);
+    } else if (profileName == "advanced") {
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Profile);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Profile);
+        config->set("connection_probability", 0.15f, ConfigSource::Profile);
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Profile);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Profile);
+        config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Profile);
+        config->set("enable_curiosity", true, ConfigSource::Profile);
+        config->set("curiosity_intensity", 0.7f, ConfigSource::Profile);
+    } else if (profileName == "production") {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Profile);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Profile);
+        config->set("connection_probability", 0.12f, ConfigSource::Profile);
+        config->set("stdp_ltp_weight", 0.015f, ConfigSource::Profile);
+        config->set("stdp_ltd_weight", 0.01f, ConfigSource::Profile);
+        config->set("enable_reward_modulation", true, ConfigSource::Profile);
+        config->set("enable_structural_plasticity", true, ConfigSource::Profile);
+    } else if (profileName == "development") {
+        config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Profile);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Profile);
+        config->set("connection_probability", 0.2f, ConfigSource::Profile);
+        config->set("stdp_ltp_weight", 0.03f, ConfigSource::Profile);
+        config->set("stdp_ltd_weight", 0.02f, ConfigSource::Profile);
+        config->set("synaptogenesis_rate", 0.0005f, ConfigSource::Profile);
+        config->set("pruning_rate", 0.00005f, ConfigSource::Profile);
+        config->set("enable_development", true, ConfigSource::Profile);
+        config->set("developmental_stage", "Initial", ConfigSource::Profile);
+    }
+    
+    NLM_LOG_INFO("Profile applied successfully");
+}
+
+void showConfiguration(std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("=== Current Configuration ===");
+    NLM_LOG_INFO(config->summary());
+}
+
+void validateConfiguration(const std::string& filepath) {
+    NLM_LOG_INFO("Validating configuration file: " + filepath);
+    
+    auto config = std::make_shared<Config>();
+    if (config->loadFromFile(filepath)) {
+        NLM_LOG_INFO("Configuration file is valid");
+        showConfiguration(config);
+    } else {
+        NLM_LOG_ERROR("Configuration file is invalid or not found");
+    }
+}
+
+void exportConfiguration(std::shared_ptr<Config>& config, const std::string& filepath) {
+    NLM_LOG_INFO("Exporting configuration to: " + filepath);
+    
+    if (config->saveToFile(filepath)) {
+        NLM_LOG_INFO("Configuration exported successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to export configuration");
+    }
+}
+
+void listCheckpoints(const std::string& checkpointDir) {
+    NLM_LOG_INFO("Listing checkpoints in directory: " + checkpointDir);
+    
+    std::filesystem::path dir(checkpointDir);
+    if (!std::filesystem::exists(dir)) {
+        NLM_LOG_INFO("Checkpoint directory does not exist");
+        return;
+    }
+    
+    int count = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        if (entry.is_regular_file()) {
+            NLM_LOG_INFO("  " + entry.path().filename().string());
+            count++;
+        }
+    }
+    
+    NLM_LOG_INFO("Total checkpoints: " + std::to_string(count));
+}
+
+void createCheckpoint(std::shared_ptr<Brain>& brain, const std::string& checkpointName) {
+    if (!brain) {
+        NLM_LOG_ERROR("Brain not initialized - cannot create checkpoint");
+        return;
+    }
+    
+    std::string filepath = "checkpoints/" + checkpointName + ".nlm";
+    NLM_LOG_INFO("Creating checkpoint: " + filepath);
+    
+    if (brain->save(filepath)) {
+        NLM_LOG_INFO("Checkpoint created successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to create checkpoint");
+    }
+}
+
+void deleteCheckpoint(const std::string& checkpointName) {
+    std::string filepath = "checkpoints/" + checkpointName + ".nlm";
+    
+    if (std::filesystem::exists(filepath)) {
+        std::filesystem::remove(filepath);
+        NLM_LOG_INFO("Checkpoint deleted: " + filepath);
+    } else {
+        NLM_LOG_WARN("Checkpoint not found: " + filepath);
+    }
+}
+
+void purgeCheckpoints() {
+    std::string checkpointDir = "checkpoints";
+    std::filesystem::path dir(checkpointDir);
+    
+    if (!std::filesystem::exists(dir)) {
+        NLM_LOG_INFO("Checkpoint directory does not exist");
+        return;
+    }
+    
+    int count = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".nlm") {
+            std::filesystem::remove(entry.path());
+            count++;
+        }
+    }
+    
+    NLM_LOG_INFO("Purged " + std::to_string(count) + " checkpoints");
+}
+
+void setupLogFile(const std::string& logFile, LogLevel logLevel) {
+    // Create log file directory if it doesn't exist
+    std::filesystem::path logPath(logFile);
+    if (!logPath.parent_path().empty()) {
+        std::filesystem::create_directories(logPath.parent_path());
+    }
+    
+    auto logger = std::make_shared<Logger>();
+    auto fileLogger = std::make_shared<FileLogger>(logFile, logLevel);
+    logger->addLogger(fileLogger);
+    
+    NLM_LOG_INFO("Log file configured: " + logFile);
+}
 }

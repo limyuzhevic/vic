@@ -196,6 +196,19 @@ float ConceptFormation::getConceptStability(size_t conceptId) const {
     return 0.0f;
 }
 
+// Get active concepts (those with sufficient stability)
+std::vector<size_t> ConceptFormation::getActiveConcepts() const {
+    std::vector<size_t> activeConcepts;
+    
+    for (const auto& concept : concepts_) {
+        if (concept.avgStability >= stabilityThreshold_) {
+            activeConcepts.push_back(concept.id);
+        }
+    }
+    
+    return activeConcepts;
+}
+
 void ConceptFormation::mergeConcepts(size_t conceptA, size_t conceptB) {
     DiscoveredConcept* a = nullptr;
     DiscoveredConcept* b = nullptr;
