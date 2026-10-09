@@ -44,6 +44,12 @@ struct Brain::Impl {
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
+    // ========== MOTOR SYSTEM ==========
+    std::unique_ptr<MotorSystem> motorSystem;
+    
+    // ========== CHECKPOINT SYSTEM ==========
+    std::unique_ptr<CheckpointManager> checkpointManager;
+    
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
     std::unique_ptr<Curiosity> curiosity;
@@ -75,8 +81,8 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -129,32 +135,15 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        motorSystem = std::make_unique<MotorSystem>();
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+    // Function declarations for spike handlers
+    void registerSpikeHandlers();
+    void registerDelayedSpikeHandler();
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -245,6 +234,9 @@ bool Brain::initialize() {
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
@@ -258,6 +250,9 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->motorSystem->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -374,32 +369,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             neuron->getId(),
                             syn->getDestinationNeuron(),
                             syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
+                            delay,
+                            event.is_excitatory
                         );
-
                         pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
                 }
             }
         }
     }
-    
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -585,6 +563,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== COLLECT STATISTICS ==========
+    // Update global spike statistics
+    size_t currentSpikes = pImpl->totalSpikesThisStep;
+    if (currentSpikes > 0) {
+        NLM_LOG_INFO("Step " + std::to_string(currentStep) + ": " + 
+                    std::to_string(currentSpikes) + " spikes, " +
+                    std::to_string(pImpl->totalSpikesTotal) + " total");
     }
 }
 
@@ -897,7 +884,6 @@ bool Brain::load(const std::string& filepath) {
         
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -950,7 +936,8 @@ const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
     return pImpl->regions;
 }
 
-void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
+void Brain::addInterRegionConnection(RegionId source, RegionId target, 
+                                  float weight = 0.0f, Delay delay = 1) {
     pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
 }
 
@@ -997,6 +984,7 @@ size_t Brain::getFiringNeuronCount() const {
 float Brain::getAverageFiringRate() const {
     if (pImpl->regions.empty()) return 0.0f;
     float sum = 0.0f;
+    
     for (const auto& region : pImpl->regions) {
         sum += region->getAverageFiringRate();
     }
