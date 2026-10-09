@@ -149,7 +149,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+             "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -163,6 +163,65 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Configuration validation utilities
+    py::class_<ConfigValidation>(m, "ConfigValidation", R"pbdoc(Configuration validation utilities)pbdoc")
+        .def_static("validateConfig", &ConfigValidation::validateConfig,
+                    py::arg("config"),
+                    "Validate a configuration and return validation results")
+        .def_static("validateKey", &ConfigValidation::validateKey,
+                    py::arg("key"), py::arg("value"),
+                    "Validate a specific configuration key and value")
+        .def_static("getSchema", &ConfigValidation::getSchema,
+                    "Get configuration schema definition")
+        .def_static("getRecommendedSettings", &ConfigValidation::getRecommendedSettings,
+                    "Get recommended configuration settings for common use cases")
+        .def_static("validateAgainstSchema", &ConfigValidation::validateAgainstSchema,
+                    py::arg("config"), py::arg("schema"),
+                    "Validate configuration against a custom schema");
+
+    // Configuration presets and templates
+    py::class_<ConfigPresets>(m, "ConfigPresets", R"pbdoc(Configuration preset templates)pbdoc")
+        .def_static("getDefaultConfig", &ConfigPresets::getDefaultConfig,
+                    "Get default configuration")
+        .def_static("getDevelopmentConfig", &ConfigPresets::getDevelopmentConfig,
+                    "Get development-focused configuration")
+        .def_static("getPerformanceConfig", &ConfigPresets::getPerformanceConfig,
+                    "Get performance-optimized configuration")
+        .def_static("getResearchConfig", &ConfigPresets::getResearchConfig,
+                    "Get research-oriented configuration")
+        .def_static("getMinimalConfig", &ConfigPresets::getMinimalConfig,
+                    "Get minimal configuration for testing")
+        .def_static("getLargeScaleConfig", &ConfigPresets::getLargeScaleConfig,
+                    "Get large-scale configuration for extensive simulations");
+
+    // Advanced configuration utilities
+    py::class_<ConfigUtils>(m, "ConfigUtils", R"pbdoc(Advanced configuration utilities)pbdoc")
+        .def_static("mergeConfigs", &ConfigUtils::mergeConfigs,
+                    py::arg("config1"), py::arg("config2"),
+                    "Merge two configurations (config2 overrides config1)")
+        .def_static("compareConfigs", &ConfigUtils::compareConfigs,
+                    py::arg("config1"), py::arg("config2"),
+                    "Compare two configurations and return differences")
+        .def_static("interpolateConfigs", &ConfigUtils::interpolateConfigs,
+                    py::arg("baseConfig"), py::arg("overrides"),
+                    py::arg("ratio") = 0.5,
+                    "Interpolate between two configurations")
+        .def_static("validateAndFix", &ConfigUtils::validateAndFix,
+                    py::arg("config"),
+                    "Validate configuration and automatically fix common issues")
+        .def_static("exportConfig", &ConfigUtils::exportConfig,
+                    py::arg("config"), py::arg("format") = "json",
+                    "Export configuration in specified format")
+        .def_static("importConfig", &ConfigUtils::importConfig,
+                    py::arg("data"), py::arg("format") = "json",
+                    "Import configuration from string data")
+        .def_static("getConfigTemplate", &ConfigUtils::getConfigTemplate,
+                    py::arg("useCase"),
+                    "Get configuration template for specific use case")
+        .def_static("validateAgainstConstraints", &ConfigUtils::validateAgainstConstraints,
+                    py::arg("config"), py::arg("constraints"),
+                    "Validate configuration against resource constraints");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -289,6 +348,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Enhanced Brain class with additional utility functions
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +411,191 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Enhanced utility functions for advanced users
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulation system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulation system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detection system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attention system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // Performance and monitoring utilities
+        .def("getSimulationTime", &Brain::getSimulationTime,
+             "Get current simulation time")
+        .def("getClockTime", &Brain::getClockTime,
+             "Get current clock time")
+        .def("setClockTime", &Brain::setClockTime,
+             py::arg("time"),
+             "Set current clock time")
+        .def("getStepCount", &Brain::getStepCount,
+             "Get current step count")
+        .def("setStepCount", &Brain::setStepCount,
+             py::arg("step"),
+             "Set current step count")
+        
+        // Debug and inspection utilities
+        .def("getNeuronsByType", &Brain::getNeuronsByType,
+             py::arg("type"),
+             "Get all neurons of a specific type")
+        .def("getNeuronsInRegion", &Brain::getNeuronsInRegion,
+             py::arg("regionId"),
+             "Get all neurons in a specific region")
+        .def("getSynapsesInRegion", &Brain::getSynapsesInRegion,
+             py::arg("regionId"),
+             "Get all synapses in a specific region")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getPlasticityRule", &Brain::getPlasticityRule,
+             py::arg("type"),
+             "Get specific plasticity rule")
+        .def("listAllPlasticityRules", &Brain::listAllPlasticityRules,
+             "List all available plasticity rules")
+        
+        // Export brain state for analysis
+        .def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+            brain->save(filename);
+        }, py::arg("filename"),
+             "Export brain state to file")
+        .def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+            std::ostringstream stats;
+            stats << "Brain Statistics:" << std::endl;
+            stats << "  Total Neurons: " << brain->getTotalNeuronCount() << std::endl;
+            stats << "  Total Synapses: " << brain->getTotalSynapseCount() << std::endl;
+            stats << "  Active Neurons: " << brain->getActiveNeuronCount() << std::endl;
+            stats << "  Firing Neurons: " << brain->getFiringNeuronCount() << std::endl;
+            stats << "  Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+            stats << "  Average Firing Rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+            stats << "  Excitation/Inhibition Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+            stats << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+            return stats.str();
+        }, "Get comprehensive brain statistics as string")
+        .def("createSnapshot", [](std::shared_ptr<Brain> brain) {
+            // Create a copy of the current brain state
+            auto snapshot = std::make_shared<Brain>(*brain->getConfig());
+            snapshot->initialize();
+            // Note: This is a simplified snapshot - in practice, you might want
+            // to serialize/deserialize the complete state
+            return snapshot;
+        }, "Create a snapshot of the current brain state");
+
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        
+        // Enhanced agent brain utilities
+        .def("getAgentBody", &AgentBrain::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("getWorld", &AgentBrain::getWorld,
+             py::return_value_policy::reference_internal,
+             "Get world reference")
+        .def("setRewardFunction", [](AgentBrain& agent, std::function<float(const ActionResult&)> rewardFunc) {
+            // Set custom reward function
+            agent.setRewardFunction(rewardFunc);
+        }, py::arg("rewardFunction"),
+             "Set custom reward function")
+        .def("getSensoryInput", [](AgentBrain& agent) {
+            return agent.getWorld()->getSensoryPercept();
+        }, "Get current sensory input")
+        .def("applyAction", [](AgentBrain& agent, const Action& action) {
+            agent.getWorld()->applyMotorCommand(action, agent.getBrain()->getSimulationTime());
+        }, py::arg("action"),
+             "Apply action to world")
+        .def("getActionResult", [](AgentBrain& agent, const Action& action) {
+            return agent.getWorld()->applyMotorCommand(action, agent.getBrain()->getSimulationTime());
+        }, py::arg("action"),
+             "Get action result from world")
+        .def("enableAllFeatures", [](AgentBrain& agent) {
+            agent.enableRewardModulation(true);
+            agent.enableStructuralPlasticity(true);
+            agent.enableDevelopment(true);
+            agent.enableCuriosity(true);
+        }, "Enable all learning features")
+        .def("disableAllFeatures", [](AgentBrain& agent) {
+            agent.enableRewardModulation(false);
+            agent.enableStructuralPlasticity(false);
+            agent.enableDevelopment(false);
+            agent.enableCuriosity(false);
+        }, "Disable all learning features")
+        .def("isFeatureEnabled", [](AgentBrain& agent, const std::string& feature) {
+            if (feature == "reward") return agent.isRewardModulationEnabled();
+            else if (feature == "structural") return agent.isStructuralPlasticityEnabled();
+            else if (feature == "development") return agent.isDevelopmentEnabled();
+            else if (feature == "curiosity") return agent.isCuriosityEnabled();
+            else return false;
+        }, py::arg("feature"),
+             "Check if a specific feature is enabled")
+        .def("getFeatureStatus", [](AgentBrain& agent) {
+            std::ostringstream status;
+            status << "Agent Features Status:" << std::endl;
+            status << "  Reward Modulation: " << (agent.isRewardModulationEnabled() ? "Enabled" : "Disabled") << std::endl;
+            status << "  Structural Plasticity: " << (agent.isStructuralPlasticityEnabled() ? "Enabled" : "Disabled") << std::endl;
+            status << "  Development: " << (agent.isDevelopmentEnabled() ? "Enabled" : "Disabled") << std::endl;
+            status << "  Curiosity: " << (agent.isCuriosityEnabled() ? "Enabled" : "Disabled") << std::endl;
+            return status.str();
+        }, "Get current agent feature status")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
