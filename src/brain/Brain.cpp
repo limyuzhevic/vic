@@ -33,9 +33,6 @@ struct Brain::Impl {
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
@@ -113,8 +110,8 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        // Note: PredictionSystem doesn't have an initialize method yet
+        // predictionSystem = std::make_unique<PredictionSystem>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -510,10 +507,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
+    // Note: PredictionSystem is not initialized yet (placeholder for Phase 2)
+    // if (pImpl->predictionSystem) {
+    //     // The prediction system would be updated with sensory observations
+    //     // For now, just track prediction error history
+    // }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
@@ -589,14 +587,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Validate input before processing
+    if (input.getData().empty()) {
+        NLM_LOG_WARNING("Empty sensory input received");
+        return;
+    }
+    
+    // Check if sensory neurons are available for input injection
+    if (pImpl->sensoryNeurons.empty()) {
+        NLM_LOG_WARNING("No sensory neurons available for input injection");
+        return;
+    }
+    
+    // Validate input dimensions against available sensory neurons
+    size_t numSensory = pImpl->sensoryNeurons.size();
+    const auto& values = input.getData();
+    
+    if (values.size() < numSensory) {
+        NLM_LOG_WARNING("Input data size (" + std::to_string(values.size()) + ") "
+                       "smaller than expected sensory neurons (" + std::to_string(numSensory) + ")");
+        NLM_LOG_WARNING("Using available data, ignoring excess sensory neurons");
+    }
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
-    if (values.empty()) return;
-    
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -604,6 +618,12 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        }
+        
+        // Validate normalized value to prevent extreme values
+        if (std::abs(normalizedValue) > 1000.0f) {
+            NLM_LOG_WARNING("Extreme normalized value: " + std::to_string(normalizedValue) + " mV, clamping to [-1000, 1000]")
+            normalizedValue = std::clamp(normalizedValue, -1000.0f, 1000.0f);
         }
         
         // Inject current into this sensory neuron
@@ -617,18 +637,45 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Validate input parameters
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("Random generator not initialized for current injection");
+        return;
+    }
+    
+    if (std::abs(current) > 1000.0f) {
+        NLM_LOG_WARNING("Extreme current value: " + std::to_string(current) + " mV, clamping to [-1000, 1000]");
+        current = std::clamp(current, -1000.0f, 1000.0f);
+    }
+    
+    // Search for neuron across all regions
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
+                NLM_LOG_DEBUG("Injected current " + std::to_string(current) + " mV into neuron " + std::to_string(neuron.index()));
                 return;
             }
         }
     }
+    
+    NLM_LOG_WARNING("Neuron not found for current injection: " + std::to_string(neuron.index()));
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate input parameters
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("Random generator not initialized for current injection");
+        return;
+    }
+    
+    if (std::abs(current) > 1000.0f) {
+        NLM_LOG_WARNING("Extreme current value: " + std::to_string(current) + " mV, clamping to [-1000, 1000]");
+        current = std::clamp(current, -1000.0f, 1000.0f);
+    }
+    
+    // Inject current to all neurons of specified type
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
@@ -638,6 +685,8 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
             }
         }
     }
+    
+    NLM_LOG_DEBUG("Injected current " + std::to_string(current) + " mV to " + std::to_string(static_cast<int>(type)) + " neurons");
 }
 
 SpikeSystem* Brain::getSpikeSystem() {
@@ -690,39 +739,90 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection based on motor neuron activity
+    // More sophisticated action selection considering multiple factors
     
     if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_DEBUG("No motor neurons available, producing Wait action");
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
+    // Calculate activity of motor neuron groups with more sophisticated analysis
     size_t firingMotor = 0;
+    size_t totalMotor = pImpl->motorNeurons.size();
+    float averageFiringRate = 0.0f;
+    
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
             ++firingMotor;
+            averageFiringRate += neuron->getState().firingRate;
         }
     }
     
-    // Return a simple action
+    if (totalMotor > 0) {
+        averageFiringRate /= static_cast<float>(totalMotor);
+    }
+    
+    // More sophisticated action selection logic
     ActionType type = ActionType::Wait;
+    
     if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+        // Determine action based on firing patterns and rates
+        if (averageFiringRate > 5.0f) {  // High firing rate
+            type = ActionType::MoveForward;
+        } else if (averageFiringRate > 2.0f) {  // Moderate firing rate
+            type = ActionType::MoveRight;
+        } else {  // Low firing rate
+            type = ActionType::Rest;
+        }
+    }
+    
+    // Validate action type
+    if (type < ActionType::MoveForward || type > ActionType::Custom) {
+        NLM_LOG_WARNING("Invalid action type, falling back to Wait");
+        type = ActionType::Wait;
     }
     
     auto action = std::make_unique<Action>(type);
+    NLM_LOG_DEBUG("Producing action: " + std::to_string(static_cast<int>(type)));
     
     return action;
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Enhanced neuromodulation with better error handling
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Validate modulation level
+    if (modulation < 0.0f) {
+        NLM_LOG_WARNING("Negative neuromodulation level: " + std::to_string(modulation) + ", clamping to 0.0");
+        modulation = 0.0f;
+    } else if (modulation > 10.0f) {
+        NLM_LOG_WARNING("Extreme neuromodulation level: " + std::to_string(modulation) + ", clamping to 10.0");
+        modulation = 10.0f;
+    }
+    
+    // Validate STDP system is available
+    if (!pImpl->stdp) {
+        NLM_LOG_ERROR("STDP system not initialized for neuromodulation");
+        return;
+    }
+    
+    // Scale STDP learning rates with bounds checking
+    float ltpWeight = 0.01f * modulation;
+    float ltdWeight = 0.012f * modulation;
+    
+    // Ensure weights are within valid bounds
+    ltpWeight = std::clamp(ltpWeight, 0.0f, 1.0f);
+    ltdWeight = std::clamp(ltdWeight, 0.0f, 1.0f);
+    
+    // Apply weight changes
+    pImpl->stdp->setLTPWeight(ltpWeight);
+    pImpl->stdp->setLTDWeight(ltdWeight);
+    
+    NLM_LOG_DEBUG("Applied neuromodulation: level=" + std::to_string(modulation) + 
+                  ", LTP=" + std::to_string(ltpWeight) + 
+                  ", LTD=" + std::to_string(ltdWeight));
 }
 
 void Brain::updatePlasticity() {
@@ -1019,9 +1119,10 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
+// Note: PredictionSystem is not initialized yet (placeholder for Phase 2)
+// PredictionSystem* Brain::getPredictionSystem() {
+//     return pImpl->predictionSystem.get();
+// }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 

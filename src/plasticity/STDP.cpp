@@ -94,12 +94,37 @@ void STDP::update(Synapse* synapse,
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        NLM_LOG_WARNING("Attempted to apply weight change to null synapse");
+        return;
+    }
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
+    // Validate delta value to prevent extreme changes
+    if (std::abs(delta) > 1.0f) {
+        NLM_LOG_WARNING("Extreme weight delta: " + std::to_string(delta) + ", clamping to [-1.0, 1.0]");
+        delta = std::clamp(delta, -1.0f, 1.0f);
+    }
+    
+    // Clamp weight to bounds with better error handling
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Check for potential NaN or infinite values
+    if (std::isnan(newWeight) || std::isinf(newWeight)) {
+        NLM_LOG_ERROR("Invalid weight calculation: NaN or infinite value detected");
+        return;
+    }
+    
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    
+    // Only update if weight actually changed
+    if (std::abs(newWeight - currentWeight) > 1e-6f) {
+        synapse->setWeight(newWeight);
+        NLM_LOG_DEBUG("Applied STDP weight change: " + std::to_string(currentWeight) + 
+                     " -> " + std::to_string(newWeight) + " (delta=" + std::to_string(delta) + ")");
+    } else {
+        NLM_LOG_DEBUG("STDP weight change too small to apply: " + std::to_string(delta));
+    }
 }
 
 const char* STDP::getName() const {
@@ -107,7 +132,14 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
+    // Enhanced validation for LTP weight
+    if (std::isnan(weight) || std::isinf(weight)) {
+        NLM_LOG_ERROR("Invalid LTP weight: NaN or infinite value");
+        return;
+    }
+    
     pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    NLM_LOG_DEBUG("Set STDP LTP weight to: " + std::to_string(pImpl->ltpWeight));
 }
 
 float STDP::getLTPWeight() const {
@@ -115,7 +147,14 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
+    // Enhanced validation for LTD weight
+    if (std::isnan(weight) || std::isinf(weight)) {
+        NLM_LOG_ERROR("Invalid LTD weight: NaN or infinite value");
+        return;
+    }
+    
     pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    NLM_LOG_DEBUG("Set STDP LTD weight to: " + std::to_string(pImpl->ltdWeight));
 }
 
 float STDP::getLTDWeight() const {
@@ -123,7 +162,14 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
+    // Enhanced validation for time constant
+    if (std::isnan(tau) || std::isinf(tau)) {
+        NLM_LOG_ERROR("Invalid time constant: NaN or infinite value");
+        return;
+    }
+    
     pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    NLM_LOG_DEBUG("Set STDP time constant to: " + std::to_string(pImpl->timeConstant) + " ms");
 }
 
 float STDP::getTimeConstant() const {
@@ -131,9 +177,21 @@ float STDP::getTimeConstant() const {
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
+    // Validate all configuration parameters
+    if (std::isnan(ltpWeight) || std::isinf(ltpWeight) ||
+        std::isnan(ltdWeight) || std::isinf(ltdWeight) ||
+        std::isnan(tau) || std::isinf(tau)) {
+        NLM_LOG_ERROR("Invalid STDP configuration parameters");
+        return;
+    }
+    
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+    
+    NLM_LOG_INFO("Configured STDP: LTP=" + std::to_string(pImpl->ltpWeight) +
+                 ", LTD=" + std::to_string(pImpl->ltdWeight) +
+                 ", tau=" + std::to_string(pImpl->timeConstant));
 }
 
 } // namespace nlm

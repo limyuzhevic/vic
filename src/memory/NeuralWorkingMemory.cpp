@@ -34,23 +34,47 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_) {
+        NLM_LOG_DEBUG("Skipping store: empty pattern or brain not available");
+        return;
+    }
+    
+    // Validate strength to prevent extreme values
+    if (std::abs(strength) > 1000.0f) {
+        NLM_LOG_WARNING("Extreme store strength: " + std::to_string(strength) + ", clamping to [-100.0, 100.0]");
+        strength = std::clamp(strength, -100.0f, 100.0f);
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    
+    if (neuronsNeeded == 0) {
+        NLM_LOG_DEBUG("No neurons available for memory storage");
+        return;
+    }
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
+        // Validate activation
+        if (std::isnan(activation) || std::isinf(activation)) {
+            NLM_LOG_ERROR("Invalid activation value: " + std::to_string(activation));
+            continue;
+        }
+        
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        auto* region = brain_->getRegion(neuron.getId() / 1000);
+        if (region) {
+            for (auto* nn : region->getAllNeurons()) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
+                    NLM_LOG_DEBUG("Stored activation " + std::to_string(activation) + " to neuron " + std::to_string(neuron.index()));
                     break;
                 }
             }
+        } else {
+            NLM_LOG_WARNING("Region not found for neuron: " + std::to_string(neuron.index()));
         }
         
         // Update stored activation
@@ -66,6 +90,39 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    }
+    
+    NLM_LOG_DEBUG("Stored pattern of size " + std::to_string(pattern.size()) + " with strength " + std::to_string(strength));
+}
+
+void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Validate input parameters
+    if (std::isnan(activation) || std::isinf(activation)) {
+        NLM_LOG_ERROR("Invalid activation value: " + std::to_string(activation));
+        return;
+    }
+    
+    // Find or add this neuron to memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
+        NLM_LOG_DEBUG("Updated activation to neuron " + std::to_string(neuron.index()) + ": " + std::to_string(activation));
+    } else if (memoryNeurons_.size() < capacity_) {
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+        NLM_LOG_DEBUG("Added new neuron " + std::to_string(neuron.index()) + " to working memory with activation " + std::to_string(activation));
+    } else {
+        NLM_LOG_DEBUG("Working memory at capacity " + std::to_string(capacity_) + ", cannot add new neuron");
+        return;
+    }
+    
+    // Inject current to maintain activation
+    if (brain_) {
+        brain_->injectCurrent(neuron, activation * 5.0f);
     }
 }
 

@@ -47,6 +47,27 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// The Brain class represents a complete artificial brain with:
+// - Real spiking neural dynamics (LIF neurons with event-driven spike propagation)
+// - Integrated memory systems (working, episodic, associative)
+// - Prediction systems for forward modeling and error computation
+// - Cognitive systems (neural planning, concept formation, attentional selection)
+// - Neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+// - Developmental system for plasticity regulation and learning
+// - Sensorimotor integration and action selection
+//
+// The brain operates as a closed-loop system that continuously:
+// 1. Processes sensory input from environment
+// 2. Updates neural dynamics and spike propagation
+// 3. Maintains working memory of current experiences
+// 4. Stores experiences in episodic memory
+// 5. Forms associations between experiences
+// 6. Predicts future sensory states
+// 7. Selects actions based on neural activity
+// 8. Receives reward signals and updates neuromodulation
+// 9. Learns through plasticity rules (STDP, Hebbian)
+// 10. Develops and adapts over time
 
 class Brain {
 public:

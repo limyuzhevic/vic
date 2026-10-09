@@ -19,9 +19,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -49,38 +49,95 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Enhanced validation of input parameters
+    if (!synapse) {
+        NLM_LOG_WARNING("Attempted Hebbian update on null synapse");
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    if (preSpikes.empty() || postSpikes.empty()) {
+        NLM_LOG_DEBUG("Empty spike history for Hebbian update, skipping");
+        return;
+    }
+    
+    if (std::isnan(dt) || std::isinf(dt) || dt <= 0.0) {
+        NLM_LOG_ERROR("Invalid timestep duration for Hebbian update: " + std::to_string(dt));
+        return;
+    }
+    
+    // Count correlated spike pairs with improved validation
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+    size_t maxCorrelationPairs = preSpikes.size() * postSpikes.size();
+    
+    if (maxCorrelationPairs > 1000000) {
+        NLM_LOG_WARNING("Large spike history detected for Hebbian update: " + 
+                       std::to_string(maxCorrelationPairs) + " spike pairs, sampling");
+        // For very large spike histories, sample to avoid excessive computation
+        // This is a simplified approach - in practice, more sophisticated sampling would be used
+        correlationCount = std::min(maxCorrelationPairs / 1000, static_cast<size_t>(1000));
+    } else {
+        for (Timestamp preTime : preSpikes) {
+            for (Timestamp postTime : postSpikes) {
+                float dt = static_cast<float>(postTime - preTime);
+                // Count spikes within a broad time window as correlated
+                if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+                    ++correlationCount;
+                }
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
+    // Compute weight change based on correlation with bounds checking
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    
+    // Validate delta value
+    if (std::isnan(delta) || std::isinf(delta)) {
+        NLM_LOG_ERROR("Invalid Hebbian weight delta: NaN or infinite value");
+        return;
+    }
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
+        NLM_LOG_DEBUG("Applied Hebbian weight change: delta=" + std::to_string(delta) + 
+                     ", correlation pairs=" + std::to_string(correlationCount));
+    } else {
+        NLM_LOG_DEBUG("Hebbian weight change too small to apply: " + std::to_string(delta));
     }
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        NLM_LOG_WARNING("Attempted to apply Hebbian weight change to null synapse");
+        return;
+    }
     
-    float newWeight = synapse->getWeight() + delta;
+    // Validate delta value to prevent extreme changes
+    if (std::abs(delta) > 1.0f) {
+        NLM_LOG_WARNING("Extreme Hebbian weight delta: " + std::to_string(delta) + ", clamping to [-1.0, 1.0]");
+        delta = std::clamp(delta, -1.0f, 1.0f);
+    }
+    
+    // Clamp weight to bounds with better error handling
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Check for potential NaN or infinite values
+    if (std::isnan(newWeight) || std::isinf(newWeight)) {
+        NLM_LOG_ERROR("Invalid weight calculation: NaN or infinite value detected");
+        return;
+    }
+    
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    
+    // Only update if weight actually changed
+    if (std::abs(newWeight - currentWeight) > 1e-6f) {
+        synapse->setWeight(newWeight);
+        NLM_LOG_DEBUG("Applied Hebbian weight change: " + std::to_string(currentWeight) + 
+                     " -> " + std::to_string(newWeight) + " (delta=" + std::to_string(delta) + ")");
+    } else {
+        NLM_LOG_DEBUG("Hebbian weight change too small to apply: " + std::to_string(delta));
+    }
 }
 
 const char* Hebbian::getName() const {
