@@ -193,9 +193,77 @@ public:
     // Logging
     void logStatus() const;
     
+    // Performance monitoring
+    std::shared_ptr<PerformanceMonitor> getPerformanceMonitor() { return pImpl->performanceMonitor; }
+    const std::shared_ptr<PerformanceMonitor> getPerformanceMonitor() const { return pImpl->performanceMonitor; }
+    
+    // Generate performance report
+    void generatePerformanceReport(const std::string& filename = "performance_report.txt") {
+        if (pImpl->performanceMonitor) {
+            pImpl->performanceMonitor->generatePerformanceReport(filename);
+        }
+    }
+    
+    // Print performance summary
+    void printPerformanceSummary() const {
+        if (pImpl->performanceMonitor) {
+            pImpl->performanceMonitor->printPerformanceSummary();
+        }
+    }
+    
+    // Performance status
+    struct PerformanceStats {
+        double cpuUsagePercent;
+        size_t memoryUsageMB;
+        size_t memoryPeakMB;
+        double stepsPerSecond;
+        double currentStepTimeMs;
+        size_t simulationStepCount;
+        size_t currentStep;
+        std::chrono::high_resolution_clock::time_point timestamp;
+    };
+    
+    PerformanceStats getPerformanceStats() const {
+        PerformanceStats stats;
+        if (pImpl->performanceMonitor) {
+            auto systemUsage = pImpl->performanceMonitor->getCurrentSystemUsage();
+            auto simMetrics = pImpl->performanceMonitor->getCurrentSimulationMetrics();
+            
+            stats.cpuUsagePercent = systemUsage.cpuUsagePercent;
+            stats.memoryUsageMB = systemUsage.memoryUsageMB;
+            stats.memoryPeakMB = systemUsage.memoryPeakMB;
+            stats.stepsPerSecond = simMetrics.stepsPerSecond;
+            stats.currentStepTimeMs = simMetrics.actualStepTimeMs;
+            stats.simulationStepCount = simMetrics.simulationStepCount;
+            stats.currentStep = simMetrics.currentStep;
+            stats.timestamp = simMetrics.timestamp;
+        }
+        return stats;
+    }
+    
+    void logPerformanceStatus() const {
+        auto stats = getPerformanceStats();
+        if (pImpl->performanceMonitor) {
+            NLM_LOG_INFO("=== NLM Brain Performance Status ===");
+            NLM_LOG_INFO("CPU Usage: " + std::to_string(stats.cpuUsagePercent) + "%");
+            NLM_LOG_INFO("Memory Usage: " + std::to_string(stats.memoryUsageMB) + " MB (Peak: " + 
+                         std::to_string(stats.memoryPeakMB) + " MB)");
+            NLM_LOG_INFO("Simulation Speed: " + std::to_string(stats.stepsPerSecond) + " steps/sec");
+            NLM_LOG_INFO("Current Step Time: " + std::to_string(stats.currentStepTimeMs) + " ms");
+            NLM_LOG_INFO("Total Steps: " + std::to_string(stats.simulationStepCount));
+            NLM_LOG_INFO("Current Step: " + std::to_string(stats.currentStep));
+            
+            // Check for performance alerts
+            pImpl->performanceMonitor->checkAlerts();
+        }
+    }
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Forward declaration for PerformanceMonitor
+class PerformanceMonitor;
 
 } // namespace nlm

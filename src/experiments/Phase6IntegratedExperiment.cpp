@@ -6,6 +6,8 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <cstring>
+#include <unistd.h>  // for getpid()
 
 namespace nlm {
 
@@ -62,10 +64,14 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        const auto& brainRegions = agent.getBrain()->getRegions();
+        if (!brainRegions.empty()) {
+            SensoryPercept percept = world.observe(brainRegions[0].get());
+            agent.processSensoryInput(percept);
+        } else {
+            NLM_LOG_WARNING("No brain regions available for observation");
+            continue;
+        }
         
         // Brain step
         brain->step(step, step * 0.001);
@@ -74,10 +80,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        if (!brainRegions.empty()) {
+            world.applyAction(brainRegions[0].get(), cmd);
+        } else {
+            NLM_LOG_WARNING("No brain regions available for action application");
+            continue;
+        }
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(brainRegions[0].get());
         totalReward += reward;
         
         // Apply reward modulation
@@ -337,8 +348,9 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
-    // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    // Save checkpoint with platform-independent path
+    std::string path = "/tmp/nlm_checkpoint_test_" + std::to_string(getpid()) + ".bin";
+    NLM_LOG_INFO("Using checkpoint path: " + path);
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
@@ -356,8 +368,12 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
     
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
+    // Clean up checkpoint file
+    if (std::remove(path.c_str()) == 0) {
+        NLM_LOG_INFO("Checkpoint file cleaned up: " + path);
+    } else {
+        NLM_LOG_WARNING("Failed to clean up checkpoint file: " + path);
+    }
     
     NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
     return true;

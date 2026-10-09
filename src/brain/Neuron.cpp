@@ -260,9 +260,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // DEPRECATED: This method is kept for API compatibility
+    // The proper implementation uses stepLIF with timestep from Brain class
+    // Brain class calls stepLIF directly with pImpl->timestep from config
+    // This method is kept to avoid breaking existing code but should be deprecated
+    stepLIF(currentTime, 0.001f);
 }
 
 void Neuron::reset() {

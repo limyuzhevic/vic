@@ -2,6 +2,9 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/ErrorHandling/ErrorHandling.hpp"
+#include "../core/Validation/Validation.hpp"
+#include "../core/Integration/Integration.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
@@ -15,10 +18,12 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/PerformanceMonitor.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
 
 namespace nlm {
 
@@ -56,6 +61,10 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Error handling system
+    std::unique_ptr<nlm::ErrorManager> errorManager;
+    std::unique_ptr<nlm::ErrorRecoverySystem> recoverySystem;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -78,6 +87,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Performance monitoring system
+    std::unique_ptr<PerformanceMonitor> performanceMonitor;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,7 +104,33 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , performanceMonitor(nullptr)
     {
+        // Initialize error handling systems
+        errorManager = std::make_unique<nlm::ErrorManager>();
+        recoverySystem = std::make_unique<nlm::ErrorRecoverySystem>();
+        
+        // Initialize error handling integration
+        nlm::ErrorHandling::log("Initializing error handling systems", nlm::ErrorSeverity::Info, "brain_init");
+        
+        // Validate configuration before proceeding
+        auto configResult = nlm::ConfigValidator::validateConfigComprehensive(*config);
+        if (!configResult.success) {
+            nlm::ErrorHandling::log("Configuration validation failed during initialization", nlm::ErrorSeverity::Critical, "brain_init");
+            // Log all validation errors
+            for (const auto& error : configResult.errors) {
+                nlm::ErrorHandling::log(error->what(), error->getSeverity(), error->getContext());
+            }
+            throw std::runtime_error("Configuration validation failed - cannot initialize brain");
+        }
+        
+        // Setup error integration for all systems
+        nlm::ErrorIntegration::integrateWithConfig(*config);
+        nlm::ErrorIntegration::integrateWithLogger(nlm::Logger::getGlobal());
+        
+        nlm::ErrorHandling::log("Error handling systems initialized successfully", nlm::ErrorSeverity::Info, "brain_init");
+        nlm::ErrorHandling::log("Error handling systems initialized successfully", nlm::ErrorSeverity::Info, "brain_init");
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -151,6 +189,22 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize performance monitoring system
+        PerformanceMonitorConfig perfConfig;
+        perfConfig.sampleIntervalMs = config->getOr<double>("performance_sample_interval_ms", 1000.0);
+        perfConfig.historySize = config->getOr<size_t>("performance_history_size", 3600);
+        perfConfig.enableRealTimeMetrics = true;
+        perfConfig.enableProfiling = config->getOr<bool>("performance_profiling", false);
+        perfConfig.enableMemoryAlerts = config->getOr<bool>("performance_memory_alerts", true);
+        perfConfig.enablePerformanceAlerts = config->getOr<bool>("performance_alerts", true);
+        perfConfig.enableTextReports = true;
+        perfConfig.enableConsoleOutput = true;
+        perfConfig.enableOptimizationHints = config->getOr<bool>("performance_optimization_hints", true);
+        perfConfig.enableBottleneckDetection = true;
+        
+        performanceMonitor = std::make_unique<PerformanceMonitor>(perfConfig);
+        performanceMonitor->initialize();
     }
     
     DevelopmentalStage developmentalStage;
@@ -582,10 +636,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+        // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // Record step performance metrics
+    if (pImpl->performanceMonitor) {
+        // Update performance monitoring
+        pImpl->performanceMonitor->update();
+        
+        // Log performance status periodically (every 100 steps)
+        if (currentStep % 100 == 0) {
+            logPerformanceStatus();
+        }
+    }
+    
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {

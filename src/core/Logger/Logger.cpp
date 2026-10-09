@@ -32,9 +32,17 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp (thread-safe version)
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+#if defined(_WIN32)
+    // Windows: use thread-safe version
+    struct tm tmbuf;
+    oss << std::put_time(std::localtime_s(&tmbuf, &time) ? &tmbuf : &time, "%Y-%m-%d %H:%M:%S");
+#else
+    // POSIX: use reentrant version
+    struct tm tmbuf;
+    oss << std::put_time(std::localtime_r(&time, &tmbuf), "%Y-%m-%d %H:%M:%S");
+#endif
     
     oss << " " << entry.message;
     
