@@ -412,14 +412,272 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createBrainConfig", 
+          [](std::unordered_map<std::string, std::variant<int64_t, double, std::string>> settings) {
+              auto config = std::make_shared<Config>();
+              
+              // Set default values first
+              config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+              config->set("simulation_timestep", 0.001, ConfigSource::Default);
+              config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+              config->set("connection_probability", 0.15f, ConfigSource::Default);
+              config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+              config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+              config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
+              config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+              config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+              
+              // Override with user settings
+              for (const auto& setting : settings) {
+                  config->set(setting.first, setting.second);
+              }
+              
+              return config;
+          }, py::arg("settings") = std::unordered_map<std::string, std::variant<int64_t, double, std::string>>(),
+          "Create a brain configuration with optional custom settings");
 
-} // namespace nlm
+    m.def("createWorldConfig", 
+          [](int width, int height, int visionWidth, int visionHeight) {
+              auto config = std::make_shared<Config>();
+              config->set("environment_width", width);
+              config->set("environment_height", height);
+              config->set("vision_width", visionWidth);
+              config->set("vision_height", visionHeight);
+              config->set("environment_name", std::string("GridWorld"));
+              return config;
+          }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+          "Create a configuration for a world environment");
+
+    m.def("createPhase2Config", 
+          [](int neuronCount, int regionCount, double timestep) {
+              auto config = std::make_shared<Config>();
+              config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+              config->set("simulation_timestep", timestep, ConfigSource::Default);
+              config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+              config->set("connection_probability", 0.15f, ConfigSource::Default);
+              config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+              config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+              config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
+              config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+              config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+              return config;
+          }, py::arg("neuronCount") = 500, py::arg("regionCount") = 1, py::arg("timestep") = 0.001,
+          "Create a Phase 2 configuration (basic neural computation)");
+
+    m.def("createPhase3Config", 
+          [](int worldWidth, int worldHeight, int neuronCount, int regionCount) {
+              auto config = std::make_shared<Config>();
+              
+              // Environment settings
+              config->set("environment_width", worldWidth);
+              config->set("environment_height", worldHeight);
+              config->set("environment_name", std::string("GridWorld"));
+              config->set("vision_width", 16);
+              config->set("vision_height", 16);
+              
+              // Brain settings
+              config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+              config->set("simulation_timestep", 0.001, ConfigSource::Default);
+              config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+              config->set("connection_probability", 0.1f, ConfigSource::Default);
+              
+              // Neuromodulation
+              config->set("enable_reward_modulation", true, ConfigSource::Default);
+              config->set("enable_structural_plasticity", true, ConfigSource::Default);
+              config->set("enable_development", true, ConfigSource::Default);
+              config->set("enable_curiosity", true, ConfigSource::Default);
+              
+              return config;
+          }, py::arg("worldWidth") = 20, py::arg("worldHeight") = 20, 
+          py::arg("neuronCount") = 500, py::arg("regionCount") = 2,
+          "Create a Phase 3 configuration (world interaction)");
+
+    m.def("createPhase4Config", 
+          [](int neuronCount, bool enableLearning, bool enableDevelopment) {
+              auto config = std::make_shared<Config>();
+              config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+              config->set("simulation_timestep", 0.001, ConfigSource::Default);
+              config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+              config->set("connection_probability", 0.05f, ConfigSource::Default);
+              config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+              config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+              config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
+              
+              // Enable advanced features based on parameters
+              config->set("enable_reward_modulation", enableLearning, ConfigSource::Default);
+              config->set("enable_structural_plasticity", enableLearning, ConfigSource::Default);
+              config->set("enable_development", enableDevelopment, ConfigSource::Default);
+              config->set("enable_curiosity", true, ConfigSource::Default);
+              
+              return config;
+          }, py::arg("neuronCount") = 500, py::arg("enableLearning") = true, 
+          py::arg("enableDevelopment") = true,
+          "Create a Phase 4 configuration (advanced cognition)");
+
+    m.def("createDefaultTestConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set up a comprehensive default configuration
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("plasticity_learning_rate", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
+        config->set("development_synaptogenesis_rate", 0.001f, ConfigSource::Default);
+        config->set("development_pruning_rate", 0.0001f, ConfigSource::Default);
+        config->set("dopamine_baseline", 0.0f, ConfigSource::Default);
+        config->set("reward_discount_factor", 0.99f, ConfigSource::Default);
+        config->set("environment_width", 10, ConfigSource::Default);
+        config->set("environment_height", 10, ConfigSource::Default);
+        config->set("log_level", std::string("INFO"), ConfigSource::Default);
+        config->set("log_to_file", false, ConfigSource::Default);
+        config->set("max_simulation_steps", 10000LL, ConfigSource::Default);
+        
+        return config;
+    }, "Create a comprehensive default configuration suitable for most tests");
+
+    m.def("createQuickTestConfig", 
+          [](int quickNeuronCount) {
+              auto config = std::make_shared<Config>();
+              config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+              config->set("simulation_timestep", 0.001, ConfigSource::Default);
+              config->set("neuron_count", static_cast<int64_t>(quickNeuronCount), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+              config->set("connection_probability", 0.05f, ConfigSource::Default);
+              config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+              config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+              config->set("synaptogenesis_rate", 0.00005f, ConfigSource::Default);
+              config->set("pruning_rate", 0.000005f, ConfigSource::Default);
+              config->set("log_level", std::string("WARNING"), ConfigSource::Default);
+              return config;
+          }, py::arg("quickNeuronCount") = 100,
+          "Create a lightweight configuration for quick testing");
+
+    m.def("createProductionConfig", 
+          [](int productionNeuronCount) {
+              auto config = std::make_shared<Config>();
+              config->set("random_seed", static_cast<int64_t>(12345), ConfigSource::Default);
+              config->set("simulation_timestep", 0.01, ConfigSource::Default);  // Larger timestep for performance
+              config->set("neuron_count", static_cast<int64_t>(productionNeuronCount), ConfigSource::Default);
+              config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+              config->set("connection_probability", 0.02f, ConfigSource::Default);
+              config->set("stdp_ltp_weight", 0.005f, ConfigSource::Default);
+              config->set("stdp_ltd_weight", 0.008f, ConfigSource::Default);
+              config->set("stdp_time_constant", 50.0f, ConfigSource::Default);  // Slower plasticity
+              config->set("synaptogenesis_rate", 0.00001f, ConfigSource::Default);
+              config->set("pruning_rate", 0.000001f, ConfigSource::Default);
+              config->set("log_level", std::string("ERROR"), ConfigSource::Default);  // Minimal logging
+              config->set("max_simulation_steps", 5000LL, ConfigSource::Default);
+              config->set("enable_memory_systems", true, ConfigSource::Default);
+              config->set("enable_neuromodulation", true, ConfigSource::Default);
+              config->set("enable_prediction_system", true, ConfigSource::Default);
+              config->set("enable_cognition_systems", true, ConfigSource::Default);
+              return config;
+          }, py::arg("productionNeuronCount") = 1000,
+          "Create a production-ready configuration optimized for performance");
+
+    m.def("createDebugConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(0), ConfigSource::Default);
+        config->set("simulation_timestep", 0.0001, ConfigSource::Default);  // Very small timestep for accuracy
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);  // Smaller for debugging
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.05f, ConfigSource::Default);  // Strong plasticity
+        config->set("stdp_ltd_weight", 0.04f, ConfigSource::Default);
+        config->set("stdp_time_constant", 10.0f, ConfigSource::Default);  // Faster plasticity
+        config->set("synaptogenesis_rate", 0.001f, ConfigSource::Default);  // High structural plasticity
+        config->set("pruning_rate", 0.0001f, ConfigSource::Default);
+        config->set("log_level", std::string("DEBUG"), ConfigSource::Default);  // Maximum verbosity
+        config->set("log_to_file", true, ConfigSource::Default);
+        config->set("max_simulation_steps", 20000LL, ConfigSource::Default);
+        config->set("visualization_enabled", true, ConfigSource::Default);
+        return config;
+    }, "Create a debug configuration optimized for accuracy and detailed logging");
+
+    m.def("createConfigFromEnvironment", 
+          [](const std::string& envType) {
+              auto config = std::make_shared<Config>();
+              
+              if (envType == "development" || envType == "dev") {
+                  // Development environment: detailed logging, smaller simulations
+                  config->set("log_level", std::string("DEBUG"), ConfigSource::Default);
+                  config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Default);
+                  config->set("simulation_timestep", 0.001, ConfigSource::Default);
+                  config->set("max_simulation_steps", 5000LL, ConfigSource::Default);
+              } else if (envType == "production" || envType == "prod") {
+                  // Production environment: optimized for performance
+                  config->set("log_level", std::string("WARNING"), ConfigSource::Default);
+                  config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+                  config->set("simulation_timestep", 0.01, ConfigSource::Default);
+                  config->set("max_simulation_steps", 10000LL, ConfigSource::Default);
+              } else if (envType == "testing" || envType == "test") {
+                  // Testing environment: comprehensive, reproducible
+                  config->set("log_level", std::string("INFO"), ConfigSource::Default);
+                  config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+                  config->set("simulation_timestep", 0.001, ConfigSource::Default);
+                  config->set("max_simulation_steps", 10000LL, ConfigSource::Default);
+              } else if (envType == "research" || envType == "research") {
+                  // Research environment: maximum detail
+                  config->set("log_level", std::string("DEBUG"), ConfigSource::Default);
+                  config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+                  config->set("simulation_timestep", 0.0005, ConfigSource::Default);
+                  config->set("max_simulation_steps", 50000LL, ConfigSource::Default);
+              } else {
+                  throw std::runtime_error("Unknown environment type: " + envType);
+              }
+              
+              return config;
+          }, py::arg("envType"), 
+          "Create a configuration optimized for a specific environment type");
+
+    m.def("copyConfig", 
+          [](const Config& source) {
+              auto config = std::make_shared<Config>();
+              // Copy all settings from source (simplified implementation)
+              auto keys = source.getKeys();
+              for (const auto& key : keys) {
+                  auto value = source.getValue(key);
+                  config->set(key, value);
+              }
+              return config;
+          }, py::arg("source"),
+          "Create a copy of an existing configuration");
+
+    m.def("mergeConfigs", 
+          [](const Config& baseConfig, const Config& overrideConfig) {
+              auto config = std::make_shared<Config>();
+              
+              // Copy base config
+              auto baseKeys = baseConfig.getKeys();
+              for (const auto& key : baseKeys) {
+                  auto value = baseConfig.getValue(key);
+                  config->set(key, value);
+              }
+              
+              // Override with override config
+              auto overrideKeys = overrideConfig.getKeys();
+              for (const auto& key : overrideKeys) {
+                  auto value = overrideConfig.getValue(key);
+                  config->set(key, value);
+              }
+              
+              return config;
+          }, py::arg("baseConfig"), py::arg("overrideConfig"),
+          "Merge two configurations (base + override)");
