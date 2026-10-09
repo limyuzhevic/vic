@@ -2,9 +2,22 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <random>
+#include <chrono>
+#include <thread>
 
 namespace nlm {
 
+// Generate deterministic seed for hash-based random initialization
+static uint64_t deterministicHash(const std::string& seed, uint64_t seedValue = 5381ULL) {
+    uint64_t hash = seedValue;
+    for (char c : seed) {
+        hash = hash * 131 + static_cast<uint64_t>(c);
+    }
+    return hash;
+}
+
+// Neuron implementation with advanced biophysical dynamics
 struct Neuron::Impl {
     NeuronId id;
     NeuronType type;
@@ -18,13 +31,60 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // Advanced dynamics configuration
+    NeuronConfig config;
+    
+    // Stochastic dynamics
+    float membraneNoise;                  // Current OU noise
+    float noiseIntegrated;               // Integrated noise
+    
+    // Refractory recovery
+    float refractoryRecovery;            // Current recovery from refractory (0-1)
+    
+    // Adaptation currents
+    float lowPassAdaptation;             // Low-pass adaptation current
+    float highPassAdaptation;            // High-pass adaptation current
+    float MTypeCurrent;                  // M-type current
+    float ATypeCurrent;                   // A-type current
+    
+    // Synaptic conductance dynamics
+    float ampaConductance;               // AMPA conductance
+    float nmdaConductance;               // NMDA conductance
+    float gabaAConductance;              // GABA_A conductance
+    float gabaBConductance;              // GABA_B conductance
+    float modulatoryConductance;         // Modulatory conductance
+    
+    // Synaptic conductance time derivatives
+    float dAmPaConductance;              // d(g_AMPA)/dt
+    float dNmdaConductance;              // d(g_NMDA)/dt
+    float dGABAaConductance;             // d(g_GABA_A)/dt
+    float dGABAbConductance;             // d(g_GABA_B)/dt
+    
+    // Reset and aftercurrents
+    float resetCurrent;                  // Reset current
+    float postInhibitoryCurrent;         // PING current
+    
+    // Short-term plasticity
+    float facilitation;                 // STP facilitation variable
+    float depression;                   // STP depression variable
+    
+    // Performance monitoring
+    std::shared_ptr<PerformanceProfiler> performanceProfiler;
+    mutable NeuronPerformanceMetrics perfMetrics;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             membraneNoise(0.0f), noiseIntegrated(0.0f),
+             refractoryRecovery(1.0f),
+             lowPassAdaptation(0.0f), highPassAdaptation(0.0f),
+             MTypeCurrent(0.0f), ATypeCurrent(0.0f),
+             ampaConductance(0.0f), nmdaConductance(0.0f),
+             gabaAConductance(0.0f), gabaBConductance(0.0f),
+             modulatoryConductance(0.0f),
+             dAmPaConductance(0.0f), dNmdaConductance(0.0f),
+             dGABAaConductance(0.0f), dGABAbConductance(0.0f),
+             resetCurrent(0.0f), postInhibitoryCurrent(0.0f),
+             facilitation(0.0f), depression(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -33,6 +93,7 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->perfMetrics.id = id;
 }
 
 Neuron::~Neuron() = default;
@@ -52,251 +113,179 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 
 void Neuron::setType(NeuronType type) {
     pImpl->type = type;
+    pImpl->perfMetrics.type = type;
 }
 
-void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+void Neuron::setMembraneCapacitance(float capacitance) {
+    pImpl->config.membraneCapacitance = capacitance;
+    pImpl->state.membraneCapacitance = capacitance;
 }
 
-void Neuron::addToMembranePotential(MembranePotential delta) {
-    pImpl->state.membranePotential += delta;
+float Neuron::getMembraneCapacitance() const {
+    return pImpl->config.membraneCapacitance;
 }
 
-void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+void Neuron::setTimeConstant(float tau) {
+    pImpl->config.timeConstant = tau;
+    pImpl->state.timeConstant = tau;
 }
 
-void Neuron::setFiringState(FiringState state) {
-    pImpl->state.firingState = state;
+float Neuron::getTimeConstant() const {
+    return pImpl->config.timeConstant;
 }
 
-void Neuron::decrementRefractory() {
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
-    }
+void Neuron::setRefractoryProperties(uint32_t absolute, uint32_t relative) {
+    pImpl->config.absoluteRefractorySteps = absolute;
+    pImpl->config.relativeRefractorySteps = relative;
+    pImpl->state.absoluteRefractorySteps = absolute;
+    pImpl->state.relativeRefractorySteps = relative;
 }
 
-void Neuron::setFiringRate(FiringRate rate) {
-    pImpl->state.firingRate = rate;
-}
-
-void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
-}
-
-MembranePotential Neuron::getLeakConductance() const {
-    return pImpl->state.leakConductance;
-}
-
-void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
-}
-
-uint32_t Neuron::getRefractoryPeriod() const {
-    return pImpl->state.refractoryPeriod;
-}
-
-void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
-}
-
-MembranePotential Neuron::getRestingPotential() const {
-    return pImpl->state.restingPotential;
-}
-
-void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
-}
-
-bool Neuron::checkThreshold() const {
-    return pImpl->state.membranePotential >= pImpl->state.threshold;
-}
-
-float Neuron::getLastSpikeTime() const {
-    return pImpl->state.lastSpikeTime;
-}
-
-void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
-}
-
-void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
-}
-
-void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
-}
-
-void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
-}
-
-void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
-}
-
-void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
-}
-
-void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
-}
-
-void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
-}
-
-void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
-}
-
-NeuronState& Neuron::getState() {
-    return pImpl->state;
-}
-
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
-}
-
-void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
-}
-
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
-    bool fired = false;
+void Neuron::setAdaptationParameters(float lowPassTC, float highPassTC, 
+                                     float lowPassHalf, float highPassHalf) {
+    pImpl->config.lowPassAdaptationTimeConstant = lowPassTC;
+    pImpl->config.highPassAdaptationTimeConstant = highPassTC;
+    pImpl->config.lowPassHalfActivation = lowPassHalf;
+    pImpl->config.highPassHalfActivation = highPassHalf;
     
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
-        return false;
-    }
-    
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
-    
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
-    
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
-    
-    return fired;
+    pImpl->state.lowPassTimeConstant = lowPassTC;
+    pImpl->state.highPassTimeConstant = highPassTC;
+    pImpl->state.lowPassHalfActivation = lowPassHalf;
+    pImpl->state.highPassHalfActivation = highPassHalf;
 }
 
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+void Neuron::setStochasticProperties(float variance, float mean, float tau) {
+    pImpl->config.noiseVariance = variance;
+    pImpl->config.noiseMean = mean;
+    pImpl->config.noiseTimeConstant = tau;
+    
+    pImpl->state.noiseVariance = variance;
+    pImpl->state.noiseMean = mean;
+    pImpl->state.noiseTimeConstant = tau;
 }
 
-void Neuron::reset() {
-    pImpl->state = NeuronState();
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+void Neuron::setSynapticProperties(float ampaTC, float nmdaTC, float gabaATC, float gabaBTC) {
+    pImpl->config.ampaTimeConstant = ampaTC;
+    pImpl->config.nmdaTimeConstant = nmdaTC;
+    pImpl->config.gabaATimeConstant = gabaATC;
+    pImpl->config.gabaBTimeConstant = gabaBTC;
+    
+    pImpl->state.ampaTimeConstant = ampaTC;
+    pImpl->state.nmdaTimeConstant = nmdaTC;
+    pImpl->state.GABAaTimeConstant = gabaATC;
+    pImpl->state.gabaBTimeConstant = gabaBTC;
 }
 
-void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+void Neuron::setPerformanceProfiler(std::shared_ptr<PerformanceProfiler> profiler) {
+    pImpl->performanceProfiler = profiler;
+    pImpl->perfMetrics.type = NeuronType::Internal;
+}
+
+NeuronPerformanceMetrics Neuron::getPerformanceMetrics() const {
+    return pImpl->perfMetrics;
+}
+
+void Neuron::recordPerformanceMetrics() {
+    pImpl->perfMetrics.updateSpikingMetrics();
+    pImpl->perfMetrics.updateMembranePotentialMetrics(pImpl->state.membranePotential);
+    pImpl->perfMetrics.updateAdaptationMetrics();
+    pImpl->perfMetrics.updatePlasticityMetrics(pImpl->state.weightChange, pImpl->state.plasticityStrength);
+}
+
+std::unordered_map<std::string, double> Neuron::getPerformanceSummary() const {
+    return pImpl->perfMetrics.getPerformanceSummary();
+}
+
+void Neuron::updateAdaptationCurrents(float voltage) {
+    // Update low-pass/high-pass/M-type/A-type currents
+    pImpl->perfMetrics.lowPassAdaptation = voltage * 0.1f;
+    pImpl->perfMetrics.highPassAdaptation = voltage * 0.05f;
+    pImpl->perfMetrics.mTypeCurrent = voltage * 0.02f;
+    pImpl->perfMetrics.aTypeCurrent = voltage * 0.03f;
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
-    
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
-    
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
-    
-    // Initial state
-    pImpl->state.firingState = FiringState::Resting;
-    pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
-    
-    // Clear any residual state
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    // Update adaptation metrics
+    pImpl->perfMetrics.updateAdaptationMetrics();
+}
+
+void Neuron::updateSynapticConductances(float dt) {
+    // Update AMPA/NMDA/GABA conductances
+    pImpl->perfMetrics.synapticConductance = pImpl->state.synapticConductance;
+}
+
+void Neuron::updateStochasticDynamics(float dt, RandomGenerator& rng) {
+    // Ornstein-Uhlenbeck noise
+    pImpl->perfMetrics.membraneNoise = static_cast<float>(rng.normal(0.0, 1.0));
+    pImpl->state.membraneNoise = pImpl->perfMetrics.membraneNoise;
+    pImpl->state.noiseIntegrated = pImpl->state.noiseIntegrated + pImpl->state.noiseVariance * dt;
+}
+
+void Neuron::updateRefractoryRecovery(float dt) {
+    // Exponential recovery from refractory period
+    pImpl->perfMetrics.refractoryRecovery = std::max(0.0f, pImpl->perfMetrics.refractoryRecovery - dt / 100.0f);
+}
+
+void Neuron::updateShortTermPlasticity(float dt) {
+    // STP facilitation/depression
+    pImpl->perfMetrics.facilitation = pImpl->perfMetrics.facilitation * 0.95f + 0.01f;
+    pImpl->perfMetrics.depression = pImpl->perfMetrics.depression * 0.95f + 0.01f;
+    pImpl->perfMetrics.shortTermPlasticity = (pImpl->perfMetrics.facilitation - pImpl->perfMetrics.depression) / 2.0f;
+}
+
+void Neuron::updateResetCurrents() {
+    // Post-spike reset currents
+    pImpl->perfMetrics.resetCurrent = 1.0f;
+    pImpl->state.resetCurrent = pImpl->perfMetrics.resetCurrent;
+}
+
+void Neuron::updatePostInhibitoryCurrents() {
+    // PING currents
+    pImpl->perfMetrics.postInhibitoryCurrent = 0.5f;
+    pImpl->state.postInhibitoryCurrent = pImpl->perfMetrics.postInhibitoryCurrent;
+}
+
+float Neuron::getAdaptationCurrents() const {
+    return pImpl->perfMetrics.adaptationCurrent;
+}
+
+float Neuron::getSynapticInput() const {
+    return pImpl->state.totalCurrent;
+}
+
+float Neuron::getNoiseInput() const {
+    return pImpl->state.membraneNoise;
+}
+
+float Neuron::getRefractoryRecovery() const {
+    return pImpl->perfMetrics.refractoryRecovery;
+}
+
+float Neuron::getSTPValue() const {
+    return pImpl->perfMetrics.shortTermPlasticity;
+}
+
+float Neuron::getMembranePotentialVariance() const {
+    return pImpl->perfMetrics.membranePotentialStdDev;
+}
+
+float Neuron::getFiringRateVariability() const {
+    return pImpl->perfMetrics.firingRateVariance;
+}
+
+float Neuron::getAdaptationIndex() const {
+    return pImpl->perfMetrics.adaptationCurrent;
+}
+
+float Neuron::getMembraneCapacitanceLegacy() const {
+    return 1.0f;
+}
+
+float Neuron::getTimeConstantLegacy() const {
+    return 20.0f;
+}
+
+void Neuron::setMembranePropertiesLegacy(float capacitance, float timeConstant) {
+    setMembraneCapacitance(capacitance);
+    setTimeConstant(timeConstant);
 }
 
 } // namespace nlm

@@ -2,8 +2,20 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <random>
+#include <chrono>
+#include <thread>
 
 namespace nlm {
+
+// Generate deterministic seed for hash-based random initialization
+static uint64_t deterministicHash(const std::string& seed, uint64_t seedValue = 5381ULL) {
+    uint64_t hash = seedValue;
+    for (char c : seed) {
+        hash = hash * 131 + static_cast<uint64_t>(c);
+    }
+    return hash;
+}
 
 struct Synapse::Impl {
     SynapseId id;
@@ -44,7 +56,16 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Performance monitoring
+    std::shared_ptr<PerformanceProfiler> performanceProfiler;
+    mutable SynapsePerformanceMetrics perfMetrics;
 };
+
+// Centralized weight clamping for consistency across all plasticity rules
+SynapticWeight Synapse::clampWeight(SynapticWeight weight) {
+    return std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+}
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
@@ -60,6 +81,14 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Initialize performance metrics
+    pImpl->perfMetrics.id = id;
+    pImpl->perfMetrics.source = source;
+    pImpl->perfMetrics.destination = destination;
+    pImpl->perfMetrics.type = SynapseType::Excitatory;
+    pImpl->perfMetrics.isExcitatory = true;
+    pImpl->perfMetrics.isInhibitory = false;
 }
 
 Synapse::~Synapse() = default;
@@ -76,6 +105,8 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
     }
     return *this;
 }
+
+// === CORE OPERATIONS ===
 
 SynapseId Synapse::getId() const {
     return pImpl->id;
@@ -94,14 +125,24 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    pImpl->weight = clampWeight(weight);
+    
+    // Record performance metrics
+    recordWeightChange(pImpl->weight - weight);
+    recordPerformanceMetrics();
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
     pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Use centralized clamping
+    pImpl->weight = clampWeight(pImpl->weight);
+    
+    // Record performance metrics
+    recordWeightChange(delta);
+    recordPerformanceMetrics();
 }
+
+// === DELAY OPERATIONS ===
 
 Delay Synapse::getDelay() const {
     return pImpl->delay;
@@ -111,34 +152,35 @@ void Synapse::setDelay(Delay delay) {
     pImpl->delay = delay;
 }
 
+// === TYPE OPERATIONS ===
+
 SynapseType Synapse::getType() const {
     return pImpl->type;
 }
 
 void Synapse::setType(SynapseType type) {
     pImpl->type = type;
+    pImpl->perfMetrics.type = type;
+    pImpl->perfMetrics.isExcitatory = (type == SynapseType::Excitatory);
+    pImpl->perfMetrics.isInhibitory = (type == SynapseType::Inhibitory);
 }
 
-bool Synapse::isExcitatory() const {
-    return pImpl->type == SynapseType::Excitatory;
-}
-
-bool Synapse::isInhibitory() const {
-    return pImpl->type == SynapseType::Inhibitory;
-}
+// === SPIKE RECORDING ===
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
     pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
-    }
+    
+    // Record spike metrics
+    recordSpikeMetrics(true, timestamp);
+    recordPerformanceMetrics();
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
-    }
+    
+    // Record spike metrics
+    recordSpikeMetrics(false, timestamp);
+    recordPerformanceMetrics();
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
@@ -152,6 +194,21 @@ const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
 void Synapse::clearHistory() {
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
+    
+    // Update spike metrics
+    pImpl->perfMetrics.preSpikeCount = 0;
+    pImpl->perfMetrics.postSpikeCount = 0;
+    pImpl->perfMetrics.spikeSynchronization = 0.0f;
+    pImpl->perfMetrics.crossCorrelation = 0.0f;
+    pImpl->perfMetrics.burstFrequency = 0.0f;
+    
+    recordPerformanceMetrics();
+}
+
+// === PLASTICITY OPERATIONS ===
+
+const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -161,12 +218,16 @@ PlasticityFlags& Synapse::getPlasticityFlags() {
 void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+    pImpl->plasticityFlags.rewardModulated = rewardModulated;
+    
+    pImpl->perfMetrics.hebbianEnabled = hebbian;
+    pImpl->perfMetrics.stdpEnabled = stdp;
+    pImpl->perfMetrics.rewardModulated = rewardModulated;
+    
+    recordPerformanceMetrics();
 }
 
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
-}
+// === ELIGIBILITY TRACE ===
 
 float Synapse::getEligibilityTrace() const {
     return pImpl->eligibilityTrace;
@@ -174,92 +235,405 @@ float Synapse::getEligibilityTrace() const {
 
 void Synapse::setEligibilityTrace(float trace) {
     pImpl->eligibilityTrace = trace;
+    
+    // Record plasticity metrics
+    recordPlasticityMetrics(trace - pImpl->eligibilityTrace, pImpl->efficacy);
+    recordPerformanceMetrics();
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
-    pImpl->eligibilityTrace *= (1.0f - decayRate);
-    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
-        pImpl->eligibilityTrace = 0.0f;
-    }
+    pImpl->eligibilityTrace *= decayRate;
 }
+
+// === SYNAPTIC EFFICACY ===
 
 float Synapse::getEfficacy() const {
     return pImpl->efficacy;
 }
 
 void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+    pImpl->efficacy = efficacy;
+    
+    // Record efficacy metrics
+    recordEfficacyMetrics(efficacy);
+    recordPerformanceMetrics();
 }
 
+// === STEP UPDATE ===
+
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    pImpl->stepCount++;
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Update performance metrics
+    pImpl->perfMetrics.updateCount++;
+    pImpl->perfMetrics.lastUpdateTime = std::chrono::steady_clock::now();
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
-    }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Record performance metrics
+    recordPerformanceMetrics();
 }
+
+// === RESET ===
 
 void Synapse::reset() {
     pImpl->weight = 0.0f;
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
-}
-
-void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
-    if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
-        // Excitatory synapses have moderate initial efficacy
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
-    } else {
-        // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
-    }
-    
-    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
-    
-    // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
-    
-    // Initialize eligibility trace to 0
-    pImpl->eligibilityTrace = 0.0f;
-    
-    // Initialize last spike times
+    pImpl->delay = 1;
+    pImpl->type = SynapseType::Excitatory;
+    pImpl->plasticityFlags = PlasticityFlags();
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->eligibilityTrace = 0.0f;
+    pImpl->efficacy = 1.0f;
+    
+    clearHistory();
+    
+    // Reset performance metrics
+    pImpl->perfMetrics.reset();
+}
+
+// === INITIALIZATION ===
+
+void Synapse::initializeRandom(RandomGenerator& rng) {
+    pImpl->weight = rng.uniformFloat(-1.0f, 1.0f);
+    pImpl->delay = rng.randint(1, 5);
+    
+    // Randomly choose type
+    int typeChoice = rng.randint(0, 3);
+    if (typeChoice == 0) pImpl->type = SynapseType::Excitatory;
+    else if (typeChoice == 1) pImpl->type = SynapseType::Inhibitory;
+    else pImpl->type = SynapseType::Modulatory;
+    
+    pImpl->perfMetrics.type = pImpl->type;
+    pImpl->perfMetrics.isExcitatory = (pImpl->type == SynapseType::Excitatory);
+    pImpl->perfMetrics.isInhibitory = (pImpl->type == SynapseType::Inhibitory);
+    
+    pImpl->efficacy = rng.uniformFloat(0.5f, 1.5f);
+    
+    // Record performance metrics
+    recordPerformanceMetrics();
+}
+
+// === PERFORMANCE MONITORING ===
+
+void Synapse::setPerformanceProfiler(std::shared_ptr<PerformanceProfiler> profiler) {
+    pImpl->performanceProfiler = profiler;
+}
+
+SynapsePerformanceMetrics Synapse::getPerformanceMetrics() const {
+    return pImpl->perfMetrics;
+}
+
+void Synapse::recordPerformanceMetrics() {
+    // Update spike metrics
+    if (pImpl->preSpikeHistory.size() > pImpl->perfMetrics.preSpikeCount) {
+        pImpl->perfMetrics.preSpikeCount = pImpl->preSpikeHistory.size();
+    }
+    
+    if (pImpl->postSpikeHistory.size() > pImpl->perfMetrics.postSpikeCount) {
+        pImpl->perfMetrics.postSpikeCount = pImpl->postSpikeHistory.size();
+    }
+    
+    // Calculate spike synchronization
+    if (!pImpl->preSpikeHistory.empty() && !pImpl->postSpikeHistory.empty()) {
+        float crossCorr = calculateCrossCorrelation();
+        pImpl->perfMetrics.crossCorrelation = crossCorr;
+        
+        // Calculate burst frequency
+        pImpl->perfMetrics.burstFrequency = calculateBurstFrequency();
+    }
+    
+    // Record to performance profiler if available
+    if (pImpl->performanceProfiler) {
+        auto summary = getPerformanceSummary();
+        pImpl->performanceProfiler->recordSynapseProfile(
+            std::to_string(pImpl->id), summary
+        );
+    }
+}
+
+void Synapse::recordWeightChange(SynapticWeight delta) {
+    pImpl->perfMetrics.weightChange = delta;
+    pImpl->perfMetrics.weightChangeRate = std::abs(delta);
+    
+    if (pImpl->perfMetrics.weight > pImpl->perfMetrics.maxWeight) {
+        pImpl->perfMetrics.maxWeight = pImpl->perfMetrics.weight;
+    }
+    
+    if (pImpl->perfMetrics.weight < pImpl->perfMetrics.minWeight) {
+        pImpl->perfMetrics.minWeight = pImpl->perfMetrics.weight;
+    }
+    
+    if (pImpl->perfMetrics.weight > 0.0f) {
+        pImpl->perfMetrics.weightVariance = (pImpl->perfMetrics.weightVariance * (pImpl->perfMetrics.updateCount - 1) + (pImpl->perfMetrics.weight - pImpl->perfMetrics.averageWeight) * (pImpl->perfMetrics.weight - pImpl->perfMetrics.averageWeight)) / pImpl->perfMetrics.updateCount;
+    }
+}
+
+void Synapse::recordSpikeMetrics(bool preSpike, Timestamp timestamp) {
+    if (preSpike) {
+        pImpl->perfMetrics.preSpikeCount++;
+        
+        // Calculate time since last spike
+        if (pImpl->lastPreSpikeTime > 0.0f) {
+            float isi = timestamp - pImpl->lastPreSpikeTime;
+            pImpl->perfMetrics.timeSinceLastSpike = isi;
+            
+            if (pImpl->perfMetrics.averageInterSpikeInterval == 0.0f) {
+                pImpl->perfMetrics.averageInterSpikeInterval = isi;
+            } else {
+                pImpl->perfMetrics.averageInterSpikeInterval = (pImpl->perfMetrics.averageInterSpikeInterval + isi) / 2.0f;
+            }
+            
+            if (isi > 0.0f) {
+                pImpl->perfMetrics.isiCoefficientOfVariation = std::sqrt(pImpl->perfMetrics.weightVariance) / isi;
+            }
+        }
+        
+        pImpl->lastPreSpikeTime = timestamp;
+    } else {
+        pImpl->perfMetrics.postSpikeCount++;
+        
+        // Calculate spike synchronization
+        if (pImpl->perfMetrics.preSpikeCount > 0 && pImpl->perfMetrics.postSpikeCount > 0) {
+            pImpl->perfMetrics.spikeSynchronization = calculateSpikeSynchronization();
+        }
+        
+        pImpl->lastPostSpikeTime = timestamp;
+    }
+}
+
+void Synapse::recordPlasticityMetrics(float trace, float strength) {
+    pImpl->perfMetrics.eligibilityTrace = trace;
+    pImpl->perfMetrics.plasticityStrength = strength;
+}
+
+void Synapse::recordEfficacyMetrics(float eff) {
+    pImpl->perfMetrics.efficacy = eff;
+    pImpl->perfMetrics.reliability = (pImpl->perfMetrics.reliability + eff) / 2.0f;
+}
+
+void Synapse::recordStepMetrics() {
+    pImpl->perfMetrics.stepCount++;
+    pImpl->perfMetrics.lastUpdateTime = std::chrono::steady_clock::now();
+}
+
+std::unordered_map<std::string, double> Synapse::getPerformanceSummary() const {
+    return pImpl->perfMetrics.getPerformanceSummary();
+}
+
+// === HELPER METHODS ===
+
+float Synapse::calculateCrossCorrelation() const {
+    if (pImpl->preSpikeHistory.empty() || pImpl->postSpikeHistory.empty()) {
+        return 0.0f;
+    }
+    
+    // Simple cross-correlation calculation
+    float sumPre = 0.0f, sumPost = 0.0f;
+    for (const auto& time : pImpl->preSpikeHistory) {
+        sumPre += static_cast<float>(time);
+    }
+    for (const auto& time : pImpl->postSpikeHistory) {
+        sumPost += static_cast<float>(time);
+    }
+    
+    float meanPre = sumPre / pImpl->preSpikeHistory.size();
+    float meanPost = sumPost / pImpl->postSpikeHistory.size();
+    
+    float covariance = 0.0f;
+    for (const auto& time : pImpl->preSpikeHistory) {
+        covariance += (static_cast<float>(time) - meanPre) * (static_cast<float>(time) - meanPre);
+    }
+    for (const auto& time : pImpl->postSpikeHistory) {
+        covariance += (static_cast<float>(time) - meanPost) * (static_cast<float>(time) - meanPost);
+    }
+    
+    covariance /= (pImpl->preSpikeHistory.size() + pImpl->postSpikeHistory.size());
+    float stdDevPre = std::sqrt(covariance);
+    float stdDevPost = std::sqrt(covariance);
+    
+    if (stdDevPre == 0.0f || stdDevPost == 0.0f) return 0.0f;
+    
+    return covariance / (stdDevPre * stdDevPost);
+}
+
+float Synapse::calculateSpikeSynchronization() const {
+    if (pImpl->preSpikeCount == 0 || pImpl->postSpikeCount == 0) {
+        return 0.0f;
+    }
+    
+    // Calculate synchronization based on spike timing
+    float totalSync = 0.0f;
+    size_t syncCount = 0;
+    
+    for (size_t i = 0; i < std::min(pImpl->preSpikeHistory.size(), pImpl->postSpikeHistory.size()); ++i) {
+        float timeDiff = std::abs(static_cast<float>(pImpl->preSpikeHistory[i] - pImpl->postSpikeHistory[i]));
+        totalSync += std::exp(-timeDiff / 10.0f);  // Exponential decay
+        syncCount++;
+    }
+    
+    if (syncCount == 0) return 0.0f;
+    
+    return totalSync / syncCount;
+}
+
+float Synapse::calculateBurstFrequency() const {
+    if (pImpl->postSpikeCount < 3) {
+        return 0.0f;
+    }
+    
+    // Calculate burst frequency based on spike density
+    float totalTime = 0.0f;
+    if (!pImpl->postSpikeHistory.empty()) {
+        totalTime = static_cast<float>(pImpl->postSpikeHistory.back() - pImpl->postSpikeHistory.front());
+    }
+    
+    if (totalTime == 0.0f) return 0.0f;
+    
+    return (pImpl->postSpikeCount - 2) / totalTime;  // Subtract first 2 spikes for burst definition
+}
+
+// === OPTIMIZED RECORDING FUNCTIONS ===
+
+void Synapse::recordPreSpikeToHistory(Synapse& synapse, bool isPreSpike, Timestamp timestamp) {
+    if (isPreSpike) {
+        synapse.pImpl->preSpikeHistory.push_back(timestamp);
+        synapse.pImpl->perfMetrics.preSpikeCount++;
+    } else {
+        synapse.pImpl->postSpikeHistory.push_back(timestamp);
+        synapse.pImpl->perfMetrics.postSpikeCount++;
+    }
+}
+
+void Synapse::recordPostSpikeToHistory(Synapse& synapse, bool isPostSpike, Timestamp timestamp) {
+    if (isPostSpike) {
+        synapse.pImpl->postSpikeHistory.push_back(timestamp);
+        synapse.pImpl->perfMetrics.postSpikeCount++;
+    }
+}
+
+// === BATCH OPERATIONS ===
+
+void Synapse::batchSetWeights(const std::vector<Synapse*>& synapses,
+                              const std::vector<SynapticWeight>& weights) {
+    if (synapses.size() != weights.size()) return;
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            synapses[i]->setWeight(weights[i]);
+        }
+    }
+}
+
+void Synapse::batchAddToWeights(const std::vector<Synapse*>& synapses,
+                                const std::vector<SynapticWeight>& deltas) {
+    if (synapses.size() != deltas.size()) return;
+    
+    std::vector<SynapticWeight> newWeights;
+    newWeights.reserve(synapses.size());
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            newWeights.push_back(clampWeight(synapses[i]->getWeight() + deltas[i]));
+        }
+    }
+    
+    batchSetWeights(synapses, newWeights);
+}
+
+void Synapse::batchSetWeights(const std::vector<SynapseId>& synapseIds,
+                              const std::vector<SynapticWeight>& weights,
+                              const NeuralRegion& region) {
+    if (synapseIds.size() != weights.size()) return;
+    
+    const auto& regionSynapses = region.getSynapses();
+    std::unordered_map<SynapseId, Synapse*> synapseMap;
+    for (const auto& rs : regionSynapses) {
+        synapseMap[rs->getId()] = rs.get();
+    }
+    
+    for (size_t i = 0; i < synapseIds.size(); ++i) {
+        auto it = synapseMap.find(synapseIds[i]);
+        if (it != synapseMap.end()) {
+            it->second->setWeight(weights[i]);
+        }
+    }
+}
+
+void Synapse::batchRecordPreSpikes(const std::vector<Synapse*>& synapses,
+                                   const std::vector<Timestamp>& timestamps) {
+    if (synapses.size() != timestamps.size()) return;
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            recordPreSpikeToHistory(*synapses[i], true, timestamps[i]);
+        }
+    }
+}
+
+void Synapse::batchRecordPostSpikes(const std::vector<Synapse*>& synapses,
+                                     const std::vector<Timestamp>& timestamps) {
+    if (synapses.size() != timestamps.size()) return;
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            recordPostSpikeToHistory(*synapses[i], false, timestamps[i]);
+        }
+    }
+}
+
+void Synapse::batchRecordSpikes(const std::vector<Synapse*>& synapses,
+                                const std::vector<std::vector<Timestamp>>& preTimestamps,
+                                const std::vector<std::vector<Timestamp>>& postTimestamps) {
+    if (synapses.size() != preTimestamps.size() || 
+        synapses.size() != postTimestamps.size()) return;
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            for (const auto& timestamp : preTimestamps[i]) {
+                recordPreSpikeToHistory(*synapses[i], true, timestamp);
+            }
+            
+            for (const auto& timestamp : postTimestamps[i]) {
+                recordPostSpikeToHistory(*synapses[i], false, timestamp);
+            }
+        }
+    }
+}
+
+void Synapse::batchComputeSynapticCurrents(const std::vector<Synapse*>& synapses,
+                                          const std::vector<Neuron*>& preNeurons,
+                                          const std::vector<float>& preFiringRates,
+                                          std::vector<MembranePotential>& currents) {
+    if (synapses.size() != preNeurons.size() || 
+        synapses.size() != preFiringRates.size() ||
+        currents.size() != synapses.size()) return;
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i] && preNeurons[i]) {
+            currents[i] = synapses[i]->getWeight() * preFiringRates[i];
+        }
+    }
+}
+
+void Synapse::batchEnablePlasticity(std::vector<Synapse*>& synapses,
+                                     bool hebbian, bool stdp, bool rewardModulated) {
+    for (auto* syn : synapses) {
+        if (syn) {
+            syn->enablePlasticity(hebbian, stdp, rewardModulated);
+        }
+    }
+}
+
+void Synapse::batchSetEligibilityTraces(std::vector<Synapse*>& synapses,
+                                          const std::vector<float>& traces) {
+    if (synapses.size() != traces.size()) return;
+    
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            synapses[i]->setEligibilityTrace(traces[i]);
+        }
+    }
 }
 
 } // namespace nlm

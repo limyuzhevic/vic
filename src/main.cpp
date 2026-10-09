@@ -1,12 +1,3 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
-
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -18,6 +9,15 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "cli/CLI.hpp"
+#include "cli/ConfigurationCLI.hpp"
+#include "cli/DebugCLI.hpp"
+#include "cli/MonitorCLI.hpp"
+#include "cli/ExperimentCLI.hpp"
+#include "cli/UtilityCLI.hpp"
+#include "utils/Profiler.hpp"
+#include "utils/CheckpointManager.hpp"
+#include "utils/BrainExporter.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +25,11 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <thread>
+#include <csignal>
+#include <map>
+#include <algorithm>
 
 using namespace nlm;
 
@@ -39,10 +44,10 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                     ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -321,6 +326,60 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void runPhase2DefaultTests(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("=== Running Phase 2 Default Tests ===");
+    NLM_LOG_INFO("These tests demonstrate the core capabilities of the NLM brain:");
+    NLM_LOG_INFO("");
+    
+    // Reset brain for first test
+    brain->reset();
+    brain->initialize();
+    
+    // Run Test 1: Basic connectivity
+    runBasicConnectivityTest(brain);
+    
+    // Reset brain for plasticity experiment
+    brain->reset();
+    brain->initialize();
+    
+    // Run Test 2: Plasticity learning experiment
+    runPlasticityExperiment(brain);
+    
+    // Reset and run Test 3: STDP verification
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
+}
+
+void runPhase2WithConfig(std::shared_ptr<Brain> brain, const std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("=== Running NLM with Configuration ===");
+    NLM_LOG_INFO("Configuration loaded and applied to brain system");
+    
+    // Apply configuration to brain
+    brain->configure(config);
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration applied:");
+    NLM_LOG_INFO("  Brain configured with " + std::to_string(config->getOr<int64_t>("neuron_count", 500)) + " neurons");
+    NLM_LOG_INFO("  " + std::to_string(config->getOr<int64_t>("region_count", 1)) + " regions");
+    NLM_LOG_INFO("  " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s timestep");
+    NLM_LOG_INFO("");
+    
+    // Run basic functionality tests
+    runPhase2DefaultTests(brain);
+}
+
+void cleanup() {
+    NLM_LOG_INFO("Cleaning up resources...");
+    // Implementation would clean up global resources
+}
+
+bool isShuttingDown() {
+    // Check for shutdown signal
+    return false;
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -409,6 +468,109 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    // Check for CLI commands
+    bool runCLI = false;
+    std::string cliCommand;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--cli" || arg == "-cli") {
+            runCLI = true;
+        } else if (arg == "--help" || arg == "-h") {
+            runCLI = true;
+            cliCommand = "help";
+        } else if (arg.find("cli=") == 0) {
+            runCLI = true;
+            cliCommand = arg.substr(4);
+        }
+    }
+    
+    // Run comprehensive CLI if requested
+    if (runCLI) {
+        NLM_LOG_INFO("Starting comprehensive CLI system...");
+        
+        // Initialize CLI components
+        auto cli = std::make_shared<MainCLI>();
+        auto configurationCLI = std::make_shared<ConfigurationCLI>();
+        auto debugCLI = std::make_shared<DebugCLI>();
+        auto monitorCLI = std::make_shared<MonitorCLI>();
+        auto experimentCLI = std::make_shared<ExperimentCLI>();
+        auto utilityCLI = std::make_shared<UtilityCLI>();
+        auto profiler = std::make_shared<Profiler>();
+        auto checkpointManager = std::make_shared<CheckpointManager>();
+        auto brainExporter = std::make_shared<BrainExporter>();
+        
+        // Initialize all components
+        configurationCLI->initialize();
+        debugCLI->initialize();
+        monitorCLI->initialize();
+        experimentCLI->initialize();
+        utilityCLI->initialize();
+        profiler->initialize();
+        checkpointManager->initialize();
+        brainExporter->initialize();
+        
+        // Set up components
+        configurationCLI->setConfig(config);
+        debugCLI->setConfig(config);
+        monitorCLI->setConfig(config);
+        experimentCLI->setConfig(config);
+        utilityCLI->setConfig(config);
+        
+        configurationCLI->setBrain(brain);
+        debugCLI->setBrain(brain);
+        monitorCLI->setBrain(brain);
+        experimentCLI->setBrain(brain);
+        utilityCLI->setBrain(brain);
+        
+        profiler->setConfig(config);
+        profiler->setBrain(brain);
+        
+        checkpointManager->setConfig(config);
+        checkpointManager->setBrain(brain);
+        checkpointManager->setCLI(&(*cli));
+        
+        brainExporter->setConfig(config);
+        brainExporter->setBrain(brain);
+        brainExporter->setCLI(&(*cli));
+        
+        // Set up the main CLI
+        cli->setBrain(brain);
+        cli->setConfig(config);
+        cli->setConfigurationCLI(configurationCLI.get());
+        cli->setDebugCLI(debugCLI.get());
+        cli->setMonitorCLI(monitorCLI.get());
+        cli->setExperimentCLI(experimentCLI.get());
+        cli->setUtilityCLI(utilityCLI.get());
+        
+        // Run CLI command
+        if (!cliCommand.empty()) {
+            std::vector<std::string> args;
+            for (int i = 1; i < argc; ++i) {
+                args.push_back(argv[i]);
+            }
+            cli->executeCommand(args);
+        } else {
+            // Start interactive CLI
+            cli->showHelp();
+            cli->startInteractiveMode();
+        }
+        
+        // Cleanup
+        cleanup();
+        return 0;
+    }
+    
+    // Run Phase 2 default tests
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running Phase 2 Default Tests ===");
+    NLM_LOG_INFO("These tests demonstrate the core capabilities of the NLM brain:");
+    NLM_LOG_INFO("");
+    
+    // Reset brain for first test
+    brain->reset();
+    brain->initialize();
+    
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
@@ -444,6 +606,9 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Cleanup
+    cleanup();
     
     return 0;
 }

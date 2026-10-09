@@ -1,0 +1,285 @@
+#include "Neuron.hpp"
+#include "../core/Random/Random.hpp"
+#include <cmath>
+#include <algorithm>
+
+namespace nlm {
+
+struct Neuron::Impl {
+    NeuronId id;
+    NeuronType type;
+    NeuronState state;
+    RegionId regionId;
+    PopulationId populationId;
+    MembranePotential totalCurrent;  // Total synaptic current input this step
+    MembranePotential synapticInput;  // Accumulated synaptic input
+    std::vector<Timestamp> spikeHistory;
+    std::vector<SynapseHandle> incomingSynapses;
+    std::vector<SynapseHandle> outgoingSynapses;
+    PlasticityFlags plasticityFlags;
+    
+    // Advanced dynamics configuration
+    NeuronConfig config;
+    
+    // Stochastic dynamics
+    float membraneNoise;                  // Current OU noise
+    float noiseIntegrated;               // Integrated noise
+    
+    // Refractory recovery
+    float refractoryRecovery;            // Current recovery from refractory (0-1)
+    
+    // Adaptation currents
+    float lowPassAdaptation;             // Low-pass adaptation current
+    float highPassAdaptation;            // High-pass adaptation current
+    float MTypeCurrent;                  // M-type current
+    float ATypeCurrent;                   // A-type current
+    
+    // Synaptic conductance dynamics
+    float ampaConductance;               // AMPA conductance
+    float nmdaConductance;               // NMDA conductance
+    float gabaAConductance;              // GABA_A conductance
+    float gabaBConductance;              // GABA_B conductance
+    float modulatoryConductance;         // Modulatory conductance
+    
+    // Synaptic conductance time derivatives
+    float dAmPaConductance;              // d(g_AMPA)/dt
+    float dNmdaConductance;              // d(g_NMDA)/dt
+    float dGABAaConductance;             // d(g_GABA_A)/dt
+    float dGABAbConductance;             // d(g_GABA_B)/dt
+    
+    // Reset and aftercurrents
+    float resetCurrent;                  // Reset current
+    float postInhibitoryCurrent;         // PING current
+    
+    // Short-term plasticity
+    float facilitation;                 // STP facilitation variable
+    float depression;                   // STP depression variable
+    
+    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
+             totalCurrent(0.0f), synapticInput(0.0f),
+             membraneNoise(0.0f), noiseIntegrated(0.0f),
+             refractoryRecovery(1.0f),
+             lowPassAdaptation(0.0f), highPassAdaptation(0.0f),
+             MTypeCurrent(0.0f), ATypeCurrent(0.0f),
+             ampaConductance(0.0f), nmdaConductance(0.0f),
+             gabaAConductance(0.0f), gabaBConductance(0.0f),
+             modulatoryConductance(0.0f),
+             dAmPaConductance(0.0f), dNmdaConductance(0.0f),
+             dGABAaConductance(0.0f), dGABAbConductance(0.0f),
+             resetCurrent(0.0f), postInhibitoryCurrent(0.0f),
+             facilitation(0.0f), depression(0.0f) {}
+};
+
+Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    pImpl->id = id;
+    pImpl->type = NeuronType::Internal;
+    pImpl->regionId = INVALID_REGION_ID;
+    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->totalCurrent = 0.0f;
+}
+
+Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    pImpl->id = id;
+    pImpl->type = NeuronType::Internal;
+    pImpl->regionId = INVALID_REGION_ID;
+    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->totalCurrent = 0.0f;
+}
+
+// Initialize random parameters with biological constraints
+    void initializeRandom(RandomGenerator& rng) {
+        // Set membrane properties based on neuron type
+        switch (pImpl->type) {
+            case NeuronType::Excitatory:
+                pImpl->config = NeuronConfig::createExcitatoryNeuronConfig();
+                break;
+            case NeuronType::Inhibitory:
+                pImpl->config = NeuronConfig::createInhibitoryNeuronConfig();
+                break;
+            case NeuronType::Sensory:
+                pImpl->config = NeuronConfig::createSensoryNeuronConfig();
+                break;
+            case NeuronType::Motor:
+                pImpl->config = NeuronConfig::createMotorNeuronConfig();
+                break;
+            case NeuronType::Modulatory:
+                pImpl->config = NeuronConfig::createModulatoryNeuronConfig();
+                break;
+            default: // Internal
+                pImpl->config = NeuronConfig::createInternalNeuronConfig();
+                break;
+        }
+        
+        // Initialize state with type-specific defaults
+        pImpl->state = NeuronState();
+        pImpl->state.neuronType = pImpl->type;
+        pImpl->state.membraneCapacitance = pImpl->config.membraneCapacitance;
+        pImpl->state.timeConstant = pImpl->config.timeConstant;
+        
+        // Adjust parameters for different neuron types
+        if (pImpl->type == NeuronType::Excitatory) {
+            pImpl->state.threshold = -50.0f;  // Higher threshold
+            pImpl->state.restingPotential = -65.0f;
+            pImpl->state.resetPotential = -70.0f;
+            pImpl->state.refractoryPeriod = pImpl->config.excitatoryRefractoryPeriod;
+        } else if (pImpl->type == NeuronType::Inhibitory) {
+            pImpl->state.threshold = -40.0f;  // Lower threshold
+            pImpl->state.restingPotential = -60.0f;
+            pImpl->state.resetPotential = -65.0f;
+            pImpl->state.refractoryPeriod = pImpl->config.inhibitoryRefractoryPeriod;
+        } else if (pImpl->type == NeuronType::Sensory) {
+            pImpl->state.threshold = -45.0f;
+            pImpl->state.restingPotential = -65.0f;
+            pImpl->state.resetPotential = -70.0f;
+            pImpl->state.refractoryPeriod = pImpl->config.sensoryRefractoryPeriod;
+        } else if (pImpl->type == NeuronType::Motor) {
+            pImpl->state.threshold = -55.0f;
+            pImpl->state.restingPotential = -65.0f;
+            pImpl->state.resetPotential = -70.0f;
+            pImpl->state.refractoryPeriod = pImpl->config.motorRefractoryPeriod;
+        } else if (pImpl->type == NeuronType::Modulatory) {
+            pImpl->state.threshold = -52.0f;
+            pImpl->state.restingPotential = -65.0f;
+            pImpl->state.resetPotential = -70.0f;
+            pImpl->state.refractoryPeriod = pImpl->config.modulatoryRefractoryPeriod;
+        }
+        
+        // Randomize around type-specific defaults
+        pImpl->state.membranePotential = pImpl->state.restingPotential + 
+                                         rng.uniformReal(-5.0f, 5.0f);
+        pImpl->state.threshold = pImpl->state.threshold + 
+                                rng.uniformReal(-5.0f, 5.0f);
+        
+        // Set adaptation variables based on type
+        pImpl->state.lowPassTimeConstant = pImpl->config.lowPassAdaptationTimeConstant;
+        pImpl->state.highPassTimeConstant = pImpl->config.highPassAdaptationTimeConstant;
+        pImpl->state.MTypeTimeConstant = pImpl->config.mTypeTimeConstant;
+        pImpl->state.ATypeTimeConstant = pImpl->config.aTypeTimeConstant;
+        
+        // Set synaptic time constants
+        pImpl->state.ampaTimeConstant = pImpl->config.ampaTimeConstant;
+        pImpl->state.nmdaTimeConstant = pImpl->config.nmdaTimeConstant;
+        pImpl->state.GABAaTimeConstant = pImpl->config.gabaATimeConstant;
+        pImpl->state.gabaBTimeConstant = pImpl->config.gabaBTimeConstant;
+        
+        // Set noise parameters
+        pImpl->state.noiseVariance = pImpl->config.noiseVariance;
+        pImpl->state.noiseMean = pImpl->config.noiseMean;
+        pImpl->state.noiseTimeConstant = pImpl->config.noiseTimeConstant;
+        
+        // Initialize refractory recovery
+        pImpl->state.refractoryRemaining = 0;
+        pImpl->state.absoluteRefractorySteps = pImpl->config.absoluteRefractorySteps;
+        pImpl->state.relativeRefractorySteps = pImpl->config.relativeRefractorySteps;
+        pImpl->state.recoveryVariable = 1.0f;
+        
+        // Initialize STP
+        pImpl->state.facilitation = 0.0f;
+        pImpl->state.depression = 0.0f;
+        pImpl->state.STPTimeConstant = pImpl->config.STPTimeConstant;
+        
+        // Clear history
+        pImpl->spikeHistory.clear();
+        pImpl->synapticInput = 0.0f;
+        pImpl->membraneNoise = 0.0f;
+        pImpl->noiseIntegrated = 0.0f;
+        pImpl->refractoryRecovery = 1.0f;
+        pImpl->lowPassAdaptation = 0.0f;
+        pImpl->highPassAdaptation = 0.0f;
+        pImpl->MTypeCurrent = 0.0f;
+        pImpl->ATypeCurrent = 0.0f;
+        pImpl->ampaConductance = 0.0f;
+        pImpl->nmdaConductance = 0.0f;
+        pImpl->gabaAConductance = 0.0f;
+        pImpl->gabaBConductance = 0.0f;
+        pImpl->modulatoryConductance = 0.0f;
+        pImpl->resetCurrent = 0.0f;
+        pImpl->postInhibitoryCurrent = 0.0f;
+    };
+
+Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    pImpl->id = id;
+    pImpl->type = NeuronType::Internal;
+    pImpl->regionId = INVALID_REGION_ID;
+    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->totalCurrent = 0.0f;
+}
+
+Neuron::~Neuron() = default;
+
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Neuron& Neuron::operator=(Neuron&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
+
+void Neuron::setType(NeuronType type) {
+    pImpl->type = type;
+}
+
+void Neuron::setMembraneCapacitance(float capacitance) {
+    pImpl->config.membraneCapacitance = capacitance;
+    pImpl->state.membraneCapacitance = capacitance;
+}
+
+float Neuron::getMembraneCapacitance() const {
+    return pImpl->config.membraneCapacitance;
+}
+
+void Neuron::setTimeConstant(float tau) {
+    pImpl->config.timeConstant = tau;
+    pImpl->state.timeConstant = tau;
+}
+
+float Neuron::getTimeConstant() const {
+    return pImpl->config.timeConstant;
+}
+
+void Neuron::setRefractoryProperties(uint32_t absolute, uint32_t relative) {
+    pImpl->config.absoluteRefractorySteps = absolute;
+    pImpl->config.relativeRefractorySteps = relative;
+    pImpl->state.absoluteRefractorySteps = absolute;
+    pImpl->state.relativeRefractorySteps = relative;
+}
+
+void Neuron::setAdaptationParameters(float lowPassTC, float highPassTC, 
+                                     float lowPassHalf, float highPassHalf) {
+    pImpl->config.lowPassAdaptationTimeConstant = lowPassTC;
+    pImpl->config.highPassAdaptationTimeConstant = highPassTC;
+    pImpl->config.lowPassHalfActivation = lowPassHalf;
+    pImpl->config.highPassHalfActivation = highPassHalf;
+    
+    pImpl->state.lowPassTimeConstant = lowPassTC;
+    pImpl->state.highPassTimeConstant = highPassTC;
+    pImpl->state.lowPassHalfActivation = lowPassHalf;
+    pImpl->state.highPassHalfActivation = highPassHalf;
+}
+
+void Neuron::setStochasticProperties(float variance, float mean, float tau) {
+    pImpl->config.noiseVariance = variance;
+    pImpl->config.noiseMean = mean;
+    pImpl->config.noiseTimeConstant = tau;
+    
+    pImpl->state.noiseVariance = variance;
+    pImpl->state.noiseMean = mean;
+    pImpl->state.noiseTimeConstant = tau;
+}
+
+void Neuron::setSynapticProperties(float ampaTC, float nmdaTC, float gabaATC, float gabaBTC) {
+    pImpl->config.ampaTimeConstant = ampaTC;
+    pImpl->config.nmdaTimeConstant = nmdaTC;
+    pImpl->config.gabaATimeConstant = gabaATC;
+    pImpl->config.gabaBTimeConstant = gabaBTC;
+    
+    pImpl->state.ampaTimeConstant = ampaTC;
+    pImpl->state.nmdaTimeConstant = nmdaTC;
+    pImpl->state.GABAaTimeConstant = gabaATC;
+    pImpl->state.gabaBTimeConstant = gabaBTC;
+}

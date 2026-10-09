@@ -136,11 +136,49 @@ struct Brain::Impl {
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        // Configure structural plasticity - advanced parameters
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0005f);
+        float hebbianLearningRate = config->getOr<float>("hebbian_learning_rate", 0.01f);
+        float targetSynapticDensity = config->getOr<float>("target_synaptic_density", 0.05f);
+        float pruningRate = config->getOr<float>("pruning_rate", 0.0001f);
+        float pruningThreshold = config->getOr<float>("pruning_threshold", 0.05f);
+        float activityThreshold = config->getOr<float>("activity_threshold", 0.001f);
+        float competitivePruningLevel = config->getOr<float>("competitive_pruning_level", 0.5f);
+        float homeostaticTargetFiringRate = config->getOr<float>("homeostatic_target_firing_rate", 5.0f);
+        
+        float maxConnectionDistance = config->getOr<float>("max_connection_distance", 100.0f);
+        bool layerSpecificRules = config->getOr<bool>("layer_specific_rules", true);
+        bool dendriticCompartmentConstraints = config->getOr<bool>("dendritic_compartment_constraints", true);
+        
+        bool sensorySpecificRules = config->getOr<bool>("sensory_specific_rules", true);
+        bool motorSpecificRules = config->getOr<bool>("motor_specific_rules", true);
+        
+        bool experienceExpectantPlasticity = config->getOr<bool>("experience_expectant_plasticity", true);
+        float criticalPeriodModulation = config->getOr<float>("critical_period_modulation", 1.0f);
+        
+        bool enableBatchOperations = config->getOr<bool>("enable_batch_operations", true);
+        size_t batchSize = config->getOr<size_t>("batch_size", 100);
+        bool efficiencyMode = config->getOr<bool>("efficiency_mode", true);
+        
+        // Configure structural plasticity with all advanced parameters
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        structuralPlasticity->setHebbianLearningRate(hebbianLearningRate);
+        structuralPlasticity->setTargetSynapticDensity(targetSynapticDensity);
         structuralPlasticity->setPruningRate(pruningRate);
+        structuralPlasticity->setPruningThreshold(pruningThreshold);
+        structuralPlasticity->setActivityThreshold(activityThreshold);
+        structuralPlasticity->setCompetitivePruningLevel(competitivePruningLevel);
+        structuralPlasticity->setHomeostaticTargetFiringRate(homeostaticTargetFiringRate);
+        structuralPlasticity->setMaxConnectionDistance(maxConnectionDistance);
+        structuralPlasticity->setLayerSpecificRules(layerSpecificRules);
+        structuralPlasticity->setDendriticCompartmentConstraints(dendriticCompartmentConstraints);
+        structuralPlasticity->setSensorySpecificRules(sensorySpecificRules);
+        structuralPlasticity->setMotorSpecificRules(motorSpecificRules);
+        structuralPlasticity->setExperienceExpectantPlasticity(experienceExpectantPlasticity);
+        structuralPlasticity->setCriticalPeriodModulation(criticalPeriodModulation);
+        structuralPlasticity->enableBatchOperations(enableBatchOperations);
+        structuralPlasticity->setBatchSize(batchSize);
+        structuralPlasticity->setEfficiencyMode(efficiencyMode);
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -554,25 +592,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
             
+            // Set structural plasticity development stage
+            sp->setDevelopmentStage(stage);
+            
+            // Apply developmental modulation based on stage
+            float stageModulation = 1.0f;
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    stageModulation = 1.5f;  // High plasticity
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    stageModulation = 1.2f;
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    stageModulation = 0.8f;
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    stageModulation = 0.5f;  // Stable
+                    break;
+                case DevelopmentalStage::Aging:
+                    stageModulation = 0.3f;  // Reduced plasticity
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Update all structural plasticity parameters with stage modulation
+            sp->setSynaptogenesisRate(0.0005f * stageModulation);
+            sp->setHebbianLearningRate(0.01f * stageModulation);
+            sp->setPruningRate(0.0001f * (2.0f - stageModulation));
+            sp->setCompetitivePruningLevel(0.5f * stageModulation);
+            sp->setCriticalPeriodModulation(1.0f * stageModulation);
         }
     }
     
@@ -731,7 +780,7 @@ void Brain::updatePlasticity() {
 }
 
 void Brain::develop() {
-    // Development updates structural plasticity
+    // Development updates structural plasticity with advanced algorithms
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
@@ -751,6 +800,9 @@ void Brain::reset() {
     
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
+    
+    // Reset structural plasticity
+    pImpl->structuralPlasticity->reset();
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();

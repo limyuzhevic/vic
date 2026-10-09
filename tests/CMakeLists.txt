@@ -13,7 +13,12 @@ add_executable(nlm_test
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
+    test_triplet_stdp.cpp
     test_brain.cpp
+    test_hebbian.cpp
+    test_batch_operations.cpp
+    test_advanced_neuron.cpp
+    test_structural_plasticity.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

@@ -85,6 +85,17 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # CLI Modules
+    src/cli/CLI.cpp
+    src/cli/ConfigurationCLI.cpp
+    src/cli/DebugCLI.cpp
+    src/cli/MonitorCLI.cpp
+    src/cli/ExperimentCLI.cpp
+    src/cli/UtilityCLI.cpp
+    # Utility Modules
+    src/utils/Profiler.cpp
+    src/utils/CheckpointManager.cpp
+    src/utils/BrainExporter.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
