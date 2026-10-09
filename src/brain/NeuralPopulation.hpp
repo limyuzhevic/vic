@@ -7,9 +7,18 @@
 
 namespace nlm {
 
-// NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
-
+/**
+ * @brief NeuralPopulation: A group of neurons with shared properties
+ * 
+ * A neural population is a homogeneous group of neurons that share common
+ * properties such as neuron type, spatial location, and functional role.
+ * Populations enable organized neural computation by grouping neurons that
+ * perform similar functions and are connected to each other.
+ * 
+ * Populations are the basic units of organization within brain regions,
+ * allowing for efficient implementation of population-level neural dynamics
+ * and enabling modular brain architecture.
+ */
 class NeuralPopulation {
 public:
     // Create population with ID and size

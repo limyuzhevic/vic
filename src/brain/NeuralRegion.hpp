@@ -9,9 +9,17 @@
 
 namespace nlm {
 
-// NeuralRegion: A brain region containing multiple populations and local connectivity
-// PLACEHOLDER - Phase 2 will implement region-level dynamics
-
+/**
+ * @brief NeuralRegion: A brain region containing multiple populations and local connectivity
+ * 
+ * A brain region is a computational module containing multiple neural populations
+ * and implementing local synaptic connectivity. Regions serve as organizational
+ * units for the brain, allowing different types of neural computations to occur
+ * in parallel and semi-independently.
+ * 
+ * Phase 6 implements full region functionality with support for local plasticity,
+ * population dynamics, and inter-regional connections through long-range pathways.
+ */
 class NeuralRegion {
 public:
     // Create region with ID

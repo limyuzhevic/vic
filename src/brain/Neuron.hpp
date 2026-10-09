@@ -10,7 +10,12 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
+/**
+ * @brief Neuron state structure for efficient storage
+ * 
+ * Contains all state variables for a single LIF neuron including membrane
+ * potential, synaptic inputs, firing state, and plasticity-related variables.
+ */
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
@@ -40,8 +45,16 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+/**
+ * @brief Neuron class representing a single neuron
+ * 
+ * Implements Leaky Integrate-and-Fire (LIF) dynamics with realistic
+ * biophysical properties including synaptic inputs, spike detection,
+ * refractory periods, and spike-frequency adaptation.
+ * 
+ * This is the fundamental building block of the NLM neural substrate,
+ * capable of event-driven spike propagation and synaptic plasticity.
+ */
 class Neuron {
 public:
     // Create neuron with ID
@@ -134,7 +147,6 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

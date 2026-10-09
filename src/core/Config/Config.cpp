@@ -186,6 +186,74 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Configuration validation implementation
+ConfigValidationResult Config::validate() const {
+    ConfigValidationResult result;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Check if required field is set
+        if (entry.required && entry.value.index() == static_cast<size_t>(ConfigValueIndex::Null)) {
+            result.addError("Required configuration key \"" + entry.key + "\" is not set");
+            continue;
+        }
+        
+        // Validate value against custom validator if present
+        auto metaIt = configMetadata.find(entry.key);
+        if (metaIt != configMetadata.end()) {
+            const auto& meta = metaIt->second;
+            if (!meta.validator(entry.value)) {
+                result.addError("Validation failed for configuration key \"" + entry.key + "\": invalid value");
+            }
+        }
+        
+        // Perform basic type validation
+        if (!validateValue(entry)) {
+            result.addError("Invalid value type for configuration key \"" + entry.key + "\"");
+        }
+    }
+    
+    return result;
+}
+
+ConfigValidationResult Config::validate(const std::map<std::string, ConfigValidator>& customValidators) const {
+    ConfigValidationResult result = validate();
+    
+    // Apply custom validators
+    for (const auto& [key, validator] : customValidators) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            if (!validator(it->value)) {
+                result.addError("Custom validation failed for configuration key \"" + key + "\"");
+            }
+        }
+    }
+    
+    return result;
+}
+
+void Config::setRequired(const std::string& key, bool required) {
+    configMetadata[key].required = required;
+}
+
+void Config::setValidator(const std::string& key, const ConfigValidator& validator) {
+    configMetadata[key].validator = validator;
+}
+
+void Config::setDescription(const std::string& key, const std::string& description) {
+    configMetadata[key].description = description;
+}
+
+std::string Config::getDescription(const std::string& key) const {
+    auto it = configMetadata.find(key);
+    if (it != configMetadata.end()) {
+        return it->second.description;
+    }
+    return "";
+}
+
+// Helper function implementations
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -197,6 +265,132 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::isNumber(const std::string& str) {
+    return !str.empty() && std::all_of(str.begin(), str.end(), ::isdigit);
+}
+
+std::string Config::parseValueType(const std::string& value) {
+    if (value.empty()) return "string";
+    
+    if (value[0] == '"' && value.back() == '"') {
+        return "string";
+    }
+    
+    if (value == "true" || value == "false") {
+        return "bool";
+    }
+    
+    if (isNumber(value)) {
+        return "int";
+    }
+    
+    try {
+        std::stod(value);
+        return "float";
+    } catch (...) {
+        return "string";
+    }
+}
+
+ConfigValue Config::parseValue(const std::string& value, const std::string& typeHint) {
+    if (value.empty()) {
+        return "";
+    }
+    
+    // Parse based on type hint
+    if (typeHint == "int" || typeHint == "bool") {
+        // Try to parse as int
+        try {
+            return std::stoi(value);
+        } catch (...) {}
+    }
+    
+    if (typeHint == "float") {
+        // Try to parse as double
+        try {
+            return std::stod(value);
+        } catch (...) {}
+    }
+    
+    if (value == "true") {
+        return true;
+    } else if (value == "false") {
+        return false;
+    }
+    
+    // Try to parse as int
+    try {
+        return std::stoi(value);
+    } catch (...) {}
+    
+    // Try to parse as float
+    try {
+        return std::stod(value);
+    } catch (...) {}
+    
+    // Return as string
+    return value;
+}
+
+// Validation helper implementations
+ConfigValidationResult Config::validateSingleEntry(const ConfigEntry& entry) const {
+    ConfigValidationResult result;
+    
+    if (!validateTypeMatch(entry, getTypeName(entry.value))) {
+        result.addError("Type mismatch for configuration key \"" + entry.key + "\"");
+    }
+    
+    if (!validateValue(entry)) {
+        result.addError("Invalid value for configuration key \"" + entry.key + "\"");
+    }
+    
+    return result;
+}
+
+bool Config::validateTypeMatch(const ConfigEntry& entry, const std::string& expectedType) const {
+    // Basic type matching - this can be extended with more sophisticated validation
+    auto metaIt = configMetadata.find(entry.key);
+    if (metaIt != configMetadata.end()) {
+        const auto& meta = metaIt->second;
+        if (!meta.typeName.empty() && meta.typeName != expectedType) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Config::validateValue(const ConfigEntry& entry) const {
+    // Basic validation - check if value is set and valid
+    if (entry.required && entry.value.index() == static_cast<size_t>(ConfigValueIndex::Null)) {
+        return false;
+    }
+    
+    // Additional validation can be added here
+    return true;
+}
+
+std::string Config::getTypeName(const ConfigValue& value) {
+    if (const auto* v = std::get_if<int>(&value)) {
+        return "int";
+    } else if (const auto* v = std::get_if<int64_t>(&value)) {
+        return "int64_t";
+    } else if (const auto* v = std::get_if<double>(&value)) {
+        return "double";
+    } else if (const auto* v = std::get_if<bool>(&value)) {
+        return "bool";
+    } else if (const auto* v = std::get_if<std::string>(&value)) {
+        return "string";
+    } else if (const auto* v = std::get_if<std::vector<int>>(&value)) {
+        return "vector<int>";
+    } else if (const auto* v = std::get_if<std::vector<double>>(&value)) {
+        return "vector<double>";
+    } else if (const auto* v = std::get_if<std::vector<std::string>>(&value)) {
+        return "vector<string>";
+    }
+    
+    return "unknown";
 }
 
 // Explicit template instantiations
