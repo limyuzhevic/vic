@@ -1,5 +1,7 @@
 #include "NeuralPrediction.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -24,7 +26,11 @@ struct NeuralPrediction::Impl {
     std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
     std::vector<float> actionRewards;
     
-    Impl() : brain(nullptr) {}
+    // Neural activity patterns for prediction
+    std::vector<float> neuralActivityPattern;
+    float predictionStrength;
+    
+    Impl() : brain(nullptr), predictionStrength(0.0f) {}
 };
 
 NeuralPrediction::NeuralPrediction()

@@ -1,25 +1,39 @@
 #pragma once
 
 #include "SensoryInput.hpp"
+#include <vector>
+#include <memory>
 
 namespace nlm {
 
-// Vision processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
+// Helper functions for vision processing
+inline std::vector<float> convertInput(const SensoryInput& input) {
+    return input.getData();
+}
 
-class VisionProcessor {
+inline std::unique_ptr<SensoryInput> createInput(const std::vector<float>& data) {
+    auto vision = std::make_unique<Vision>(1, data.size(), 1);
+    vision->setData(data);
+    return vision;
+}
+
+class Vision : public SensoryInput {
 public:
-    VisionProcessor();
-    ~VisionProcessor();
+    Vision();
+    Vision(size_t width, size_t height, size_t channels);
+    ~Vision() override;
     
-    // Process vision input
-    void process(const Vision& input);
+    const char* getType() const override;
+    const std::vector<float>& getData() const override;
+    size_t getDimensions() const override;
+    std::unique_ptr<SensoryInput> clone() const override;
     
-    // Get feature representation
-    const std::vector<float>& getFeatures() const;
+    void setData(const std::vector<float>& data);
+    void setData(float* data, size_t size);
     
-    // Get feature dimensionality
-    size_t getFeatureDimensions() const;
+    size_t getWidth() const;
+    size_t getHeight() const;
+    size_t getChannels() const;
     
 private:
     struct Impl;
