@@ -6,8 +6,11 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+class SpikeEvent;
+
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -33,16 +36,34 @@ public:
     double getUpdateRate() const;
     
     // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    void visualizeNetwork(const Brain& brain);
     
     // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    void visualizeActivity(const Brain& brain);
     
     // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    void visualizeSpikes(const std::vector<SpikeEvent>& spikes);
     
     // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    void visualizeWeights(const Brain& brain);
+    
+    // Performance profiling helper functions
+    void startPerformanceProfile();
+    void endPerformanceProfile();
+    double getProfileDuration() const;
+    
+    // Debug session management
+    void startDebugSession(const std::string& sessionName);
+    void endDebugSession();
+    bool isDebugMode() const;
+    void setDebugData(const std::string& key, const std::string& value);
+    std::string getDebugData(const std::string& key) const;
+    
+    // Export debugging data
+    bool exportDebugData(const std::string& filepath);
+    
+    // Batch processing for debugging
+    void batchProcess(const Brain& brain, size_t steps);
     
 private:
     struct Impl;

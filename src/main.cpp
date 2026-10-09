@@ -49,7 +49,7 @@ void printBanner() {
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
+class LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
     size_t initialSynapseCount;
@@ -57,6 +57,7 @@ struct LearningExperiment {
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
     
+public:
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
@@ -429,21 +430,144 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     
+// Batch processing functions
+void runBatchExperiment(std::shared_ptr<Brain> brain, const std::string& batchConfig, size_t numBatches) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Batch Processing Experiment ===");
+    NLM_LOG_INFO("Configuration: " + batchConfig);
+    NLM_LOG_INFO("Number of batches: " + std::to_string(numBatches));
     
-    return 0;
+    for (size_t batch = 0; batch < numBatches; ++batch) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Batch " + std::to_string(batch + 1) + "/" + std::to_string(numBatches) + " ===");
+        
+        // Reset brain for each batch
+        brain->reset();
+        brain->initialize();
+        
+        // Run plasticity experiment
+        runPlasticityExperiment(brain);
+        
+        // Save batch results if configured
+        if (!batchConfig.empty()) {
+            std::string filename = "batch_" + std::to_string(batch) + "_" + batchConfig + ".cfg";
+            brain->save(filename);
+            NLM_LOG_INFO("Batch " + std::to_string(batch + 1) + " results saved to: " + filename);
+        }
+        
+        // Log batch progress
+        NLM_LOG_INFO("Batch " + std::to_string(batch + 1) + " completed. Total spikes: " + 
+                     std::to_string(brain->getTotalSpikeCount()));
+    }
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Batch Processing Complete ===");
+}
+
+void runAutomatedWorkflow(std::shared_ptr<Brain> brain, const std::string& workflowConfig) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Automated Workflow ===");
+    NLM_LOG_INFO("Workflow configuration: " + workflowConfig);
+    
+    // Common workflow steps
+    NLM_LOG_INFO("Initializing automated workflow...");
+    
+    // Step 1: Initialize and run basic connectivity test
+    runBasicConnectivityTest(brain);
+    
+    // Step 2: Run plasticity experiment
+    brain->reset();
+    brain->initialize();
+    runPlasticityExperiment(brain);
+    
+    // Step 3: Run STDP verification
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
+    
+    // Step 4: Save final results
+    std::string filename = "workflow_" + workflowConfig + "_" + 
+                          std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".cfg";
+    brain->save(filename);
+    NLM_LOG_INFO("Automated workflow completed. Results saved to: " + filename);
+}
+
+void runContinuousSimulation(std::shared_ptr<Brain> brain, size_t totalSteps, double timestep) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Continuous Simulation ===");
+    NLM_LOG_INFO("Total steps: " + std::to_string(totalSteps));
+    NLM_LOG_INFO("Timestep: " + std::to_string(timestep) + "s");
+    
+    // Start performance profiling
+    double startTime = 0.0;
+    try {
+        startTime = std::chrono::system_clock::now().time_since_epoch().count() / 1000.0;
+    } catch (...) {
+        NLM_LOG_WARNING("Failed to get current time, using 0 as start time");
+    }
+    
+    // Run simulation
+    for (SimulationStep step = 0; step < totalSteps; ++step) {
+        brain->step(step, static_cast<Timestamp>(step) * timestep);
+        
+        // Log progress every 100 steps
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + "/" + std::to_string(totalSteps) +
+                         " | Total spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Active neurons: " + std::to_string(brain->getActiveNeuronCount()));
+        }
+    }
+    
+    // Log simulation results
+    double endTime = 0.0;
+    try {
+        endTime = std::chrono::system_clock::now().time_since_epoch().count() / 1000.0;
+    } catch (...) {
+        NLM_LOG_WARNING("Failed to get end time");
+    }
+    
+    double duration = endTime - startTime;
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Simulation Complete ===");
+    NLM_LOG_INFO("Duration: " + std::to_string(duration) + "s");
+    NLM_LOG_INFO("Steps per second: " + std::to_string(totalSteps / duration));
+    NLM_LOG_INFO("Final statistics:");
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(brain->getAverageFiringRate()));
+    NLM_LOG_INFO("  Active neurons: " + std::to_string(brain->getActiveNeuronCount()));
+}
+
+void runBenchmarkTest(std::shared_ptr<Brain> brain, size_t numSteps) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Benchmark Test ===");
+    NLM_LOG_INFO("Benchmark steps: " + std::to_string(numSteps));
+    
+    // Start performance profiling
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Run benchmark
+    for (SimulationStep step = 0; step < numSteps; ++step) {
+        brain->step(step, static_cast<Timestamp>(step) * 0.001); // 1ms timestep
+    }
+    
+    // Calculate performance
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    double stepsPerSecond = numSteps / (duration.count() / 1000.0);
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Benchmark Results ===");
+    NLM_LOG_INFO("Total steps: " + std::to_string(numSteps));
+    NLM_LOG_INFO("Duration: " + std::to_string(duration.count()) + "ms");
+    NLM_LOG_INFO("Steps per second: " + std::to_string(stepsPerSecond));
+    NLM_LOG_INFO("Steps per millisecond: " + std::to_string(numSteps / duration.count()));
+    
+    // Save benchmark results
+    std::string filename = "benchmark_" + std::to_string(numSteps) + "_" + 
+                          std::to_string(stepsPerSecond) + "_" +
+                          std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".cfg";
+    brain->save(filename);
+    NLM_LOG_INFO("Benchmark results saved to: " + filename);
 }
