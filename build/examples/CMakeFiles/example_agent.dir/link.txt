@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/example_agent.dir/agent_world.cpp.o -o example_agent  ../libnlm_core.a ../libnlm_agent.a ../libnlm_world.a 

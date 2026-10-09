@@ -14,6 +14,16 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_memory_integration.cpp
+    test_prediction_system.cpp
+    test_cognition_system.cpp
+    test_neuromodulation_system.cpp
+    test_development_system.cpp
+    test_performance_infrastructure.cpp
+    test_error_handling.cpp
+    test_python_bindings.cpp
+    test_checkpoint_reset.cpp
+    test_phase6_integration.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

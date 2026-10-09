@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/example_memory.dir/memory_demo.cpp.o -o example_memory  ../libnlm_core.a 

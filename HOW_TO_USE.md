@@ -496,6 +496,199 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Advanced Configuration
+
+```python
+import pynlm
+
+# Create custom configuration
+config = pynlm.createBrainConfig("research")
+config["brain.plasticity.enabled"] = "true"
+config["brain.development.enabled"] = "true"
+config["brain.reward.enabled"] = "true"
+config["brain.curiosity.enabled"] = "true"
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Use brain with all learning features
+with pynlm.createSimpleWorld() as world:
+    world.configure(20, 20, 8, 8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # Run learning episode
+    for step in range(50):
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Key Classes and Methods
+
+#### Brain Class
+
+```python
+# Creation
+brain = pynlm.createBrain(config)
+
+# Initialization
+brain.initialize()
+
+# Simulation
+brain.step(step_number)           # Run one simulation step
+brain.step(step_number, time)    # Run step with timestamp
+brain.reset()                     # Reset brain state
+
+# Input/Output
+brain.receiveSensoryInput(sensory_input)  # Inject sensory data
+action = brain.produceAction()             # Get motor action
+
+# Statistics
+brain.getTotalNeuronCount()       # Total neurons
+brain.getTotalSynapseCount()      # Total synapses
+brain.getFiringNeuronCount()     # Currently firing
+brain.getAverageFiringRate()      # Average firing rate
+brain.getExcitationInhibitionRatio()  # E/I balance
+
+# State
+brain.save("checkpoint.pkl")       # Save state
+brain.load("checkpoint.pkl")       # Load state
+
+# Regions
+region_id = brain.addRegion("cortex")
+region = brain.getRegion(region_id)
+```
+
+#### Config Class
+
+```python
+# Create
+config = pynlm.createDefaultConfig()
+
+# Query
+if config.has("brain.neuron_count"):
+    keys = config.getKeys()
+
+# Modify
+config.set("brain.neuron_count", 1000)
+config.set("learning.rate", 0.001)
+
+# File I/O
+config.loadFromFile("config.json")
+config.saveToFile("config.json")
+```
+
+#### AgentBrain Class
+
+```python
+# Creation
+agent = pynlm.createAgentBrain(brain)
+
+# Initialization
+agent.initialize(world)
+
+# Sensory processing
+agent.processSensoryInput(percept)
+
+# Motor decoding
+motor_cmd = agent.decodeMotorCommand()
+
+# Neuromodulation
+agent.applyRewardModulation(reward, predicted_reward)
+
+# Development
+agent.updateDevelopment(timestep)
+agent.getDevelopmentalStage()
+
+# Subsystem enable/disable
+agent.enableRewardModulation(True/False)
+agent.enableStructuralPlasticity(True/False)
+agent.enableDevelopment(True/False)
+agent.enableCuriosity(True/False)
+
+# Statistics
+agent.getCuriosityLevel()
+agent.getNoveltyLevel()
+agent.getPredictionError()
+agent.getNeuromodulationLevel()
+```
+
+#### SimpleWorld Class
+
+```python
+# Creation
+world = pynlm.createSimpleWorld()
+
+# Configuration
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+
+# Control
+world.reset()
+world.update(timestep)
+world.setRandomSeed(42)
+
+# Agent interaction
+world.setAgentStart(x, y)
+world.applyMotorCommand(motor_cmd, current_time)
+
+# State access
+percept = world.getSensoryPercept()
+body = world.getAgentBody()
+
+# World objects
+world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
+world.removeObject(x, y)
+world.isValidPosition(x, y)
+
+# Properties
+world.getWidth()
+world.getHeight()
+world.getSimulationTime()
+world.getMaxEnergy()
+world.setMaxEnergy(100.0)
+```
+
+### Enumerations
+
+```python
+# Neuron types
+pynlm.NeuronType.Excitatory
+pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Sensory
+pynlm.NeuronType.Motor
+pynlm.NeuronType.Modulatory
+pynlm.NeuronType.Internal
+
+# Developmental stages
+pynlm.DevelopmentalStage.Initial
+pynlm.DevelopmentalStage.CriticalPeriod
+pynlm.DevelopmentalStage.Maturation
+pynlm.DevelopmentalStage.Adult
+pynlm.DevelopmentalStage.Aging
+
+# Action types
+pynlm.ActionType.MoveForward
+pynlm.ActionType.TurnLeft
+pynlm.ActionType.Interact
+pynlm.ActionType.Eat
+# ... and more
+
+# World object types
+pynlm.WorldObjectType.Empty
+pynlm.WorldObjectType.Resource
+pynlm.WorldObjectType.Hazard
+pynlm.WorldObjectType.Wall
+pynlm.WorldObjectType.Marker
+```
+
 ---
 
 ## Troubleshooting

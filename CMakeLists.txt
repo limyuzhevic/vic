@@ -1,151 +1,149 @@
-cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+# NLM Modular Build System
+# This CMake module provides a comprehensive build system for the Neuromodular Learning Machine project
 
-# C++20 standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# CMake version requirements
+cmake_minimum_required(VERSION 3.20)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Project declaration
+project(NLM VERSION 0.1.0 LANGUAGES CXX
+    DESCRIPTION "Neuromodular Learning Machine - A modular neural network simulation framework"
+)
+
+# Set C++20 standard
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+# Global configuration options
+option(NLM_ENABLE_PYTHON_BINDINGS "Enable Python bindings" ON)
+option(NLM_ENABLE_TESTS "Enable tests" ON)
+option(NLM_ENABLE_DOCS "Enable documentation generation" OFF)
+option(NLM_ENABLE_COVERAGE "Enable code coverage reporting" OFF)
+option(NLM_ENABLE_SANITIZERS "Enable memory leak detection" OFF)
+option(NLM_ENABLE_PERFORMANCE_PROFILING "Enable performance profiling" OFF)
+option(NLM_ENABLE_DISTRIBUTED_BUILD "Enable distributed build support" OFF)
+option(NLM_BUILD_SHARED_LIBS "Build shared libraries" OFF)
+
+# Platform-specific configuration
+if(WIN32)
+    set(NLM_PLATFORM "Windows")
+    set(NLM_COMPILER_RUNTIME "/MD")
+elseif(APPLE)
+    set(NLM_PLATFORM "macOS")
+    set(NLM_COMPILER_RUNTIME "")
+elseif(UNIX)
+    set(NLM_PLATFORM "Linux")
+    set(NLM_COMPILER_RUNTIME "")
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Source directory setup
+set(NLM_SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Core library
+# Core library definition with actual source files
 add_library(nlm_core STATIC
-    # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
-    # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
-    # Prediction
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
-    # Motor
     src/motor/MotorSystem.cpp
-    # Environment
+    src/motor/Action.cpp
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    src/development/DevelopmentSystem.cpp
+    src/development/Synaptogenesis.cpp
+    src/development/Pruning.cpp
+    src/development/Maturation.cpp
+    src/plasticity/PlasticityRule.cpp
+    src/plasticity/Hebbian.cpp
+    src/plasticity/STDP.cpp
+    src/plasticity/StructuralPlasticity.cpp
+    src/dynamics/NeuralDynamics.cpp
+    src/dynamics/SpikeSystem.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
-
-# Agent system (body, sensory percept, agent-brain interface)
+# Agent library
 add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/SensoryPercept.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
+# World library
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
+add_executable(nlm src/main.cpp)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+# Demo executables
+add_executable(nlm_phase3_demo src/experiments/Phase3Demo.cpp)
+add_executable(nlm_phase4_demo src/experiments/Phase4Demo.cpp)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+# Python bindings
+if(NLM_ENABLE_PYTHON_BINDINGS)
+    include(cmake/NLMPythonBindings.cmake)
+endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Tests
+if(NLM_ENABLE_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Examples (simplified with placeholder files)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/examples)
+    add_subdirectory(examples)
+endif()
+
+# Experiments (simplified with placeholder files)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/experiments)
+    add_subdirectory(experiments)
+endif()
+
+# Documentation
+if(NLM_ENABLE_DOCS)
+    include(cmake/NLMDocumentation.cmake)
+endif()
+
+# Summary
+message(STATUS "NLM Build System Configuration:")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Platform: ${NLM_PLATFORM}")
+message(STATUS "  Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "  Python Bindings: ${NLM_ENABLE_PYTHON_BINDINGS}")
+message(STATUS "  Tests: ${NLM_ENABLE_TESTS}")
