@@ -71,35 +71,124 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Example 3: Enhanced Brain with Error Handling
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create and configure
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)
+config.set("brain.synapse_density", 0.05)
 
-# Initialize it
+brain = pynlm.createBrain(config)
+
+# Use context manager for safe operations
+with brain:
+    brain.initialize()
+    
+    # Safe step with error recovery
+    pynlm.batch_brain_steps_safe(brain, 1000)
+    
+    print("Brain simulation completed successfully!")
+
+# Save state
+brain.save("brain_checkpoint.bin")
+print("Brain state saved to checkpoint")
+```
+
+### Example 4: Complete Agent with Learning
+
+```python
+import pynlm
+
+# Setup with enhanced configuration
+config = pynlm.create_config_safe(
+    brain_neuron_count=1000,
+    brain_synapse_density=0.1,
+    brain_v_thresh=-50.0,
+    plasticity_stdp_enable=True,
+    neuromod_curiosity_enable=True
+)
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Create complete agent system
+brain, agent, world = pynlm.setup_agent_environment(
+    config=config,
+    world=world,
+    setup_learning=True,
+    setup_development=True,
+    setup_curiosity=True
+)
+
+# Run simulation with error recovery and progress tracking
+def simple_reward_function():
+    return 1.0  # Simple reward
+
+total_reward, error_count = pynlm.run_simulation_with_recovery(
+    brain, world, agent,
+    max_steps=500,
+    reward_fn=simple_reward_function,
+    continue_on_error=True,
+    error_handler=lambda err: print(f"Warning: {err}")
+)
+
+print(f"Simulation completed!")
+print(f"Total reward: {total_reward}")
+print(f"Error count: {error_count}")
+```
+
+### Example 5: Brain State Management
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
-# Make it active
-brain.step(0)
+# Simulate some activity
+for i in range(100):
+    brain.step(i)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Create backup
+pynlm.backup_brain_state(brain, "my_brain_backup")
+
+# Later, restore from backup
+restored_brain = pynlm.safe_load_brain("my_brain_backup.bin")
+restored_brain.initialize()
+
+print("Brain restored successfully from backup")
+```
+
+### Example 6: Configuration Validation
+
+```python
+import pynlm
+
+# Create configuration with validation
+try:
+    config = pynlm.create_config_safe(
+        brain_neuron_count=2000,
+        brain_synapse_density=0.05,
+        plasticity_stdp_enable=True
+    )
+    
+    # Validate configuration
+    errors = pynlm.validate_config_strict(config)
+    if errors:
+        print("Configuration errors:", errors)
+    else:
+        print("Configuration is valid!")
+        
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+except pynlm.ConfigError as e:
+    print(f"Configuration error: {e}")
 ```
 
 ---
@@ -268,6 +357,12 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Create config | `pynlm.createDefaultConfig()` |
+| Save brain | `brain.save(filepath)` |
+| Load brain | `pynlm.safe_load_brain(filepath)` |
+| Run batch steps | `pynlm.batch_brain_steps_safe(brain, steps)` |
+| Validate config | `pynlm.validate_config_strict(config)` |
+| Run simulation | `pynlm.run_simulation_with_recovery(brain, world, agent, steps)` |
 
 ---
 
@@ -285,6 +380,14 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Configuration error"**
+- Use `pynlm.validate_config_strict()` to see what's wrong
+- Try `pynlm.create_config_safe()` for easier configuration
+
+**"Brain loading failed"**
+- Use `pynlm.safe_load_brain()` for safe loading with error handling
+- Check that the file exists and is valid
+
 ---
 
 ## Next Steps
@@ -294,4 +397,16 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## Advanced Features
+
+With the enhanced NLM Python API, you can now:
+
+- **Use context managers**: `with brain:` for automatic cleanup
+- **Handle errors gracefully**: `try: ... except pynlm.BrainError:`
+- **Validate configurations**: `pynlm.validate_config_strict(config)`
+- **Backup/restore**: `pynlm.backup_brain_state(brain, filepath)`
+- **Run simulations with recovery**: `pynlm.run_simulation_with_recovery()`
+- **Use property-based access**: `brain.get_total_spike_count()`
+- **Create complete agent systems**: `pynlm.setup_agent_environment()`
+
+That's it! You're now ready to use NLM with professional-grade Python bindings.
