@@ -1,0 +1,294 @@
+# Batch processing system for NLM experiments
+# File format: Each line represents an experiment configuration
+# Format: experiment_name,param1=value,param2=value,...
+# Empty lines and comments (starting with #) are ignored
+
+# Example batch file
+# Experiment configurations for parameter sweeps
+
+cognitive,neuron-count=1000,steps=2000,plasticity.stdp-ltp-weight=0.02
+
+cognitive,neuron-count=500,steps=1000,plasticity.stdp-ltp-weight=0.01
+
+cognitive,neuron-count=2000,steps=5000,plasticity.stdp-ltp-weight=0.03
+
+social,neuron-count=800,steps=3000,neuromodulation.enable-curiosity=true,neuromodulation.enable-novelty=true
+
+social,neuron-count=400,steps=1500,neuromodulation.enable-curiosity=true,neuromodulation.enable-novelty=false
+
+developmental,neuron-count=600,steps=4000,development.enable-development=true,checkpoint.enable-checkpointing=true
+
+developmental,neuron-count=300,steps=2000,development.enable-development=true,checkpoint.enable-checkpointing=false
+
+# Performance comparison
+performance_quick,neuron-count=100,steps=500,development.enable-development=false,logging.log-level=warning
+
+performance_medium,neuron-count=500,steps=2000,development.enable-development=true,logging.log-level=info
+
+performance_large,neuron-count=2000,steps=10000,development.enable-development=true,logging.log-level=warning
+
+# Research parameter sweeps
+research_1,neuron-count=1000,plasticity.stdp-ltp-weight=0.005,plasticity.stdp-ltd-weight=0.006,plasticity.stdp-tau=10.0
+research_2,neuron-count=1000,plasticity.stdp-ltp-weight=0.02,plasticity.stdp-ltd-weight=0.024,plasticity.stdp-tau=40.0
+research_3,neuron-count=1000,plasticity.stdp-ltp-weight=0.01,plasticity.stdp-ltd-weight=0.012,plasticity.stdp-tau=20.0,synaptogenesis-rate=0.0005
+research_4,neuron-count=1000,plasticity.stdp-ltp-weight=0.015,plasticity.stdp-ltd-weight=0.018,plasticity.stdp-tau=30.0,pruning-rate=0.00005
+
+# Memory capacity tests
+memory_test_1,neuron-count=500,memory.working-memory-capacity=50,memory.max-episodes=100
+memory_test_2,neuron-count=500,memory.working-memory-capacity=200,memory.max-episodes=500
+memory_test_3,neuron-count=500,memory.working-memory-capacity=500,memory.max-episodes=1000
+
+# Development stage tests
+development_test_1,neuron-count=800,development.enable-development=true,development.stage=initial
+
+development_test_2,neuron-count=800,development.enable-development=true,development.stage=critical
+
+development_test_3,neuron-count=800,development.enable-development=true,development.stage=adult
+
+# Neuromodulation combinations
+neuromod_1,neuron-count=600,neuromodulation.enable-curiosity=true,neuromodulation.enable-novelty=true,neuromodulation.reward-scaling=1.0
+neuromod_2,neuron-count=600,neuromodulation.enable-curiosity=true,neuromodulation.enable-novelty=false,neuromodulation.reward-scaling=0.5
+neuromod_3,neuron-count=600,neuromodulation.enable-curiosity=false,neuromodulation.enable-novelty=true,neuromodulation.reward-scaling=1.5
+
+# Combined parameter sets for complex experiments
+complex_exp_1,neuron-count=1000,steps=3000,plasticity.stdp-ltp-weight=0.015,plasticity.stdp-ltd-weight=0.018,development.enable-development=true,neuromodulation.enable-curiosity=true,checkpoint.enable-checkpointing=true
+
+complex_exp_2,neuron-count=800,steps=4000,plasticity.stdp-ltp-weight=0.01,plasticity.stdp-ltd-weight=0.012,development.enable-development=false,neuromodulation.enable-novelty=true,checkpoint.enable-checkpointing=false
+
+complex_exp_3,neuron-count=1200,steps=2500,plasticity.stdp-ltp-weight=0.02,plasticity.stdp-ltd-weight=0.024,development.enable-development=true,neuromodulation.enable-curiosity=true,neuromodulation.enable-novelty=true,checkpoint.enable-checkpointing=true
+
+# Machine learning hyperparameter optimization style grid search
+# These would typically be used in research to find optimal parameters
+
+hp_opt_1,neuron-count=1000,plasticity.stdp-ltp-weight=0.005,plasticity.stdp-ltd-weight=0.006,synaptogenesis-rate=0.0001,pruning-rate=0.00001
+
+hp_opt_2,neuron-count=1000,plasticity.stdp-ltp-weight=0.01,plasticity.stdp-ltd-weight=0.012,synaptogenesis-rate=0.0002,pruning-rate=0.00002
+
+hp_opt_3,neuron-count=1000,plasticity.stdp-ltp-weight=0.02,plasticity.stdp-ltd-weight=0.024,synaptogenesis-rate=0.0005,pruning-rate=0.00005
+
+hp_opt_4,neuron-count=1000,plasticity.stdp-ltp-weight=0.04,plasticity.stdp-ltd-weight=0.048,synaptogenesis-rate=0.001,pruning-rate=0.0001
+
+hp_opt_5,neuron-count=1000,plasticity.stdp-ltp-weight=0.008,plasticity.stdp-ltd-weight=0.009,synaptogenesis-rate=0.00005,pruning-rate=0.000005
+
+# Time-course experiments (varying simulation duration)
+time_course_1,neuron-count=500,steps=500,development.enable-development=false
+
+time_course_2,neuron-count=500,steps=1000,development.enable-development=false
+
+time_course_3,neuron-count=500,steps=2000,development.enable-development=false
+
+time_course_4,neuron-count=500,steps=5000,development.enable-development=false
+
+time_course_5,neuron-count=500,steps=10000,development.enable-development=false
+
+# Scale experiments (varying brain size)
+scale_1,neuron-count=100,steps=1000
+
+scale_2,neuron-count=500,steps=1000
+
+scale_3,neuron-count=1000,steps=1000
+
+scale_4,neuron-count=2000,steps=1000
+
+scale_5,neuron-count=5000,steps=1000
+
+# Adaptive experiments (with adaptive plasticity)
+adaptive_1,neuron-count=800,plasticity.adaptive=true,plasticity.adaptation-rate=0.1
+
+adaptive_2,neuron-count=800,plasticity.adaptive=true,plasticity.adaptation-rate=0.01
+
+adaptive_3,neuron-count=800,plasticity.adaptive=true,plasticity.adaptation-rate=0.001
+
+# Competitive experiments (multiple agents)
+competitive_1,neuron-count=400,agents=2,steps=1500,competition=true
+
+competitive_2,neuron-count=400,agents=3,steps=2000,competition=true
+
+competitive_3,neuron-count=400,agents=4,steps=2500,competition=true
+
+# Social learning experiments
+social_learning_1,neuron-count=600,agents=2,steps=2000,social-learning=true,imitation-rate=0.5
+
+social_learning_2,neuron-count=600,agents=3,steps=3000,social-learning=true,imitation-rate=0.3
+
+social_learning_3,neuron-count=600,agents=2,steps=2500,social-learning=true,imitation-rate=0.7
+
+# Stress-response experiments
+stress_test_1,neuron-count=500,steps=2000,stress-level=low,recovery=true
+
+stress_test_2,neuron-count=500,steps=2000,stress-level=medium,recovery=true
+
+stress_test_3,neuron-count=500,steps=2000,stress-level=high,recovery=true
+
+# Sleep and consolidation experiments
+sleep_1,neuron-count=600,steps=3000,sleep-cycle=true,consolidation-interval=500
+
+sleep_2,neuron-count=600,steps=3000,sleep-cycle=true,consolidation-interval=1000
+
+sleep_3,neuron-count=600,steps=3000,sleep-cycle=true,consolidation-interval=2000
+
+# Reward prediction experiments
+prediction_1,neuron-count=700,steps=2500,prediction-error=true,reward-prediction=true
+
+prediction_2,neuron-count=700,steps=3000,prediction-error=true,reward-prediction=false
+
+prediction_3,neuron-count=700,steps=3500,prediction-error=false,reward-prediction=true
+
+# Exploration-exploitation experiments
+exploration_1,neuron-count=500,steps=2000,exploration-rate=high,exploitation-rate=low
+
+exploration_2,neuron-count=500,steps=2000,exploration-rate=medium,exploitation-rate=medium
+
+exploration_3,neuron-count=500,steps=2000,exploration-rate=low,exploitation-rate=high
+
+# Visual processing experiments
+vision_1,neuron-count=800,steps=2000,sensory=vision,visual-field-size=central
+
+vision_2,neuron-count=800,steps=2000,sensory=vision,visual-field-size=wide
+
+vision_3,neuron-count=800,steps=2000,sensory=vision,visual-field-size=wide,dual-vision=true
+
+# Audio processing experiments
+audio_1,neuron-count=700,steps=2000,sensory=audio,auditory-frequency-range=high
+
+audio_2,neuron-count=700,steps=2000,sensory=audio,auditory-frequency-range=low
+
+audio_3,neuron-count=700,steps=2000,sensory=audio,auditory-frequency-range=wide
+
+# Internal signal experiments
+internal_1,neuron-count=600,steps=2000,sensory=internal,internal-signal-types=basic
+
+internal_2,neuron-count=600,steps=2000,sensory=internal,internal-signal-types=advanced
+
+internal_3,neuron-count=600,steps=2000,sensory=internal,internal-signal-types=comprehensive
+
+# Motor control experiments
+motor_1,neuron-count=550,steps=2000,motor-control=true,action-space=simple
+
+motor_2,neuron-count=550,steps=2000,motor-control=true,action-space=complex
+
+motor_3,neuron-count=550,steps=2000,motor-control=true,action-space=continuous
+
+# Environment interaction experiments
+environment_1,neuron-count=650,steps=2000,environment=static,interaction-mode=passive
+
+environment_1,neuron-count=650,steps=2000,environment=dynamic,interaction-mode=active
+
+environment_1,neuron-count=650,steps=2000,environment=adaptive,interaction-mode=responsive
+
+# Custom user-defined experiment templates (commented out for reference)
+
+#user_template_1,neuron-count=500,steps=1500,my-custom-parameter=value,another-parameter=123
+
+#user_template_2,neuron-count=300,steps=800,yet-another-parameter=true,final-parameter=false
+
+#user_template_3,neuron-count=1500,steps=5000,complex-parameter=0.5,simple-parameter=yes
+
+# Performance benchmark experiments
+benchmark_1,neuron-count=100,steps=100,purpose=benchmark_speed
+
+benchmark_2,neuron-count=500,steps=500,purpose=benchmark_accuracy
+
+benchmark_3,neuron-count=1000,steps=1000,purpose=benchmark_scalability
+
+benchmark_4,neuron-count=2000,steps=2000,purpose=benchmark_memory
+
+benchmark_5,neuron-count=500,steps=5000,purpose=benchmark_stability
+
+# Distributed computing style experiments (for cluster computing)
+
+distributed_1,neuron-count=300,steps=1000,cluster-node=1,total-nodes=4,partition=true
+
+distributed_2,neuron-count=300,steps=1000,cluster-node=2,total-nodes=4,partition=true
+
+distributed_3,neuron-count=300,steps=1000,cluster-node=3,total-nodes=4,partition=true
+
+distributed_4,neuron-count=300,steps=1000,cluster-node=4,total-nodes=4,partition=true
+
+# Real-time simulation experiments
+realtime_1,neuron-count=400,steps=2000,realtime-mode=true,update-frequency=60,simulation-timestep=0.001
+
+realtime_2,neuron-count=400,steps=2000,realtime-mode=true,update-frequency=30,simulation-timestep=0.01
+
+realtime_3,neuron-count=400,steps=2000,realtime-mode=true,update-frequency=10,simulation-timestep=0.1
+
+# Training mode experiments
+training_1,neuron-count=800,steps=5000,training-mode=true,learning-rate=0.1,training-epochs=10
+
+training_2,neuron-count=800,steps=8000,training-mode=true,learning-rate=0.01,training-epochs=20
+
+training_3,neuron-count=800,steps=10000,training-mode=true,learning-rate=0.05,training-epochs=15
+
+# Testing mode experiments (for quality assurance)
+
+test_unit_1,neuron-count=50,steps=100,purpose=unit_test,testing-mode=true
+
+test_unit_2,neuron-count=100,steps=200,purpose=unit_test,testing-mode=true
+
+test_unit_3,neuron-count=200,steps=400,purpose=unit_test,testing-mode=true
+
+# Integration test experiments
+
+integration_1,neuron-count=300,steps=1000,purpose=integration_test,full-system=true
+
+integration_2,neuron-count=500,steps=2000,purpose=integration_test,full-system=true
+
+integration_3,neuron-count=800,steps=3000,purpose=integration_test,full-system=true
+
+# Documentation generation hints (these are examples, not actual batch runs)
+
+# To generate documentation from batch files:
+# 1. Run with --dry-run to validate syntax
+# 2. Use --info to generate experiment information
+# 3. Use --help to see all available options
+
+# Batch file validation rules:
+# 1. Each line must start with experiment name
+# 2. Parameters use underscore format for multi-word keys
+# 3. Values can be integers, floats, or strings
+# 4. Boolean values: true/false
+# 5. Comments start with #
+# 6. Empty lines are ignored
+# 7. Maximum line length: 1024 characters
+# 8. Maximum parameters per line: 20
+# 9. Experiment names should be descriptive and unique
+# 10. Parameter names must match valid configuration keys
+
+# Usage examples:
+# nlm --batch experiments.batch
+# nlm --batch --dry-run experiments.batch
+# nlm --batch --info experiments.batch
+# nlm --batch --validate experiments.batch
+# nlm --batch --parallel experiments.batch --jobs=4
+# nlm --batch --progress experiments.batch
+# nlm --batch --continue experiments.batch
+# nlm --batch --resume experiments.batch
+
+# For help on batch processing:
+# nlm --help --batch
+# nlm --batch --help
+# nlm --info --batch
+# nlm --validate --batch
+
+# Performance optimization:
+# Use --dry-run to validate batch file before execution
+# Use --parallel to run experiments in parallel
+# Use --progress to show progress updates
+# Use --continue to resume interrupted batch runs
+# Use --info to get experiment information without running
+# Use --validate to validate batch file format
+
+# For research reproducibility:
+# Save batch files in version control
+# Use consistent parameter naming
+# Document experiment conditions in comments
+# Include random seeds for reproducibility
+
+# Custom batch file formats (advanced):
+# JSON format batch files are also supported
+# CSV format for simple parameter sweeps
+# YAML format for complex configurations
+
+# See docs/BATCH_PROCESSING.md for detailed batch file documentation
+# See docs/EXPERIMENT_MANAGEMENT.md for experiment management
+# See docs/PARAMETER_SWEEPS.md for parameter sweep techniques
