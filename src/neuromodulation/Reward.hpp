@@ -7,10 +7,10 @@ namespace nlm {
 // Reward signal for reinforcement learning
 // PLACEHOLDER - Phase 2 will implement real reward computation
 
-class Reward {
+class Reward : public Neuromodulator {
 public:
     Reward();
-    ~Reward();
+    ~Reward() override;
     
     // Get current reward value
     float getValue() const;
@@ -29,6 +29,13 @@ public:
     // Reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Neuromodulator interface implementation
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
     
 private:
     struct Impl;

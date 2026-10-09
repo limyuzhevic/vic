@@ -122,6 +122,18 @@ struct PlasticityFlags {
                                   eligible(false) {}
 };
 
+// Neuromodulator type enumeration
+enum class NeuromodulatorType : uint8_t {
+    Dopamine,
+    Serotonin,
+    Norepinephrine,
+    Acetylcholine,
+    Curiosity,
+    Novelty,
+    PredictionError,
+    Reward
+};
+
 // Developmental state
 enum class DevelopmentalStage : uint8_t {
     Initial,
@@ -129,6 +141,18 @@ enum class DevelopmentalStage : uint8_t {
     Maturation,
     Adult,
     Aging
+};
+
+// Developmental milestones
+enum class DevelopmentalMilestone : uint8_t {
+    FirstSleepCycle,
+    FirstMemoryConsolidation,
+    AttentionStabilityEstablished,
+    NeuromodulationCalibration,
+    WorkingMemoryCapacityIncreased,
+    PlasticityRuleCalibration,
+    LifeHistoryEstablishment,
+    SleepWakeCycleRegulated
 };
 
 // Spike event for event-driven computation

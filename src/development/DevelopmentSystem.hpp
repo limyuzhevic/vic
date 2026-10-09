@@ -46,10 +46,55 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Get excitability modifier for current stage
+    float getExcitabilityModifier() const;
+    
+    // Get attention stability modifier for current stage
+    float getAttentionStabilityModifier() const;
+    
+    // Get working memory capacity modifier for current stage
+    float getWorkingMemoryCapacityModifier() const;
+    
+    // Get memory consolidation strength modifier for current stage
+    float getMemoryConsolidationModifier() const;
+    
+    // Get neuromodulation levels modifier for current stage
+    float getNeuromodulationModifier(NeuromodulatorType type) const;
+    
+    // Get sleep/rest cycle duration modifier for current stage
+    float getSleepCycleModifier() const;
+    
+    // Get life history memory persistence modifier for current stage
+    float getLifeHistoryPersistenceModifier() const;
+    
+    // Get plasticity rule modifier for current stage (beyond structural)
+    float getPlasticityRuleModifier() const;
+    
+    // Update life history tracking
+    void updateLifeHistory(Brain* brain, TimestepDuration dt);
+    
+    // Get current developmental milestone (0.0 to 1.0)
+    float getCurrentDevelopmentalMilestone() const;
+    
+    // Check if a developmental milestone has been reached
+    bool hasMilestonePassed(DevelopmentalMilestone milestone) const;
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    
+    // Life history tracking
+    struct LifeHistoryImpl {
+        double lastSleepEndTime;
+        double totalSleepTime;
+        double totalWakeTime;
+        double sleepEfficiency;
+        
+        LifeHistoryImpl() 
+            : lastSleepEndTime(0.0), totalSleepTime(0.0), totalWakeTime(0.0), sleepEfficiency(0.0) {}
+    };
+    LifeHistoryImpl lifeHistory_;
 };
 
 } // namespace nlm

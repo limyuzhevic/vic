@@ -1,29 +1,5 @@
 #pragma once
 
-/**
- * CheckpointSystem - Brain state serialization and checkpointing
- * 
- * Provides robust checkpointing for large-scale neural simulations.
- * Supports incremental saves, version compatibility, and validation.
- * 
- * Features:
- * - Complete brain state serialization
- * - Incremental checkpointing
- * - Version compatibility checks
- * - Integrity validation
- * - Streaming for large checkpoints
- * 
- * Stored state:
- * - Neuron states (membrane potential, firing state, etc.)
- * - Synapse states (weights, plasticity, etc.)
- * - Spike history (recent)
- * - Plasticity state (eligibility traces, etc.)
- * - Developmental state
- * - Random generator state
- * - Simulation clock
- * - Environment state (optional)
- */
-
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -33,6 +9,10 @@
 #include <fstream>
 #include <functional>
 #include <variant>
+#include "PerformanceMonitor.hpp"
+#include "Profiler.hpp"
+#include "Optimizer.hpp"
+#include "AnalysisTools.hpp"
 
 namespace nlm {
 
@@ -188,7 +168,6 @@ public:
     
     /**
      * Open a checkpoint file for reading
-     * @return true if successful
      */
     bool open(const std::string& filepath);
     
@@ -232,7 +211,7 @@ public:
      * Get reader progress (0.0 - 1.0)
      */
     double getProgress() const;
-
+    
 private:
     std::ifstream stream_;
     CheckpointHeader header_;
@@ -255,9 +234,6 @@ public:
     
     /**
      * Create a new checkpoint file
-     * @param filepath Output file path
-     * @param compression Compression level
-     * @return true if successful
      */
     bool create(const std::string& filepath, CompressionLevel compression = CompressionLevel::Balanced);
     
@@ -275,7 +251,7 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
@@ -290,7 +266,6 @@ public:
     
     /**
      * Finalize and write footer
-     * @return true if successful
      */
     bool finalize();
     
@@ -303,7 +278,7 @@ public:
      * Get total bytes written
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
-
+    
 private:
     bool writeHeader();
     bool writeSectionHeader(const SectionHeader& header);

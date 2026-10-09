@@ -46,4 +46,29 @@ void Reward::clearHistory() {
     pImpl->history.clear();
 }
 
+// Neuromodulator interface implementation
+const char* Reward::getName() const {
+    return "Reward";
+}
+
+float Reward::getLevel() const {
+    return pImpl->currentValue;
+}
+
+void Reward::setLevel(float level) {
+    pImpl->currentValue = level;
+}
+
+float Reward::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real reward-modulated plasticity factor
+    // PLACEHOLDER: Higher reward increases plasticity
+    return 0.5f + 0.5f * pImpl->currentValue;
+}
+
+void Reward::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real reward dynamics
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->currentValue = std::max(0.0f, pImpl->currentValue - 0.1f * static_cast<float>(dt));
+}
+
 } // namespace nlm
