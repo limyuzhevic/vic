@@ -33,6 +33,20 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
+void Novelty::setSensitivity(float sensitivity) {
+    pImpl->noveltyThreshold = sensitivity;
+}
+
+float Novelty::getSensitivity() const {
+    return pImpl->noveltyThreshold;
+}
+
+void Novelty::reset() {
+    pImpl->level = 0.0f;
+    pImpl->history.clear();
+    NLM_LOG_INFO("Novelty system reset");
+}
+
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare

@@ -46,8 +46,12 @@ void PredictionError::clearHistory() {
     pImpl->history.clear();
 }
 
-float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+void PredictionError::reset() {
+    pImpl->error = 0.0f;
+    pImpl->predictedValue = 0.0f;
+    pImpl->actualValue = 0.0f;
+    pImpl->history.clear();
+    NLM_LOG_INFO("PredictionError system reset");
 }
 
 } // namespace nlm

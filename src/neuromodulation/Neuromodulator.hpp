@@ -24,10 +24,16 @@ public:
     // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
+    // Reset neuromodulator to initial state
+    virtual void reset() = 0;
+    
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
-protected:
+    // Check if neuromodulator is null (Python binding)
+    static bool isNull(const Neuromodulator* mod) {
+        return mod == nullptr;
+    }
     Neuromodulator() = default;
 };
 

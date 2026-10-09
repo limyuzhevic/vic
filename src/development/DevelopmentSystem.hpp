@@ -36,15 +36,33 @@ public:
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
     
+    // Set plasticity modifier for current stage
+    void setPlasticityModifier(float modifier);
+    
     // Get critical period info
     bool isCriticalPeriod() const;
     float getCriticalPeriodProgress() const;
+    
+    // Get critical period duration
+    double getCriticalPeriodDuration() const;
+    
+    // Set critical period duration
+    void setCriticalPeriodDuration(double duration);
     
     // Get developmental age (in simulation time)
     double getDevelopmentalAge() const { return age_; }
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Trigger phase transition (force advancement to next stage)
+    void triggerPhaseTransition();
+    
+    // Get maturation rate (placeholder for Phase 4 implementation)
+    double getMaturationRate() const;
+    
+    // Set maturation rate
+    void setMaturationRate(double rate);
     
 private:
     struct Impl;

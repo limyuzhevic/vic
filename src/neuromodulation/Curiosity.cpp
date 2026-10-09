@@ -57,6 +57,7 @@ void Curiosity::setPredictionErrorWeight(float weight) {
 
 void Curiosity::reset() {
     pImpl->level = 0.0f;
+    NLM_LOG_INFO("Curiosity system reset");
 }
 
 } // namespace nlm

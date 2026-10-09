@@ -19,6 +19,10 @@ public:
     float getLevel() const;
     void setLevel(float level);
     
+    // Get sensitivity (threshold for novelty detection)
+    float getSensitivity() const;
+    void setSensitivity(float sensitivity);
+    
     // Detect novelty from observation
     void detectNovelty(const class Observation& observation, 
                        const class Observation& previousObservation);
@@ -33,6 +37,9 @@ public:
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Reset novelty system
+    void reset();
     
 private:
     struct Impl;
