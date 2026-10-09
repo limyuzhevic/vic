@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -100,6 +106,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    bool parseJSONFile(const std::string& filepath);
 };
 
 } // namespace nlm

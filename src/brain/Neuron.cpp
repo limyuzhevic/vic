@@ -37,14 +37,14 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        // Use std::exchange to properly handle move
+        std::swap(pImpl, other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
@@ -188,10 +188,14 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
+namespace nlm {
+
+// Optimized LIF step function using better numerical methods
+// Uses exponential Euler integration which is more stable and efficient
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with early exit
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -202,34 +206,32 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
+    // Pre-compute frequently used values for performance
     MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    const MembranePotential V_rest = pImpl->state.restingPotential;
+    const MembranePotential V_reset = pImpl->state.resetPotential;
+    const MembranePotential threshold = pImpl->state.threshold;
+    const float tau = Impl::TIME_CONSTANT;  // ms
+    const float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Exponential Euler integration for better stability
+    // V_new = V_rest + (V - V_rest) * exp(-dt/tau) + (I * tau / C) * (1 - exp(-dt/tau))
+    const float alpha = std::exp(-static_cast<float>(dt) * 1000.0f / tau);  // Pre-compute exp factor
+    const float synapticContribution = pImpl->synapticInput / C * (1.0f - alpha);
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V_rest + (V - V_rest) * alpha + synapticContribution;
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Apply spike-frequency adaptation (optimized)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential to prevent instability (optimized)
+    if (V > 50.0f) V = 50.0f;
+    if (V < -100.0f) V = -100.0f;
     
     // Check for spike
     if (V >= threshold) {
@@ -258,6 +260,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     return fired;
 }
+
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)

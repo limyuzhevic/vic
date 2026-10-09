@@ -100,12 +100,22 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+# Python bindings module (using pybind11)
+add_library(pynlm MODULE
+    python_bindings.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX ".so"
+)
+
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm PRIVATE
+    ${PYBIND11_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC

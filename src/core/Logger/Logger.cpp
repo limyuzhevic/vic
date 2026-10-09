@@ -54,14 +54,6 @@ void ConsoleLogger::log(const LogEntry& entry) {
     }
 }
 
-void ConsoleLogger::setLevel(LogLevel level) {
-    pImpl->level = level;
-}
-
-LogLevel ConsoleLogger::getLevel() const {
-    return pImpl->level;
-}
-
 void ConsoleLogger::setUseColors(bool useColors) {
     pImpl->useColors = useColors;
 }
@@ -71,13 +63,33 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
+    if (filepath.empty()) {
+        throw std::invalid_argument("File path cannot be empty");
+    }
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
+    
+    // Open new file
+    pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        throw std::runtime_error("Failed to open log file: " + filepath);
+    }
+}
+
+void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+ConsoleLogger::~ConsoleLogger() {
+    closeOutputFile();
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
@@ -106,15 +118,29 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    bool shuttingDown = false;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->shuttingDown = true;
+    // Clean up all loggers
+    pImpl->loggers.clear();
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        throw std::invalid_argument("Logger pointer cannot be null");
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (pImpl->shuttingDown) {
+        throw std::runtime_error("Cannot add logger during shutdown");
+    }
+    
+    pImpl->loggers.push_back(std::move(logger));
 }
 
 void Logger::clearLoggers() {
@@ -124,14 +150,33 @@ void Logger::clearLoggers() {
 
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
+        try {
+            logger->setLevel(level);
+        } catch (const std::exception& e) {
+            // Log error but don't fail the entire operation
+            std::cerr << "Warning: Failed to set logger level: " << e.what() << std::endl;
+        }
     }
 }
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
+    // Validate inputs
+    if (message.empty()) {
+        throw std::invalid_argument("Log message cannot be empty");
+    }
+    if (line < 0) {
+        throw std::invalid_argument("Line number cannot be negative");
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Check if shutting down
+    if (pImpl->shuttingDown) {
+        return; // Silently drop log messages during shutdown
+    }
     
     LogEntry entry;
     entry.level = level;
@@ -141,8 +186,17 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Log to all active loggers with error handling
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        if (!logger) continue; // Skip null pointers
+        
+        try {
+            logger->log(entry);
+        } catch (const std::exception& e) {
+            // Log to stderr as fallback
+            std::cerr << "Logger error: " << e.what() << std::endl;
+            // Continue with other loggers
+        }
     }
 }
 

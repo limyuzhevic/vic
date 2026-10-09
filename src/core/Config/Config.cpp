@@ -19,16 +19,29 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    if (filepath.empty()) {
+        throw std::invalid_argument("File path cannot be empty");
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
+    // Try to parse as JSON first
+    if (parseJSONFile(filepath)) {
+        NLM_LOG_INFO("Configuration loaded successfully from JSON file: " + filepath);
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    NLM_LOG_INFO("JSON parsing failed, falling back to key=value format for: " + filepath);
+    
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,18 +54,107 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            if (key.empty()) {
+                NLM_LOG_WARNING("Skipping line " + std::to_string(lineNumber) + 
+                               ": key is empty");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Skipping line " + std::to_string(lineNumber) + 
+                           ": no '=' found");
         }
     }
     
+    NLM_LOG_INFO("Configuration loaded from key=value file: " + filepath + 
+                 " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
+}
+
+bool Config::parseJSONFile(const std::string& filepath) {
+    // Simple JSON parser for basic configuration files
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    
+    // Remove whitespace
+    std::string cleaned;
+    for (char c : content) {
+        if (!std::isspace(static_cast<unsigned char>(c))) {
+            cleaned += c;
+        }
+    }
+    
+    // Parse simple JSON objects: {"key": "value", "key2": 123, "key3": true}
+    if (cleaned.front() != '{' || cleaned.back() != '}') {
+        return false; // Not a valid JSON object
+    }
+    
+    // Remove braces
+    std::string jsonContent = cleaned.substr(1, cleaned.size() - 2);
+    
+    // Simple parsing (not production-ready)
+    size_t pos = 0;
+    while (pos < jsonContent.size()) {
+        // Find key
+        size_t keyStart = jsonContent.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = jsonContent.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = jsonContent.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find colon
+        size_t colonPos = jsonContent.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Skip whitespace
+        size_t valueStart = jsonContent.find_first_not_of(" \t\n\r", colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find next comma or end
+        size_t valueEnd = jsonContent.find_first_of(",}", valueStart);
+        if (valueEnd == std::string::npos) {
+            valueEnd = jsonContent.size();
+        }
+        
+        std::string valueStr = jsonContent.substr(valueStart, valueEnd - valueStart);
+        
+        // Parse value based on type
+        ConfigValue value;
+        if (valueStr.front() == '"' && valueStr.back() == '"') {
+            // String value
+            value = valueStr.substr(1, valueStr.size() - 2);
+        } else if (valueStr == "true" || valueStr == "false") {
+            // Boolean value
+            value = (valueStr == "true");
+        } else if (valueStr.find('.') != std::string::npos) {
+            // Float value
+            value = std::stof(valueStr);
+        } else {
+            // Integer value
+            value = std::stoi(valueStr);
+        }
+        
+        set(key, value, ConfigSource::File);
+        
+        pos = valueEnd + 1;
+    }
+    
+    return !pImpl->entries.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
