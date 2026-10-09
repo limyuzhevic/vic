@@ -5,16 +5,176 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <filesystem>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
+#include "../src/core/Random/Random.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "src/cognition/NeuralPlanner.hpp"
+#include "src/cognition/ConceptFormation.hpp"
+#include "src/cognition/AttentionalSelection.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+
+namespace py = pybind11;
+namespace nlm {
+
+// Python exception classes
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigError : public NLMError {
+public:
+    explicit ConfigError(const std::string& msg) : NLMError(msg) {}
+};
+
+class BrainError : public NLMError {
+public:
+    explicit BrainError(const std::string& msg) : NLMError(msg) {}
+};
+
+class ValidationError : public NLMError {
+public:
+    explicit ValidationError(const std::string& msg) : NLMError(msg) {}
+};
+
+// Helper functions for validation
+template<typename T>
+void validateNotNull(const T* ptr, const std::string& name) {
+    if (!ptr) {
+        throw ValidationError(name + " is null");
+    }
+}
+
+template<typename T>
+void validateCondition(bool condition, const std::string& msg) {
+    if (!condition) {
+        throw ValidationError(msg);
+    }
+}
+
+// Memory management helpers
+class SmartNeuron {
+private:
+    std::shared_ptr<class Neuron> neuron_;
+    
+public:
+    explicit SmartNeuron(std::shared_ptr<class Neuron> neuron) : neuron_(neuron) {}
+    
+    NeuronId getId() const { return neuron_->getId(); }
+    NeuronType getType() const { return neuron_->getType(); }
+    FiringState getState() const { return neuron_->getState(); }
+    float getPotential() const { return neuron_->getPotential(); }
+    float getCurrent() const { return neuron_->getCurrent(); }
+    Timestamp getLastFiring() const { return neuron_->getLastFiring(); }
+    float getFiringRate() const { return neuron_->getFiringRate(); }
+    size_t getIncomingSynapseCount() const { return neuron_->getIncomingSynapseCount(); }
+    size_t getOutgoingSynapseCount() const { return neuron_->getOutgoingSynapseCount(); }
+    
+    std::vector<std::shared_ptr<class Synapse>> getIncomingSynapses() const {
+        auto synapses = neuron_->getIncomingSynapses();
+        return synapses;
+    }
+    
+    std::vector<std::shared_ptr<class Synapse>> getOutgoingSynapses() const {
+        auto synapses = neuron_->getOutgoingSynapses();
+        return synapses;
+    }
+    
+    void injectCurrent(float current) { neuron_->injectCurrent(current); }
+    bool fire() { return neuron_->fire(); }
+    void reset() { neuron_->reset(); }
+};
+
+class SmartSynapse {
+private:
+    std::shared_ptr<class Synapse> synapse_;
+    
+public:
+    explicit SmartSynapse(std::shared_ptr<class Synapse> synapse) : synapse_(synapse) {}
+    
+    SynapseId getId() const { return synapse_->getId(); }
+    SynapseType getType() const { return synapse_->getType(); }
+    NeuronId getSource() const { return synapse_->getSource(); }
+    NeuronId getTarget() const { return synapse_->getTarget(); }
+    float getWeight() const { return synapse_->getWeight(); }
+    Delay getDelay() const { return synapse_->getDelay(); }
+    bool getEnabled() const { return synapse_->getEnabled(); }
+    float getStrength() const { return synapse_->getStrength(); }
+    
+    void setWeight(float weight) { synapse_->setWeight(weight); }
+    void setDelay(Delay delay) { synapse_->setDelay(delay); }
+    void enable() { synapse_->enable(); }
+    void disable() { synapse_->disable(); }
+    
+    float computeEffect(Neuron* source, Neuron* target) { 
+        return synapse_->computeEffect(source, target); 
+    }
+};
+
+class SmartRegion {
+private:
+    std::shared_ptr<class NeuralRegion> region_;
+    
+public:
+    explicit SmartRegion(std::shared_ptr<class NeuralRegion> region) : region_(region) {}
+    
+    RegionId getId() const { return region_->getId(); }
+    std::string getName() const { return region_->getName(); }
+    PopulationId getPopulationId() const { return region_->getPopulationId(); }
+    size_t getNeuronCount() const { return region_->getNeuronCount(); }
+    size_t getSynapseCount() const { return region_->getSynapseCount(); }
+    float getExcitatoryRatio() const { return region_->getExcitatoryRatio(); }
+    
+    std::vector<std::shared_ptr<class Neuron>> getNeurons() const {
+        auto neurons = region_->getNeurons();
+        return neurons;
+    }
+    
+    std::vector<std::shared_ptr<class NeuralPopulation>> getPopulations() const {
+        auto populations = region_->getPopulations();
+        return populations;
+    }
+    
+    NeuronId getMostActiveNeuron() const { return region_->getMostActiveNeuron(); }
+    float getAveragePotential() const { return region_->getAveragePotential(); }
+    float getAverageCurrent() const { return region_->getAverageCurrent(); }
+    
+    SmartNeuron getNeuron(NeuronId id) const {
+        auto neuron = region_->getNeuron(id);
+        return SmartNeuron(neuron);
+    }
+    
+    std::vector<SmartSynapse> getOutgoingSynapses() const {
+        auto synapses = region_->getOutgoingSynapses();
+        std::vector<SmartSynapse> smartSynapses;
+        for (const auto& synapse : synapses) {
+            smartSynapses.emplace_back(synapse);
+        }
+        return smartSynapses;
+    }
+};
 
 namespace py = pybind11;
 namespace nlm {
@@ -24,10 +184,22 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, Action,
+        and comprehensive access to neural systems including neuromodulation, memory,
+        prediction, cognition, development, spike control, and random generation.
     )pbdoc";
 
+    // Register Python exception classes
+    py::register_exception<NLMError>(m, "NLMError");
+    py::register_exception<ConfigError>(m, "ConfigError");
+    py::register_exception<BrainError>(m, "BrainError");
+    py::register_exception<ValidationError>(m, "ValidationError");
+    
+    // Map C++ exceptions to Python exceptions
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    py::register_exception<std::filesystem::filesystem_error>(m, "IOError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
