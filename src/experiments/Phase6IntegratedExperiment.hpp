@@ -1,19 +1,8 @@
-#pragma once
+// Phase 6 Integration Experiment Header
+// This file contains the declarations for the Phase 6 integration experiment
+// that verifies all brain systems are properly connected and working together.
 
-/**
- * Phase6IntegratedExperiment - Phase 6 final integration test
- * 
- * This experiment demonstrates that the integrated brain systems work together:
- * - Memory systems are connected to neural processing
- * - Neuromodulation affects plasticity and neural dynamics
- * - Development affects plasticity rates
- * - Prediction system is integrated
- * - Replay and consolidation are functional
- * - Checkpoint save/load works
- * 
- * The experiment runs a complete lifetime simulation and verifies
- * that all systems interact properly.
- */
+#pragma once
 
 #include "../experiments/Experiment.hpp"
 #include "../experiments/Metrics.hpp"
