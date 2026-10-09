@@ -113,8 +113,74 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Experiment Results" << "\n";
+    file << "# Generated on " << getCurrentTimeString() << "\n";
+    file << "# " << pImpl->experiments.size() << " experiments saved\n\n";
+    
+    for (const auto& experiment : pImpl->experiments) {
+        file << "[EXPERIMENT] " << experiment->getName() << "\n";
+        file << "  Seed: " << experiment->getSeed() << "\n";
+        file << "  Steps: " << experiment->getStartStep() << " - " << experiment->getEndStep() << "\n";
+        file << "  Duration: " << (experiment->getEndStep() - experiment->getStartStep()) << " steps\n\n";
+        
+        // Write metrics
+        file << "  [METRICS]\n";
+        const auto& metrics = experiment->getMetrics();
+        for (const auto& metric : metrics) {
+            file << "    " << metric.first << " = " << metric.second << "\n";
+        }
+        file << "\n";
+        
+        // Write step data summary
+        file << "  [STEP_DATA]\n";
+        const auto& stepData = experiment->getStepData();
+        file << "    Steps recorded: " << stepData.size() << "\n";
+        if (!stepData.empty()) {
+            file << "    First step neurons: " << stepData.front().neuronCount << "\n";
+            file << "    Last step neurons: " << stepData.back().neuronCount << "\n";
+            file << "    Peak firing rate: " << getMaxFiringRate(stepData) << " Hz\n";
+        }
+        file << "\n";
+        
+        // Write notes
+        const auto& notes = experiment->getNotes();
+        if (!notes.empty()) {
+            file << "  [NOTES]\n";
+            for (const auto& note : notes) {
+                file << "    " << note << "\n";
+            }
+            file << "\n";
+        }
+        
+        file << "=== END EXPERIMENT ===\n\n";
+    }
+    
+    return true;
+}
+
+// Helper function to get current time as string
+std::string ExperimentRunner::getCurrentTimeString() const {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+// Helper function to find max firing rate in step data
+float ExperimentRunner::getMaxFiringRate(const std::vector<Experiment::StepData>& stepData) const {
+    if (stepData.empty()) return 0.0f;
+    
+    float maxRate = 0.0f;
+    for (const auto& step : stepData) {
+        maxRate = std::max(maxRate, step.avgFiringRate);
+    }
+    return maxRate;
 }
 
 } // namespace nlm

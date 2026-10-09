@@ -191,21 +191,34 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
+// Synaptic plasticity uses the Tsodyks-Markram model for short-term plasticity
+// This model describes how synaptic efficacy changes with activity patterns
+// 
+// Short-term depression: synaptic efficacy decreases with high firing rates
+// Model equation: dD/dt = (1-D)/tau_D - U*D*r(t)
+// Where D is depression variable (0-1), U is utilization, r(t) is presynaptic rate
+// 
+// Short-term facilitation: synaptic efficacy increases with recent activity  
+// Model equation: dF/dt = (1-F)/tau_F + U*F*r(t)
+// Where F is facilitation variable (0-1)
+
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // Real synaptic dynamics update:
+    // 1. Decay short-term plasticity state (facilitation and depression)
+    // 2. Decay eligibility trace for reward-modulated learning
+    // 3. Update efficacy based on current use-dependent modulation
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
+    // Facilitation decays exponentially toward baseline (0.0)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression (recovery toward full efficacy)
+    // Depression recovers exponentially toward baseline (1.0)
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
@@ -216,9 +229,12 @@ void Synapse::step(Timestamp currentTime) {
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Eligibility traces accumulate during presynaptic activity and decay over time
+    // They represent which synapses were involved in recent actions for reward prediction
+    decayEligibilityTrace(0.001f);  // Fast decay (1ms time constant)
     
-    // Clamp weight bounds
+    // Clamp weight bounds to prevent numerical instability
+    // Real synapses have physical limits on synaptic strength
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
@@ -232,32 +248,39 @@ void Synapse::reset() {
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
     // Proper random initialization based on synapse type
+    // Excitatory synapses facilitate neural activation
+    // Inhibitory synapses suppress neural activity
+    // Other types have intermediate effects
+    
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
         // Excitatory synapses have moderate initial efficacy
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
+        // Inhibitory synapses: negative weights suppress post-synaptic neuron
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
-        // Other types: small random weights
+        // Other types: small random weights (modulatory, electrical, etc.)
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    // Physiological delays range from 0.5-5ms in real synapses
     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
     
     // Initialize short-term plasticity state
+    // Depression starts at 1.0 (full recovery), facilitation at 0.0 (no initial facilitation)
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
     pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
     
     // Initialize eligibility trace to 0
+    // Used for reward-modulated learning
     pImpl->eligibilityTrace = 0.0f;
     
-    // Initialize last spike times
+    // Initialize last spike times to -1 (no spikes yet)
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
 }

@@ -299,4 +299,94 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
+// LIF neuron dynamics: 
+// dV/dt = (V_rest - V)/tau + I/C
+// Where:
+// - V is membrane potential
+// - V_rest is resting potential (-70mV typically)
+// - tau is membrane time constant (20ms typically)
+// - I is total synaptic current input
+// - C is membrane capacitance (1nF typically)
+// 
+// The discrete approximation used:
+// V_new = V + dt * 1000 * ( (V_rest - V)/tau + I/C )
+// 
+// Spike detection: neuron fires when V >= threshold (typically -55mV)
+// Post-spike: V is reset to V_reset and neuron enters refractory period
+
+bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    bool fired = false;
+    
+    // Handle refractory period - neuron cannot spike during this time
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        // During refractory period, clear synaptic input but don't integrate
+        pImpl->synapticInput = 0.0f;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        return false;
+    }
+    
+    // LIF dynamics: Leaky Integrate-and-Fire
+    // Equation: V(t+dt) = V(t) + dt * ( (V_rest - V)/tau + I/C )
+    // This implements the exponential decay toward resting potential
+    
+    MembranePotential& V = pImpl->state.membranePotential;
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    MembranePotential V_reset = pImpl->state.resetPotential;
+    MembranePotential threshold = pImpl->state.threshold;
+    float tau = Impl::TIME_CONSTANT;  // ms - membrane time constant
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF - membrane capacitance
+    
+    // Synaptic input contributes to membrane potential change
+    float synapticContribution = pImpl->synapticInput / C;
+    
+    // Leak contribution drives V toward V_rest exponentially
+    float leakContribution = (V_rest - V) / tau;
+    
+    // Update membrane potential using exponential Euler integration
+    // Note: multiply by 1000 to convert from ms to s
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Adaptation variable grows with each spike and slowly decays
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;  // Adaptation hyperpolarizes
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Clamp membrane potential to prevent numerical instability
+    // Real neurons have hard limits: -100mV (hyperpolarization) to +50mV (depolarization)
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Check for spike threshold crossing
+    if (V >= threshold) {
+        fired = true;
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike timestamp for STDP and analysis
+        recordSpike(currentTime);
+        
+        // Reset membrane potential to V_reset after spike
+        V = V_reset;
+        
+        // Enter refractory period - prevent immediate re-firing
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update adaptation variable for spike-frequency adaptation
+        // Each spike increases adaptation, reducing firing rate over time
+        pImpl->state.adaptationVariable += 1.0f;
+    } else {
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Clear synaptic input for next timestep - input is integrated over current timestep
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+}
+
 } // namespace nlm

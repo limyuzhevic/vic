@@ -5,6 +5,9 @@
 #include "../environment/Environment.hpp"
 #include <memory>
 #include <vector>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
 
