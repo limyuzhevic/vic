@@ -1,97 +1,124 @@
-#pragma once
+# pragma once
 
-#include <cstdint>
-#include <type_traits>
+#include "core/Types/Types.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <memory>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
+/**
+ * @brief Core types and constants for NLM neural simulation framework
+ * 
+ * This file contains fundamental type definitions and constants used throughout
+ * the NLM system. All other components should include this file to ensure
+ * consistent type definitions.
+ */
 
-// Neuron identifier
+// Basic identifier types
 struct NeuronId {
     uint64_t value;
     
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
+    NeuronId() : value(0) {}
+    explicit NeuronId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
+    uint64_t index() const { return value; }
     
-    constexpr uint64_t index() const { return value; }
+    bool operator==(const NeuronId& other) const { return value == other.value; }
+    bool operator!=(const NeuronId& other) const { return value != other.value; }
+    bool operator<(const NeuronId& other) const { return value < other.value; }
+    bool operator>(const NeuronId& other) const { return value > other.value; }
 };
 
-// Synapse identifier
 struct SynapseId {
     uint64_t value;
     
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
+    SynapseId() : value(0) {}
+    explicit SynapseId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
+    uint64_t index() const { return value; }
     
-    constexpr uint64_t index() const { return value; }
+    bool operator==(const SynapseId& other) const { return value == other.value; }
+    bool operator!=(const SynapseId& other) const { return value != other.value; }
 };
 
-// Region identifier
 struct RegionId {
     uint64_t value;
     
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
+    RegionId() : value(0) {}
+    explicit RegionId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
+    uint64_t index() const { return value; }
     
-    constexpr uint64_t index() const { return value; }
+    bool operator==(const RegionId& other) const { return value == other.value; }
+    bool operator!=(const RegionId& other) const { return value != other.value; }
 };
 
-// Population identifier
 struct PopulationId {
     uint64_t value;
     
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
+    PopulationId() : value(0) {}
+    explicit PopulationId(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
+    uint64_t index() const { return value; }
     
-    constexpr uint64_t index() const { return value; }
+    bool operator==(const PopulationId& other) const { return value == other.value; }
+    bool operator!=(const PopulationId& other) const { return value != other.value; }
 };
 
-// Simulation step counter
-using SimulationStep = uint64_t;
+struct InterRegionConnectionId {
+    uint64_t value;
+    
+    InterRegionConnectionId() : value(0) {}
+    explicit InterRegionConnectionId(uint64_t v) : value(v) {}
+    
+    uint64_t index() const { return value; }
+    
+    bool operator==(const InterRegionConnectionId& other) const { return value == other.value; }
+    bool operator!=(const InterRegionConnectionId& other) const { return value != other.value; }
+};
 
-// Simulation time in seconds (floating point)
-using Timestamp = double;
+struct SimulationStep {
+    uint64_t value;
+    
+    SimulationStep() : value(0) {}
+    explicit SimulationStep(uint64_t v) : value(v) {}
+    
+    uint64_t index() const { return value; }
+};
 
-// Timestep duration in seconds
-using TimestepDuration = double;
+struct Timestamp {
+    double value;
+    
+    Timestamp() : value(0.0) {}
+    explicit Timestamp(double v) : value(v) {}
+    
+    double getMilliseconds() const { return value * 1000.0; }
+};
 
-// Index types for arrays
-using NeuronIndex = uint64_t;
-using SynapseIndex = uint64_t;
-using PopulationIndex = uint64_t;
-using RegionIndex = uint64_t;
+struct Delay {
+    uint32_t steps;
+    
+    Delay() : steps(1) {}
+    explicit Delay(uint32_t s) : steps(s) {}
+};
 
-// Synaptic weight type
-using SynapticWeight = float;
+// Basic value types
+using MembranePotential = float;    // Membrane voltage (mV)
+using SynapticWeight = float;       // Synaptic strength (-1.0 to +1.0)
+using FiringRate = float;           // Neurons firing rate (Hz)
+using PlasticityFlags = struct {
+    bool hebbian = false;
+    bool stdp = false;
+    bool reward_modulated = false;
+    bool reward_modulated = false;
+};
 
-// Membrane potential type
-using MembranePotential = float;
-
-// Neuron firing rate type
-using FiringRate = float;
-
-// Connection delay in simulation steps
-using Delay = uint32_t;
-
-// Typed enums for neuron types
-enum class NeuronType : uint8_t {
+// Enumeration types
+enum class NeuronType {
     Excitatory,
     Inhibitory,
     Modulatory,
@@ -100,8 +127,7 @@ enum class NeuronType : uint8_t {
     Internal
 };
 
-// Typed enums for synapse types
-enum class SynapseType : uint8_t {
+enum class SynapseType {
     Excitatory,
     Inhibitory,
     Modulatory,
@@ -109,21 +135,7 @@ enum class SynapseType : uint8_t {
     GapJunction
 };
 
-// Synaptic plasticity state flags
-struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
-    
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
-                                  reward_modulated(false), structural(false), 
-                                  eligible(false) {}
-};
-
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
+enum class DevelopmentalStage {
     Initial,
     CriticalPeriod,
     Maturation,
@@ -131,62 +143,71 @@ enum class DevelopmentalStage : uint8_t {
     Aging
 };
 
-// Spike event for event-driven computation
-struct SpikeEvent {
-    NeuronId source_neuron;
-    Timestamp timestamp;
-    SimulationStep step;
-    
-    SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
-    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
-        : source_neuron(nid), timestamp(ts), step(s) {}
-};
-
-// Delayed spike event for synaptic transmission with delay
-struct DelayedSpikeEvent {
-    NeuronId source_neuron;
-    NeuronId destination_neuron;
-    SynapseId synapse_id;
-    SynapticWeight weight;  // Weight at time of spike (frozen)
-    SynapseType synapse_type;
-    Timestamp timestamp;      // When spike occurs
-    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
-    SimulationStep step;      // Current simulation step
-    SimulationStep delivery_step;  // Step when spike should be delivered
-    bool is_excitatory;  // Cached for quick lookup
-    
-    DelayedSpikeEvent()
-        : source_neuron(), destination_neuron(), synapse_id()
-        , weight(0.0f), synapse_type(SynapseType::Excitatory)
-        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
-        , is_excitatory(true) {}
-    
-    DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,
-                      SynapticWeight w, SynapseType type,
-                      Timestamp ts, Timestamp delivery, SimulationStep s, SimulationStep deliveryS)
-        : source_neuron(src), destination_neuron(dst), synapse_id(syn)
-        , weight(w), synapse_type(type)
-        , timestamp(ts), delivery_time(delivery)
-        , step(s), delivery_step(deliveryS)
-        , is_excitatory(type == SynapseType::Excitatory) {}
-};
-
-// Action potential state
-enum class FiringState : uint8_t {
+enum class FiringState {
     Resting,
     Active,
     Refractory,
     Inhibited
 };
 
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
+enum class ActionType {
+    MoveForward,
+    MoveBackward,
+    TurnLeft,
+    TurnRight,
+    Look,
+    LookUp,
+    LookDown,
+    Interact,
+    Eat,
+    Drink,
+    Rest,
+    Wait,
+    Custom
+};
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+enum class MotorCommand {
+    MoveForward,
+    MoveBackward,
+    TurnLeft,
+    TurnRight,
+    LookLeft,
+    LookRight,
+    Interact,
+    Wait
+};
+
+enum class WorldObjectType {
+    Empty,
+    Resource,
+    Hazard,
+    Wall,
+    Marker
+};
+
+enum class EventType {
+    Spike,
+    DelayedSpike,
+    PlasticityUpdate,
+    Reward,
+    Novelty,
+    Prediction
+};
+
+// Constants
+namespace Constants {
+    constexpr float PI = 3.141592653589793f;
+    constexpr float E = 2.718281828459045f;
+    constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;
+    constexpr float DEFAULT_THRESHOLD = -55.0f;
+    constexpr float DEFAULT_RESET_POTENTIAL = -70.0f;
+    constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;
+    constexpr uint32_t DEFAULT_REFECTORY_PERIOD = 5;
+    constexpr float DEFAULT_LTP_WEIGHT = 0.01f;
+    constexpr float DEFAULT_LTD_WEIGHT = 0.012f;
+    constexpr float DEFAULT_STDP_TIME_CONSTANT = 20.0f;
+    constexpr float MAX_WEIGHT = 1.0f;
+    constexpr float MIN_WEIGHT = -1.0f;
+}
 
 } // namespace nlm
