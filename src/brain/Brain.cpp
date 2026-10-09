@@ -345,6 +345,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) {
+                    continue;  // Skip null neurons
+                }
+                
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -359,12 +363,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        if (syn) {
+                            syn->recordPostSpike(currentTime);
+                        }
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;  // Skip null synapses
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -917,16 +925,17 @@ RegionId Brain::addRegion(const std::string& name) {
 
 NeuralRegion* Brain::getRegion(RegionId id) {
     for (auto& region : pImpl->regions) {
-        if (region->getId() == id) {
+        if (region && region->getId() == id) {
             return region.get();
         }
     }
+    NLM_LOG_ERROR("Region not found: " + std::to_string(id.index()));
     return nullptr;
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
     for (const auto& region : pImpl->regions) {
-        if (region->getId() == id) {
+        if (region && region->getId() == id) {
             return region.get();
         }
     }
