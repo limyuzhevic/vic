@@ -6,9 +6,136 @@
 
 namespace nlm {
 
-// Forward declarations
-class Synapse;
-class RandomGenerator;
+// Configuration parameters for neuron behavior
+struct NeuronConfig {
+    // LIF dynamics parameters
+    float membraneCapacitance;     // nF
+    float timeConstant;            // ms
+    float maxMembranePotential;    // mV
+    float minMembranePotential;    // mV
+    
+    // Default biological values
+    static constexpr float DEFAULT_MEMBRANE_CAPACITANCE = 1.0f;
+    static constexpr float DEFAULT_TIME_CONSTANT = 20.0f;
+    static constexpr float DEFAULT_MAX_POTENTIAL = 50.0f;
+    static constexpr float DEFAULT_MIN_POTENTIAL = -100.0f;
+    
+    // Adaptation parameters
+    float adaptationTimeConstant;  // ms
+    float maxAdaptation;           // mV
+    
+    // Default adaptation values
+    static constexpr float DEFAULT_ADAPTATION_TC = 100.0f;
+    static constexpr float DEFAULT_MAX_ADAPTATION = 20.0f;
+    
+    // Input scaling parameters
+    float excitatoryWeight;        // Scaling factor for excitatory inputs
+    float inhibitoryWeight;         // Scaling factor for inhibitory inputs
+    
+    // Default input weights
+    static constexpr float DEFAULT_EXCITATORY_WEIGHT = 1.0f;
+    static constexpr float DEFAULT_INHIBITORY_WEIGHT = 0.8f;
+    
+    // Firing rate parameters
+    float maxFiringRate;           // Hz
+    float minFiringRate;           // Hz
+    
+    // Default firing rate limits
+    static constexpr float DEFAULT_MAX_FIRING_RATE = 1000.0f;
+    static constexpr float DEFAULT_MIN_FIRING_RATE = 0.0f;
+    
+    NeuronConfig()
+        : membraneCapacitance(DEFAULT_MEMBRANE_CAPACITANCE)
+        , timeConstant(DEFAULT_TIME_CONSTANT)
+        , maxMembranePotential(DEFAULT_MAX_POTENTIAL)
+        , minMembranePotential(DEFAULT_MIN_POTENTIAL)
+        , adaptationTimeConstant(DEFAULT_ADAPTATION_TC)
+        , maxAdaptation(DEFAULT_MAX_ADAPTATION)
+        , excitatoryWeight(DEFAULT_EXCITATORY_WEIGHT)
+        , inhibitoryWeight(DEFAULT_INHIBITORY_WEIGHT)
+        , maxFiringRate(DEFAULT_MAX_FIRING_RATE)
+        , minFiringRate(DEFAULT_MIN_FIRING_RATE) {}
+};
+
+// Constants for biologically plausible ranges
+struct NeuronConstants {
+    // Membrane potential ranges (mV)
+    static constexpr float MIN_MEMBRANE_POTENTIAL = -120.0f;
+    static constexpr float MAX_MEMBRANE_POTENTIAL = 50.0f;
+    static constexpr float DEFAULT_MEMBRANE_POTENTIAL = -70.0f;
+    
+    // Threshold ranges (mV)
+    static constexpr float MIN_THRESHOLD = -80.0f;
+    static constexpr float MAX_THRESHOLD = -40.0f;
+    static constexpr float DEFAULT_THRESHOLD = -55.0f;
+    
+    // Resting potential ranges (mV)
+    static constexpr float MIN_RESTING_POTENTIAL = -80.0f;
+    static constexpr float MAX_RESTING_POTENTIAL = -50.0f;
+    static constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;
+    
+    // Leak conductance ranges (nS)
+    static constexpr float MIN_LEAK_CONDUCTANCE = 1.0f;
+    static constexpr float MAX_LEAK_CONDUCTANCE = 100.0f;
+    static constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;
+    
+    // Refractory period ranges (ms)
+    static constexpr uint32_t MIN_REFLECTORY_PERIOD = 1;
+    static constexpr uint32_t MAX_REFLECTORY_PERIOD = 100;
+    static constexpr uint32_t DEFAULT_REFLECTORY_PERIOD = 5;
+    
+    // Adaptation ranges (mV)
+    static constexpr float MIN_ADAPTATION = 0.0f;
+    static constexpr float MAX_ADAPTATION = 50.0f;
+    static constexpr float DEFAULT_ADAPTATION = 0.0f;
+    
+    // Firing rate ranges (Hz)
+    static constexpr float MIN_FIRING_RATE = 0.0f;
+    static constexpr float MAX_FIRING_RATE = 1000.0f;
+    static constexpr float DEFAULT_FIRING_RATE = 0.0f;
+};
+
+// Factory methods for creating specialized neurons
+class NeuronFactory {
+public:
+    // Standard biological neuron
+    static Neuron createStandardNeuron(NeuronId id);
+    
+    // Fast-spiking neuron
+    static Neuron createFastSpikingNeuron(NeuronId id);
+    
+    // Regular spiking neuron
+    static Neuron createRegularSpikingNeuron(NeuronId id);
+    
+    // Intrinsic burster
+    static Neuron createIntrinsicBursterNeuron(NeuronId id);
+    
+    // Chattering neuron
+    static Neuron createChatteringNeuron(NeuronId id);
+    
+    // Adapting neuron
+    static Neuron createAdaptingNeuron(NeuronId id);
+    
+    // Customized neuron with specific configuration
+    static Neuron createCustomizedNeuron(NeuronId id, const NeuronConfig& config);
+    
+    // Initialize neuron with random parameters
+    static void initializeRandom(Neuron& neuron, RandomGenerator& rng, const NeuronConfig& config = NeuronConfig());
+    
+    // Validation helpers
+    static bool validateMembranePotential(MembranePotential potential);
+    static bool validateThreshold(MembranePotential threshold);
+    static bool validateLeakConductance(MembranePotential conductance);
+    static bool validateRefractoryPeriod(uint32_t period);
+    static bool validateAdaptation(float adaptation);
+    static bool validateFiringRate(FiringRate rate);
+    
+    // Configuration helpers
+    static NeuronConfig createDefaultConfig();
+    static NeuronConfig createFastConfig();
+    static NeuronConfig createBurstingConfig();
+    static NeuronConfig createAdaptingConfig();
+};
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -109,12 +236,16 @@ public:
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
     MembranePotential getTotalCurrent() const;
+    MembranePotential getSynapticInput() const;
     void clearTotalCurrent();
     
     // Spike history (recent spikes for STDP)
     void recordSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
+    
+    // Advanced spike history management
+    void resetSpikeHistory();
     
     // Synapse management (incoming and outgoing)
     void addIncomingSynapse(SynapseHandle handle);
