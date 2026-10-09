@@ -1,11 +1,19 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration - Main Simulation Component
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
+// This phase implements the complete integrated artificial brain with:
+// - Leaky Integrate-and-Fire (LIF) neuron dynamics
 // - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
+// - STDP and Hebbian plasticity rules
 // - Structural plasticity (synaptogenesis/pruning)
+// - All brain systems integrated into coherent neural processing
+// - Memory systems (working + episodic + associative) connected
+// - Neuromodulation affecting plasticity and neural dynamics
+// - Prediction system integrated with learning
+// - Development affecting plasticity rates
+// - Checkpoint save/load functionality
+// - Replay and consolidation during simulation
+// - Complete closed-loop world interaction
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,14 +43,10 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Complete artificial developmental brain system.            ║
+    ║     All brain systems integrated into coherent processing.     ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;

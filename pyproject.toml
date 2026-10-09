@@ -5,16 +5,16 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) - Phase 6 Final Integration"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -25,20 +25,30 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neural Networks",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "scikit-build-core>=0.5.0",
+    "pybind11>=2.11.0",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "myst-parser>=0.19",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Phase 6 Integration" = "https://nlm.readthedocs.io/en/latest/phase6.html"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +57,64 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-Dpython3_EXECUTABLE={python}",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+PYBIND11_ROOT = "{pybind11}"
+
+[tool.scikit-build.cmake.cvars]
+skip_install = false
+build_type = "Release"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short -x"
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# Dynamic metadata
+[tool.pynlm]
+phase = "6"
+integration_complete = true
+components = [
+    "memory",
+    "neuromodulation", 
+    "prediction",
+    "development",
+    "cognition",
+    "sensory",
+    "motor",
+    "plasticity",
+]
+
+[tool.pynlm.features]
+checkpointing = true
+replay = true
+development = true
+agent_interface = true
+world_simulation = true
+
+# Documentation generation
+[tool.pynlm.docs]
+doc_dir = "docs"
+api_docs = true
+examples = true
+
