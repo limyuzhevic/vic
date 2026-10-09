@@ -125,7 +125,48 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# NLM CLI tool - command-line interface for simulation management
+add_executable(nlm-cli
+    src/cli/NLMCLI_main.cpp
+)
+target_link_libraries(nlm-cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# NLM configuration management CLI tool
+add_executable(nlm-config
+    src/cli/CLIConfigManager.cpp
+    src/cli/CLIConfigManager_main.cpp
+)
+target_link_libraries(nlm-config PUBLIC nlm_core)
+
+# NLM performance monitoring CLI tool
+add_executable(nlm-monitor
+    src/cli/CLIMonitor.cpp
+    src/cli/CLIMonitor_main.cpp
+)
+target_link_libraries(nlm-monitor PUBLIC nlm_core nlm_agent nlm_world)
+
+# NLM performance profiling CLI tool
+add_executable(nlm-profile
+    src/cli/CLIProfiler.cpp
+    src/cli/CLIProfiler_main.cpp
+)
+target_link_libraries(nlm-profile PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# NLM checkpoint management CLI tool
+add_executable(nlm-checkpoint
+    src/cli/CLICheckpointManager.cpp
+    src/cli/CLICheckpointManager_main.cpp
+)
+target_link_libraries(nlm-checkpoint PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# NLM debugging and visualization CLI tool
+add_executable(nlm-debug
+    src/cli/CLIDebugger.cpp
+    src/cli/CLIDebugger_main.cpp
+)
+target_link_libraries(nlm-debug PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

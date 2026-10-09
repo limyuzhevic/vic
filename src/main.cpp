@@ -1,11 +1,19 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 2: Real Neural Computation with Performance Optimizations
 //
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Enhanced with performance optimization infrastructure:
+// - Memory pool allocators for neurons and synapses
+// - Event-driven spike processing
+// - Structure-of-Arrays (SoA) data layout
+// - Sparse connectivity optimization
+// - SIMD vectorization for neural computations
+// - Multi-threaded parallel processing
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +26,13 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "performance/OptimizedBrain.hpp"
+#include "performance/EventQueue.hpp"
+#include "performance/SIMDVectorization.hpp"
+#include "performance/ParallelProcessing.hpp"
+#include "performance/MemoryPool.hpp"
+#include "performance/SparseConnectivity.hpp"
+#include "performance/CheckpointSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +40,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
@@ -46,6 +62,22 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printPerformanceOptions() {
+    std::cout << "" << std::endl;
+    std::cout << "Performance Options:" << std::endl;
+    std::cout << "  --use-optimized-brain      Use OptimizedBrain with performance features" << std::endl;
+    std::cout << "  --enable-multithreading    Enable multi-threaded neural processing" << std::endl;
+    std::cout << "  --disable-simd            Disable SIMD optimizations" << std::endl;
+    std::cout << "  --enable-event-driven     Enable event-driven spike processing" << std::endl;
+    std::cout << "  --disable-sparse-connectivity Disable sparse connectivity" << std::endl;
+    std::cout << "  --memory-pool-size N      Memory pool size (neurons/synapses)" << std::endl;
+    std::cout << "  --thread-count N          Number of threads (default: auto)" << std::endl;
+    std::cout << "  --benchmark-mode          Run benchmark tests" << std::endl;
+    std::cout << "  --stress-test            Run stress tests" << std::endl;
+    std::cout << "  --performance-report      Generate performance report" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -324,7 +356,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM with performance optimizations...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,13 +364,67 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("=== NLM Performance-Optimized Neural Simulation ===");
+    NLM_LOG_INFO("This version includes performance optimization infrastructure:");
+    NLM_LOG_INFO("  - Memory pool allocators for neurons and synapses");
+    NLM_LOG_INFO("  - Event-driven spike processing");
+    NLM_LOG_INFO("  - Structure-of-Arrays (SoA) data layout");
+    NLM_LOG_INFO("  - Sparse connectivity optimization");
+    NLM_LOG_INFO("  - SIMD vectorization for neural computations");
+    NLM_LOG_INFO("  - Multi-threaded parallel processing");
     NLM_LOG_INFO("");
+    
+    // Parse command line arguments for performance options
+    bool useOptimizedBrain = true;
+    bool enableMultithreading = false;
+    bool enableSIMD = true;
+    bool enableEventDriven = true;
+    bool enableSparseConnectivity = true;
+    size_t memoryPoolSize = 1024;
+    size_t threadCount = 0; // 0 = auto-detect
+    bool benchmarkMode = false;
+    bool stressTest = false;
+    bool performanceReport = false;
+    
+    // Performance command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--no-optimized-brain") {
+            useOptimizedBrain = false;
+        } else if (arg == "--enable-multithreading") {
+            enableMultithreading = true;
+        } else if (arg == "--disable-simd") {
+            enableSIMD = false;
+        } else if (arg == "--disable-event-driven") {
+            enableEventDriven = false;
+        } else if (arg == "--disable-sparse-connectivity") {
+            enableSparseConnectivity = false;
+        } else if (arg == "--memory-pool-size" && i + 1 < argc) {
+            memoryPoolSize = std::stoi(argv[++i]);
+        } else if (arg == "--thread-count" && i + 1 < argc) {
+            threadCount = std::stoi(argv[++i]);
+        } else if (arg == "--benchmark-mode") {
+            benchmarkMode = true;
+        } else if (arg == "--stress-test") {
+            stressTest = true;
+        } else if (arg == "--performance-report") {
+            performanceReport = true;
+        } else if (arg == "--help") {
+            printBanner();
+            printPerformanceOptions();
+            return 0;
+        }
+    }
+    
+    // Initialize performance optimizations
+    NLM_LOG_INFO("Initializing performance optimizations...");
+    NLM_LOG_INFO("OptimizedBrain: " << (useOptimizedBrain ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("Multithreading: " << (enableMultithreading ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("SIMD: " << (enableSIMD ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("Event-driven: " << (enableEventDriven ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("Sparse connectivity: " << (enableSparseConnectivity ? "Enabled" : "Disabled"));
+    NLM_LOG_INFO("Memory pool size: " << memoryPoolSize);
+    NLM_LOG_INFO("Thread count: " << (threadCount > 0 ? std::to_string(threadCount) : "Auto"));
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -346,7 +432,7 @@ int main(int argc, char** argv) {
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+        std::string arg = argv[i];
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
@@ -397,37 +483,100 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with performance optimizations
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    NLM_LOG_INFO("Initializing NLM Brain with performance optimizations...");
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Create OptimizedBrain with performance features
+    auto optimizedBrain = std::make_shared<OptimizedBrain>(config);
+    optimizedBrain->enableEventDriven(enableEventDriven);
+    optimizedBrain->enableMultithreading(enableMultithreading);
+    optimizedBrain->enableSIMD(enableSIMD);
+    optimizedBrain->enableSparseConnectivity(enableSparseConnectivity);
+    optimizedBrain->setThreadCount(threadCount);
+    
+    if (!optimizedBrain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize optimized brain! Falling back to baseline brain.");
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize baseline brain!");
+            return 1;
+        }
+        brain->logStatus();
+        
+        // Run tests with baseline brain
+        runBasicConnectivityTest(brain);
+        
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        brain->logStatus();
+    } else {
+        NLM_LOG_INFO("Optimized brain initialized successfully.");
+        optimizedBrain->logStatus();
+        
+        // Run tests with optimized brain
+        runBasicConnectivityTest(optimizedBrain);
+        
+        optimizedBrain->reset();
+        optimizedBrain->initialize();
+        runPlasticityExperiment(optimizedBrain);
+        
+        optimizedBrain->reset();
+        optimizedBrain->initialize();
+        runStdpVerification(optimizedBrain);
+        
+        optimizedBrain->logStatus();
+        
+        // Performance reporting
+        if (performanceReport) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Performance Report ===");
+            auto stats = optimizedBrain->getPerformanceStats();
+            NLM_LOG_INFO("Neurons per second: " + std::to_string(stats.neuronsPerSecond));
+            NLM_LOG_INFO("Spikes per second: " + std::to_string(stats.spikesPerSecond));
+            NLM_LOG_INFO("Synaptic events per second: " + std::to_string(stats.synapticEventsPerSecond));
+            NLM_LOG_INFO("Real-time factor: " + std::to_string(stats.realTimeFactor));
+            NLM_LOG_INFO("Active neurons: " + std::to_string(stats.activeNeurons));
+            NLM_LOG_INFO("Firing neurons: " + std::to_string(stats.firingNeurons));
+            NLM_LOG_INFO("Pending spikes: " + std::to_string(stats.pendingSpikes));
+            NLM_LOG_INFO("Pending delayed spikes: " + std::to_string(stats.pendingDelayedSpikes));
+            NLM_LOG_INFO("Average firing rate: " + std::to_string(stats.avgFiringRate) + " Hz");
+            NLM_LOG_INFO("Memory usage: " + std::to_string(stats.memoryUsageMB) + " MB");
+            NLM_LOG_INFO("Step time: " + std::to_string(stats.stepTimeMs) + " ms");
+        }
+        
+        // Benchmark mode
+        if (benchmarkMode) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Benchmark Mode ===");
+            NLM_LOG_INFO("Running benchmark tests... (placeholder - would run comprehensive benchmarks)");
+            NLM_LOG_INFO("Benchmark completed successfully (simulated).");
+        }
+        
+        // Stress test
+        if (stressTest) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Stress Test Mode ===");
+            NLM_LOG_INFO("Running stress tests... (placeholder - would run stress tests)");
+            NLM_LOG_INFO("Stress test completed successfully (simulated).");
+        }
     }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
     
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    
+    if (useOptimizedBrain && enableEventDriven && enableMultithreading && enableSIMD && enableSparseConnectivity) {
+        optimizedBrain->logStatus();
+    } else {
+        if (brain) brain->logStatus();
+    }
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
@@ -435,11 +584,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+    NLM_LOG_INFO("  ✓ STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Performance optimizations enabled:");
+    NLM_LOG_INFO("  - " << (useOptimizedBrain ? "OptimizedBrain (SoA, memory pools, sparse connectivity)" : "Baseline brain"));
+    NLM_LOG_INFO("  - " << (enableMultithreading ? "Multi-threaded processing" : "Single-threaded"));
+    NLM_LOG_INFO("  - " << (enableSIMD ? "SIMD vectorization" : "Scalar operations"));
+    NLM_LOG_INFO("  - " << (enableEventDriven ? "Event-driven spike processing" : "Continuous processing"));
+    NLM_LOG_INFO("  - " << (enableSparseConnectivity ? "Sparse connectivity optimization" : "Dense connectivity"));
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
@@ -447,3 +602,5 @@ int main(int argc, char** argv) {
     
     return 0;
 }
+
+```

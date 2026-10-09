@@ -452,9 +452,947 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
+```
+
 ---
 
-## Part 5: Example Scripts
+## Part 5: Advanced Examples
+
+The following examples demonstrate practical applications and advanced usage patterns for NLM.
+
+### 5.1 Realistic Agent with Learning and Memory
+
+This example shows how to create an agent that learns from experience, uses memory systems, and develops over time.
+
+```python
+import pynlm
+import random
+import statistics
+import time
+import json
+
+def run_realistic_agent_simulation(episodes=1000):
+    """
+    Run a realistic agent simulation with learning, memory, and decision making.
+    This example shows how to create an agent that learns from experience.
+    """
+    # 1. Configure the brain with realistic parameters
+    config = pynlm.createDefaultConfig()
+    
+    # Advanced brain configuration
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.synapse_density", 0.12)
+    config.set("brain.connection_probability", 0.04)
+    config.set("brain.v_thresh", -50.0)
+    config.set("brain.v_rest", -70.0)
+    config.set("brain.tau_mem", 20.0)
+    
+    # Enable advanced plasticity
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.002)
+    config.set("plasticity.stdp.tau_plus", 15.0)
+    config.set("plasticity.stdp.tau_minus", 15.0)
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.hebbian.strength", 0.3)
+    config.set("plasticity.structural.enable", True)
+    config.set("plasticity.structural.rate", 0.01)
+    
+    # Advanced neuromodulation
+    config.set("neuromod.dopamine.scale", 1.5)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.curiosity.sensitivity", 0.8)
+    config.set("neuromod.curiosity.exploration_bonus", 0.4)
+    config.set("neuromod.novelty.enable", True)
+    config.set("neuromod.novelty.threshold", 0.35)
+    config.set("neuromod.development.enable", True)
+    config.set("neuromod.development.boost", 1.2)
+    
+    # 2. Create the brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create the world environment
+    world = pynlm.createSimpleWorld()
+    world.configure(
+        width=30, 
+        height=30, 
+        visionWidth=10, 
+        visionHeight=10
+    )
+    world.setMaxEnergy(1000.0)
+    world.setRandomSeed(42)  # For reproducible experiments
+    
+    # Add environmental elements
+    _add_environment_elements(world)
+    
+    # Set starting position
+    world.setAgentStart(15.0, 15.0)
+    world.reset()
+    
+    # 4. Create agent interface
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # 5. Enable all learning subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print(f"Starting Realistic Agent Simulation")
+    print(f"=================================")
+    print(f"Brain: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+    print(f"World: {world.getWidth()}x{world.getHeight()}, vision: {world.getVisionWidth()}x{world.getVisionHeight()}")
+    print(f"Episodes: {episodes}")
+    print()
+    
+    # 6. Simulation data collection
+    episode_data = []
+    learning_curve = []
+    curiosity_over_time = []
+    prediction_errors = []
+    
+    # 7. Run simulation
+    for episode in range(episodes):
+        episode_stats = {
+            'episode': episode,
+            'steps': 0,
+            'total_reward': 0.0,
+            'max_curiosity': 0.0,
+            'avg_prediction_error': 0.0,
+            'final_firing_rate': 0.0,
+            'novel_events': 0
+        }
+        
+        # Reset environment for new episode
+        world.reset()
+        world.setAgentStart(15.0, 15.0)
+        
+        # Run episode
+        for step in range(50):  # 50 steps per episode
+            # World update
+            world.update(0.05)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent.processSensoryInput(percept)
+            
+            # Brain computation
+            brain.step(step)
+            
+            # Decode action
+            action = agent.decodeMotorCommand()
+            
+            # Apply action and get results
+            action_result = world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Apply reward modulation with exploration bonus
+            reward = action_result.reward
+            if agent.getCuriosityLevel() > 0.5:  # Curiosity-driven exploration
+                reward += 0.2
+            
+            agent.applyRewardModulation(reward, brain.getPredictionError())
+            
+            # Update development
+            agent.updateDevelopment(0.05)
+            
+            # Collect statistics
+            episode_stats['steps'] += 1
+            episode_stats['total_reward'] += reward
+            episode_stats['max_curiosity'] = max(episode_stats['max_curiosity'], agent.getCuriosityLevel())
+            episode_stats['avg_prediction_error'] += agent.getPredictionError()
+            episode_stats['final_firing_rate'] = brain.getAverageFiringRate()
+            
+            # Check for novel events
+            if agent.getNoveltyLevel() > 0.7:
+                episode_stats['novel_events'] += 1
+        
+        # Calculate episode averages
+        episode_stats['avg_prediction_error'] /= episode_stats['steps']
+        
+        # Store episode data
+        episode_data.append(episode_stats)
+        learning_curve.append(episode_stats['total_reward'])
+        curiosity_over_time.append(episode_stats['max_curiosity'])
+        prediction_errors.append(episode_stats['avg_prediction_error'])
+        
+        # Print progress every 100 episodes
+        if episode % 100 == 0:
+            print(f"Episode {episode + 1}/{episodes}")
+            print(f"  Total Reward: {episode_stats['total_reward']:.2f}")
+            print(f"  Max Curiosity: {episode_stats['max_curiosity']:.3f}")
+            print(f"  Avg Prediction Error: {episode_stats['avg_prediction_error']:.3f}")
+            print(f"  Novel Events: {episode_stats['novel_events']}")
+            print(f"  Firing Rate: {episode_stats['final_firing_rate']:.2f} Hz")
+            print()
+    
+    # 8. Analyze results
+    print(f"Simulation Complete!")
+    print(f"==================")
+    
+    final_stats = episode_data[-1]
+    
+    print(f"Final Performance:")
+    print(f"  Total Reward: {final_stats['total_reward']:.2f}")
+    print(f"  Average Curiosity: {statistics.mean(curiosity_over_time):.3f}")
+    print(f"  Average Prediction Error: {statistics.mean(prediction_errors):.3f}")
+    print(f"  Final Firing Rate: {final_stats['final_firing_rate']:.2f} Hz")
+    
+    # Calculate learning metrics
+    mid_point = len(learning_curve) // 2
+    first_half_avg = statistics.mean(learning_curve[:mid_point])
+    second_half_avg = statistics.mean(learning_curve[mid_point:])
+    learning_improvement = ((second_half_avg - first_half_avg) / first_half_avg) * 100 if first_half_avg > 0 else 0
+    
+    print(f"\nLearning Analysis:")
+    print(f"  First Half Average Reward: {first_half_avg:.2f}")
+    print(f"  Second Half Average Reward: {second_half_avg:.2f}")
+    print(f"  Learning Improvement: {learning_improvement:.1f}%")
+    
+    # Check for convergence
+    last_10_episodes = learning_curve[-10:]
+    episode_variance = statistics.stdev(last_10_episodes) if len(last_10_episodes) > 1 else 0
+    
+    print(f"\nConvergence Analysis:")
+    print(f"  Last 10 Episodes Variance: {episode_variance:.3f}")
+    print(f"  Performance Stable: {'Yes' if episode_variance < 0.5 else 'No'}")
+    
+    # Save results
+    _save_simulation_results(episode_data, learning_curve, curiosity_over_time, prediction_errors)
+    
+    # Save final brain state
+    brain.save("realistic_agent_final_brain.bin")
+    print(f"\nFinal brain state saved to realistic_agent_final_brain.bin")
+    
+    return episode_data
+
+# Helper functions for realistic simulation
+def _add_environment_elements(world):
+    """Add environmental elements like resources and hazards."""
+    # Add resources
+    for _ in range(8):
+        x = random.uniform(5, 25)
+        y = random.uniform(5, 25)
+        resource = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=5.0)
+        world.addObject(resource)
+    
+    # Add hazards
+    for _ in range(3):
+        x = random.uniform(25, 35)
+        y = random.uniform(25, 35)
+        hazard = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Hazard, value=-3.0)
+        world.addObject(hazard)
+    
+    # Add walls
+    for x in [0, 40]:
+        for y in range(0, 41, 2):
+            wall = pynlm.WorldObject(float(x), float(y), pynlm.WorldObjectType.Wall, value=0.0)
+            world.addObject(wall)
+    
+    for y in [0, 40]:
+        for x in range(0, 41, 2):
+            wall = pynlm.WorldObject(float(x), float(y), pynlm.WorldObjectType.Wall, value=0.0)
+            world.addObject(wall)
+
+def _save_simulation_results(episode_data, learning_curve, curiosity_over_time, prediction_errors):
+    """Save simulation results to files."""
+    results = {
+        'episode_data': episode_data,
+        'learning_curve': learning_curve,
+        'curiosity_over_time': curiosity_over_time,
+        'prediction_errors': prediction_errors,
+        'metadata': {
+            'simulation_type': 'realistic_agent',
+            'total_episodes': len(episode_data),
+            'timestamp': time.time()
+        }
+    }
+    
+    with open('realistic_agent_results.json', 'w') as f:
+        json.dump(results, f, indent=2, default=str)
+    
+    print(f"Simulation results saved to realistic_agent_results.json")
+
+# Run the realistic simulation (uncomment to execute)
+# simulation_data = run_realistic_agent_simulation(1000)
+```
+
+### 5.2 Multi-Agent System
+
+```python
+import pynlm
+import random
+import statistics
+import time
+import json
+
+def run_multi_agent_simulation(num_agents=3, episodes=500):
+    """
+    Run a multi-agent simulation where multiple agents learn together.
+    This example shows interaction between multiple NLM brains.
+    """
+    print(f"Multi-Agent Simulation with {num_agents} Agents")
+    print("=" * 45)
+    
+    # Create shared world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=12, visionHeight=12)
+    world.setMaxEnergy(5000.0)
+    world.setRandomSeed(123)
+    world.reset()
+    
+    # Add shared environmental elements
+    for _ in range(15):
+        x = random.uniform(10, 40)
+        y = random.uniform(10, 40)
+        resource = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=3.0)
+        world.addObject(resource)
+    
+    # Create multiple agents with different configurations
+    agents = []
+    brains = []
+    
+    for agent_id in range(num_agents):
+        # Each agent can have different characteristics
+        config = pynlm.createDefaultConfig()
+        
+        # Vary parameters to create different agent types
+        if agent_id == 0:
+            # Fast learner
+            config.set("brain.neuron_count", 1500)
+            config.set("plasticity.stdp.learning_rate", 0.003)
+            config.set("neuromod.curiosity.sensitivity", 0.9)
+            agent_type = "Fast Learner"
+        elif agent_id == 1:
+            # Conservative learner
+            config.set("brain.neuron_count", 3000)
+            config.set("plasticity.stdp.learning_rate", 0.001)
+            config.set("neuromod.curiosity.sensitivity", 0.5)
+            agent_type = "Conservative"
+        else:
+            # Curious explorer
+            config.set("brain.neuron_count", 2000)
+            config.set("plasticity.stdp.learning_rate", 0.002)
+            config.set("neuromod.curiosity.sensitivity", 0.8)
+            config.set("neuromod.novelty.threshold", 0.2)
+            agent_type = "Curious Explorer"
+        
+        # Set different starting positions
+        start_x = 10 + agent_id * 15
+        start_y = 10 + agent_id * 10
+        
+        # Create brain and agent
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable all features
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        agents.append(agent)
+        brains.append(brain)
+        
+        print(f"Agent {agent_id + 1} ({agent_type}): {brain.getTotalNeuronCount()} neurons")
+    
+    # Multi-agent simulation
+    print(f"\nRunning Multi-Agent Simulation ({episodes} episodes)")
+    
+    # Track social learning
+    social_interactions = []
+    agent_performance = []
+    
+    for episode in range(episodes):
+        episode_data = {
+            'episode': episode,
+            'total_reward': 0.0,
+            'individual_rewards': [],
+            'social_events': 0,
+            'coordination_events': 0
+        }
+        
+        # Reset world for new episode
+        world.reset()
+        
+        # Reset all agents
+        for agent in agents:
+            agent.reset()
+        
+        # Run episode for all agents
+        for step in range(30):
+            # Update world
+            world.update(0.04)
+            
+            # Each agent perceives the same world state
+            percept = world.getSensoryPercept()
+            
+            # Process through all agents
+            agent_rewards = []
+            for agent_idx, agent in enumerate(agents):
+                agent.processSensoryInput(percept)
+                brain.step(step)
+                
+                action = agent.decodeMotorCommand()
+                action_result = world.applyMotorCommand(action, world.getSimulationTime())
+                
+                agent.applyRewardModulation(action_result.reward, brain.getPredictionError())
+                agent.updateDevelopment(0.04)
+                
+                agent_rewards.append(action_result.reward)
+            
+            # Check for social interactions
+            reward_variance = max(agent_rewards) - min(agent_rewards)
+            if reward_variance > 2.0:  # High variance indicates potential social learning opportunity
+                episode_data['social_events'] += 1
+            
+            if len(agent_rewards) > 1:
+                # Simple coordination check (all agents getting similar rewards)
+                avg_reward = sum(agent_rewards) / len(agent_rewards)
+                coordination = all(abs(r - avg_reward) < 1.0 for r in agent_rewards)
+                if coordination:
+                    episode_data['coordination_events'] += 1
+            
+            episode_data['individual_rewards'].append(agent_rewards)
+            episode_data['total_reward'] += sum(agent_rewards)
+        
+        agent_performance.append(episode_data)
+        
+        if episode % 100 == 0:
+            print(f"Episode {episode + 1}/{episodes}")
+            print(f"  Total Reward: {episode_data['total_reward']:.2f}")
+            print(f"  Social Events: {episode_data['social_events']}")
+            print(f"  Coordination Events: {episode_data['coordination_events']}")
+    
+    # Analyze multi-agent results
+    print(f"\nMulti-Agent Analysis:")
+    
+    total_reward = sum(ep['total_reward'] for ep in agent_performance)
+    avg_social_events = sum(ep['social_events'] for ep in agent_performance) / len(agent_performance)
+    avg_coordination = sum(ep['coordination_events'] for ep in agent_performance) / len(agent_performance)
+    
+    print(f"  Total Reward: {total_reward:.2f}")
+    print(f"  Average Social Events: {avg_social_events:.1f}")
+    print(f"  Average Coordination Events: {avg_coordination:.1f}")
+    
+    # Individual agent performance
+    print(f"\nIndividual Agent Performance:")
+    for i, brain in enumerate(brains):
+        final_firing_rate = brain.getAverageFiringRate()
+        total_spikes = brain.getTotalSpikeCount()
+        print(f"  Agent {i + 1}: {final_firing_rate:.2f} Hz, {total_spikes} total spikes")
+    
+    # Save multi-agent results
+    multi_agent_results = {
+        'agent_performance': agent_performance,
+        'num_agents': num_agents,
+        'episodes': episodes,
+        'final_brain_states': [
+            {
+                'neuron_count': brain.getTotalNeuronCount(),
+                'synapse_count': brain.getTotalSynapseCount(),
+                'total_spikes': brain.getTotalSpikeCount(),
+                'average_firing_rate': brain.getAverageFiringRate()
+            }
+            for brain in brains
+        ],
+        'timestamp': time.time()
+    }
+    
+    with open('multi_agent_results.json', 'w') as f:
+        json.dump(multi_agent_results, f, indent=2, default=str)
+    
+    print(f"\nMulti-agent results saved to multi_agent_results.json")
+    
+    # Save all brain states
+    for i, brain in enumerate(brains):
+        brain.save(f"multi_agent_{i+1}_brain.bin")
+    
+    print(f"Individual brain states saved")
+    
+    print(f"\nMulti-agent simulation complete!")
+    return agent_performance
+
+# Run the multi-agent simulation (uncomment to execute)
+# multi_agent_data = run_multi_agent_simulation(3, 500)
+```
+
+---
+
+## Part 3: Advanced Examples
+
+The following examples demonstrate practical applications and advanced usage patterns for NLM.
+
+### 3.1 Realistic Agent with Learning and Memory
+
+This example shows how to create an agent that learns from experience, uses memory systems, and develops over time.
+
+```python
+import pynlm
+import random
+import statistics
+import time
+import json
+
+def run_realistic_agent_simulation(episodes=1000):
+    """
+    Run a realistic agent simulation with learning, memory, and decision making.
+    This example shows how to create an agent that learns from experience.
+    """
+    # 1. Configure the brain with realistic parameters
+    config = pynlm.createDefaultConfig()
+    
+    # Advanced brain configuration
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.synapse_density", 0.12)
+    config.set("brain.connection_probability", 0.04)
+    config.set("brain.v_thresh", -50.0)
+    config.set("brain.v_rest", -70.0)
+    config.set("brain.tau_mem", 20.0)
+    
+    # Enable advanced plasticity
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.002)
+    config.set("plasticity.stdp.tau_plus", 15.0)
+    config.set("plasticity.stdp.tau_minus", 15.0)
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.hebbian.strength", 0.3)
+    config.set("plasticity.structural.enable", True)
+    config.set("plasticity.structural.rate", 0.01)
+    
+    # Advanced neuromodulation
+    config.set("neuromod.dopamine.scale", 1.5)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.curiosity.sensitivity", 0.8)
+    config.set("neuromod.curiosity.exploration_bonus", 0.4)
+    config.set("neuromod.novelty.enable", True)
+    config.set("neuromod.novelty.threshold", 0.35)
+    config.set("neuromod.development.enable", True)
+    config.set("neuromod.development.boost", 1.2)
+    
+    # 2. Create the brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create the world environment
+    world = pynlm.createSimpleWorld()
+    world.configure(
+        width=30, 
+        height=30, 
+        visionWidth=10, 
+        visionHeight=10
+    )
+    world.setMaxEnergy(1000.0)
+    world.setRandomSeed(42)  # For reproducible experiments
+    
+    # Add environmental elements
+    _add_environment_elements(world)
+    
+    # Set starting position
+    world.setAgentStart(15.0, 15.0)
+    world.reset()
+    
+    # 4. Create agent interface
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # 5. Enable all learning subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print(f"Starting Realistic Agent Simulation")
+    print(f"=================================")
+    print(f"Brain: {brain.getTotalNeuronCount()} neurons, {brain.getTotalSynapseCount()} synapses")
+    print(f"World: {world.getWidth()}x{world.getHeight()}, vision: {world.getVisionWidth()}x{world.getVisionHeight()}")
+    print(f"Episodes: {episodes}")
+    print()
+    
+    # 6. Simulation data collection
+    episode_data = []
+    learning_curve = []
+    curiosity_over_time = []
+    prediction_errors = []
+    
+    # 7. Run simulation
+    for episode in range(episodes):
+        episode_stats = {
+            'episode': episode,
+            'steps': 0,
+            'total_reward': 0.0,
+            'max_curiosity': 0.0,
+            'avg_prediction_error': 0.0,
+            'final_firing_rate': 0.0,
+            'novel_events': 0
+        }
+        
+        # Reset environment for new episode
+        world.reset()
+        world.setAgentStart(15.0, 15.0)
+        
+        # Run episode
+        for step in range(50):  # 50 steps per episode
+            # World update
+            world.update(0.05)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent.processSensoryInput(percept)
+            
+            # Brain computation
+            brain.step(step)
+            
+            # Decode action
+            action = agent.decodeMotorCommand()
+            
+            # Apply action and get results
+            action_result = world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Apply reward modulation with exploration bonus
+            reward = action_result.reward
+            if agent.getCuriosityLevel() > 0.5:  # Curiosity-driven exploration
+                reward += 0.2
+            
+            agent.applyRewardModulation(reward, brain.getPredictionError())
+            
+            # Update development
+            agent.updateDevelopment(0.05)
+            
+            # Collect statistics
+            episode_stats['steps'] += 1
+            episode_stats['total_reward'] += reward
+            episode_stats['max_curiosity'] = max(episode_stats['max_curiosity'], agent.getCuriosityLevel())
+            episode_stats['avg_prediction_error'] += agent.getPredictionError()
+            episode_stats['final_firing_rate'] = brain.getAverageFiringRate()
+            
+            # Check for novel events
+            if agent.getNoveltyLevel() > 0.7:
+                episode_stats['novel_events'] += 1
+        
+        # Calculate episode averages
+        episode_stats['avg_prediction_error'] /= episode_stats['steps']
+        
+        # Store episode data
+        episode_data.append(episode_stats)
+        learning_curve.append(episode_stats['total_reward'])
+        curiosity_over_time.append(episode_stats['max_curiosity'])
+        prediction_errors.append(episode_stats['avg_prediction_error'])
+        
+        # Print progress every 100 episodes
+        if episode % 100 == 0:
+            print(f"Episode {episode + 1}/{episodes}")
+            print(f"  Total Reward: {episode_stats['total_reward']:.2f}")
+            print(f"  Max Curiosity: {episode_stats['max_curiosity']:.3f}")
+            print(f"  Avg Prediction Error: {episode_stats['avg_prediction_error']:.3f}")
+            print(f"  Novel Events: {episode_stats['novel_events']}")
+            print(f"  Firing Rate: {episode_stats['final_firing_rate']:.2f} Hz")
+            print()
+    
+    # 8. Analyze results
+    print(f"Simulation Complete!")
+    print(f"==================")
+    
+    final_stats = episode_data[-1]
+    
+    print(f"Final Performance:")
+    print(f"  Total Reward: {final_stats['total_reward']:.2f}")
+    print(f"  Average Curiosity: {statistics.mean(curiosity_over_time):.3f}")
+    print(f"  Average Prediction Error: {statistics.mean(prediction_errors):.3f}")
+    print(f"  Final Firing Rate: {final_stats['final_firing_rate']:.2f} Hz")
+    
+    # Calculate learning metrics
+    mid_point = len(learning_curve) // 2
+    first_half_avg = statistics.mean(learning_curve[:mid_point])
+    second_half_avg = statistics.mean(learning_curve[mid_point:])
+    learning_improvement = ((second_half_avg - first_half_avg) / first_half_avg) * 100 if first_half_avg > 0 else 0
+    
+    print(f"\nLearning Analysis:")
+    print(f"  First Half Average Reward: {first_half_avg:.2f}")
+    print(f"  Second Half Average Reward: {second_half_avg:.2f}")
+    print(f"  Learning Improvement: {learning_improvement:.1f}%")
+    
+    # Check for convergence
+    last_10_episodes = learning_curve[-10:]
+    episode_variance = statistics.stdev(last_10_episodes) if len(last_10_episodes) > 1 else 0
+    
+    print(f"\nConvergence Analysis:")
+    print(f"  Last 10 Episodes Variance: {episode_variance:.3f}")
+    print(f"  Performance Stable: {'Yes' if episode_variance < 0.5 else 'No'}")
+    
+    # Save results
+    _save_simulation_results(episode_data, learning_curve, curiosity_over_time, prediction_errors)
+    
+    # Save final brain state
+    brain.save("realistic_agent_final_brain.bin")
+    print(f"\nFinal brain state saved to realistic_agent_final_brain.bin")
+    
+    return episode_data
+
+# Helper functions for realistic simulation
+def _add_environment_elements(world):
+    """Add environmental elements like resources and hazards."""
+    # Add resources
+    for _ in range(8):
+        x = random.uniform(5, 25)
+        y = random.uniform(5, 25)
+        resource = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=5.0)
+        world.addObject(resource)
+    
+    # Add hazards
+    for _ in range(3):
+        x = random.uniform(25, 35)
+        y = random.uniform(25, 35)
+        hazard = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Hazard, value=-3.0)
+        world.addObject(hazard)
+    
+    # Add walls
+    for x in [0, 40]:
+        for y in range(0, 41, 2):
+            wall = pynlm.WorldObject(float(x), float(y), pynlm.WorldObjectType.Wall, value=0.0)
+            world.addObject(wall)
+    
+    for y in [0, 40]:
+        for x in range(0, 41, 2):
+            wall = pynlm.WorldObject(float(x), float(y), pynlm.WorldObjectType.Wall, value=0.0)
+            world.addObject(wall)
+
+def _save_simulation_results(episode_data, learning_curve, curiosity_over_time, prediction_errors):
+    """Save simulation results to files."""
+    results = {
+        'episode_data': episode_data,
+        'learning_curve': learning_curve,
+        'curiosity_over_time': curiosity_over_time,
+        'prediction_errors': prediction_errors,
+        'metadata': {
+            'simulation_type': 'realistic_agent',
+            'total_episodes': len(episode_data),
+            'timestamp': time.time()
+        }
+    }
+    
+    with open('realistic_agent_results.json', 'w') as f:
+        json.dump(results, f, indent=2, default=str)
+    
+    print(f"Simulation results saved to realistic_agent_results.json")
+
+# Run the realistic simulation (uncomment to execute)
+# simulation_data = run_realistic_agent_simulation(1000)
+```
+
+### 3.2 Multi-Agent System
+
+```python
+import pynlm
+import random
+import statistics
+import time
+import json
+
+def run_multi_agent_simulation(num_agents=3, episodes=500):
+    """
+    Run a multi-agent simulation where multiple agents learn together.
+    This example shows interaction between multiple NLM brains.
+    """
+    print(f"Multi-Agent Simulation with {num_agents} Agents")
+    print("=" * 45)
+    
+    # Create shared world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=12, visionHeight=12)
+    world.setMaxEnergy(5000.0)
+    world.setRandomSeed(123)
+    world.reset()
+    
+    # Add shared environmental elements
+    for _ in range(15):
+        x = random.uniform(10, 40)
+        y = random.uniform(10, 40)
+        resource = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=3.0)
+        world.addObject(resource)
+    
+    # Create multiple agents with different configurations
+    agents = []
+    brains = []
+    
+    for agent_id in range(num_agents):
+        # Each agent can have different characteristics
+        config = pynlm.createDefaultConfig()
+        
+        # Vary parameters to create different agent types
+        if agent_id == 0:
+            # Fast learner
+            config.set("brain.neuron_count", 1500)
+            config.set("plasticity.stdp.learning_rate", 0.003)
+            config.set("neuromod.curiosity.sensitivity", 0.9)
+            agent_type = "Fast Learner"
+        elif agent_id == 1:
+            # Conservative learner
+            config.set("brain.neuron_count", 3000)
+            config.set("plasticity.stdp.learning_rate", 0.001)
+            config.set("neuromod.curiosity.sensitivity", 0.5)
+            agent_type = "Conservative"
+        else:
+            # Curious explorer
+            config.set("brain.neuron_count", 2000)
+            config.set("plasticity.stdp.learning_rate", 0.002)
+            config.set("neuromod.curiosity.sensitivity", 0.8)
+            config.set("neuromod.novelty.threshold", 0.2)
+            agent_type = "Curious Explorer"
+        
+        # Set different starting positions
+        start_x = 10 + agent_id * 15
+        start_y = 10 + agent_id * 10
+        
+        # Create brain and agent
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable all features
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        agents.append(agent)
+        brains.append(brain)
+        
+        print(f"Agent {agent_id + 1} ({agent_type}): {brain.getTotalNeuronCount()} neurons")
+    
+    # Multi-agent simulation
+    print(f"\nRunning Multi-Agent Simulation ({episodes} episodes)")
+    
+    # Track social learning
+    social_interactions = []
+    agent_performance = []
+    
+    for episode in range(episodes):
+        episode_data = {
+            'episode': episode,
+            'total_reward': 0.0,
+            'individual_rewards': [],
+            'social_events': 0,
+            'coordination_events': 0
+        }
+        
+        # Reset world for new episode
+        world.reset()
+        
+        # Reset all agents
+        for agent in agents:
+            agent.reset()
+        
+        # Run episode for all agents
+        for step in range(30):
+            # Update world
+            world.update(0.04)
+            
+            # Each agent perceives the same world state
+            percept = world.getSensoryPercept()
+            
+            # Process through all agents
+            agent_rewards = []
+            for agent_idx, agent in enumerate(agents):
+                agent.processSensoryInput(percept)
+                brain.step(step)
+                
+                action = agent.decodeMotorCommand()
+                action_result = world.applyMotorCommand(action, world.getSimulationTime())
+                
+                agent.applyRewardModulation(action_result.reward, brain.getPredictionError())
+                agent.updateDevelopment(0.04)
+                
+                agent_rewards.append(action_result.reward)
+            
+            # Check for social interactions
+            reward_variance = max(agent_rewards) - min(agent_rewards)
+            if reward_variance > 2.0:  # High variance indicates potential social learning opportunity
+                episode_data['social_events'] += 1
+            
+            if len(agent_rewards) > 1:
+                # Simple coordination check (all agents getting similar rewards)
+                avg_reward = sum(agent_rewards) / len(agent_rewards)
+                coordination = all(abs(r - avg_reward) < 1.0 for r in agent_rewards)
+                if coordination:
+                    episode_data['coordination_events'] += 1
+            
+            episode_data['individual_rewards'].append(agent_rewards)
+            episode_data['total_reward'] += sum(agent_rewards)
+        
+        agent_performance.append(episode_data)
+        
+        if episode % 100 == 0:
+            print(f"Episode {episode + 1}/{episodes}")
+            print(f"  Total Reward: {episode_data['total_reward']:.2f}")
+            print(f"  Social Events: {episode_data['social_events']}")
+            print(f"  Coordination Events: {episode_data['coordination_events']}")
+    
+    # Analyze multi-agent results
+    print(f"\nMulti-Agent Analysis:")
+    
+    total_reward = sum(ep['total_reward'] for ep in agent_performance)
+    avg_social_events = sum(ep['social_events'] for ep in agent_performance) / len(agent_performance)
+    avg_coordination = sum(ep['coordination_events'] for ep in agent_performance) / len(agent_performance)
+    
+    print(f"  Total Reward: {total_reward:.2f}")
+    print(f"  Average Social Events: {avg_social_events:.1f}")
+    print(f"  Average Coordination Events: {avg_coordination:.1f}")
+    
+    # Individual agent performance
+    print(f"\nIndividual Agent Performance:")
+    for i, brain in enumerate(brains):
+        final_firing_rate = brain.getAverageFiringRate()
+        total_spikes = brain.getTotalSpikeCount()
+        print(f"  Agent {i + 1}: {final_firing_rate:.2f} Hz, {total_spikes} total spikes")
+    
+    # Save multi-agent results
+    multi_agent_results = {
+        'agent_performance': agent_performance,
+        'num_agents': num_agents,
+        'episodes': episodes,
+        'final_brain_states': [
+            {
+                'neuron_count': brain.getTotalNeuronCount(),
+                'synapse_count': brain.getTotalSynapseCount(),
+                'total_spikes': brain.getTotalSpikeCount(),
+                'average_firing_rate': brain.getAverageFiringRate()
+            }
+            for brain in brains
+        ],
+        'timestamp': time.time()
+    }
+    
+    with open('multi_agent_results.json', 'w') as f:
+        json.dump(multi_agent_results, f, indent=2, default=str)
+    
+    print(f"\nMulti-agent results saved to multi_agent_results.json")
+    
+    # Save all brain states
+    for i, brain in enumerate(brains):
+        brain.save(f"multi_agent_{i+1}_brain.bin")
+    
+    print(f"Individual brain states saved")
+    
+    print(f"\nMulti-agent simulation complete!")
+    return agent_performance
+
+# Run the multi-agent simulation (uncomment to execute)
+# multi_agent_data = run_multi_agent_simulation(3, 500)
+```
+
+---
+
+## Part 4: Configuration Options
 
 ### Minimal Example
 

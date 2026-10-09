@@ -287,10 +287,396 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Examples (Building on Basic Knowledge)
+
+Now that you understand the basics, let's look at more complex examples that utilize all the features.
+
+### Example 1: Learning through Play
+
+This example shows how an agent learns to explore and discover resources in its environment using curiosity and reward modulation.
+
+```python
+import pynlm
+import time
+import random
+
+def run_learning_simulation():
+    # Create brain with larger capacity for learning
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.synapse_density", 0.15)
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.001)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    config.set("neuromod.dopamine.scale", 2.0)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+    world.setMaxEnergy(1000.0)
+    world.reset()
+    
+    # Place some resources in the world
+    agent_start_x, agent_start_y = 15.0, 15.0
+    world.setAgentStart(agent_start_x, agent_start_y)
+    
+    # Add resources randomly
+    for _ in range(10):
+        x = random.uniform(0, 30)
+        y = random.uniform(0, 30)
+        obj = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=5.0)
+        world.addObject(obj)
+    
+    # Add hazards (optional)
+    for _ in range(3):
+        x = random.uniform(0, 30)
+        y = random.uniform(0, 30)
+        hazard = pynlm.WorldObject(x, y, pynlm.WorldObjectType.Hazard, value=-2.0)
+        world.addObject(hazard)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all learning features
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("Starting learning simulation...")
+    print("Features enabled: Reward modulation, Structural plasticity, Development, Curiosity")
+    
+    for step in range(1000):
+        world.update(0.05)
+        
+        # Get what agent sees
+        percept = world.getSensoryPercept()
+        
+        # Brain processes sensory input
+        agent.processSensoryInput(percept)
+        
+        # Brain thinks
+        brain.step(step)
+        
+        # Brain decides action
+        action = agent.decodeMotorCommand()
+        
+        # World applies action and returns result
+        action_result = world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward with prediction error
+        agent.applyRewardModulation(
+            action_result.reward, 
+            brain.getPredictionError()
+        )
+        
+        # Update development
+        agent.updateDevelopment(0.05)
+        
+        # Print stats every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+            print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Agent energy: {world.getAgentBody().energy:.1f}")
+            print(f"  Agent age: {world.getAgentBody().age}")
+    
+    print("\nLearning simulation complete!")
+    print(f"Final brain size: {brain.getTotalNeuronCount()} neurons")
+    print(f"Total synapses: {brain.getTotalSynapseCount()}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+
+# Run the example
+run_learning_simulation()
+```
+
+### Example 2: Memory System Demonstration
+
+This example demonstrates how different memory systems work together in NLM.
+
+```python
+import pynlm
+
+def demonstrate_memory_systems():
+    """Demonstrate working memory, episodic memory, and associative memory."""
+    
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 1500)
+    config.set("plasticity.structural.enable", True)
+    config.set("neuromod.curiosity.enable", True)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=6, visionHeight=6)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Create a memory episode
+    print("Demonstrating memory systems...")
+    
+    for episode in range(3):
+        print(f"\n--- Episode {episode + 1} ---")
+        
+        for step in range(50):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            agent.updateDevelopment(0.1)
+            
+            if step % 10 == 0:
+                # Monitor memory state
+                print(f"Step {step}: Firing {brain.getFiringNeuronCount()} neurons, "
+                      f"Memory patterns active: {brain.getActiveNeuronCount()}")
+                print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                print(f"  Prediction error: {agent.getPredictionError():.3f}")
+    
+    # Demonstrate checkpointing
+    print("\n--- Demonstrating Checkpointing ---")
+    brain.save("memory_demo_checkpoint.bin")
+    print(f"Saved brain state with {brain.getTotalNeuronCount()} neurons")
+    print(f"Brain has {brain.getTotalSynapseCount()} synapses")
+    
+    # Modify brain
+    for _ in range(200):
+        world.reset()
+        agent.reset()
+        for step in range(30):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Load checkpoint
+    brain.load("memory_demo_checkpoint.bin")
+    print("Loaded brain state - demonstration complete")
+
+# Run memory demonstration
+demonstrate_memory_systems()
+```
+
+### Example 3: Neuromodulation Integration
+
+This example shows how different neuromodulators work together to control behavior.
+
+```python
+import pynlm
+
+def demonstrate_neuromodulation():
+    """Demonstrate integration of neuromodulator systems."""
+    
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 1200)
+    config.set("neuromod.dopamine.scale", 1.5)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.002)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=25, height=25, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(12.5, 12.5)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    print("Neuromodulation Integration Demo")
+    print("===============================")
+    
+    # Initial state
+    print(f"Initial neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+    print(f"Initial curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"Initial novelty: {agent.getNoveltyLevel():.3f}")
+    
+    for step in range(300):
+        world.update(0.08)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Monitor neuromodulation
+        if step % 50 == 0:
+            print(f"\nStep {step}:")
+            print(f"  Neuromodulation: {agent.getNeuromodulationLevel():.3f}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction Error: {agent.getPredictionError():.3f}")
+            print(f"  Developmental Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        
+        # Generate action
+        action = agent.decodeMotorCommand()
+        action_result = world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply neuromodulation
+        agent.applyRewardModulation(action_result.reward, brain.getPredictionError())
+        agent.updateDevelopment(0.08)
+        
+        # Add some interesting environmental changes to trigger neuromodulation
+        if step == 50:
+            print(f"\nEnvironmental change at step 50 - novel stimulus!")
+            # This would trigger novelty detection
+        elif step == 150:
+            print(f"\nEnvironmental change at step 150 - reward opportunity!")
+            # This would trigger reward-based learning
+    
+    print("\nNeuromodulation demonstration complete!")
+    print(f"Final state: Neuromodulation={agent.getNeuromodulationLevel():.3f}, "
+          f"Curiosity={agent.getCuriosityLevel():.3f}")
+
+# Run neuromodulation demo
+demonstrate_neuromodulation()
+```
+
+### Example 4: Simulation Control and Performance
+
+This example demonstrates advanced simulation control features and performance monitoring.
+
+```python
+import pynlm
+import time
+import statistics
+
+def advanced_simulation_control():
+    """Advanced simulation with step-by-step control and performance monitoring."""
+    
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 2500)
+    config.set("plasticity.structural.enable", True)
+    config.set("plasticity.stdp.enable", True)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=40, height=40, visionWidth=10, visionHeight=10)
+    world.reset()
+    world.setAgentStart(20.0, 20.0)
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("Advanced Simulation Control Demo")
+    print("================================")
+    
+    # Performance monitoring
+    step_times = []
+    firing_rates = []
+    curiosity_levels = []
+    
+    # Phase 1: Exploration (curiosity-driven)
+    print("\nPhase 1: Exploration Phase")
+    print("-" * 30)
+    
+    for step in range(200):
+        start_time = time.time()
+        
+        world.update(0.05)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        agent.applyRewardModulation(0.0, brain.getPredictionError())
+        agent.updateDevelopment(0.05)
+        
+        step_time = time.time() - start_time
+        step_times.append(step_time)
+        firing_rates.append(brain.getAverageFiringRate())
+        curiosity_levels.append(agent.getCuriosityLevel())
+        
+        if step % 40 == 0:
+            print(f"Step {step}: Time={step_time*1000:.1f}ms, "
+                  f"Firing={brain.getAverageFiringRate():.2f}, "
+                  f"Curiosity={agent.getCuriosityLevel():.3f}")
+    
+    # Phase 2: Exploitation (reward-driven)
+    print("\nPhase 2: Exploitation Phase")
+    print("-" * 30)
+    
+    for step in range(200, 400):
+        start_time = time.time()
+        
+        # Add rewards for good actions
+        world.update(0.05)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        action_result = world.applyMotorCommand(action, world.getSimulationTime())
+        agent.applyRewardModulation(action_result.reward, brain.getPredictionError())
+        agent.updateDevelopment(0.05)
+        
+        step_time = time.time() - start_time
+        step_times.append(step_time)
+        firing_rates.append(brain.getAverageFiringRate())
+        curiosity_levels.append(agent.getCuriosityLevel())
+        
+        if step % 40 == 0:
+            print(f"Step {step}: Time={step_time*1000:.1f}ms, "
+                  f"Firing={brain.getAverageFiringRate():.2f}, "
+                  f"Curiosity={agent.getCuriosityLevel():.3f}, "
+                  f"Reward={action_result.reward}")
+    
+    # Performance analysis
+    print("\nPerformance Analysis")
+    print("=" * 30)
+    print(f"Average step time: {statistics.mean(step_times)*1000:.2f}ms")
+    print(f"Min step time: {min(step_times)*1000:.2f}ms")
+    print(f"Max step time: {max(step_times)*1000:.2f}ms")
+    print(f"Average firing rate: {statistics.mean(firing_rates):.2f} Hz")
+    print(f"Firing rate std: {statistics.stdev(firing_rates):.2f} Hz")
+    print(f"Average curiosity: {statistics.mean(curiosity_levels):.3f}")
+    
+    # Demonstrate checkpoint at peak performance
+    brain.save("performance_demo_checkpoint.bin")
+    print(f"\nCheckpoint saved at peak performance: {brain.getTotalNeuronCount()} neurons")
+    
+    print("\nAdvanced simulation complete!")
+    print("Simulation controlled and monitored successfully.")
+
+# Run advanced simulation
+advanced_simulation_control()
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `ADVANCED_USAGE.md` for comprehensive advanced documentation
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
