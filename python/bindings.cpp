@@ -123,6 +123,22 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Custom", ActionType::Custom)
         .export_values();
 
+    py::enum_<LogLevel>(m, "LogLevel", R"pbdoc(Log level enumeration)pbdoc")
+        .value("Debug", LogLevel::Debug)
+        .value("Info", LogLevel::Info)
+        .value("Warning", LogLevel::Warning)
+        .value("Error", LogLevel::Error)
+        .value("Critical", LogLevel::Critical)
+        .export_values();
+
+    py::enum_<LogLevel>(m, "LogLevel", R"pbdoc(Log level enumeration)pbdoc")
+        .value("Debug", LogLevel::Debug)
+        .value("Info", LogLevel::Info)
+        .value("Warning", LogLevel::Warning)
+        .value("Error", LogLevel::Error)
+        .value("Critical", LogLevel::Critical)
+        .export_values();
+
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
         .value("MoveBackward", MotorCommand::MoveBackward)
@@ -141,6 +157,296 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    // World object factories and advanced utilities
+    m.def("createWorldObject", [](float x, float y, WorldObjectType type, float value, float radius) {
+        return WorldObject(x, y, type, value, radius);
+    }, py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("type") = WorldObjectType::Empty,
+       py::arg("value") = 0.0f, py::arg("radius") = 0.5f,
+       "Create a world object with specified parameters");
+    
+    m.def("createResourceObject", [](float x, float y, float value) {
+        return WorldObject(x, y, WorldObjectType::Resource, value);
+    }, py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("value") = 1.0f,
+       "Create a resource object");
+    
+    m.def("createHazardObject", [](float x, float y, float radius = 0.5f) {
+        return WorldObject(x, y, WorldObjectType::Hazard, 1.0f, radius);
+    }, py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("radius") = 0.5f,
+       "Create a hazard object");
+    
+    m.def("createWallObject", [](float x, float y, float width = 1.0f, float height = 1.0f) {
+        return WorldObject(x, y, WorldObjectType::Wall, 1.0f, std::max(width, height));
+    }, py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("width") = 1.0f, py::arg("height") = 1.0f,
+       "Create a wall object");
+    
+    // Advanced sensory input utilities
+    m.def("createVisionInput", [](size_t width, size_t height, size_t channels, const std::vector<float>& data) {
+        auto vision = std::make_unique<Vision>(width, height, channels);
+        vision->setData(data);
+        return vision;
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3, py::arg("data") = std::vector<float>(),
+       "Create a vision sensory input with specified dimensions and data");
+    
+    m.def("createAudioInput", [](size_t sampleRate, const std::vector<float>& samples) {
+        auto audio = std::make_unique<Audio>(sampleRate, samples.size());
+        audio->setData(samples);
+        return audio;
+    }, py::arg("sampleRate"), py::arg("samples"), py::arg("data") = std::vector<float>(),
+       "Create an audio sensory input");
+    
+    m.def("createInternalSignals", [](const std::vector<float>& signals) {
+        auto internal = std::make_unique<InternalSignals>();
+        internal->clearSignals();
+        for (float signal : signals) {
+            internal->addSignal(signal);
+        }
+        return internal;
+    }, py::arg("signals") = std::vector<float>(),
+       "Create internal signals sensory input");
+    
+    // Advanced action utilities
+    m.def("createAction", [](ActionType type, const std::vector<float>& parameters) {
+        auto action = std::make_unique<Action>(type, parameters);
+        return action;
+    }, py::arg("type"), py::arg("parameters") = std::vector<float>(),
+       "Create an action with type and parameters");
+    
+    m.def("createMovementAction", [](ActionType type, float speed, float angle) {
+        std::vector<float> params = {speed, angle};
+        auto action = std::make_unique<Action>(type, params);
+        return action;
+    }, py::arg("type") = ActionType::MoveForward, py::arg("speed") = 1.0f, py::arg("angle") = 0.0f,
+       "Create a movement action");
+    
+    m.def("createInteractionAction", [](const std::string& targetObject, const std::string& actionName) {
+        std::vector<float> params = {static_cast<float>(std::hash<std::string>{}(targetObject)), 
+                                     static_cast<float>(std::hash<std::string>{}(actionName))};
+        auto action = std::make_unique<Action>(ActionType::Interact, params);
+        return action;
+    }, py::arg("targetObject") = std::string(""), py::arg("actionName") = std::string(""),
+       "Create an interaction action");
+    
+    // Brain configuration utilities
+    m.def("createAdvancedConfig", [](const std::string& description) {
+        auto config = std::make_shared<Config>();
+        config->set("config.description", description, ConfigSource::Runtime);
+        return config;
+    }, py::arg("description") = std::string("Advanced NLM configuration"),
+       "Create an advanced configuration with description");
+    
+    m.def("configureBrain", [](std::shared_ptr<Brain> brain, const std::unordered_map<std::string, std::variant<int, double, bool, std::string>> settings) {
+        for (const auto& setting : settings) {
+            if (std::holds_alternative<int>(setting.second)) {
+                brain->getConfig()->set(setting.first, std::get<int>(setting.second), ConfigSource::Runtime);
+            } else if (std::holds_alternative<double>(setting.second)) {
+                brain->getConfig()->set(setting.first, std::get<double>(setting.second), ConfigSource::Runtime);
+            } else if (std::holds_alternative<bool>(setting.second)) {
+                brain->getConfig()->set(setting.first, std::get<bool>(setting.second), ConfigSource::Runtime);
+            } else if (std::holds_alternative<std::string>(setting.second)) {
+                brain->getConfig()->set(setting.first, std::get<std::string>(setting.second), ConfigSource::Runtime);
+            }
+        }
+    }, py::arg("brain"), py::arg("settings"),
+       "Configure brain with advanced settings dictionary");
+    
+    // Agent utilities
+    m.def("createAdvancedAgent", [](std::shared_ptr<Brain> brain) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
+    }, py::arg("brain"), "Create an advanced agent brain interface");
+    
+    m.def("configureAgentAdvanced", [](std::shared_ptr<AgentBrain> agent, 
+                                       bool rewardMod, bool structuralPlastic, 
+                                       bool development, bool curiosity,
+                                       float noveltyDecay) {
+        agent->enableRewardModulation(rewardMod);
+        agent->enableStructuralPlasticity(structuralPlastic);
+        agent->enableDevelopment(development);
+        agent->enableCuriosity(curiosity);
+        // Note: sensoryNoveltyDecay_ is not directly exposed but can be modified internally
+    }, py::arg("agent"), py::arg("rewardModulation") = true, 
+       py::arg("structuralPlasticity") = true, py::arg("development") = true,
+       py::arg("curiosity") = true, py::arg("noveltyDecay") = 0.99f,
+       "Configure agent with advanced settings");
+    
+    // World utilities
+    m.def("createWorldAdvanced", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20,
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create an advanced world with configuration");
+    
+    // Simulation utilities
+    m.def("runSimulationAdvanced", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent, size_t steps, 
+                                     const std::function<bool(size_t, const SensoryPercept&)>& stopCondition) {
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            auto internal = percept.getInternal();
+            float reward = internal.empty() ? 0.0f : internal[0];
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Check stop condition
+            if (stopCondition && stopCondition(step, percept)) {
+                break;
+            }
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 1000,
+       py::arg("stopCondition") = nullptr,
+       "Run an advanced simulation with customizable stop condition");
+    
+    // Statistics and analysis utilities
+    m.def("analyzeBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, double> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["exc_inh_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Analyze and return brain statistics as dictionary");
+    
+    m.def("printDetailedStats", [](std::shared_ptr<Brain> brain) {
+        std::cout << "=== Detailed Brain Statistics ===" << std::endl;
+        std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Firing Neurons: " << brain->getFiringNeuronCount() << std::endl;
+        std::cout << "Active Neurons: " << brain->getActiveNeuronCount() << std::endl;
+        std::cout << "Average Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+        std::cout << "Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        std::cout << "Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        brain->logStatus();
+    }, py::arg("brain"), "Print detailed brain statistics");
+    
+    // Debug and monitoring utilities
+    m.def("brainDebugReport", [](std::shared_ptr<Brain> brain) {
+        std::cout << "=== BRAIN DEBUG REPORT ===" << std::endl;
+        std::cout << "Configuration Summary:" << std::endl;
+        brain->getConfig()->summary();
+        std::cout << std::endl << "Region Information:" << std::endl;
+        for (auto regionId : brain->getRegionIds()) {
+            auto region = brain->getRegion(regionId);
+            std::cout << "  Region " << regionId << ": " 
+                     << region->getPopulationCount() << " populations, "
+                     << region->getNeuronCount() << " neurons" << std::endl;
+        }
+        std::cout << std::endl << "Advanced Memory Status:" << std::endl;
+        auto workingMem = brain->getWorkingMemory();
+        auto episodicMem = brain->getEpisodicMemory();
+        auto associativeMem = brain->getAssociativeMemory();
+        std::cout << "  Working Memory Active Patterns: " << (workingMem ? "Enabled" : "Disabled") << std::endl;
+        std::cout << "  Episodic Memory Capacity: " << (episodicMem ? "Enabled" : "Disabled") << std::endl;
+        std::cout << "  Associative Memory Connections: " << (associativeMem ? "Enabled" : "Disabled") << std::endl;
+        std::cout << std::endl << "Prediction System Status:" << std::endl;
+        auto predSys = brain->getPredictionSystem();
+        std::cout << "  Prediction Error: " << (predSys ? "Enabled" : "Disabled") << std::endl;
+        std::cout << "  Novelty Detection: " << (brain->getNovelty() ? "Enabled" : "Disabled") << std::endl;
+        std::cout << "  Curiosity System: " << (brain->getCuriosity() ? "Enabled" : "Disabled") << std::endl;
+    }, py::arg("brain"), "Generate comprehensive debug report for brain");
+    
+    // Recording and data export utilities
+    m.def("exportBrainData", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        // Create a simple data export format
+        std::ofstream file(filename);
+        if (file.is_open()) {
+            file << "# NLM Brain Data Export" << std::endl;
+            file << "# Total Neurons: " << brain->getTotalNeuronCount() << std::endl;
+            file << "# Total Synapses: " << brain->getTotalSynapseCount() << std::endl;
+            file << "# Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+            file << "# Average Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+            file << "# Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+            file << std::endl;
+            
+            // Export region information
+            file << "Region Data:" << std::endl;
+            for (auto regionId : brain->getRegionIds()) {
+                auto region = brain->getRegion(regionId);
+                file << "  Region " << regionId << ": " << region->getNeuronCount() << " neurons, "
+                     << region->getSynapseCount() << " synapses" << std::endl;
+            }
+            
+            file.close();
+            return true;
+        }
+        return false;
+    }, py::arg("brain"), py::arg("filename"), "Export brain data to file");
+    
+    // Advanced simulation utilities
+    m.def("createRandomSimulation", [](std::shared_ptr<Config> config, size_t steps) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable advanced features
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        std::cout << "Starting random simulation with " << steps << " steps..." << std::endl;
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = 0.0f;
+            if (!percept.getInternal().empty()) {
+                reward = percept.getInternal()[0];
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1);
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() << " firing neurons" << std::endl;
+            }
+        }
+        
+        return brain;
+    }, py::arg("config") = nullptr, py::arg("steps") = 1000, "Create and run a random simulation");
+    
+    // Configuration file utilities
+    m.def("saveConfigAdvanced", [](std::shared_ptr<Config> config, const std::string& filename) {
+        config->saveToFile(filename);
+    }, py::arg("config"), py::arg("filename"), "Save configuration to advanced format");
+    
+    m.def("loadConfigAdvanced", [](const std::string& filename) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filename);
+        return config;
+    }, py::arg("filename"), "Load configuration from advanced format");
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
