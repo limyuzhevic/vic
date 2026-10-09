@@ -149,9 +149,12 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
+// Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
-    }
+        // Configure checkpoint system
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        checkpointManager->configure(checkpointDir, 10000, 5, true);
+    };
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -286,11 +289,7 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
@@ -299,8 +298,109 @@ bool Brain::initialize() {
     return true;
 }
 
-void Brain::step(SimulationStep currentStep) {
-    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+void Brain::setCheckpointDataProviders() {
+    if (!pImpl->checkpointManager) return;
+    
+    // Provide access to checkpoint data
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+        // Collect all neuron states
+        data.membranePotential.clear();
+        data.restingPotential.clear();
+        data.threshold.clear();
+        data.resetPotential.clear();
+        data.leakConductance.clear();
+        data.firingState.clear();
+        data.refractoryRemaining.clear();
+        data.refractoryPeriod.clear();
+        data.lastSpikeTime.clear();
+        data.neuronType.clear();
+        data.regionId.clear();
+        data.populationId.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    data.regionId.push_back(region->getId().index());
+                    data.populationId.push_back(pop->getId());
+                }
+            }
+        }
+        
+        return !data.membranePotential.empty();
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+        // Collect all synapse states
+        data.sourceNeuron.clear();
+        data.destinationNeuron.clear();
+        data.weight.clear();
+        data.delay.clear();
+        data.synapseType.clear();
+        data.plasticityFlags.u64 = 0; // Clear all flags
+        data.eligibilityTrace.clear();
+        data.efficacy.clear();
+        data.shortTermDepression.clear();
+        data.shortTermFacilitation.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay().count());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+                data.shortTermDepression.push_back(syn->getShortTermDepression());
+                data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+            }
+        }
+        
+        return !data.weight.empty();
+    });
+}
+
+void Brain::initializeCheckpointing() {
+    if (!pImpl->checkpointManager) {
+        pImpl->checkpointManager = std::make_unique<CheckpointManager>();
+    }
+    
+    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    setCheckpointDataProviders();
+}
+
+bool Brain::save(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving brain state to " + filepath);
+    
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return false;
+    }
+    
+    return pImpl->checkpointManager->saveImmediately(filepath);
+}
+
+bool Brain::load(const std::string& filepath) {
+    NLM_LOG_INFO("Loading brain state from " + filepath);
+    
+    if (!pImpl->checkpointManager) {
+        pImpl->checkpointManager = std::make_unique<CheckpointManager>();
+    }
+    
+    return pImpl->checkpointManager->load(filepath);
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {

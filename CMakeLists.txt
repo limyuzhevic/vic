@@ -121,23 +121,35 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Advanced interface components
+add_library(nlm_advanced_interface STATIC
+    # Interface components
+    src/nlm/interfaces/AdvancedCLI.cpp
+    src/nlm/interfaces/ExpertUI.cpp
+    src/nlm/interfaces/ConfigValidator.cpp
+    src/nlm/experiments/BatchProcessor.cpp
+    src/nlm/monitoring/PerformanceMonitor.cpp
+    src/nlm/debugging/DebugTools.cpp
+    # New files for completeness
+    src/nlm/interfaces/AdvancedInterface.hpp
+    src/nlm/experiments/BatchProcessor.hpp
+    src/nlm/monitoring/PerformanceMonitor.hpp
+    src/nlm/debugging/DebugTools.hpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+target_include_directories(nlm_advanced_interface PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+target_link_libraries(nlm_advanced_interface PUBLIC nlm_core)
+
+# Phase 3 demo executable (updated with advanced interface)
+add_executable(nlm_expert
+    src/main_advanced.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+target_link_libraries(nlm_expert PUBLIC nlm_core nlm_advanced_interface)
 
 # Testing
 enable_testing()

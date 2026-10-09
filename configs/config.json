@@ -1,0 +1,146 @@
+# NLM Configuration File (JSON)
+# Enhanced JSON format configuration with support for complex value types
+
+{
+    "config_version": "2.0",
+    "metadata": {
+        "created_by": "NLM Agent",
+        "created_at": "2026-10-09T00:39:41Z",
+        "description": "Phase 2 enhanced configuration with JSON support"
+    },
+    
+    "simulation_settings": {
+        "random_seed": 42,
+        "simulation_timestep": 0.001,
+        "max_simulation_steps": 10000,
+        "simulation_time_limit": 0.0
+    },
+    
+    "brain_settings": {
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1,
+        "plasticity": {
+            "learning_rate": 0.01,
+            "stdp_ltp_weight": 0.01,
+            "stdp_ltd_weight": 0.012,
+            "stdp_time_constant": 20.0
+        }
+    },
+    
+    "development_settings": {
+        "synaptogenesis_rate": 0.001,
+        "pruning_rate": 0.0001,
+        "maturation_rate": 0.0005
+    },
+    
+    "neuromodulation_settings": {
+        "dopamine_baseline": 0.1,
+        "reward_discount_factor": 0.99,
+        "curiosity_weight": 0.5,
+        "novelty_sensitivity": 0.8
+    },
+    
+    "environment_settings": {
+        "environment_name": "GridWorld",
+        "environment_width": 10,
+        "environment_height": 10,
+        "grid_cell_size": 1.0,
+        "obstacle_density": 0.2
+    },
+    
+    "memory_settings": {
+        "working_memory_capacity": 100,
+        "episodic_memory_duration": 3600,
+        "semantic_memory_decay": 0.95,
+        "procedural_memory_learning_rate": 0.02
+    },
+    
+    "cognition_settings": {
+        "concept_formation_threshold": 0.7,
+        "planning_horizon": 10,
+        "recognition_threshold": 0.85,
+        "attention_span": 5.0
+    },
+    
+    "sensory_settings": {
+        "vision_enabled": true,
+        "vision_resolution": 320,
+        "vision_fov": 90,
+        "audio_enabled": true,
+        "audio_sample_rate": 44100,
+        "audio_channels": 2
+    },
+    
+    "motor_settings": {
+        "motor_system_enabled": true,
+        "max_actuators": 50,
+        "actuator_response_time": 0.05,
+        "max_velocity": 1.0
+    },
+    
+    "visualization_settings": {
+        "visualization_enabled": false,
+        "visualization_update_rate": 30.0,
+        "visualization_port": 8080,
+        "visualization_host": "localhost"
+    },
+    
+    "logging_settings": {
+        "log_level": "INFO",
+        "log_to_file": true,
+        "log_filename": "nlm.log",
+        "log_max_size_mb": 100,
+        "log_rotation_count": 5,
+        "console_logging": true
+    },
+    
+    "experimental_settings": {
+        "experiment_mode": "Phase2",
+        "performance_monitoring": true,
+        "benchmark_mode": false,
+        "profiling_enabled": true,
+        "debug_mode": false
+    },
+    
+    "advanced_settings": {
+        "gpu_acceleration": true,
+        "num_threads": 4,
+        "memory_limit_gb": 8,
+        "timeout_seconds": 3600,
+        "retry_attempts": 3,
+        "load_balancing": true
+    },
+    
+    "validation_schema": {
+        "min_neuron_count": 10,
+        "max_neuron_count": 10000,
+        "min_connection_probability": 0.0,
+        "max_connection_probability": 1.0,
+        "valid_log_levels": ["DEBUG", "INFO", "WARNING", "ERROR"],
+        "valid_environment_types": ["GridWorld", "Labyrinth", "OpenField"]
+    },
+    
+    "array_examples": {
+        "integer_array": [1, 2, 3, 4, 5],
+        "float_array": [0.1, 0.2, 0.3, 0.4, 0.5],
+        "string_array": ["option1", "option2", "option3"],
+        "matrix_2d": [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    },
+    
+    "nested_configuration": {
+        "database": {
+            "host": "localhost",
+            "port": 5432,
+            "credentials": {
+                "username": "admin",
+                "password": "encrypted_password"
+            }
+        },
+        "api": {
+            "version": "v2",
+            "endpoints": ["/api/v2/neural", "/api/v2/simulation", "/api/v2/experiment"],
+            "rate_limit": 1000
+        }
+    }
+}
