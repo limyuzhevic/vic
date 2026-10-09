@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../environment/SensoryInput.hpp"
 #include <vector>
 #include <memory>
 
@@ -31,8 +32,14 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model with sensory observation
     void train(const SensoryInput& observation);
+    
+    // Train prediction model with pattern
+    void trainFromPattern(const std::vector<float>& pattern);
+    
+    // Boost prediction confidence during rest consolidation
+    void boostConfidence(float factor);
     
 private:
     struct Impl;

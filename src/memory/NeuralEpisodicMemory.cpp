@@ -167,19 +167,24 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
-    // Reactivate neurons that were active during this episode
+    // Reactivate neurons that were active during this episode with enhanced strength
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
         float activation = i < episode->neuronActivations.size() ? 
-                          episode->neuronActivations[i] : 0.5f;
+                          episode->neuronActivations[i] * 1.5f : 0.75f;
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        // Inject enhanced current to strongly reawaken this pattern
+        brain_->injectCurrent(neuron, activation * 4.0f);
     }
     
     // Also inject sensory pattern if available
-    if (!episode->sensoryState.empty()) {
-        // This would go through sensory channels - simplified here
+    if (!episode->sensoryState.empty() && brain_) {
+        // Convert sensory pattern to neural input
+        // This simulates reinjection of sensory experience
+        for (size_t i = 0; i < std::min(episode->sensoryState.size(), 10UL); ++i) {
+            float scaledInput = episode->sensoryState[i] * 8.0f - 4.0f;  // Center around 0
+            brain_->injectCurrentToNeurons(NeuronType::Sensory, scaledInput);
+        }
     }
 }
 

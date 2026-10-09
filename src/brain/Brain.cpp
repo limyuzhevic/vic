@@ -74,6 +74,8 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    size_t lastRestCheck;
+    size_t restInterval;  // New: rest cycle interval
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -92,6 +94,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , restInterval(5000)       // Rest every 5000 steps
+        , lastRestCheck(0)         // Initialize rest check timer
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -148,6 +152,8 @@ struct Brain::Impl {
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        restInterval = config->getOr<size_t>("rest_interval", 5000);  // New: rest every 5000 steps
+        lastRestCheck = 0;  // Initialize rest check timer
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -511,8 +517,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use sensory input to update predictions
+        // Get the most recent sensory input if available
+        // This would typically be stored from the environment
+        // For now, we just log that prediction system is available
+        // TODO: Integrate with actual sensory input from environment
+        
+        // Train prediction system with current neural activity patterns
+        // Convert current neural state to "sensory-like" input for prediction
+        std::vector<float> neuralPattern;
+        neuralPattern.reserve(256);  // Standard size for neural patterns
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    neuralPattern.push_back(
+                        std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                    
+                    if (neuralPattern.size() >= 256) break;
+                }
+                if (neuralPattern.size() >= 256) break;
+            }
+            if (neuralPattern.size() >= 256) break;
+        }
+        
+        if (neuralPattern.size() == 256) {
+            // Create a synthetic sensory input for prediction training
+            // This simulates how the brain predicts its own sensory consequences
+            // In a real implementation, this would be actual sensory data
+            pImpl->predictionSystem->trainFromPattern(neuralPattern);
+        }
+        
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate learning
+        if (predictionError > 0.1f) {
+            // High prediction error increases plasticity
+            float learningMod = 1.0f + predictionError;
+            
+            // Apply to STDP
+            if (pImpl->stdp) {
+                float currentLTP = pImpl->stdp->getLTPWeight();
+                pImpl->stdp->setLTPWeight(currentLTP * learningMod);
+            }
+            
+            // Apply to Hebbian
+            if (pImpl->hebbian) {
+                float currentHebb = pImpl->hebbian->getLearningRate();
+                pImpl->hebbian->setLearningRate(currentHebb * learningMod);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -582,10 +638,60 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+        // Add rest/sleep cycle management
+    if (currentStep >= pImpl->lastRestCheck + pImpl->restInterval) {
+        // Check if it's time for rest/sleep
+        pImpl->lastRestCheck = currentStep;
+        
+        // Simple rest cycle: every 5000 steps, enter rest for 500 steps
+        if (currentStep % 5000 < 500) {
+            // Enter rest mode
+            pImpl->isResting = true;
+            NLM_LOG_INFO("Brain entering rest mode for memory consolidation");
+        } else {
+            // Exit rest mode
+            pImpl->isResting = false;
+        }
     }
+    
+    // Enhanced memory consolidation during rest
+    if (pImpl->isResting && pImpl->episodicMemory) {
+        // During rest, perform more aggressive memory consolidation
+        float consolidationStrength = 0.5f; // Moderate consolidation during rest
+        
+        // Consolidate episodes with stronger criteria
+        pImpl->episodicMemory->consolidate(consolidationStrength);
+        
+        // Replay important memories with higher frequency during rest
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+        for (const auto* episode : episodesToReplay) {
+            // Enhanced replay during rest - directly replay in brain
+            replayEpisode(episode);
+        }
+        
+        // Strengthen synaptic connections through reactivation
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // During rest, enhance important connections
+                    if (neuron->isActive()) {
+                        // Boost excitability for important neural patterns
+                        neuron->boostExcitability(1.2f);
+                    }
+                }
+            }
+        }
+        
+        // Update prediction models with consolidated memories
+        if (pImpl->predictionSystem) {
+            // Update prediction confidence based on consolidated memories
+            float confidenceBoost = 0.1f;
+            pImpl->predictionSystem->boostConfidence(confidenceBoost);
+        }
+    }
+    
+    // Reset rest check timer
+    pImpl->lastRestCheck = currentStep;
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {

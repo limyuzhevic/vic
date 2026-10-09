@@ -424,15 +424,127 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
-    // Final brain status
+    // ============= NEW SIMPLIFIED API DEMO =============
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    NLM_LOG_INFO("=== NEW SimpleBrain Simplified API Demo ===");
     
+    // Create brain using simplified interface
+    SimpleBrain simpleBrain;
+    
+    if (simpleBrain.initialize()) {
+        NLM_LOG_INFO("SimpleBrain created successfully using simplified API");
+        
+        // Run a few steps
+        for (int i = 0; i < 10; ++i) {
+            simpleBrain.step();
+            NLM_LOG_INFO("  Step " + std::to_string(i) + ": " + simpleBrain.getAction());
+        }
+        
+        // Show simplified status
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("SimpleBrain Status:");
+        NLM_LOG_INFO(simpleBrain.getStatus().c_str());
+        
+        // Clean up
+        simpleBrain.reset();
+        NLM_LOG_INFO("SimpleBrain demo completed successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to create SimpleBrain");
+    }
+    
+    // ============= DIAGNOSTICS DEMO =============
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+    NLM_LOG_INFO("=== Diagnostics - Scientific Metrics Demo ===");
+    
+    // Create brain for diagnostics
+    auto diagnosticBrain = std::make_shared<Brain>(config);
+    if (diagnosticBrain->initialize()) {
+        NLM_LOG_INFO("Running diagnostics on brain...");
+        
+        // Collect comprehensive metrics
+        auto metrics = Diagnostics::collectMetrics(diagnosticBrain.get());
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Brain Metrics ===");
+        NLM_LOG_INFO("Neurons: " + std::to_string(metrics.neuronCount));
+        NLM_LOG_INFO("Synapses: " + std::to_string(metrics.synapseCount));
+        NLM_LOG_INFO("Active neurons: " + std::to_string(metrics.activeNeurons));
+        NLM_LOG_INFO("Prediction error: " + std::to_string(metrics.predictionError));
+        NLM_LOG_INFO("Prediction confidence: " + std::to_string(metrics.predictionConfidence));
+        NLM_LOG_INFO("Learning progress: " + std::to_string(metrics.learningProgress));
+        NLM_LOG_INFO("Memory retention: " + std::to_string(metrics.memoryRetention));
+        NLM_LOG_INFO("Novelty processing: " + std::to_string(metrics.noveltyProcessing));
+        
+        // Validate brain health
+        bool isHealthy = Diagnostics::validateBrain(diagnosticBrain.get());
+        NLM_LOG_INFO("Brain health: " + std::string(isHealthy ? "✅ Healthy" : "❌ Issues detected"));
+        
+        // Generate scientific report
+        std::string report = Diagnostics::generateScientificReport(diagnosticBrain.get());
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Scientific Report (first 10 lines) ===");
+        
+        // Print first 10 lines of report
+        std::stringstream reportStream(report);
+        std::string line;
+        int lineCount = 0;
+        while (std::getline(reportStream, line) && lineCount < 10) {
+            NLM_LOG_INFO(line);
+            lineCount++;
+        }
+        if (report.find('\n') != std::string::npos) {
+            NLM_LOG_INFO("... (report truncated)");
+        }
+        
+        // Clean up
+        diagnosticBrain->reset();
+        NLM_LOG_INFO("Diagnostics demo completed successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize brain for diagnostics");
+    }
+    
+    // ============= ADVANCED API DEMO =============
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
+    NLM_LOG_INFO("=== Advanced - Direct System Access Demo ===");
+    
+    // Create brain for advanced access
+    auto advancedBrain = std::make_shared<Brain>(config);
+    if (advancedBrain->initialize()) {
+        NLM_LOG_INFO("Advanced System Access created successfully");
+        
+        // Enable all plasticity
+        advancedBrain->getSTDP()->setLTPWeight(0.05f);
+        advancedBrain->getSTDP()->setLTDWeight(0.06f);
+        advancedBrain->getHebbian()->setLearningRate(0.1f);
+        
+        // Apply custom neuromodulation
+        advancedBrain->applyCustomNeuromodulation(1.5f);
+        
+        // Get all neurons
+        auto allNeurons = advancedBrain->getAllNeurons();
+        NLM_LOG_INFO("Retrieved " + std::to_string(allNeurons.size()) + " neurons");
+        
+        // Test memory systems
+        if (auto* workingMemory = advancedBrain->getWorkingMemory()) {
+            NLM_LOG_INFO("Working memory activity: " + std::to_string(workingMemory->getMemoryActivity()));
+        }
+        
+        if (auto* episodicMemory = advancedBrain->getEpisodicMemory()) {
+            NLM_LOG_INFO("Episodic memory size: " + std::to_string(episodicMemory->getEpisodeCount()));
+        }
+        
+        // Clean up
+        advancedBrain->reset();
+        NLM_LOG_INFO("Advanced demo completed successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to create advanced brain");
+    }
+    
+    // Return to Phase 2 summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Phase 2: Real Neural Computation + New Simplified APIs ===");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Phase 2 Core Objectives (Previously):");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
     NLM_LOG_INFO("  ✓ STDP plasticity rule");
@@ -441,8 +553,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("NEW: Added Comprehensive User Interfaces:");
+    NLM_LOG_INFO("  ✓ SimpleBrain - High-level interface for easy usage");
+    NLM_LOG_INFO("  ✓ Diagnostics - Scientific metrics and validation tools");
+    NLM_LOG_INFO("  ✓ Advanced - Direct system access for power users");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("The NLM brain now supports three levels of usage:");
+    NLM_LOG_INFO("  1. Simple - Just 'new SimpleBrain()' and 'brain.step()'");
+    NLM_LOG_INFO("  2. Diagnostics - Get scientific metrics and validation");
+    NLM_LOG_INFO("  3. Advanced - Direct access to all internal systems");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("This makes NLM usable by beginners while providing");
+    NLM_LOG_INFO("power tools for advanced researchers and developers.");
     NLM_LOG_INFO("");
     
     return 0;

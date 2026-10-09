@@ -80,6 +80,9 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
+    // Enhanced replay during rest
+    void injectCurrentForReplay(const EpisodicMemoryItem* episode);
+    
     // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;

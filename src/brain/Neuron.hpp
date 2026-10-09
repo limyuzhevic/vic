@@ -98,6 +98,35 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
+    // Firing state
+    bool isFiring() const;
+    bool isRefractory() const;
+    void setFiringState(FiringState state);
+    void setRefractoryPeriod(uint32_t steps);
+    void decrementRefractory();
+    
+    // Firing rate (for rate-based computation)
+    FiringRate getFiringRate() const;
+    void setFiringRate(FiringRate rate);
+    
+    // LIF neuron parameters
+    void setLeakConductance(MembranePotential conductance);
+    MembranePotential getLeakConductance() const;
+    uint32_t getRefractoryPeriod() const;
+    void setRestingPotential(MembranePotential potential);
+    MembranePotential getRestingPotential() const;
+    void setResetPotential(MembranePotential potential);
+    
+    // Is neuron currently active (firing or high activity)
+    bool isActive() const;
+    
+    // Boost excitability during rest consolidation
+    void boostExcitability(float factor);
+    
+    // Spike detection
+    bool checkThreshold() const;
+    float getLastSpikeTime() const;
+    
     // LIF step function - returns true if neuron fired
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     

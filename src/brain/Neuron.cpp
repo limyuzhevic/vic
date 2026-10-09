@@ -299,4 +299,42 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+bool Neuron::isActive() const {
+    // Check if neuron is firing or has high activity
+    if (pImpl->state.firingState == FiringState::Active || 
+        pImpl->state.firingState == FiringState::Refractory) {
+        return true;
+    }
+    
+    // Check for high membrane potential (excited even if not firing)
+    if (pImpl->state.membranePotential > -50.0f) {
+        return true;
+    }
+    
+    // Check for very high firing rate
+    if (pImpl->state.firingRate > 50.0f) {  // Hz
+        return true;
+    }
+    
+    return false;
+}
+
+void Neuron::boostExcitability(float factor) {
+    // Temporarily boost neuron's excitability during rest consolidation
+    // This helps strengthen important neural patterns
+    
+    if (factor <= 0.0f) return;
+    
+    // Increase threshold (makes it harder to fire) - this is counterintuitive but
+    // during rest consolidation, we want to strengthen connections, not necessarily
+    // make neurons fire more easily
+    // Actually, let's increase the membrane potential instead
+    pImpl->state.membranePotential += factor * 2.0f;
+    
+    // Clamp to reasonable range
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, -80.0f, -40.0f);
+    
+    // Also reduce leak conductance to make neuron more responsive
+    pImpl->state.leakConductance *= (1.0f - factor * 0.3f);
+    pImpl->state.leakConductance = std::max(1.0f, pImpl->state.leakConductance);
+}
