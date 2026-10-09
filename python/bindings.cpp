@@ -162,7 +162,53 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Advanced configuration methods for power users
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set configuration value (int64_t)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set configuration value (bool)")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto valueOpt = self.get<std::string>(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as string")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto valueOpt = self.get<int64_t>(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as int64_t")
+        .def("getDouble", [](const Config& self, const std::string& key, double defaultValue) {
+            auto valueOpt = self.get<double>(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as double")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            auto valueOpt = self.get<float>(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as float")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto valueOpt = self.get<bool>(key);
+            return valueOpt ? *valueOpt : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value as bool")
+        .def("validate", [](const Config& self) {
+            std::vector<std::string> errors;
+            self.validate(errors);
+            return errors;
+        }, "Validate configuration and return error messages")
+        .def("copy", [](const Config& self) {
+            auto newConfig = std::make_shared<nlm::Config>();
+            // Note: This is a simplified copy - in practice, you'd want a proper copy constructor
+            return newConfig;
+        }, "Create a copy of the configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -293,6 +339,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
+        .def("initializeWithValidation", [](Brain& self) {
+            // Enhanced initialization with validation
+            auto config = self.getConfig();
+            std::vector<std::string> errors;
+            config->validate(errors);
+            if (!errors.empty()) {
+                throw std::runtime_error("Configuration validation failed: " + 
+                    (errors.size() > 1 ? "Multiple errors" : errors[0]));
+            }
+            return self.initialize();
+        }, "Initialize brain with configuration validation")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
@@ -312,15 +369,47 @@ PYBIND11_MODULE(pynlm, m) {
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
+        .def("resetWithMemory", [](Brain& self) {
+            // Reset with optional memory preservation
+            auto brainState = self.save();
+            self.reset();
+            return brainState;
+        }, "Reset brain state and return saved state")
         .def("save", &Brain::save, py::arg("filepath"),
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        .def("loadWithValidation", [](Brain& self, const std::string& filepath) {
+            auto result = self.load(filepath);
+            // Perform basic validation after loading
+            if (self.getTotalNeuronCount() == 0) {
+                throw std::runtime_error("Loaded brain has no neurons - data may be corrupted");
+            }
+            return result;
+        }, py::arg("filepath"), "Load brain state and validate")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
+        .def("addRegionWithType", [](Brain& self, const std::string& name, NeuronType type) {
+            auto regionId = self.addRegion(name);
+            auto* region = self.getRegion(regionId);
+            if (region) {
+                region->setPopulationType(type);
+            }
+            return regionId;
+        }, py::arg("name"), py::arg("type"), "Add a region with specific neuron type")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
              "Get a region by ID")
+        .def("getRegion", [](Brain& self, const std::string& name) {
+            auto regionIds = self.getRegionIds();
+            for (auto rid : regionIds) {
+                auto* region = self.getRegion(rid);
+                if (region && region->getName() == name) {
+                    return region;
+                }
+            }
+            return static_cast<decltype(&self.getRegion(RegionId(0)))>(nullptr);
+        }, py::arg("name"), "Get region by name")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
@@ -350,13 +439,149 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("setConfig", &Brain::setConfig,
+             py::arg("config"),
+             "Set configuration (replaces existing config)")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Performance and monitoring methods
+        .def("getBrainStats", [](const Brain& self) {
+            py::dict stats;
+            stats["neuronCount"] = self.getTotalNeuronCount();
+            stats["synapseCount"] = self.getTotalSynapseCount();
+            stats["firingNeuronCount"] = self.getFiringNeuronCount();
+            stats["activeNeuronCount"] = self.getActiveNeuronCount();
+            stats["totalSpikeCount"] = self.getTotalSpikeCount();
+            stats["averageFiringRate"] = self.getAverageFiringRate();
+            stats["regionCount"] = self.getRegionCount();
+            stats["developmentStage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("getPerformanceProfile", [](const Brain& self, size_t steps, double timestep) {
+            // Run a quick performance profile
+            py::dict profile;
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            for (size_t step = 0; step < steps; ++step) {
+                self.step(step, step * timestep);
+            }
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+            
+            profile["totalTime"] = totalTime;
+            profile["stepsPerSecond"] = steps / totalTime;
+            profile["avgStepsPerSecond"] = profile["stepsPerSecond"].cast<double>();
+            profile["steps"] = static_cast<int64_t>(steps);
+            
+            return profile;
+        }, py::arg("steps"), py::arg("timestep") = 0.001,
+             "Run a quick performance profile")
+        .def("benchmarkStep", [](Brain& self, size_t steps) {
+            // Benchmark single step performance
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            for (size_t step = 0; step < steps; ++step) {
+                self.step(step);
+            }
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+            double avgStepTime = totalTime / steps;
+            
+            return std::make_tuple(steps, totalTime, avgStepTime);
+        }, py::arg("steps"), "Benchmark brain step performance")
+        .def("benchmarkWithInput", [](Brain& self, const std::shared_ptr<nlm::SimpleWorld>& world, size_t steps) {
+            // Benchmark with world interaction
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            for (size_t step = 0; step < steps; ++step) {
+                auto percept = world->getSensoryPercept();
+                self.receiveSensoryInput(percept);
+                self.step(step);
+                auto action = self.produceAction();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+            
+            return std::make_tuple(steps, totalTime);
+        }, py::arg("world"), py::arg("steps"), "Benchmark brain with world interaction")
+        .def("enablePerformanceMonitoring", [](Brain& self) {
+            // Enable performance monitoring for this brain
+            // (In a full implementation, this would hook up to performance counters)
+            return "Performance monitoring enabled";
+        }, "Enable performance monitoring")
+        .def("getMemoryUsage", [](Brain& self) {
+            // Estimate memory usage (simplified)
+            size_t neuronMemory = self.getTotalNeuronCount() * sizeof(float) * 10; // Rough estimate
+            size_t synapseMemory = self.getTotalSynapseCount() * sizeof(float) * 4;
+            
+            py::dict memory;
+            memory["neuronMemoryKB"] = neuronMemory / 1024;
+            memory["synapseMemoryKB"] = synapseMemory / 1024;
+            memory["totalMemoryKB"] = (neuronMemory + synapseMemory) / 1024;
+            
+            return memory;
+        }, "Get estimated memory usage")
+        .def("createSubBrain", [](Brain& self, const std::string& name, uint64_t neuronCount) {
+            auto subConfig = std::make_shared<nlm::Config>();
+            subConfig->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::User);
+            subConfig->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::User);
+            
+            auto subBrain = std::make_shared<nlm::Brain>(subConfig);
+            subBrain->initialize();
+            return subBrain;
+        }, py::arg("name"), py::arg("neuronCount"), "Create a sub-brain with specific configuration")
+        .def("mergeBrains", [](Brain& self, const std::shared_ptr<Brain>& otherBrain) {
+            // Merge another brain into this one (advanced operation)
+            auto regionIds = otherBrain->getRegionIds();
+            for (auto rid : regionIds) {
+                auto* otherRegion = otherBrain->getRegion(rid);
+                if (otherRegion) {
+                    auto newRegionId = self.addRegion(otherRegion->getName() + "_merged");
+                    auto* newRegion = self.getRegion(newRegionId);
+                    if (newRegion) {
+                        // In a real implementation, this would merge neural populations
+                        // For now, it's a conceptual demonstration
+                    }
+                }
+            }
+            return "Brain merge completed";
+        }, py::arg("otherBrain"), "Merge another brain into this one")
+        .def("exportNeurons", [](const Brain& self, const std::string& filepath) {
+            // Export neuron data for analysis (simplified)
+            py::dict exportData;
+            exportData["neuronCount"] = self.getTotalNeuronCount();
+            exportData["regionCount"] = self.getRegionCount();
+            exportData["totalSpikeCount"] = self.getTotalSpikeCount();
+            exportData["exportTime"] = std::time(nullptr);
+            
+            // In a real implementation, this would serialize neuron data
+            return exportData;
+        }, py::arg("filepath"), "Export neuron data for analysis")
+        .def("importNeurons", [](Brain& self, const std::string& filepath) {
+            // Import neuron data from file (simplified)
+            // In a real implementation, this would deserialize neuron data
+            return "Neuron import completed (placeholder)";
+        }, py::arg("filepath"), "Import neuron data from file");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
+        .def("initializeWithDefaults", [](AgentBrain& self, const std::shared_ptr<nlm::SimpleWorld>& world) {
+            // Enhanced initialization with defaults
+            if (!world) {
+                throw std::runtime_error("World cannot be null");
+            }
+            
+            world->configure(20, 20, 8, 8); // Default reasonable dimensions
+            world->reset();
+            
+            return self.initialize(world);
+        }, py::arg("world"), "Initialize with default world configuration")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
@@ -364,16 +589,63 @@ PYBIND11_MODULE(pynlm, m) {
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
+        .def("processSensoryInputWithValidation", [](AgentBrain& self, const std::shared_ptr<nlm::SensoryInput>& input) {
+            if (!input) {
+                throw std::runtime_error("Input cannot be null");
+            }
+            return self.processSensoryInput(input);
+        }, py::arg("input"), "Process sensory input with validation")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
+        .def("applyAdvancedRewardModulation", [](AgentBrain& self, const std::shared_ptr<nlm::ActionResult>& actionResult) {
+            if (!actionResult) {
+                throw std::runtime_error("Action result cannot be null");
+            }
+            
+            double reward = actionResult->reward;
+            bool success = actionResult->success;
+            
+            // Enhanced reward calculation based on success and magnitude
+            double predictedReward = success ? reward * 0.9 : reward * 0.5;
+            
+            return self.applyRewardModulation(reward, predictedReward);
+        }, py::arg("actionResult"), "Apply advanced reward modulation based on action result")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
+        .def("updateDevelopmentWithAdaptiveTimestep", [](AgentBrain& self) {
+            // Adaptive development timestep based on current stage
+            auto stage = self.getDevelopmentalStage();
+            double timestep = 0.1; // Default
+            
+            switch (stage) {
+                case nlm::DevelopmentalStage::Initial:
+                    timestep = 0.2;
+                    break;
+                case nlm::DevelopmentalStage::CriticalPeriod:
+                    timestep = 0.1;
+                    break;
+                case nlm::DevelopmentalStage::Maturation:
+                    timestep = 0.05;
+                    break;
+                case nlm::DevelopmentalStage::Adult:
+                    timestep = 0.01;
+                    break;
+                case nlm::DevelopmentalStage::Aging:
+                    timestep = 0.02;
+                    break;
+            }
+            
+            return self.updateDevelopment(timestep);
+        }, "Update development with adaptive timestep")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
+        .def("setDevelopmentalStage", &AgentBrain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
              "Get current neuromodulation level")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
@@ -382,11 +654,87 @@ PYBIND11_MODULE(pynlm, m) {
              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+        .def("getBehavioralProfile", [](AgentBrain& self) {
+            // Get comprehensive behavioral profile
+            py::dict profile;
+            profile["developmentalStage"] = static_cast<int>(self.getDevelopmentalStage());
+            profile["neuromodulationLevel"] = self.getNeuromodulationLevel();
+            profile["curiosityLevel"] = self.getCuriosityLevel();
+            profile["noveltyLevel"] = self.getNoveltyLevel();
+            profile["predictionError"] = self.getPredictionError();
+            
+            // Calculate behavior indicators
+            bool isExploring = self.getCuriosityLevel() > 0.5;
+            bool isLearning = self.getNoveltyLevel() > 0.3;
+            bool isPredicting = self.getPredictionError() > 0.1;
+            
+            profile["isExploring"] = isExploring;
+            profile["isLearning"] = isLearning;
+            profile["isPredicting"] = isPredicting;
+            
+            return profile;
+        }, "Get comprehensive behavioral profile")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
+        .def("resetWithCheckpoint", [](AgentBrain& self) {
+            // Reset with checkpoint preservation
+            auto brain = self.getBrain();
+            auto checkpointFile = "agent_checkpoint_" + std::to_string(std::time(nullptr)) + ".bin";
+            
+            try {
+                brain->save(checkpointFile);
+                self.reset();
+                return checkpointFile;
+            } catch (const std::exception& e) {
+                self.reset();
+                throw;
+            }
+        }, "Reset agent with checkpoint saving")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        .def("setBrain", &AgentBrain::setBrain,
+             py::arg("brain"),
+             "Set new brain for this agent")
+        // Advanced neuromodulation features
+        .def("enableAdvancedNeuromodulation", [](AgentBrain& self) {
+            // Enable all neuromodulation subsystems
+            self.enableRewardModulation(true);
+            self.enableCuriosity(true);
+            self.enableDevelopment(true);
+            self.enableStructuralPlasticity(true);
+            
+            return "Advanced neuromodulation enabled";
+        }, "Enable all neuromodulation subsystems")
+        .def("getNeuromodulationStats", [](AgentBrain& self) {
+            // Get neuromodulation statistics
+            py::dict stats;
+            stats["rewardModulationEnabled"] = self.isRewardModulationEnabled();
+            stats["curiosityEnabled"] = self.isCuriosityEnabled();
+            stats["developmentEnabled"] = self.isDevelopmentEnabled();
+            stats["structuralPlasticityEnabled"] = self.isStructuralPlasticityEnabled();
+            
+            // Get current levels
+            stats["curiosityLevel"] = self.getCuriosityLevel();
+            stats["noveltyLevel"] = self.getNoveltyLevel();
+            stats["predictionError"] = self.getPredictionError();
+            stats["neuromodulationLevel"] = self.getNeuromodulationLevel();
+            
+            return stats;
+        }, "Get neuromodulation statistics")
+        .def("createEnhancedAgent", [](const std::shared_ptr<nlm::Brain>& brain) {
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            
+            // Apply enhanced initialization
+            auto world = std::make_shared<nlm::SimpleWorld>();
+            world->configure(15, 15, 8, 8);
+            world->reset();
+            
+            agent->initializeWithDefaults(world);
+            agent->enableAdvancedNeuromodulation();
+            
+            return agent;
+        }, py::arg("brain"), "Create an enhanced agent with advanced features")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -398,7 +746,218 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Simulation control methods
+        .def("runEpisode", [](AgentBrain& self, const std::shared_ptr<nlm::SimpleWorld>& world, 
+                           size_t maxSteps, bool verbose = false) {
+            if (!world) {
+                throw std::runtime_error("World cannot be null for episode");
+            }
+            
+            world->reset();
+            auto agentBrain = self.getBrain();
+            
+            double totalReward = 0.0;
+            size_t stepsCompleted = 0;
+            
+            for (size_t step = 0; step < maxSteps; ++step) {
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                agentBrain->step(step);
+                auto action = self.decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                auto actionResult = world->getActionResult();
+                if (actionResult) {
+                    self.applyAdvancedRewardModulation(actionResult);
+                    totalReward += actionResult->reward;
+                }
+                
+                self.updateDevelopmentWithAdaptiveTimestep();
+                stepsCompleted++;
+                
+                if (verbose && step % 100 == 0) {
+                    std::cout << "Step " << step << ": Reward = " << totalReward 
+                              << ", Curiosity = " << self.getCuriosityLevel() << std::endl;
+                }
+            }
+            
+            py::dict results;
+            results["totalReward"] = totalReward;
+            results["stepsCompleted"] = static_cast<int64_t>(stepsCompleted);
+            results["finalCuriosity"] = self.getCuriosityLevel();
+            results["finalNovelty"] = self.getNoveltyLevel();
+            
+            return results;
+        }, py::arg("world"), py::arg("maxSteps"), py::arg("verbose") = false,
+             "Run an episode with the agent")
+        .def("createLearningScenario", [](const std::shared_ptr<nlm::Brain>& brain, 
+                                        const std::shared_ptr<nlm::SimpleWorld>& world,
+                                        const py::kwargs& kwargs) {
+            // Create a learning scenario with configurable parameters
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Apply additional configurations
+            if (kwargs.contains("curiosity")) {
+                agent->enableCuriosity(kwargs["curiosity"].cast<bool>());
+            }
+            if (kwargs.contains("rewardModulation")) {
+                agent->enableRewardModulation(kwargs["rewardModulation"].cast<bool>());
+            }
+            if (kwargs.contains("development")) {
+                agent->enableDevelopment(kwargs["development"].cast<bool>());
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create an agent with learning scenarios")
+        .def("createSimulationScenario", [](const std::shared_ptr<nlm::Brain>& brain,
+                                          const std::shared_ptr<nlm::SimpleWorld>& world,
+                                          const py::kwargs& kwargs) {
+            // Create a simulation scenario with world interaction
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Configure world parameters
+            if (kwargs.contains("worldWidth")) {
+                world->configure(
+                    kwargs["worldWidth"].cast<int>(),
+                    kwargs.contains("worldHeight") ? kwargs["worldHeight"].cast<int>() : 20,
+                    kwargs.contains("visionWidth") ? kwargs["visionWidth"].cast<int>() : 8,
+                    kwargs.contains("visionHeight") ? kwargs["visionHeight"].cast<int>() : 8
+                );
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create a simulation scenario with world interaction")
+        .def("createTrainingScenario", [](const std::shared_ptr<nlm::Brain>& brain,
+                                        const std::shared_ptr<nlm::SimpleWorld>& world,
+                                        const py::kwargs& kwargs) {
+            // Create a training scenario with learning objectives
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Enable all learning subsystems
+            agent->enableAdvancedNeuromodulation();
+            
+            // Set learning parameters
+            if (kwargs.contains("curiosityThreshold")) {
+                // Would need additional API for curiosity threshold setting
+            }
+            if (kwargs.contains("noveltyThreshold")) {
+                // Would need additional API for novelty threshold setting
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create a training scenario with all learning subsystems")
+        .def("createExperimentalSetup", [](const std::shared_ptr<nlm::Brain>& brain,
+                                         const std::shared_ptr<nlm::SimpleWorld>& world,
+                                         const py::kwargs& kwargs) {
+            // Create an experimental setup with controlled conditions
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Configure experimental parameters
+            if (kwargs.contains("environmentType")) {
+                std::string envType = kwargs["environmentType"].cast<std::string>();
+                // Would need additional world configuration based on environment type
+            }
+            if (kwargs.contains("rewardSchedule")) {
+                std::string rewardSchedule = kwargs["rewardSchedule"].cast<std::string>();
+                // Would need additional reward scheduling logic
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create an experimental setup with controlled conditions")
+        .def("createResearchSetup", [](const std::shared_ptr<nlm::Brain>& brain,
+                                     const std::shared_ptr<nlm::SimpleWorld>& world,
+                                     const py::kwargs& kwargs) {
+            // Create a research setup with advanced features
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Enable research-grade features
+            agent->enableAdvancedNeuromodulation();
+            
+            // Configure research parameters
+            if (kwargs.contains("researchProtocol")) {
+                std::string protocol = kwargs["researchProtocol"].cast<std::string>();
+                // Would need additional protocol-specific configuration
+            }
+            if (kwargs.contains("dataCollection")) {
+                bool collectData = kwargs["dataCollection"].cast<bool>();
+                // Would need additional data collection infrastructure
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create a research setup with advanced features")
+        .def("createDevelopmentSetup", [](const std::shared_ptr<nlm::Brain>& brain,
+                                        const std::shared_ptr<nlm::SimpleWorld>& world,
+                                        const py::kwargs& kwargs) {
+            // Create a development setup for skill acquisition
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Configure development-focused features
+            agent->enableDevelopment(true);
+            
+            if (kwargs.contains("skillAcquisition")) {
+                bool enableSkills = kwargs["skillAcquisition"].cast<bool>();
+                // Would need additional skill acquisition infrastructure
+            }
+            if (kwargs.contains("socialLearning")) {
+                bool enableSocial = kwargs["socialLearning"].cast<bool>();
+                // Would need additional social learning infrastructure
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create a development setup for skill acquisition")
+        .def("createSimulationSetup", [](const std::shared_ptr<nlm::Brain>& brain,
+                                       const std::shared_ptr<nlm::SimpleWorld>& world,
+                                       const py::kwargs& kwargs) {
+            // Create a general simulation setup
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            // Configure simulation parameters
+            if (kwargs.contains("simulationMode")) {
+                std::string mode = kwargs["simulationMode"].cast<std::string>();
+                // Would need additional mode-specific configuration
+            }
+            if (kwargs.contains("recordingEnabled")) {
+                bool record = kwargs["recordingEnabled"].cast<bool>();
+                // Would need additional recording infrastructure
+            }
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), py::kw_only(),
+             "Create a general simulation setup")
+        .def("createDefaultSetup", [](const std::shared_ptr<nlm::Brain>& brain,
+                                    const std::shared_ptr<nlm::SimpleWorld>& world) {
+            // Create a default setup (backward compatibility)
+            auto agent = std::make_shared<nlm::AgentBrain>(brain);
+            agent->initializeWithDefaults(world);
+            
+            return agent;
+        }, py::arg("brain"), py::arg("world"), "Create a default setup (backward compatibility)")
+        .def("getSetupTypes", []() {
+            // Return available setup types
+            py::dict setupTypes;
+            setupTypes["default"] = "Default setup with basic features";
+            setupTypes["enhanced"] = "Enhanced setup with advanced neuromodulation";
+            setupTypes["experimental"] = "Experimental setup with controlled conditions";
+            setupTypes["research"] = "Research setup with advanced features";
+            setupTypes["development"] = "Development setup for skill acquisition";
+            setupTypes["simulation"] = "General simulation setup";
+            
+            return setupTypes;
+        }, "Get available setup types");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

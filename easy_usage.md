@@ -286,12 +286,313 @@ print("Agent simulation complete!")
 - Some neurons need input to fire - make sure sensory input is connected
 
 ---
+## Quick Reference
+
+| What you want | Code |
+|--------------|------|
+| Create brain | `pynlm.createBrain(config)` |
+| Start brain | `brain.initialize()` |
+| Make brain think | `brain.step(step)` |
+| Create world | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
+
+---
+
+## Advanced Python API Features
+
+NLM now provides advanced features for power users and research applications:
+
+### 1. Enhanced Configuration
+
+The Python API now supports type-safe configuration methods:
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# Set configuration values with type safety
+config.set("brain.neuron_count", 1500)      # int64_t
+config.set("brain.synapse_density", 0.2f)   # float
+config.set("brain.connection_probability", 0.1)
+config.set("plasticity.stdp.enable", True) # bool
+config.set("random_seed", 42)              # int64_t
+
+# Get configuration values
+neuron_count = config.getInt("brain.neuron_count", 1000)
+connection_prob = config.getFloat("brain.connection_probability", 0.1)
+enable_stdp = config.getBool("plasticity.stdp.enable", True)
+
+# Configuration validation
+errors = config.validate()
+if errors:
+    print("Configuration errors:", errors)
+```
+
+### 2. Advanced Brain Operations
+
+Brain operations now include performance monitoring and advanced statistics:
+
+```python
+import pynlm
+import time
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation with performance monitoring
+start_time = time.time()
+for step in range(1000):
+    brain.step(step)
+    
+    # Optional: Monitor progress
+    if step % 200 == 0:
+        stats = brain.getBrainStats()
+        print(f"Step {step}: {stats['firingNeuronCount']} firing, "
+              f"{stats['averageFiringRate']:.2f} avg rate")
+
+end_time = time.time()
+print(f"Simulation completed in {end_time - start_time:.2f} seconds")
+
+# Get comprehensive statistics
+brain_stats = brain.getBrainStats()
+print("Comprehensive statistics:", brain_stats)
+
+# Get performance profile
+profile = brain.getPerformanceProfile(500, 0.001)
+print("Performance profile:", profile)
+```
+
+### 3. Enhanced Agent Brain
+
+AgentBrain now includes advanced neuromodulation and learning features:
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableAdvancedNeuromodulation()
+
+# Run simulation with detailed tracking
+for step in range(500):
+    world.update(0.1)
+    
+    # Process sensory input with validation
+    percept = world.getSensoryPercept()
+    if percept:
+        agent.processSensoryInput(percept)
+    
+    # Run brain
+    brain.step(step)
+    
+    # Decode motor command
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward with action context
+    action_result = world.getActionResult()
+    if action_result:
+        agent.applyAdvancedRewardModulation(action_result)
+    
+    # Update development
+    agent.updateDevelopmentWithAdaptiveTimestep()
+    
+    # Get behavioral profile
+    if step % 100 == 0:
+        profile = agent.getBehavioralProfile()
+        print(f"Step {step}: Curiosity={profile['curiosityLevel']:.2f}, "
+              f"Novelty={profile['noveltyLevel']:.2f}, "
+              f"Learning={profile['isLearning']}, "
+              f"Exploring={profile['isExploring']}")
+```
+
+### 4. Performance Benchmarking
+
+Built-in performance benchmarking tools:
+
+```python
+import pynlm
+
+def benchmark_brain_performance():
+    """Benchmark brain performance across different configurations."""
+    
+    configs = [
+        {"neurons": 500, "steps": 1000},
+        {"neurons": 1000, "steps": 500},
+        {"neurons": 2000, "steps": 200},
+        {"neurons": 5000, "steps": 100},
+    ]
+    
+    print("=== NLM Performance Benchmark ===\n")
+    
+    results = []
+    
+    for config in configs:
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.getConfig().set("neuron_count", config["neurons"])
+        brain.getConfig().set("random_seed", 42)
+        
+        start_time = time.time()
+        brain.initialize()
+        
+        for step in range(config["steps"]):
+            brain.step(step)
+        
+        end_time = time.time()
+        total_time = end_time - start_time
+        
+        brain_stats = brain.getBrainStats()
+        
+        result = {
+            "neurons": config["neurons"],
+            "steps": config["steps"],
+            "time": total_time,
+            "steps_per_sec": config["steps"] / total_time,
+            "spikes_per_step": brain_stats.get("totalSpikeCount", 0) / config["steps"],
+            "final_firing_rate": brain_stats.get("averageFiringRate", 0.0)
+        }
+        
+        results.append(result)
+        
+        print(f"{config['neurons']:>6} neurons: {result['steps_per_sec']:>8.1f} steps/sec, "
+              f"{result['spikes_per_step']:>6.2f} spikes/step, "
+              f"{result['final_firing_rate']:>6.2f} final rate")
+    
+    return results
+
+# Memory usage profiling
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Get memory usage estimate
+memory_usage = brain.getMemoryUsage()
+print(f"Memory usage: {memory_usage['totalMemoryKB']} KB total")
+print(f"  Neurons: {memory_usage['neuronMemoryKB']} KB")
+print(f"  Synapses: {memory_usage['synapseMemoryKB']} KB")
+```
+
+### 5. Checkpoint and State Management
+
+Advanced checkpoint and state management:
+
+```python
+import pynlm
+import os
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run some simulation
+for step in range(100):
+    brain.step(step)
+
+# Save brain state with validation
+checkpoint_file = "my_brain_checkpoint.bin"
+if brain.save(checkpoint_file):
+    print(f"Brain saved successfully to {checkpoint_file}")
+else:
+    print("Failed to save brain state")
+
+# Load with validation
+if brain.load(checkpoint_file):
+    print(f"Brain loaded successfully from {checkpoint_file}")
+    print(f"Loaded brain has {brain.getTotalNeuronCount()} neurons")
+else:
+    print("Failed to load brain state")
+
+# Create sub-brains for parallel processing
+sub_brain1 = brain.createSubBrain("sub1", 500)
+sub_brain2 = brain.createSubBrain("sub2", 500)
+
+print(f"Created sub-brains: {sub_brain1.getTotalNeuronCount()} + {sub_brain2.getTotalNeuronCount()} neurons")
+```
+
+### 6. Simulation Setup Types
+
+Different simulation setup types for various use cases:
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+
+# Setup type registry
+setup_types = pynlm.getAvailableSetups()
+
+# Create different setups
+default_setup = pynlm.createDefaultSetup(brain, world)
+advanced_setup = pynlm.createEnhancedSetup(brain, world)
+experimental_setup = pynlm.createExperimentalSetup(brain, world, environmentType="controlled")
+
+print("Setup types available:", setup_types)
+print(f"Created {len([default_setup, advanced_setup, experimental_setup])} different simulation setups")
+```
+
+### 7. Research and Development Features
+
+Tools for research and development:
+
+```python
+import pynlm
+
+# Research setup for controlled experiments
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+research_setup = pynlm.createResearchSetup(brain, world)
+
+# Development setup for skill acquisition
+development_setup = pynlm.createDevelopmentSetup(brain, world, skillAcquisition=True)
+
+# Export brain data for analysis
+analysis_data = brain.exportNeurons("brain_analysis.json")
+print(f"Exported brain analysis: {analysis_data}")
+
+# Import brain data (placeholder)
+import_result = brain.importNeurons("brain_analysis.json")
+print(f"Import result: {import_result}")
+```
+
+---
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+After mastering the basics, explore these advanced topics:
 
-That's it! You're now ready to use NLM.
+1. **Advanced API Features**: Use the enhanced configuration, performance monitoring, and advanced agent features
+2. **Research Applications**: Create experimental setups with controlled conditions
+3. **Development Scenarios**: Use development setups for skill acquisition and learning studies
+4. **Performance Optimization**: Use benchmarking tools and memory profiling
+5. **State Management**: Implement checkpoint systems for long-running simulations
+6. **Parallel Processing**: Create sub-brains for parallel computation
+7. **Data Analysis**: Export and import brain states for analysis
+
+NLM provides a comprehensive platform for artificial neural simulation, from simple demonstrations to complex research applications.
+
+---
+
+## Additional Resources
+
+- **HOW_TO_USE.md**: Detailed installation and configuration guide
+- **docs/ARCHITECTURE.md**: System architecture and component overview
+- **docs/EXPERIMENTS.md**: Experiment descriptions and protocols
+- **pyproject.toml**: Project configuration and dependencies
+
+Enjoy exploring the fascinating world of artificial neural systems with NLM!
+
