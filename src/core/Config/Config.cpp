@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <cctype>
 
 namespace nlm {
 
@@ -18,17 +20,64 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+ConfigFileFormat Config::detectFileFormat(const std::string& filepath) {
+    if (!std::filesystem::exists(filepath)) {
+        return ConfigFileFormat::UNKNOWN;
+    }
     
+    std::filesystem::path path(filepath);
+    std::string extension = path.extension().string();
+    
+    if (extension.empty()) {
+        return ConfigFileFormat::UNKNOWN;
+    }
+    
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    if (extension == ".json") {
+        return ConfigFileFormat::JSON;
+    } else if (extension == ".yaml" || extension == ".yml") {
+        return ConfigFileFormat::YAML;
+    } else if (extension == ".cfg" || extension == ".ini" || extension == ".txt" || extension.empty()) {
+        // Default to key-value format for files without extension or with common config extensions
+        return ConfigFileFormat::KEY_VALUE;
+    }
+    
+    return ConfigFileFormat::UNKNOWN;
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    ConfigFileFormat format = detectFileFormat(filepath);
+    return loadFromFile(filepath, format);
+}
+
+bool Config::loadFromFile(const std::string& filepath, ConfigFileFormat format) {
+    clear();
+    
+    switch (format) {
+        case ConfigFileFormat::KEY_VALUE:
+            return loadFromKeyValue(filepath, *this);
+        case ConfigFileFormat::JSON:
+            return loadFromJSON(filepath, *this);
+        case ConfigFileFormat::YAML:
+            return loadFromYAML(filepath, *this);
+        case ConfigFileFormat::UNKNOWN:
+            throw ConfigFileError("Unknown file format for " + filepath);
+    }
+    return false;
+}
+
+bool Config::loadFromKeyValue(const std::string& filepath, Config& config) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileError("Cannot open file: " + filepath);
     }
     
     std::string line;
+    int lineNumber = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,15 +92,267 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            config.set(key, value, ConfigSource::File);
+        } else {
+            throw ConfigFormatError("Invalid format at line " + std::to_string(lineNumber) + 
+                                   " in " + filepath + ": expected 'key = value' format");
         }
     }
     
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath, Config& config, const ConfigSchema* schema) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw ConfigFileError("Cannot open JSON file: " + filepath);
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        if (!jsonData.is_object()) {
+            throw ConfigFormatError("JSON file must contain an object (key-value pairs)");
+        }
+        
+        for (const auto& [key, value] : jsonData.items()) {
+            ConfigValue configValue;
+            if (!parseJSONValue(value, configValue)) {
+                throw ConfigFormatError("Failed to parse JSON value for key '" + key + "'");
+            }
+            config.set(key, configValue, ConfigSource::File);
+        }
+        
+        // Validate against schema if provided
+        if (schema) {
+            std::unordered_map<std::string, std::any> configData;
+            for (const auto& entry : config.pImpl->entries) {
+                configData[entry.key] = entry.value;
+            }
+            
+            if (!schema->validate(configData)) {
+                auto missing = schema->getMissingElements(configData);
+                throw ConfigValidationError("Missing required fields: " + 
+                    (missing.empty() ? "unknown validation error" : 
+                     std::accumulate(missing.begin(), missing.end(), std::string(),
+                                 [](const std::string& a, const std::string& b) {
+                                     return a.empty() ? b : a + ", " + b;
+                                 })));
+            }
+        }
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        throw ConfigFormatError("JSON parse error: " + std::string(e.what()) + 
+                               " at position " + std::to_string(e.byte));
+    } catch (const nlohmann::json::type_error& e) {
+        throw ConfigFormatError("JSON type error: " + std::string(e.what()) + 
+                               " at position " + std::to_string(e.byte));
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAML(const std::string& filepath, Config& config, const ConfigSchema* schema) {
+    return loadFromJSON(filepath, config, schema);
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    ConfigFileFormat format = detectFileFormat(filepath);
+    return saveToFile(filepath, format);
+}
+
+bool Config::saveToFile(const std::string& filepath, ConfigFileFormat format) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    switch (format) {
+        case ConfigFileFormat::KEY_VALUE:
+            return saveToKeyValue(filepath, *this);
+        case ConfigFileFormat::JSON:
+            return saveToJSON(filepath, *this);
+        case ConfigFileFormat::YAML:
+            return saveToYAML(filepath, *this);
+        case ConfigFileFormat::UNKNOWN:
+            return false;
+    }
+    return false;
+}
+
+bool Config::saveToKeyValue(const std::string& filepath, const Config& config) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Add file header
+    file << "# NLM Configuration File\n";
+    file << "# Generated from configuration data\n\n";
+    
+    for (const auto& entry : config.pImpl->entries) {
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        file << "\n";
+    }
+    
+    return true;
+}
+
+bool Config::saveToJSON(const std::string& filepath, const Config& config) {
+    nlohmann::json jsonData;
+    
+    for (const auto& entry : config.pImpl->entries) {
+        jsonData[entry.key] = serializeToJSON(entry.value);
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Write with pretty formatting
+    file << jsonData.dump(4);
+    
+    return true;
+}
+
+bool Config::saveToYAML(const std::string& filepath, const Config& config) {
+    // For now, YAML is implemented as JSON
+    return saveToJSON(filepath, config);
+}
+
+bool Config::parseJSONValue(const nlohmann::json& jsonValue, ConfigValue& configValue) {
+    if (jsonValue.is_string()) {
+        configValue = jsonValue.get<std::string>();
+    } else if (jsonValue.is_boolean()) {
+        configValue = jsonValue.get<bool>();
+    } else if (jsonValue.is_number_integer()) {
+        configValue = jsonValue.get<int>();
+    } else if (jsonValue.is_number()) {
+        // Check if it's an integer that fits in int64_t
+        if (jsonValue.is_number_integer()) {
+            configValue = jsonValue.get<int64_t>();
+        } else {
+            configValue = jsonValue.get<double>();
+        }
+    } else if (jsonValue.is_array()) {
+        std::vector<std::string> stringArray;
+        bool allStrings = true;
+        
+        for (const auto& item : jsonValue) {
+            if (item.is_string()) {
+                stringArray.push_back(item.get<std::string>());
+            } else if (item.is_number_integer()) {
+                stringArray.push_back(std::to_string(item.get<int64_t>()));
+            } else if (item.is_number()) {
+                stringArray.push_back(std::to_string(item.get<double>()));
+            } else if (item.is_boolean()) {
+                stringArray.push_back(item.get<bool>() ? "true" : "false");
+            } else {
+                allStrings = false;
+                break;
+            }
+        }
+        
+        if (allStrings) {
+            configValue = stringArray;
+        } else {
+            // Try to detect type based on first element
+            if (!jsonValue.empty()) {
+                if (jsonValue[0].is_number_integer()) {
+                    std::vector<int> intArray;
+                    for (const auto& item : jsonValue) {
+                        intArray.push_back(item.get<int>());
+                    }
+                    configValue = intArray;
+                } else if (jsonValue[0].is_number()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : jsonValue) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    configValue = doubleArray;
+                } else {
+                    return false;
+                }
+            }
+        }
+    } else {
+        return false;
+    }
+    
+    return true;
+}
+
+bool Config::parseYAMLValue(const nlohmann::json& yamlValue, ConfigValue& configValue) {
+    return parseJSONValue(yamlValue, configValue);
+}
+
+nlohmann::json Config::serializeToJSON(const ConfigValue& configValue) const {
+    nlohmann::json result;
+    
+    std::visit([&result](const auto& value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, int>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = value;
+        }
+    }, configValue);
+    
+    return result;
+}
+
+bool Config::setValueFromAny(Config& config, const std::string& key, const std::any& value, ConfigSource source) {
+    if (value.type() == typeid(int)) {
+        config.set(key, std::any_cast<int>(value), source);
+    } else if (value.type() == typeid(int64_t)) {
+        config.set(key, std::any_cast<int64_t>(value), source);
+    } else if (value.type() == typeid(double)) {
+        config.set(key, std::any_cast<double>(value), source);
+    } else if (value.type() == typeid(bool)) {
+        config.set(key, std::any_cast<bool>(value), source);
+    } else if (value.type() == typeid(std::string)) {
+        config.set(key, std::any_cast<std::string>(value), source);
+    } else if (value.type() == typeid(std::vector<int>)) {
+        config.set(key, std::any_cast<std::vector<int>>(value), source);
+    } else if (value.type() == typeid(std::vector<double>)) {
+        config.set(key, std::any_cast<std::vector<double>>(value), source);
+    } else if (value.type() == typeid(std::vector<std::string>)) {
+        config.set(key, std::any_cast<std::vector<std::string>>(value), source);
+    } else {
+        return false;
+    }
     return true;
 }
 
