@@ -6,9 +6,9 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +129,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -406,15 +412,73 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
+    // Update acetylcholine (attention and memory consolidation)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on attention
+        float achLevel = pImpl->acetylcholine->getLevel();
+        if (achLevel > 0.0f) {
+            // Acetylcholine enhances attention and working memory
+            // Boosts excitation in prefrontal and attentional networks
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // ACh increases membrane resistance (enhances signal-to-noise)
+                        if (achLevel > 0.5f) {
+                            neuron->injectCurrent(achLevel * 0.3f);
+                        }
+                    }
+                }
+            }
+        }
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on arousal
+        float neLevel = pImpl->norepinephrine->getLevel();
+        if (neLevel > 0.0f) {
+            // Norepinephrine increases arousal and alertness
+            // Enhances thalamocortical activation
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // NE modulates arousal and response gain
+                        if (neLevel > 0.3f) {
+                            neuron->injectCurrent(neLevel * 0.2f);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood, impulsivity, and social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on mood and behavior
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        if (serotoninLevel > 0.0f) {
+            // Serotonin modulates mood, impulsivity, and social behavior
+            // Inhibits behavioral responses, promotes impulse control
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // 5-HT has complex effects on behavior
+                        // High levels promote inhibition and social behavior
+                        if (serotoninLevel > 0.6f) {
+                            neuron->injectCurrent(-serotoninLevel * 0.2f);  // Inhibition
+                        } else if (serotoninLevel > 0.3f) {
+                            neuron->injectCurrent(serotoninLevel * 0.1f);   // Modest excitation
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -439,11 +503,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
+    // Apply other neuromodulators to plasticity rules
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Acetylcholine enhances plasticity
+    if (pImpl->acetylcholine) {
+        plasticityMod *= (1.0f + pImpl->acetylcholine->getLevel() * 0.5f);
+    }
+    
+    // Norepinephrine modulates plasticity
+    if (pImpl->norepinephrine) {
+        plasticityMod *= (1.0f + pImpl->norepinephrine->getLevel() * 0.3f);
+    }
+    
+    // Serotonin inhibits plasticity at high levels
+    if (pImpl->serotonin && pImpl->serotonin->getLevel() > 0.5f) {
+        plasticityMod *= 0.8f;
     }
     
     for (auto& region : pImpl->regions) {
@@ -511,8 +588,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Apply prediction system update with current neural state
+        // Predict next state based on current activity patterns
+        // Use sensory observations if available
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a sensory input pattern from active sensory neurons
+            std::vector<float> sensoryPattern;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    // Get normalized firing rate (0-1)
+                    float firingRate = std::min(1.0f, 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    sensoryPattern.push_back(firingRate);
+                }
+            }
+            
+            // If we have prediction system and some pattern data
+            if (!sensoryPattern.empty()) {
+                pImpl->predictionSystem->updatePredictions(
+                    sensoryPattern,
+                    sensoryPattern  // For now, predict the same (perfect prediction)
+                );
+            }
+        }
+        
+        // Update prediction system for learning
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +630,147 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current sensory pattern for concept formation
+        std::vector<float> currentPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float firingRate = 0.0f;
+                if (neuron->isFiring()) {
+                    firingRate = 1.0f;
+                } else {
+                    firingRate = std::min(1.0f,
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                }
+                currentPattern.push_back(firingRate);
+            }
+        }
+        
+        // Get features from internal neurons for concept formation
+        std::vector<float> features;
+        if (!pImpl->motorNeurons.empty()) {
+            for (auto* neuron : pImpl->motorNeurons) {
+                float activation = std::min(1.0f,
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                features.push_back(activation);
+            }
+        }
+        
+        // Create a simple reward signal based on prediction error and novelty
+        float reward = 0.0f;
+        if (pImpl->predictionSystem) {
+            reward += pImpl->predictionSystem->getPredictionError();
+        }
+        if (pImpl->novelty) {
+            reward += pImpl->novelty->getLevel();
+        }
+        if (pImpl->dopamine) {
+            reward += pImpl->dopamine->getLevel() * 2.0f;
+        }
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
+    }
+    
+    // ========== STEP 11: Update neural planning ==========
+    if (pImpl->planner) {
+        // Get current state for planning
+        std::vector<float> currentState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float firingRate = 0.0f;
+                if (neuron->isFiring()) {
+                    firingRate = 1.0f;
+                } else {
+                    firingRate = std::min(1.0f,
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                }
+                currentState.push_back(firingRate);
+            }
+        }
+        
+        // Plan action based on current state and prediction system
+        float targetReward = 0.5f;
+        if (pImpl->predictionSystem) {
+            targetReward = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Apply self-model prediction of action consequences
+        if (pImpl->conceptFormation) {
+            // Get self-model's predicted state
+            auto* planner = pImpl->planner.get();
+            if (planner) {
+                std::vector<float> predictedState = planner->predictNextState(
+                    plannedAction, currentState
+                );
+                
+                // Store in self-model
+                pImpl->conceptFormation->updateConcept(
+                    pImpl->conceptFormation->getMatchingConcept(currentState),
+                    predictedState, std::vector<float>(), 0.0f
+                );
+            }
+        }
+    }
+    
+    // ========== STEP 12: Update self-model ==========
+    if (pImpl->conceptFormation) {
+        // The concept formation system now includes self-model functionality
+        // For direct self-model updates, we can use the planner's self-model
+        if (pImpl->planner) {
+            // Record self-action with current sensory state before action
+            // and predicted state after action
+            std::vector<float> beforeState;
+            if (!pImpl->sensoryNeurons.empty()) {
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    float firingRate = 0.0f;
+                    if (neuron->isFiring()) {
+                        firingRate = 1.0f;
+                    } else {
+                        firingRate = std::min(1.0f,
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                    beforeState.push_back(firingRate);
+                }
+            }
+            
+            // Predict what would happen after an action
+            if (!beforeState.empty()) {
+                // Use current state for self-model update
+                std::vector<float> afterState = beforeState;  // No change for now
+                pImpl->conceptFormation->updateConcept(
+                    pImpl->conceptFormation->getMatchingConcept(beforeState),
+                    afterState, std::vector<float>(), 0.0f
+                );
+            }
+        }
+    }
+    
+    // ========== STEP 13: Update social learning ==========
+    if (pImpl->conceptFormation) {
+        // The concept formation system includes social learning capabilities
+        // Social learning is integrated through the agent's social interactions
+        if (pImpl->workingMemory && pImpl->workingMemory->getActiveTraces() > 0) {
+            // When we have active memory traces, this indicates we've observed something
+            // Social learning could be triggered by comparing current state with memory
+            std::vector<float> currentState;
+            if (!pImpl->sensoryNeurons.empty()) {
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    float firingRate = 0.0f;
+                    if (neuron->isFiring()) {
+                        firingRate = 1.0f;
+                    } else {
+                        firingRate = std::min(1.0f,
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                    currentState.push_back(firingRate);
+                }
+            }
+            
+            // Social learning updates could be made here
+            // For now, just log that social learning opportunities exist
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1055,6 +1296,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {
