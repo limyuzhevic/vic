@@ -28,6 +28,12 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SensoryInput;
+class Action;
+class Neuromodulator;
+class CheckpointManager;
+class DetailedSpikeEvent;
+class DelayedSpikeEvent;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
