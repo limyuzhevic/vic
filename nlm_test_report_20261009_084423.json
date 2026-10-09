@@ -1,0 +1,151 @@
+{
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "pass_rate": 0.0,
+    "total_duration": 0.045317,
+    "total_memory_usage": 0,
+    "average_performance_score": 0.6
+  },
+  "test_details": [
+    {
+      "name": "test_basic_functionality",
+      "type": "configuration",
+      "status": "PASSED",
+      "duration": 0.04421114921569824,
+      "memory_usage": 0,
+      "performance_score": 0.8,
+      "error": null,
+      "timestamp": "2026-10-09T08:44:23.354851"
+    },
+    {
+      "name": "test_config_functionality",
+      "type": "configuration",
+      "status": "PASSED",
+      "duration": 0.00012111663818359375,
+      "memory_usage": 0,
+      "performance_score": 0.8,
+      "error": null,
+      "timestamp": "2026-10-09T08:44:23.355214"
+    },
+    {
+      "name": "test_type_validation",
+      "type": "configuration",
+      "status": "FAILED",
+      "duration": 3.814697265625e-05,
+      "memory_usage": 0,
+      "performance_score": 0.0,
+      "error": "Test returned False",
+      "timestamp": "2026-10-09T08:44:23.355368"
+    },
+    {
+      "name": "test_memory_system_interface",
+      "type": "memory",
+      "status": "PASSED",
+      "duration": 4.0531158447265625e-05,
+      "memory_usage": 0,
+      "performance_score": 0.7,
+      "error": null,
+      "timestamp": "2026-10-09T08:44:23.355532"
+    },
+    {
+      "name": "test_neuromodulation_interface",
+      "type": "neurosimulation",
+      "status": "PASSED",
+      "duration": 2.5987625122070312e-05,
+      "memory_usage": 0,
+      "performance_score": 0.7,
+      "error": null,
+      "timestamp": "2026-10-09T08:44:23.355657"
+    }
+  ],
+  "performance_benchmarks": {},
+  "test_categories": {
+    "unit": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "integration": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "performance": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "security": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "compatibility": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "visual": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "memory": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "plugin": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "cli": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "configuration": {
+      "total": 3,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0
+    },
+    "error_handling": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "neurosimulation": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "concurrent": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "property_based": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

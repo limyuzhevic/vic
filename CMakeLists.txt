@@ -26,6 +26,12 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Error/NLMErrors.cpp
+    src/core/Error/NLMErrors.hpp
+    src/core/ErrorUtils/ErrorUtils.cpp
+    src/core/ErrorUtils/ErrorUtils.hpp
+    src/core/Validation/Validation.cpp
+    src/core/Validation/Validation.hpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -83,12 +89,29 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
+    # Visualization and debugging
     src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationEngine.cpp
+    src/visualization/NetworkVisualizer.cpp
+    src/visualization/ActivityAnalyzer.cpp
+    src/visualization/BrainStateDebugger.cpp
+    src/visualization/PerformanceProfiler.cpp
+    src/visualization/MemoryAnalyzer.cpp
+    src/visualization/DevelopmentInterface.cpp
+    src/visualization/ExportManager.cpp
+    src/visualization/PluginManager.cpp
+    # Plugin system
+    src/plugins/PluginManager.cpp
+    src/plugins/ScriptEngine.cpp
+    src/plugins/ScriptEditor.cpp
+    src/plugins/PerformanceProfiler.cpp
+    src/plugins/NeuralScripting.cpp
+    src/plugins/TestRunner.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plugins>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -121,7 +144,22 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# CLI tools
+add_executable(nlm_cli
+    src/cli/NLMCLI.cpp
+    src/cli/CommandBase.cpp
+    src/cli/RunCommand.cpp
+    src/cli/ConfigCommand.cpp
+    src/cli/SaveLoadCommand.cpp
+    src/cli/BenchmarkCommand.cpp
+    src/cli/DebugCommand.cpp
+    src/cli/VisualizeCommand.cpp
+    src/cli/HelpCommand.cpp
+    src/cli/VersionCommand.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+
+# Main executable (legacy)
 add_executable(nlm
     src/main.cpp
 )

@@ -1,46 +1,27 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+// Configuration validation
+struct ConfigValidationRule {
+    std::string key;
+    std::string description;
+    std::string type;
+    bool required;
+    std::string defaultValue;
+    std::string minValue;
+    std::string maxValue;
+    std::string allowedValues;
+    
+    ConfigValidationRule() : required(false) {}
+    ConfigValidationRule(const std::string& k, const std::string& d, bool req = false)
+        : key(k), description(d), required(req) {}
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
+// Configuration templates
+struct ConfigTemplate {
+    std::string name;
     std::string description;
+    std::vector<ConfigValidationRule> rules;
+    std::map<std::string, std::string> defaults;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigTemplate(const std::string& n, const std::string& d) : name(n), description(d) {}
 };
 
 // Main configuration class
@@ -58,11 +39,20 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to YAML file
+    bool saveToYAML(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,13 +83,50 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const ConfigTemplate& template) const;
+    std::string validateAll(const std::vector<ConfigTemplate>& templates) const;
+    
+    // Environment variable support
+    void loadFromEnvironment(const std::map<std::string, std::string>& envVars = {});
+    void setEnvironmentPrefix(const std::string& prefix);
+    
+    // Configuration templates
+    void addTemplate(const ConfigTemplate& template);
+    bool applyTemplate(const std::string& templateName);
+    std::vector<std::string> getAvailableTemplates() const;
+    
+    // Error handling
+    std::string getLastError() const;
+    bool hasError() const;
+    void clearError();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Error handling
+    mutable std::string lastError;
+    
+    // Environment variable support
+    std::string envPrefix;
+    
+    // Template support
+    std::map<std::string, ConfigTemplate> templates;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool stringToBool(const std::string& str);
+    static std::string boolToString(bool value);
+    static std::string doubleToString(double value);
+    static std::string int64ToString(int64_t value);
+    
+    // Validation helpers
+    static bool validateValue(const ConfigValidationRule& rule, const ConfigValue& value) const;
+    static std::string valueToString(const ConfigValue& value) const;
+    
+    // Environment variable helpers
+    static std::string getEnvVar(const std::string& name);
+    static std::string envVarToKey(const std::string& envName, const std::string& prefix = "");
 };
-
-} // namespace nlm
