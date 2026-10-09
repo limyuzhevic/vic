@@ -22,6 +22,12 @@
  * - Random generator state
  * - Simulation clock
  * - Environment state (optional)
+ * - Working memory
+ * - Episodic memory
+ * - Concept formation
+ * - Prediction system
+ * - Neural planner
+ * - Neuromodulation systems
  */
 
 #include <cstddef>
@@ -33,6 +39,15 @@
 #include <fstream>
 #include <functional>
 #include <variant>
+
+// Include checkpoint data structures
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../neuromodulation/Neuromodulation.hpp"
+#include "../development/DevelopmentSystem.hpp"
 
 namespace nlm {
 
@@ -67,8 +82,83 @@ enum class CheckpointSection : uint32_t {
     RandomState = 10,
     SimulationState = 11,
     Environment = 12,
-    Checksum = 13,
-    End = 14
+    PredictionSystem = 13,
+    ConceptFormation = 14,
+    NeuralPlanner = 15,
+    Checksum = 16,
+    End = 17
+};
+
+/**
+ * Working memory checkpoint
+ */
+struct WorkingMemoryCheckpoint {
+    std::vector<float> pattern;
+    std::vector<NeuronId> neurons;
+    std::vector<float> neuronActivations;
+    float memoryActivity;
+};
+
+/**
+ * Episodic memory checkpoint
+ */
+struct EpisodicMemoryCheckpoint {
+    std::vector<EpisodicMemoryItem> episodes;
+    size_t maxEpisodes;
+    bool replayEnabled;
+};
+
+/**
+ * Concept formation checkpoint
+ */
+struct ConceptFormationCheckpoint {
+    std::vector<DiscoveredConcept> concepts;
+    size_t nextConceptId;
+    float formationThreshold;
+    float stabilityThreshold;
+    size_t stabilityWindow;
+};
+
+/**
+ * Prediction system checkpoint
+ */
+struct PredictionSystemCheckpoint {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
+    size_t predictionCount;
+};
+
+/**
+ * Neural planner checkpoint
+ */
+struct NeuralPlannerCheckpoint {
+    std::vector<float> currentGoal;
+    size_t planningDepth;
+    float planningConfidence;
+    std::vector<float> actionQuality;
+    std::deque<bool> recentPlanSuccess;
+};
+
+/**
+ * Neuromodulation checkpoint
+ */
+struct NeuromodulationCheckpoint {
+    float dopamine;
+    float curiosity;
+    float novelty;
+    float predictionError;
+    float totalModulation;
+};
+
+/**
+ * Development system checkpoint
+ */
+struct DevelopmentCheckpoint {
+    DevelopmentalStage stage;
+    float synaptogenesisRate;
+    float pruningRate;
+    uint64_t lastDevelopmentStep;
 };
 
 /**
@@ -214,9 +304,39 @@ public:
     bool readSynapses(SynapseCheckpointData& data);
     
     /**
-     * Read raw section data
+     * Read working memory checkpoint
      */
-    std::vector<uint8_t> readSection(CheckpointSection sectionType);
+    bool readWorkingMemory(WorkingMemoryCheckpoint& data);
+    
+    /**
+     * Read episodic memory checkpoint
+     */
+    bool readEpisodicMemory(std::vector<EpisodicMemoryItem>& data);
+    
+    /**
+     * Read concept formation checkpoint
+     */
+    bool readConceptFormation(std::vector<DiscoveredConcept>& data);
+    
+    /**
+     * Read prediction system checkpoint
+     */
+    bool readPredictionSystem(PredictionSystemCheckpoint& data);
+    
+    /**
+     * Read neural planner checkpoint
+     */
+    bool readNeuralPlanner(NeuralPlannerCheckpoint& data);
+    
+    /**
+     * Read neuromodulation checkpoint
+     */
+    bool readNeuromodulation(NeuromodulationCheckpoint& data);
+    
+    /**
+     * Read development checkpoint
+     */
+    bool readDevelopment(DevelopmentCheckpoint& data);
     
     /**
      * Validate checkpoint integrity
@@ -282,6 +402,41 @@ public:
      */
     bool writeNeurons(const NeuronCheckpointData& data);
     bool writeSynapses(const SynapseCheckpointData& data);
+    
+    /**
+     * Write working memory checkpoint
+     */
+    bool writeWorkingMemory(const WorkingMemoryCheckpoint& data);
+    
+    /**
+     * Write episodic memory checkpoint
+     */
+    bool writeEpisodicMemory(const EpisodicMemoryCheckpoint& data);
+    
+    /**
+     * Write concept formation checkpoint
+     */
+    bool writeConceptFormation(const ConceptFormationCheckpoint& data);
+    
+    /**
+     * Write prediction system checkpoint
+     */
+    bool writePredictionSystem(const PredictionSystemCheckpoint& data);
+    
+    /**
+     * Write neural planner checkpoint
+     */
+    bool writeNeuralPlanner(const NeuralPlannerCheckpoint& data);
+    
+    /**
+     * Write neuromodulation checkpoint
+     */
+    bool writeNeuromodulation(const NeuromodulationCheckpoint& data);
+    
+    /**
+     * Write development checkpoint
+     */
+    bool writeDevelopment(const DevelopmentCheckpoint& data);
     
     /**
      * Write raw section data
