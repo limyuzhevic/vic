@@ -21,6 +21,7 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    episodes_.reserve(maxEpisodes_);
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
@@ -48,10 +49,15 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     }
     
     // Remove old episodes if over capacity
-    while (episodes_.size() > maxEpisodes_) {
-        episodes_.erase(episodes_.begin());
+    if (episodes_.size() > maxEpisodes_) {
+        // Remove earliest episodes (simple sliding window)
+        size_t toRemove = episodes_.size() - maxEpisodes_;
+        episodes_.erase(episodes_.begin(), episodes_.begin() + toRemove);
+        
+        // Clean up neurons
         if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin(), 
+                                       pImpl->episodeNeurons.begin() + toRemove);
         }
     }
     

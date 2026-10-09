@@ -19,9 +19,21 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced parser supporting both key=value and JSON formats
     
+    // Check if file extension suggests JSON format
+    bool isJson = filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json";
+    
+    if (isJson) {
+        // Try to parse as JSON - for now, just handle key=value as fallback
+        // TODO: Implement proper JSON parsing
+        return loadSimpleFormat(filepath);
+    } else {
+        return loadSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,11 +60,104 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse value based on type
+            parseAndSetValue(key, value);
+        } else if (line.find('{') != std::string::npos) {
+            // Very basic JSON support for simple key=value objects
+            // Extract key and value from {"key": "value"} format
+            size_t keyStart = line.find('"') + 1;
+            if (keyStart < line.size()) {
+                size_t keyEnd = line.find('"', keyStart);
+                if (keyEnd != std::string::npos && keyEnd > keyStart) {
+                    std::string key = line.substr(keyStart, keyEnd - keyStart);
+                    
+                    // Find value part
+                    size_t colonPos = line.find(':', keyEnd);
+                    if (colonPos != std::string::npos) {
+                        size_t valueStart = line.find('"', colonPos);
+                        if (valueStart != std::string::npos) {
+                            size_t valueEnd = line.find('"', valueStart + 1);
+                            if (valueEnd != std::string::npos) {
+                                std::string value = line.substr(valueStart + 1, valueEnd - valueStart - 1);
+                                parseAndSetValue(key, value);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
     return true;
+}
+
+void Config::parseAndSetValue(const std::string& key, const std::string& value) {
+    // Try to parse value as different types
+    bool parsed = false;
+    
+    // Try integer
+    try {
+        size_t pos;
+        int intVal = std::stoi(value, &pos);
+        if (pos == value.size()) {
+            set(key, intVal, ConfigSource::File);
+            parsed = true;
+        }
+    } catch (...) {}
+    
+    // Try float/double
+    if (!parsed) {
+        try {
+            size_t pos;
+            double doubleVal = std::stod(value, &pos);
+            if (pos == value.size()) {
+                set(key, doubleVal, ConfigSource::File);
+                parsed = true;
+            }
+        } catch (...) {}
+    }
+    
+    // Try boolean
+    if (!parsed) {
+        if (value == "true" || value == "false") {
+            bool boolVal = (value == "true");
+            set(key, boolVal, ConfigSource::File);
+            parsed = true;
+        }
+    }
+    
+    // Try integer array (simple format)
+    if (!parsed && value.find('[') != std::string::npos) {
+        try {
+            std::vector<int> intArray;
+            size_t start = value.find('[');
+            size_t end = value.find(']', start);
+            if (start < end) {
+                std::string arrayStr = value.substr(start + 1, end - start - 1);
+                // Simple array parsing - split by commas
+                size_t pos = 0;
+                while (pos < arrayStr.size()) {
+                    size_t commaPos = arrayStr.find(',', pos);
+                    std::string item = arrayStr.substr(pos, commaPos - pos);
+                    trim(item);
+                    if (!item.empty()) {
+                        int itemVal = std::stoi(item);
+                        intArray.push_back(itemVal);
+                    }
+                    pos = commaPos + 1;
+                }
+                if (!intArray.empty()) {
+                    set(key, intArray, ConfigSource::File);
+                    parsed = true;
+                }
+            }
+        } catch (...) {}
+    }
+    
+    // If not parsed, treat as string
+    if (!parsed) {
+        set(key, value, ConfigSource::File);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -114,32 +219,60 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+        pImpl->entries.push_back(ConfigEntry(key, ConfigValue(value), ConfigSource::File));
+    }
+    
+    return true;
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Helper function to parse and set value
+    // First check if key already exists
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
-        it->value = value;
+        it->value = ConfigValue(value);
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, ConfigValue(value), source);
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = ConfigValue(value);
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, ConfigValue(value), source);
+    }
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = ConfigValue(value);
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, ConfigValue(value), source);
+    }
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = ConfigValue(value);
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, ConfigValue(value), source);
+    }
 }
 
 bool Config::has(const std::string& key) const {

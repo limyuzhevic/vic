@@ -49,7 +49,7 @@ struct EpisodicMemoryItem {
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
-// NOT a database - episodes are encoded as synaptic patterns and can influence neural activity
+// NOT a database - episodes are encoded as neural activity and can influence neural activity
 //
 // Key mechanisms:
 // - Episodes stored as neural activity patterns
@@ -77,17 +77,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -127,7 +127,7 @@ public:
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
+                         const EpisodicMemoryItem& episode) const;
 
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,
@@ -140,7 +140,7 @@ private:
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
-    std::deque<EpisodicMemoryItem> episodes_;
+    std::vector<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
 };
