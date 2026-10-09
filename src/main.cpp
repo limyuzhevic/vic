@@ -26,9 +26,173 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+// Command-line utility functions
+void printHelp() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine
+Version: 0.1.0 (Phase 2: Real Neural Computation)
 
-void printBanner() {
+Usage: nlm [options]
+
+Options:
+  --help                    Show this help message
+  --version                 Show version information
+  --verbose                 Enable verbose logging
+  --quiet                   Suppress output (except errors)
+  --config <file>           Load configuration from file (JSON, YAML, or .cfg)
+  --list-configs            List available configuration files
+  --validate-config <file>  Validate configuration file format
+  --save-config <file>      Save current configuration to file
+  --log-level <level>       Set log level (Debug, Info, Warning, Error, Critical)
+  --log-file <file>         Set log output file
+  --seed <num>              Set random seed
+  --neuron-count <num>      Set number of neurons
+  --region-count <num>      Set number of brain regions
+  --connection-prob <float> Set connection probability
+  --timestep <float>        Set simulation timestep
+
+Examples:
+  nlm --help
+  nlm --version --verbose --log-level Debug
+  nlm --config experiments/circuit.cfg --neuron-count 1000
+  nlm --validate-config config.json
+  nlm --save-config my_config.cfg
+
+Configuration File Formats:
+  - JSON (.json): {"neuron_count": 1000, "random_seed": 42}
+  - YAML (.yaml, .yml): neuron_count: 1000\nrandom_seed: 42
+  - Simple (.cfg): neuron_count = 1000\nrandom_seed = 42
+
+Phase 2 Features:
+  ✓ Real LIF neuron dynamics
+  ✓ Event-driven spike propagation with delays
+  ✓ STDP and Hebbian plasticity rules
+  ✓ Structural plasticity (synaptogenesis/pruning)
+  ✓ Advanced configuration management
+  ✓ Comprehensive logging system
+  ✓ Command-line interface enhancements
+
+For more information: https://github.com/nlm-project/nlm
+
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) Neural Learning Machine - Version 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Implemented: Real spiking neural computation with event-driven dynamics" << std::endl;
+    std::cout << "Features: LIF neurons, STDP plasticity, structural development" << std::endl;
+    std::cout << "Status: Alpha (development build)" << std::endl;
+}
+
+void listAvailableConfigs() {
+    std::cout << "Available configuration files:" << std::endl;
+    
+    // Check for common config files
+    std::vector<std::string> configFiles = {
+        "configs/default.cfg",
+        "configs/experiment.cfg",
+        "configs/development.cfg",
+        "experiments/circuit.json",
+        "experiments/circuit.yaml",
+        "experiments/circuit.yml",
+        "experiments/brain.json",
+        "experiments/standard.yaml"
+    };
+    
+    for (const auto& configFile : configFiles) {
+        std::ifstream file(configFile);
+        if (file.good()) {
+            std::cout << "  ✓ " << configFile << std::endl;
+        } else {
+            std::cout << "  ✗ " << configFile << " (not found)" << std::endl;
+        }
+    }
+}
+
+bool validateConfig(const std::string& filepath) {
+    std::cout << "Validating configuration file: " << filepath << std::endl;
+    
+    // Try to load and validate the config
+    auto config = std::make_shared<Config>();
+    
+    if (!config->loadFromFile(filepath)) {
+        std::cout << "  ✗ Failed to load configuration file" << std::endl;
+        return false;
+    }
+    
+    // Check for required configuration keys
+    std::vector<std::string> requiredKeys = {"neuron_count", "region_count", "random_seed"};
+    bool valid = true;
+    
+    for (const auto& key : requiredKeys) {
+        if (!config->has(key)) {
+            std::cout << "  ✗ Missing required key: " << key << std::endl;
+            valid = false;
+        } else {
+            std::cout << "  ✓ Found key: " << key << std::endl;
+        }
+    }
+    
+    // Display current configuration
+    std::cout << "\nCurrent configuration summary:" << std::endl;
+    std::cout << config->summary() << std::endl;
+    
+    return valid;
+}
+
+void setLogLevelFromString(const std::string& levelStr, std::shared_ptr<Logger>& logger) {
+    LogLevel level;
+    
+    if (levelStr == "Debug" || levelStr == "debug") level = LogLevel::Debug;
+    else if (levelStr == "Warning" || levelStr == "warning") level = LogLevel::Warning;
+    else if (levelStr == "Error" || levelStr == "error") level = LogLevel::Error;
+    else if (levelStr == "Critical" || levelStr == "critical") level = LogLevel::Critical;
+    else level = LogLevel::Info; // Default
+    
+    logger->setLevel(level);
+    
+    // Also set the console logger level
+    if (logger->getGlobal() && !logger->getGlobal()->loggers.empty()) {
+        for (auto& l : logger->getGlobal()->loggers) {
+            l->setLevel(level);
+        }
+    }
+}
+
+void logConfigValidation(const Config& config) {
+    NLM_LOG_INFO("Configuration validation:");
+    
+    // Check essential parameters
+    int64_t neuronCount = config.getOr<int64_t>("neuron_count", 500);
+    int64_t regionCount = config.getOr<int64_t>("region_count", 1);
+    float connProb = config.getOr<float>("connection_probability", 0.15f);
+    double timestep = config.getOr<double>("simulation_timestep", 0.001);
+    
+    NLM_LOG_INFO("  Neural network: " << neuronCount << " neurons in " << regionCount << " regions");
+    NLM_LOG_INFO("  Connectivity: " << (connProb * 100) << "% connection probability");
+    NLM_LOG_INFO("  Simulation: " << timestep << "s timestep");
+    
+    // Validate parameter ranges
+    if (neuronCount < 10) {
+        NLM_LOG_WARNING("Neuron count is low (< 10), may not support meaningful computation");
+    }
+    
+    if (neuronCount > 10000) {
+        NLM_LOG_WARNING("Neuron count is high (> 10000), may be computationally intensive");
+    }
+    
+    if (timestep < 0.0001) {
+        NLM_LOG_WARNING("Timestep is very small, may require many iterations");
+    } else if (timestep > 0.1) {
+        NLM_LOG_WARNING("Timestep is large, may affect simulation accuracy");
+    }
+    
+    if (connProb < 0.01) {
+        NLM_LOG_WARNING("Connection probability is very low, network may be disconnected");
+    } else if (connProb > 0.5) {
+        NLM_LOG_WARNING("Connection probability is very high, may cause over-connectivity");
+    }
+}
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -322,9 +486,118 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Parse command-line arguments
+    bool showHelp = false;
+    bool showVersion = false;
+    bool verbose = false;
+    bool quiet = false;
+    bool listConfigs = false;
+    std::string validateConfigFile;
+    std::string saveConfigFile;
+    std::string logFile;
+    std::string logLevel;
+    bool configLoaded = false;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--verbose") {
+            verbose = true;
+        } else if (arg == "--quiet") {
+            quiet = true;
+        } else if (arg == "--list-configs") {
+            listConfigs = true;
+        } else if (arg == "--save-config" && i + 1 < argc) {
+            saveConfigFile = argv[++i];
+        } else if (arg.substr(0, 17) == "--validate-config") {
+            if (arg.find('=') != std::string::npos) {
+                validateConfigFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                validateConfigFile = argv[++i];
+            }
+        } else if (arg.substr(0, 10) == "--log-file") {
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        } else if (arg.substr(0, 12) == "--log-level") {
+            if (arg.find('=') != std::string::npos) {
+                logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        } else if (arg == "--config" && i + 1 < argc) {
+            // This will be handled later in the original code
+            // Keep the existing config handling
+        }
+    }
+    
+    // Handle early exits
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        if (verbose) {
+            printHelp();
+        }
+        return 0;
+    }
+    
+    if (listConfigs) {
+        listAvailableConfigs();
+        return 0;
+    }
+    
+    if (!validateConfigFile.empty()) {
+        bool isValid = validateConfig(validateConfigFile);
+        return isValid ? 0 : 1;
+    }
+    
+    // If we want to save config, load current and save to file
+    if (!saveConfigFile.empty()) {
+        auto config = std::make_shared<Config>();
+        std::string configFile = "configs/default.cfg";
+        
+        // Try to load existing config
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg.substr(0, 7) == "--config") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile = argv[++i];
+                }
+            }
+        }
+        
+        if (config->loadFromFile(configFile)) {
+            if (config->saveToFile(saveConfigFile)) {
+                std::cout << "Configuration saved to: " << saveConfigFile << std::endl;
+            } else {
+                std::cerr << "Failed to save configuration to: " << saveConfigFile << std::endl;
+                return 1;
+            }
+        } else {
+            std::cout << "Using default configuration" << std::endl;
+            if (!config->saveToFile(saveConfigFile)) {
+                std::cerr << "Failed to save default configuration to: " << saveConfigFile << std::endl;
+                return 1;
+            }
+        }
+        return 0;
+    }
+    
+    // Continue with original main function logic...
+    printBanner();
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -339,6 +612,64 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Try to load from file if provided
+    std::string configFile = "configs/default.cfg";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+    
+    // Initialize logger with appropriate level
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    // Set log level based on command line argument
+    if (!logLevel.empty()) {
+        setLogLevelFromString(logLevel, logger);
+    } else if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (quiet) {
+        consoleLogger->setLevel(LogLevel::Error);
+    }
+    
+    // Set output file if specified
+    if (!logFile.empty()) {
+        consoleLogger->setOutputFile(logFile);
+    }
+    
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Log configuration validation
+    if (!quiet) {
+        NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+        NLM_LOG_INFO("Implementing:");
+        NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+        NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+        NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+        NLM_LOG_INFO("");
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -382,15 +713,19 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Log configuration validation (unless quiet)
+    if (!quiet) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration:");
+        NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+        NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+        NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+        NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+        NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+        NLM_LOG_INFO("");
+        
+        logConfigValidation(*config);
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

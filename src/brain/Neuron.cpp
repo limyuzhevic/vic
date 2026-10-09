@@ -222,10 +222,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    float noiseAmplitude = getNoiseAmplitude();
+    if (noiseAmplitude > 0.0f) {
+        // Gaussian noise with mean 0
+        float noise = rng.normalReal(0.0f, noiseAmplitude);
+        V += noise * static_cast<float>(dt) * 1000.0f;
     }
     
     // Clamp membrane potential to prevent instability
@@ -299,4 +300,70 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+float Neuron::getNoiseAmplitude() const {
+    // Return noise amplitude based on neuron type and configuration
+    // Excitatory neurons typically have higher noise levels
+    switch (pImpl->type) {
+        case NeuronType::Excitatory:
+            return 2.0f;  // Higher noise for excitatory neurons
+        case NeuronType::Inhibitory:
+            return 1.0f;  // Moderate noise for inhibitory neurons
+        case NeuronType::Sensory:
+            return 3.0f;  // Higher noise for sensory neurons
+        case NeuronType::Motor:
+            return 1.5f;  // Lower noise for motor neurons
+        case NeuronType::Internal:
+        default:
+            return 1.0f;  // Default noise level
+    }
+}
+
+void Neuron::applyNeuronTypeDynamics(TimestepDuration dt, MembranePotential V_rest, MembranePotential threshold) {
+    // Apply neuron-type specific dynamics
+    switch (pImpl->type) {
+        case NeuronType::Excitatory:
+            // Excitatory neurons have lower threshold and stronger response
+            if (pImpl->state.threshold > -45.0f) {
+                pImpl->state.threshold = -45.0f;  // Clamp to reasonable range
+            }
+            // Excitatory neurons have higher leak conductance
+            if (pImpl->state.leakConductance < 5.0f) {
+                pImpl->state.leakConductance = 5.0f;
+            }
+            break;
+            
+        case NeuronType::Inhibitory:
+            // Inhibitory neurons have higher threshold and slower dynamics
+            if (pImpl->state.threshold < -40.0f) {
+                pImpl->state.threshold = -40.0f;  // Clamp to reasonable range
+            }
+            // Inhibitory neurons have higher adaptation for feedback
+            if (pImpl->state.adaptationVariable < 5.0f) {
+                pImpl->state.adaptationVariable += 0.1f;
+            }
+            break;
+            
+        case NeuronType::Sensory:
+            // Sensory neurons have dynamic thresholds and increased noise
+            // Threshold adapts based on recent input
+            if (pImpl->state.threshold > -50.0f) {
+                pImpl->state.threshold -= dt * 0.1f;  // Decrease threshold over time
+            }
+            break;
+            
+        case NeuronType::Motor:
+            // Motor neurons have stable output and strong adaptation
+            // Adaptation helps with sustained motor output
+            pImpl->state.adaptationVariable *= 0.98f;
+            break;
+            
+        case NeuronType::Internal:
+        default:
+            // Internal neurons have standard dynamics
+            // Small adaptation for stability
+            if (pImpl->state.adaptationVariable > 0.0f) {
+                pImpl->state.adaptationVariable *= 0.99f;
+            }
+            break;
+    }
+}

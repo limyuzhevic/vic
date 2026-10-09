@@ -4,9 +4,30 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
+#include <thread>
 
 namespace nlm {
 
+// Thread-safe time conversion helper
+static std::string getCurrentTimeString() {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    
+    // Use thread-local buffer for strftime
+    thread_local char timeBuffer[32];
+    
+    std::tm tmBuf;
+    if (std::localtime_s(&tmBuf, &time) != 0) {
+        // Fallback to empty string on error
+        return "unknown";
+    }
+    
+    std::strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &tmBuf);
+    return std::string(timeBuffer);
+}
+
+// ConsoleLogger implementation
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
@@ -32,11 +53,10 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add timestamp using thread-safe helper
+    oss << getCurrentTimeString() << " ";
     
-    oss << " " << entry.message;
+    oss << entry.message;
     
     std::string output = oss.str();
     

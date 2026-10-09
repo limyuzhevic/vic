@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +103,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced file format support
+    bool loadFromJson(const std::string& content);
+    bool loadFromYaml(const std::string& content);
+    bool parseJsonValue(const std::string& key, const std::string& value, ConfigSource source);
+    bool parseYamlValue(const std::string& key, const std::string& value, ConfigSource source);
 };
 
 } // namespace nlm
