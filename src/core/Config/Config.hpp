@@ -5,11 +5,25 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <sstream>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class Logger;
+
+// Configuration system error types
+enum class ConfigError {
+    None,
+    FileNotFound,
+    ParseError,
+    InvalidFormat,
+    OutOfRange,
+    TypeMismatch,
+    KeyNotFound
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -31,7 +45,7 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration entry with error tracking
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
@@ -41,6 +55,33 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Advanced configuration manager with validation and error recovery
+class AdvancedConfigManager {
+public:
+    AdvancedConfigManager();
+    ~AdvancedConfigManager();
+    
+    // Load configuration with validation
+    bool loadWithValidation(const std::string& filepath, bool validate = true);
+    
+    // Validate specific configuration
+    std::vector<std::string> validate(const std::string& key) const;
+    
+    // Get all errors
+    std::vector<ConfigError> getAllErrors() const;
+    
+    // Clear errors
+    void clearErrors();
+    
+    // Configuration backup/restore
+    bool backup(const std::string& path);
+    bool restore(const std::string& path);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Main configuration class

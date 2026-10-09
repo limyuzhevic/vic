@@ -1,11 +1,12 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
+#include "../dynamics/NeuralDynamics.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
 
@@ -83,6 +84,10 @@ public:
     // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
+    
+    // Neural dynamics access
+    NeuralDynamics* getNeuralDynamics();
+    const NeuralDynamics* getNeuralDynamics() const;
     
     // Plasticity system access
     STDP* getSTDP();
