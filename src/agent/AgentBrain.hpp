@@ -92,6 +92,11 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
+    // Helper function to safely get neuron by index
+    Neuron* getNeuronSafely(const std::vector<Neuron*>& neurons, size_t index) const {
+        return (index < neurons.size()) ? neurons[index] : nullptr;
+    }
+    
     // Neuromodulation state
     float dopamineLevel_;
     float noveltyLevel_;

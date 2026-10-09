@@ -133,15 +133,36 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Advanced user interface and command system
+add_library(nlm_advanced STATIC
+    src/advanced/UserCommandParser.cpp
+    src/advanced/AdvancedConfigManager.cpp
+    src/advanced/AdvancedBrainController.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_include_directories(nlm_advanced PUBLIC src)
+target_link_libraries(nlm_advanced PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Advanced main executable with enhanced user interface
+add_executable(nlm_advanced_main
+    src/advanced/AdvancedMain.cpp
+)
+target_link_libraries(nlm_advanced_main PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_advanced)
+
+# Advanced demo executables
+add_executable(nlm_advanced_demo
+    src/advanced/AdvancedDemo.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_advanced)
+
+add_executable(nlm_batch_processor
+    src/advanced/BatchProcessor.cpp
+)
+target_link_libraries(nlm_batch_processor PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_advanced)
+
+add_executable(nlm_analysis_tool
+    src/advanced/AnalysisTool.cpp
+)
+target_link_libraries(nlm_analysis_tool PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_advanced)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

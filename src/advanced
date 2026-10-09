@@ -1,0 +1,386 @@
+// NLM (熙然) - Neural Learning Machine
+// Phase 2: Advanced User Commands and Configuration Interface
+//
+// This module provides enhanced command-line interface for NLM with:
+// - Advanced configuration options
+// - Simulation control commands
+// - Output formatting options
+// - Persistence and checkpoint management
+// - Advanced debugging and analysis tools
+
+#pragma once
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <map>
+#include <functional>
+#include <chrono>
+#include <thread>
+#include <filesystem>
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
+#include "brain/Brain.hpp"
+
+namespace nlm {
+
+// Command types for advanced user interface
+enum class UserCommand {
+    // Basic commands
+    RunSimulation,
+    Configure,
+    SaveConfig,
+    LoadConfig,
+    ExportResults,
+    ImportBrain,
+    
+    // Simulation control
+    StartLearning,
+    PauseSimulation,
+    ResumeSimulation,
+    StopSimulation,
+    StepForward,
+    StepBackward,
+    
+    // Analysis and debugging
+    AnalyzePerformance,
+    AnalyzeLearning,
+    ShowStatistics,
+    DebugNeuralActivity,
+    VisualizeConnections,
+    
+    // Advanced features
+    EnableFeature,
+    DisableFeature,
+    SetParameter,
+    GetParameter,
+    
+    // Persistence
+    Checkpoint,
+    CheckpointList,
+    RestoreCheckpoint,
+    CleanupCheckpoints,
+    
+    // Output and display
+    SetOutputFormat,
+    ShowHelp,
+    ShowVersion,
+    Exit
+};
+
+// Advanced command parser with comprehensive user interface
+class UserCommandParser {
+public:
+    UserCommandParser();
+    ~UserCommandParser();
+    
+    // Parse and execute user commands
+    bool parseCommand(const std::string& commandLine, std::shared_ptr<Brain> brain,
+                     std::shared_ptr<Config> config);
+    
+    // Register new commands
+    void registerCommand(const std::string& name, UserCommand command,
+                         const std::string& description,
+                         std::function<bool(std::shared_ptr<Brain>, std::shared_ptr<Config>)> handler);
+    
+    // Get help for commands
+    std::string getCommandHelp(const std::string& commandName) const;
+    
+    // Get all available commands
+    std::vector<std::string> getAvailableCommands() const;
+    
+    // Set command mode (interactive, batch, script)
+    void setCommandMode(const std::string& mode);
+    
+    // Get current command mode
+    std::string getCommandMode() const;
+    
+    // Execute simulation with custom settings
+    bool runSimulationWithConfig(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config,
+                                const std::map<std::string, std::string>& overrides);
+    
+    // Export brain state to various formats
+    bool exportBrainState(const std::string& filepath, const std::string& format,
+                         std::shared_ptr<Brain> brain);
+    
+    // Import brain state from various formats
+    bool importBrainState(const std::string& filepath, const std::string& format,
+                         std::shared_ptr<Brain> brain);
+    
+    // Advanced analysis functions
+    std::string analyzeLearningProgress(std::shared_ptr<Brain> brain) const;
+    std::string analyzeNeuralConnectivity(std::shared_ptr<Brain> brain) const;
+    std::string analyzePerformanceMetrics(std::shared_ptr<Brain> brain) const;
+    
+    // Checkpoint management
+    bool createCheckpoint(const std::string& name, std::shared_ptr<Brain> brain);
+    bool listCheckpoints(std::vector<std::string>& checkpointNames) const;
+    bool restoreCheckpoint(const std::string& name, std::shared_ptr<Brain> brain);
+    
+    // Feature management
+    bool enableFeature(const std::string& featureName, std::shared_ptr<Brain> brain);
+    bool disableFeature(const std::string& featureName, std::shared_ptr<Brain> brain);
+    bool toggleFeature(const std::string& featureName, std::shared_ptr<Brain> brain);
+    
+    // Parameter management
+    bool setParameter(const std::string& key, const std::string& value, std::shared_ptr<Config> config);
+    std::string getParameter(const std::string& key, std::shared_ptr<Config> config) const;
+    
+    // Output formatting
+    void setOutputFormat(const std::string& format);
+    std::string formatOutput(const std::string& data, const std::string& format) const;
+    
+    // Interactive mode for exploration
+    void startInteractiveMode(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
+    
+    // Batch mode for automated execution
+    bool executeBatchScript(const std::string& scriptFile, std::shared_ptr<Brain> brain,
+                           std::shared_ptr<Config> config);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Command validation and execution
+    bool validateCommand(const UserCommand& command, std::shared_ptr<Brain> brain,
+                        std::shared_ptr<Config> config) const;
+    
+    // Command execution with error handling
+    bool executeCommand(UserCommand command, const std::vector<std::string>& args,
+                       std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
+    
+    // Command line completion and suggestions
+    std::vector<std::string> completeCommand(const std::string& partialCommand) const;
+    
+    // Statistics collection and reporting
+    std::map<std::string, double> collectPerformanceStats(std::shared_ptr<Brain> brain) const;
+    std::map<std::string, std::string> collectLearningStats(std::shared_ptr<Brain> brain) const;
+    
+    // Advanced neural network analysis
+    std::string analyzeNeuralTopology(std::shared_ptr<Brain> brain) const;
+    std::string analyzePlasticityDynamics(std::shared_ptr<Brain> brain) const;
+    std::string analyzeNeuromodulation(std::shared_ptr<Brain> brain) const;
+    
+    // Export/import utilities
+    bool exportToJSON(const std::string& filepath, std::shared_ptr<Brain> brain) const;
+    bool exportToBinary(const std::string& filepath, std::shared_ptr<Brain> brain) const;
+    bool importFromJSON(const std::string& filepath, std::shared_ptr<Brain> brain);
+    bool importFromBinary(const std::string& filepath, std::shared_ptr<Brain> brain);
+    
+    // Visualization and analysis output
+    std::string generateConnectivityMatrix(std::shared_ptr<Brain> brain) const;
+    std::string generateNeuralActivityHeatmap(std::shared_ptr<Brain> brain) const;
+    std::string generatePlasticityTimeline(std::shared_ptr<Brain> brain) const;
+    
+    // Feature state management
+    struct FeatureState {
+        std::string name;
+        bool enabled;
+        std::map<std::string, std::string> parameters;
+        std::chrono::system_clock::time_point lastModified;
+    };
+    
+    std::map<std::string, FeatureState> featureStates_;
+    
+    // Command history for interactive mode
+    std::vector<std::string> commandHistory_;
+    size_t historyIndex_;
+    
+    // Output formatting options
+    enum class OutputFormat {
+        Plain,
+        JSON,
+        CSV,
+        YAML,
+        Markdown,
+        HTML,
+        XML
+    };
+    
+    OutputFormat currentOutputFormat_;
+    
+    // Simulation control state
+    enum class SimulationState {
+        Running,
+        Paused,
+        Stopped,
+        Stepping
+    };
+    
+    SimulationState simulationState_;
+    double simulationSpeed_;
+    std::chrono::steady_clock::time_point simulationStartTime_;
+    
+    // Performance monitoring
+    struct PerformanceMetrics {
+        double cpuUsage;
+        double memoryUsage;
+        double simulationFPS;
+        size_t totalSpikes;
+        double averageFiringRate;
+        std::chrono::milliseconds executionTime;
+    };
+    
+    PerformanceMetrics currentMetrics_;
+};
+
+// Advanced configuration manager for NLM
+class AdvancedConfigManager {
+public:
+    AdvancedConfigManager();
+    ~AdvancedConfigManager();
+    
+    // Load advanced configuration from file
+    bool loadAdvancedConfig(const std::string& filepath);
+    
+    // Save advanced configuration to file
+    bool saveAdvancedConfig(const std::string& filepath) const;
+    
+    // Get configuration value with type conversion
+    template<typename T>
+    T getConfigValue(const std::string& key, const T& defaultValue = T()) const;
+    
+    // Set configuration value with validation
+    template<typename T>
+    bool setConfigValue(const std::string& key, const T& value, bool validate = true);
+    
+    // Get configuration summary for advanced users
+    std::string getAdvancedConfigSummary() const;
+    
+    // Validate configuration for specific use cases
+    bool validateConfiguration(const std::string& useCase) const;
+    
+    // Get recommended configuration for different scenarios
+    std::map<std::string, std::map<std::string, std::string>> getRecommendedConfigs() const;
+    
+    // Configuration templates for common use cases
+    bool loadConfigTemplate(const std::string& templateName, std::shared_ptr<Config> config);
+    
+    // Configuration comparison and diff
+    std::string compareConfigs(const std::string& config1, const std::string& config2) const;
+    
+    // Configuration history management
+    bool saveConfigSnapshot(const std::string& description);
+    bool restoreConfigSnapshot(const std::string& description);
+    std::vector<std::string> getConfigHistory() const;
+    
+    // Configuration encryption for sensitive data
+    bool encryptSensitiveConfig(const std::string& keyFile);
+    bool decryptSensitiveConfig(const std::string& keyFile);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Configuration validation
+    bool validateNeuronCount(size_t neuronCount) const;
+    bool validateTimestep(double timestep) const;
+    bool validateConnectionProbability(double probability) const;
+    
+    // Configuration optimization
+    std::map<std::string, std::string> optimizeConfiguration(const std::map<std::string, std::string>& config) const;
+    
+    // Configuration export/import utilities
+    bool exportConfigToJSON(const std::string& filepath, const std::map<std::string, std::string>& config) const;
+    bool importConfigFromJSON(const std::string& filepath, std::map<std::string, std::string>& config);
+    
+    // Configuration monitoring and logging
+    void logConfigurationChanges(const std::string& oldConfig, const std::string& newConfig) const;
+    std::string getConfigurationHash(const std::map<std::string, std::string>& config) const;
+};
+
+// Advanced brain controller with enhanced capabilities
+class AdvancedBrainController {
+public:
+    AdvancedBrainController(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
+    ~AdvancedBrainController();
+    
+    // Enhanced simulation control
+    bool startSimulation(const std::chrono::milliseconds& duration = std::chrono::milliseconds(0));
+    bool pauseSimulation();
+    bool resumeSimulation();
+    bool stopSimulation();
+    bool stepSimulation();
+    
+    // Advanced injection and manipulation
+    bool injectCurrentPattern(const std::vector<float>& pattern, NeuronType type);
+    bool applyRewardSignal(float reward, float predictionError = 0.0f);
+    bool applyStressSignal(float stressLevel);
+    bool applyNoise(float noiseLevel);
+    
+    // Advanced learning control
+    bool triggerLearningPhase(const std::string& phaseName);
+    bool setLearningRate(double learningRate);
+    bool getLearningStatistics(std::map<std::string, double>& stats) const;
+    
+    // Advanced analysis and control
+    bool performNeuralAnalysis(const std::string& analysisType, std::string& results);
+    bool controlPlasticity(const std::string& plasticityType, double strength);
+    bool controlNeuromodulation(const std::string& modulatorType, double level);
+    bool controlDevelopment(double age, double plasticityModifier);
+    
+    // Advanced state management
+    bool saveBrainState(const std::string& filepath, const std::string& format = "auto");
+    bool loadBrainState(const std::string& filepath, const std::string& format = "auto");
+    bool createCheckpoint(const std::string& name, const std::string& description = "");
+    bool restoreCheckpoint(const std::string& name);
+    
+    // Advanced monitoring and control
+    bool startMonitoring(const std::chrono::milliseconds& interval);
+    bool stopMonitoring();
+    std::map<std::string, double> getCurrentMetrics() const;
+    std::vector<std::map<std::string, double>> getHistoricalMetrics() const;
+    
+    // Advanced visualization and export
+    bool generateVisualization(const std::string& outputFile, const std::string& format = "png",
+                               const std::string& visualizationType = "connectivity");
+    bool exportNeuralData(const std::string& outputFile, const std::string& format = "csv",
+                         const std::map<std::string, double>& filters = {});
+    
+    // Advanced user interface
+    void showBrainStatus() const;
+    void showPerformanceMetrics() const;
+    void showLearningProgress() const;
+    void showNeuralTopology() const;
+    
+    // Advanced configuration
+    bool configureSimulation(const std::map<std::string, std::string>& settings);
+    bool validateSimulationConfig() const;
+    std::string getRecommendedConfig(const std::string& useCase) const;
+    
+    // Advanced debugging
+    bool enableDebugMode();
+    bool disableDebugMode();
+    bool runDebugAnalysis() const;
+    bool getDebugInfo(std::map<std::string, std::string>& debugInfo) const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Simulation control
+    void updateSimulationState();
+    bool checkSimulationStatus() const;
+    
+    // Monitoring thread
+    std::thread monitoringThread_;
+    std::atomic<bool> monitoringActive_;
+    std::chrono::milliseconds monitoringInterval_;
+    
+    // Metrics collection
+    mutable std::mutex metricsMutex_;
+    std::vector<std::map<std::string, double>> historicalMetrics_;
+    std::chrono::steady_clock::time_point lastUpdateTime_;
+    
+    // Advanced analysis
+    std::map<std::string, std::function<bool(const std::map<std::string, double>&, std::string&)>> analysisFunctions_;
+    std::map<std::string, std::function<bool(double)>> controlFunctions_;
+    
+    // Export/Import utilities
+    bool exportToFile(const std::string& filepath, const std::string& format,
+                     const std::map<std::string, std::vector<double>>& data) const;
+    bool importFromFile(const std::string& filepath, const std::string& format,
+                       std::map<std::string, std::vector<double>>& data);
+};
+
+} // namespace nlm

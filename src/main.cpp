@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <stdexcept>
+#include <cctype>
 
 using namespace nlm;
 
@@ -46,6 +48,53 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelpAndExit() {
+    std::cout << R"(
+=== NLM Phase 2: Command Line Options ===
+
+Basic Options:
+  --help, -h              Show this help message and exit
+  --version, -v           Show version information and exit
+
+Configuration Options:
+  --config=file           Load configuration from file (default: configs/default.cfg)
+  --seed=number           Set random seed for reproducible experiments
+  --neuron_count=number   Set number of neurons in the brain
+  --region_count=number   Set number of neural regions
+  --timestep=seconds      Set simulation timestep
+
+Example Usage:
+  ./nlm --config=myconfig.cfg --seed=42 --neuron_count=1000
+
+Configuration File Format:
+  Configuration values can be set via JSON file with keys like:
+    "random_seed": 42
+    "neuron_count": 1000
+    "simulation_timestep": 0.001
+    "connection_probability": 0.15
+
+Phase 2 Default Configuration:
+  random_seed: 42
+  simulation_timestep: 0.001s
+  neuron_count: 500
+  region_count: 1
+  connection_probability: 0.15
+
+For more information, see the NLM documentation at:
+  https://github.com/nlm-project/nlm/docs
+)" << std::endl;
+    exit(0);
+}
+
+void printVersionAndExit() {
+    std::cout << "NLM (熙然) Phase 2.0.0 - Neural Learning Machine" << std::endl;
+    std::cout << "Experimental artificial developmental brain simulation." << std::endl;
+    std::cout << "Build with C++20, CMake, and event-driven neural dynamics." << std::endl;
+    std::cout << "Phase 2: Real Neural Computation with LIF neurons, STDP, and structural plasticity." << std::endl;
+    std::cout << "Source: https://github.com/nlm-project/nlm" << std::endl;
+    exit(0);
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -350,8 +399,53 @@ int main(int argc, char** argv) {
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
+                // Validate file path
+                if (configFile.empty() || configFile.find_first_not_of(' ') == std::string::npos) {
+                    NLM_LOG_ERROR("Invalid config file path: " + configFile);
+                    return 1;
+                }
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+                // Validate file path
+                if (configFile.empty() || configFile.find_first_not_of(' ') == std::string::npos) {
+                    NLM_LOG_ERROR("Invalid config file path: " + configFile);
+                    return 1;
+                }
+            } else {
+                NLM_LOG_ERROR("Missing config file path after --config argument");
+                return 1;
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printHelpAndExit();
+        } else if (arg == "--version" || arg == "-v") {
+            printVersionAndExit();
+        } else if (arg.substr(0, 5) == "--seed") {
+            // Additional argument parsing for seed
+            if (arg.find('=') != std::string::npos) {
+                std::string seedStr = arg.substr(arg.find('=') + 1);
+                try {
+                    int64_t seed = std::stoll(seedStr);
+                    config->set("random_seed", seed, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Invalid seed value: " + seedStr + " - " + e.what());
+                    return 1;
+                }
+            }
+        } else if (arg.substr(0, 11) == "--neuron_count") {
+            // Additional argument parsing for neuron count
+            if (arg.find('=') != std::string::npos) {
+                std::string countStr = arg.substr(arg.find('=') + 1);
+                try {
+                    int64_t count = std::stoll(countStr);
+                    if (count <= 0) {
+                        NLM_LOG_ERROR("Neuron count must be positive: " + countStr);
+                        return 1;
+                    }
+                    config->set("neuron_count", count, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Invalid neuron count value: " + countStr + " - " + e.what());
+                    return 1;
+                }
             }
         }
     }
@@ -360,7 +454,7 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration. File not found: " + configFile);
     }
     
     // Override with command line args
