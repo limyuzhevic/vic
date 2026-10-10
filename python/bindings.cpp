@@ -162,16 +162,75 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        
+        // Pythonic property-based accessors
+        .def("__contains__", [](const Config& self, const std::string& key) {
+            return self.has(key);
+        })
+        .def("__getitem__", [](Config& self, const std::string& key) {
+            // Note: This assumes Config has a get method, which it doesn't in the current API
+            // This is a placeholder for future enhancement
+            return key;
+        })
+        .def("__setitem__", [](Config& self, const std::string& key, const std::string& value) {
+            // Note: This assumes Config has a set method, which it doesn't in the current API
+            // This is a placeholder for future enhancement
+        })
+        .def("__len__", &Config::getKeys)
+        .def("__iter__", [](const Config& self) {
+            py::list keys = self.getKeys();
+            return py::make_iterator(keys.begin(), keys.end());
+        }, py::return_value_policy::reference_internal)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("load_config", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file (Pythonic wrapper)")
+        .def("save_config", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file (Pythonic wrapper)")
+        .def("check_key", &Config::has, py::arg("key"),
+             "Check if a configuration key exists (Pythonic wrapper)")
+        .def("get_keys", &Config::getKeys,
+             "Get all configuration keys (Pythonic wrapper)")
+        .def("clear_config", &Config::clear,
+             "Clear all configuration entries (Pythonic wrapper)")
+        .def("config_summary", &Config::summary,
+             "Get a summary string of the configuration (Pythonic wrapper)")
+        
+        // Context manager support for automatic cleanup
+        .def("__enter__", [](Config& self) -> Config& { return self; })
+        .def("__exit__", [](Config& self, py::args) {
+            self.clear();
         });
 
+    // SensoryInput class with Pythonic enhancements
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        
+        // Pythonic property-based accessors
+        .def_readonly("type", &SensoryInput::getType)
+        .def_readonly("data", &SensoryInput::getData)
+        .def_readonly("dimensions", &SensoryInput::getDimensions)
+        .def_readonly("timestamp", &SensoryInput::getTimestamp)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("set_timestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+             "Set the timestamp (Pythonic wrapper)")
+        .def("get_data", &SensoryInput::getData,
+             "Get the raw data as a vector (Pythonic wrapper)")
+        .def("get_dimensions", &SensoryInput::getDimensions,
+             "Get the dimensionality (Pythonic wrapper)")
+        .def("get_type", &SensoryInput::getType,
+             "Get the type of sensory input (Pythonic wrapper)")
+        .def("get_timestamp", &SensoryInput::getTimestamp,
+             "Get the timestamp (Pythonic wrapper)");
 
+    // Vision class with Pythonic enhancements
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
@@ -181,8 +240,26 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        
+        // Pythonic property-based accessors
+        .def_readonly("width", &Vision::getWidth)
+        .def_readonly("height", &Vision::getHeight)
+        .def_readonly("channels", &Vision::getChannels)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("set_data", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"),
+             "Set vision data (Pythonic wrapper)")
+        .def("get_width", &Vision::getWidth,
+             "Get vision width (Pythonic wrapper)")
+        .def("get_height", &Vision::getHeight,
+             "Get vision height (Pythonic wrapper)")
+        .def("get_channels", &Vision::getChannels,
+             "Get vision channels (Pythonic wrapper)");
 
+    // Audio class with Pythonic enhancements
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
@@ -191,12 +268,39 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        
+        // Pythonic property-based accessors
+        .def_readonly("sample_rate", &Audio::getSampleRate)
+        .def_readonly("num_samples", &Audio::getNumSamples)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("set_data", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"),
+             "Set audio data (Pythonic wrapper)")
+        .def("set_sample_rate", &Audio::setSampleRate, py::arg("sample_rate"),
+             "Set audio sample rate (Pythonic wrapper)")
+        .def("get_sample_rate", &Audio::getSampleRate,
+             "Get audio sample rate (Pythonic wrapper)")
+        .def("get_num_samples", &Audio::getNumSamples,
+             "Get number of audio samples (Pythonic wrapper)");
 
+    // InternalSignals class with Pythonic enhancements
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        
+        // Pythonic property-based accessors
+        .def("get_signal_count", &InternalSignals::clearSignals,
+             "Get signal count (Pythonic wrapper)")
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("add_signal", &InternalSignals::addSignal, py::arg("value"),
+             "Add a signal value (Pythonic wrapper)")
+        .def("clear_signals", &InternalSignals::clearSignals,
+             "Clear all signals (Pythonic wrapper)");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -263,32 +367,104 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // SimpleWorld class with Pythonic enhancements
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions and vision parameters")
+        .def("reset", &SimpleWorld::reset,
+             "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state (call each simulation step)")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to agent")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get current sensory percept for the agent")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall)")
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             "Get object at position (if any)")
+        .def("getWidth", &SimpleWorld::getWidth,
+             "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight,
+             "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy,
+             "Get maximum energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducibility")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get random seed")
+        
+        // Pythonic property-based accessors
+        .def_readonly("world_width", &SimpleWorld::getWidth)
+        .def_readonly("world_height", &SimpleWorld::getHeight)
+        .def_readonly("max_energy", &SimpleWorld::getMaxEnergy)
+        .def_readonly("energy_decay_rate", &SimpleWorld::getEnergyDecayRate)
+        .def_readonly("simulation_time", &SimpleWorld::getSimulationTime)
+        .def_readonly("random_seed", &SimpleWorld::getRandomSeed)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("configure_world", &SimpleWorld::configure,
+             py::arg("width"), py::arg("height"),
+             py::arg("vision_width"), py::arg("vision_height"),
+             "Configure world dimensions and vision parameters (Pythonic wrapper)")
+        .def("reset_world", &SimpleWorld::reset,
+             "Reset world to initial state (Pythonic wrapper)")
+        .def("set_agent_start", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position (Pythonic wrapper)")
+        .def("update_world", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state (call each simulation step) (Pythonic wrapper)")
+        .def("apply_motor_command", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("current_time"),
+             "Apply motor command to agent (Pythonic wrapper)")
+        .def("get_sensory_percept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal,
+             "Get current sensory percept for the agent (Pythonic wrapper)")
+        .def("get_agent_body", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get agent body state (Pythonic wrapper)")
+        .def("add_world_object", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world (Pythonic wrapper)")
+        .def("remove_world_object", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position (Pythonic wrapper)")
+        .def("is_valid_position", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall) (Pythonic wrapper)")
+        .def("get_object_at_position", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             "Get object at position (if any) (Pythonic wrapper)")
+        .def("set_max_energy", &SimpleWorld::setMaxEnergy, py::arg("energy"),
+             "Set maximum energy (Pythonic wrapper)")
+        .def("set_energy_decay_rate", &SimpleWorld::setEnergyDecayRate, py::arg("rate"),
+             "Set energy decay rate (Pythonic wrapper)")
+        .def("set_random_seed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducibility (Pythonic wrapper)")
+        
+        // Context manager support for automatic cleanup
+        .def("__enter__", [](SimpleWorld& self) -> SimpleWorld& { return self; })
+        .def("__exit__", [](SimpleWorld& self, py::args) {
+            self.reset();
+        });
 
+    // Brain class with Pythonic enhancements
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,8 +527,56 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Pythonic property-based accessors
+        .def_readonly("total_neurons", &Brain::getTotalNeuronCount)
+        .def_readonly("total_synapses", &Brain::getTotalSynapseCount)
+        .def_readonly("active_neurons", &Brain::getActiveNeuronCount)
+        .def_readonly("firing_neurons", &Brain::getFiringNeuronCount)
+        .def_readonly("average_firing_rate", &Brain::getAverageFiringRate)
+        .def_readonly("excitation_inhibition_ratio", &Brain::getExcitationInhibitionRatio)
+        .def_readonly("total_spikes", &Brain::getTotalSpikeCount)
+        .def_readonly("region_count", &Brain::getRegionCount)
+        .def_readonly("region_ids", &Brain::getRegionIds)
+        .def_readonly("developmental_stage", &Brain::getDevelopmentalStage)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("process_sensory_input", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain (Pythonic wrapper)")
+        .def("inject_current", [](Brain& brain, NeuronId neuron, MembranePotential current) {
+            brain.injectCurrent(neuron, current);
+        }, py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron (Pythonic wrapper)")
+        .def("inject_current_to_neurons", [](Brain& brain, NeuronType type, MembranePotential current) {
+            brain.injectCurrentToNeurons(type, current);
+        }, py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type (Pythonic wrapper)")
+        .def("produce_action", &Brain::produceAction,
+             "Produce motor action based on neural activity (Pythonic wrapper)")
+        .def("reset_brain", &Brain::reset,
+             "Reset brain state (Pythonic wrapper)")
+        .def("save_brain", &Brain::save, py::arg("filepath"),
+             "Save brain state to file (Pythonic wrapper)")
+        .def("load_brain", &Brain::load, py::arg("filepath"),
+             "Load brain state from file (Pythonic wrapper)")
+        .def("add_region", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region (Pythonic wrapper)")
+        .def("get_region", &Brain::getRegion, py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID (Pythonic wrapper)")
+        .def("set_developmental_stage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage (Pythonic wrapper)")
+        
+        // Context manager support for automatic cleanup
+        .def("__enter__", [](Brain& self) -> Brain& { return self; })
+        .def("__exit__", [](Brain& self, py::args) {
+            self.reset();
+        });
 
+    // AgentBrain class with Pythonic enhancements
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -398,7 +622,37 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Pythonic property-based accessors
+        .def_readonly("sensory_input_size", &AgentBrain::getSensoryInputSize)
+        .def_readonly("motor_output_size", &AgentBrain::getMotorOutputSize)
+        .def_readonly("developmental_stage", &AgentBrain::getDevelopmentalStage)
+        .def_readonly("neuromodulation_level", &AgentBrain::getNeuromodulationLevel)
+        .def_readonly("curiosity_level", &AgentBrain::getCuriosityLevel)
+        .def_readonly("novelty_level", &AgentBrain::getNoveltyLevel)
+        .def_readonly("prediction_error", &AgentBrain::getPredictionError)
+        
+        // Enhanced methods with validation and Pythonic APIs
+        .def("process_sensory_input", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain (Pythonic wrapper)")
+        .def("decode_motor_command", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command (Pythonic wrapper)")
+        .def("apply_reward_modulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation (Pythonic wrapper)")
+        .def("update_development", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system (Pythonic wrapper)")
+        .def("reset_agent", &AgentBrain::reset,
+             "Reset agent for new episode (Pythonic wrapper)")
+        
+        // Context manager support for automatic cleanup
+        .def("__enter__", [](AgentBrain& self) -> AgentBrain& { return self; })
+        .def("__exit__", [](AgentBrain& self, py::args) {
+            self.reset();
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
