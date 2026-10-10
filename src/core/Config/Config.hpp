@@ -43,6 +43,18 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Preset type enum
+enum class PresetType {
+    Simple,
+    Medium,
+    Advanced,
+    Debug,
+    Custom
+};
+
+// Forward declaration for ConfigSchemaEntry
+struct ConfigSchemaEntry;
+
 // Main configuration class
 class Config {
 public:
@@ -93,13 +105,65 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Configuration validation
+    bool validate() const;
+    
+    // Configuration presets
+    bool applyPreset(const std::string& name, ConfigSource source = ConfigSource::Runtime);
+    void applyPresetType(PresetType type, ConfigSource source = ConfigSource::Runtime);
+    void mergePreset(const std::string& name, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration utilities
+    static Config createFromPreset(const std::string& name);
+    static Config createFromPresetType(PresetType type);
+    
+    // Configuration comparison
+    std::string generateDiff(const Config& other) const;
+    std::string generateHumanReadableDiff(const Config& other) const;
+    bool isCompatibleWith(const Config& other) const;
+    std::vector<std::string> getCompatibilityIssues(const Config& other) const;
+    
+    // Configuration sanitization
+    Config sanitize() const;
+    
+    // Configuration cloning
+    Config clone() const;
+    
+    // Configuration merging
+    Config merge(const Config& other) const;
+    Config merge(const Config& other, ConfigSource preference) const;
+    
+    // Configuration source management
+    Config withSource(ConfigSource source) const;
+    Config withoutSource(ConfigSource source) const;
+    bool hasAnySource(ConfigSource source) const;
+    ConfigSource getHighestPrioritySource() const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    Config getConfigBySource(ConfigSource source) const;
+    Config getConfigWithoutSource(ConfigSource source) const;
+    
+    // Configuration serialization
+    std::string toString() const;
+    std::string toJson() const;
+    std::string toYaml() const;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
+
+// Forward declarations for related classes
+class ConfigValidator;
+class ConfigPresets;
+class ConfigSchema;
+class ConfigComparator;
+class ConfigMerger;
+class ConfigDiffer;
+class ConfigValidatorUtils;
+class ConfigSanitizer;
 
 } // namespace nlm
