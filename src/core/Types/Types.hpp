@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
 
@@ -20,6 +21,15 @@ struct NeuronId {
     
     constexpr uint64_t index() const { return value; }
 };
+
+// Hash function for NeuronId
+inline namespace hash_custom {
+    struct NeuronIdHash {
+        std::size_t operator()(const NeuronId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+}
 
 // Synapse identifier
 struct SynapseId {
@@ -190,3 +200,11 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+namespace std {
+    template<> struct hash<nlm::NeuronId> {
+        std::size_t operator()(const nlm::NeuronId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+}

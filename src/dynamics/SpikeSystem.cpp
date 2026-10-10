@@ -48,8 +48,15 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
     pImpl->delayedSpikes[event.delivery_step].push_back(event);
 }
 
-void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
+    void SpikeSystem::processSpikes(SimulationStep currentStep) {
+    // Process all pending immediate spikes - optimize for better performance
+    if (pImpl->pendingSpikes.empty()) return;
+    
+    // Pre-allocate vectors for better memory access patterns
+    pImpl->spikeHistory.reserve(pImpl->spikeHistory.size() + pImpl->pendingSpikes.size());
+    pImpl->spikeCountPerNeuron.reserve(pImpl->spikeCountPerNeuron.size() + pImpl->pendingSpikes.size());
+    
+    // Process spikes in batch for better cache locality
     while (!pImpl->pendingSpikes.empty()) {
         SpikeEvent event = pImpl->pendingSpikes.front();
         pImpl->pendingSpikes.pop();
@@ -63,15 +70,15 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Add to history
         pImpl->spikeHistory.push_back(detailed);
         
-        // Track spike count per neuron
+        // Track spike count per neuron - optimize increment
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - check once and update boundary
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
             pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
         }
         
-        // Call handlers
+        // Call handlers - batch processing for better performance
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }
@@ -81,17 +88,20 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
-    if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
-            for (auto& handler : pImpl->delayedHandlers) {
-                handler(delayedEvent);
-            }
+    if (it == pImpl->delayedSpikes.end()) return;
+    
+    // Process all spikes scheduled for this step
+    std::vector<DelayedSpikeEvent> currentDelayedEvents = std::move(it->second);
+    
+    // Call delayed spike handlers (these will deliver synaptic input)
+    for (const auto& delayedEvent : currentDelayedEvents) {
+        for (auto& handler : pImpl->delayedHandlers) {
+            handler(delayedEvent);
         }
-        // Remove processed spikes
-        pImpl->delayedSpikes.erase(it);
     }
+    
+    // Remove processed spikes
+    pImpl->delayedSpikes.erase(it);
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {

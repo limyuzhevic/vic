@@ -20,61 +20,51 @@ STDP::STDP() : pImpl(new Impl) {}
 
 STDP::~STDP() = default;
 
-void STDP::update(Synapse* synapse,
+    void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
+    // Early exit for optimization
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
+    // Cache frequently used values
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    // Pre-compute exponential terms for better performance
+    std::vector<float> preExp(preSpikes.size());
+    std::vector<float> postExp(postSpikes.size());
+    
+    // Batch compute exponential terms
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        preExp[i] = std::exp(-static_cast<float>(preSpikes[i]) / tau);
+    }
+    
+    for (size_t i = 0; i < postSpikes.size(); ++i) {
+        postExp[i] = std::exp(static_cast<float>(postSpikes[i]) / tau);
+    }
+    
+    // Optimized pairwise computation
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        Timestamp preTime = preSpikes[i];
+        float preFactor = preExp[i];
+        
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            Timestamp postTime = postSpikes[j];
+            float dt_val = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
+            if (dt_val > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                float delta = pImpl->ltpWeight * preFactor;
                 totalDelta += delta;
-            } else if (dt < 0) {
+            } else if (dt_val < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * postExp[j];  // dt is negative, so this subtracts
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // dt_val == 0: no change (simultaneous spikes - rare in practice)
         }
     }
     

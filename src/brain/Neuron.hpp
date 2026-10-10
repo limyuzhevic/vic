@@ -40,8 +40,143 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
+namespace nlm {
+
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
+//
+// Neuron Architecture:
+// ===================
+// Individual neurons in NLM follow biologically-inspired integrate-and-fire models
+// with adaptations for computational efficiency and scalability. Each neuron maintains
+// its own state and responds to inputs from synaptic connections.
+//
+// Core Computational Model:
+// 1. **Membrane Potential Integration**: Inputs accumulate according to LIF dynamics
+// 2. **Threshold Detection**: When membrane potential reaches threshold, neuron fires
+// 3. **Refractory Period**: Neuron enters recovery period after firing
+// 4. **Synaptic Transmission**: Neuron sends signals to post-synaptic neurons
+// 5. **Plasticity**: Synaptic weights change based on spiking history
+//
+// Biological Plausibility:
+// ----------------------
+// - **Membrane Potential**: Continuous variable that integrates inputs
+// - **Spike Generation**: Binary output (firing or not)
+// - **Refractory Period**: Recovery from spike generation
+// - **Synaptic Integration**: Summation of post-synaptic potentials
+// - **Adaptation**: Spike-frequency adaptation for realistic firing patterns
+//
+// Neuron State Variables:
+// ---------------------+
+// - **membranePotential**: Current membrane potential (mV) (~ -70mV resting)
+// - **restingPotential**: Baseline membrane potential (-70mV typical)
+// - **threshold**: Firing threshold (-55mV typical)
+// - **resetPotential**: Post-spike reset value (typically close to resting)
+// - **leakConductance**: Membrane leak conductance (determines decay rate)
+// - **synapseConductance**: Current synaptic input (accumulated)
+// - **firingRate**: Current firing rate (Hz)
+// - **firingState**: Discrete firing state (Resting, Active, Refractory)
+// - **refractoryRemaining**: Steps remaining in refractory period
+// - **refractoryPeriod**: Total refractory period duration (2-10ms typical)
+// - **adaptationVariable**: Spike-frequency adaptation variable
+// - **lastSpikeTime**: Timestamp of last spike (for STDP calculations)
+//
+// Input Processing:
+// ---------------
+// Neurons receive three types of inputs:
+//
+// 1. **Excitatory Input**: Depolarizes neuron (makes firing more likely)
+//    - Represents AMPA receptor-mediated currents
+//    - Inhibits threshold crossing when negative
+//
+// 2. **Inhibitory Input**: Hyperpolarizes neuron (makes firing less likely)
+//    - Represents GABA receptor-mediated currents
+//    - Can override excitatory inputs
+//
+// 3. **Modulatory Input**: Affects plasticity and adaptation
+//    - Represents neuromodulators (dopamine, acetylcholine, etc.)
+//    - Does not directly cause firing but affects learning
+//
+// LIF Dynamics Implementation:
+// ---------------------------
+// The neuron implements the Leaky Integrate-and-Fire model:
+//
+// dV/dt = (V_rest - V)/τ + I/C
+//
+// Where:
+// - V: Membrane potential
+// - V_rest: Resting potential
+// - τ: Membrane time constant (20ms typical)
+// - I: Total input current
+// - C: Membrane capacitance (1nF typical)
+//
+// Discrete approximation:
+// V(t+1) = V(t) + dt * ( (V_rest - V(t))/τ + I(t)/C )
+//
+// Where dt is the simulation timestep (typically 1ms).
+//
+// Spike Generation:
+// ----------------
+// When membrane potential reaches threshold, the neuron:
+//
+// 1. **Fires**: Generates a spike (output event)
+// 2. **Resets**: Membrane potential is set to reset potential
+// 3. **Refractors**: Enters refractory period
+// 4. **Adapts**: Increases adaptation variable
+// 5. **Records**: Timestamp for STDP calculations
+//
+// Neuron Types:
+// -------------
+// - **Sensory**: Respond to external inputs
+// - **Interneuron**: Process and relay information between neurons
+// - **Motor**: Generate output signals for action selection
+// - **Modulatory**: Regulate plasticity and learning
+// - **Internally-Generated**: Produce autonomous activity (oscillators)
+//
+// Synaptic Connectivity:
+// --------------------
+// Each neuron maintains lists of:
+//
+// - **Incoming Synapses**: Postsynaptic connections (receive signals)
+// - **Outgoing Synapses**: Presynaptic connections (send signals)
+// - **Plasticity Flags**: Whether synapse is plastic (Hebbian, STDP, reward-modulated)
+//
+// Neuron Algorithms:
+// -----------------
+// Key computational methods:
+//
+// 1. **stepLIF()**: Main LIF integration and spike detection
+// 2. **recordSpike()**: Maintain spike history for STDP
+// 3. **initializeRandom()**: Biological initialization with variability
+// 4. **reset()**: Return to initial state
+// 5. **plasticityUpdate()**: Integrate with plasticity mechanisms
+//
+// Performance Optimizations:
+// ---------------------------
+// - **SoA (Structure of Arrays)**: Neuron states stored contiguously
+// - **Pre-allocated State**: No dynamic allocation during simulation
+// - **Vectorized Operations**: SIMD-friendly for performance-critical paths
+// - **Event-Driven Processing**: Only update active neurons
+// - **Cache-Friendly**: Memory layout optimized for CPU cache
+//
+// Neuron Pooling:
+// --------------
+// Neurons are organized into pools for efficiency:
+//
+// - **Population**: Neurons with shared properties (type, parameters)
+// - **Region**: Logical grouping of neurons (sensory, cognitive, motor)
+// - **Cluster**: Spatial or functional grouping within regions
+//
+// Neuron Initialization:
+// ---------------------+
+// Biological initialization ensures realistic behavior:
+//
+// - Membrane potential starts near resting with small noise
+// - Threshold typically -55mV (±2mV)
+// - Refractory period 2-10ms (typically 5ms)
+// - Leak conductance 10nS (sets time constant)
+// - Adaptation variable starts at 0 (increases after each spike)
+// - Type assigned based on regional function
 class Neuron {
 public:
     // Create neuron with ID

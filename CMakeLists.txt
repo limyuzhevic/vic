@@ -55,13 +55,10 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralAssociativeMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -78,7 +75,6 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -124,8 +120,9 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/benchmark.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_performance)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -138,6 +135,15 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Performance and Profiling
+add_library(nlm_performance STATIC
+    src/performance/TimeProfiler.cpp
+    src/performance/MemoryProfiler.cpp
+    src/performance/SpikeProfiler.cpp
+    src/performance/ConnectivityProfiler.cpp
+)
+target_include_directories(nlm_performance PUBLIC src)
 
 # Testing
 enable_testing()

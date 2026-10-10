@@ -9,13 +9,93 @@
 
 namespace nlm {
 
+namespace nlm {
+
+// Logging system for NLM
+// Provides flexible, hierarchical logging with multiple output formats
+//
+// Logging System Architecture:
+// ============================
+// The NLM logging system implements a multi-layer logging architecture designed
+// for performance and flexibility in large-scale neural simulations.
+//
+// Key Features:
+// 1. **Hierarchical Log Levels**: Debug, Info, Warning, Error, Critical
+// 2. **Multiple Sinks**: Console, file, and custom logging backends
+// 3. **Thread-Safe**: Designed for concurrent access in multi-threaded environments
+// 4. **Performance Optimized**: Fast path for disabled levels, minimal overhead
+// 5. **Rich Metadata**: File, line, and function name for debugging
+// 6. **Configurable**: Runtime configuration of log levels and formats
+//
+// Log Level Hierarchy:
+// ------------------
+// - **Debug**: Detailed debugging information, very verbose
+// - **Info**: General information about system operation
+// - **Warning**: Potential issues that don't prevent operation
+// - **Error**: Errors that affect functionality but don't crash
+// - **Critical**: Severe errors that may cause system failure
+//
+// Logging Categories:
+// ------------------
+// - **NEURAL COMPUTATION**: Neuron dynamics, synaptic events, spikes
+// - **PLASTICITY**: Synaptic weight changes, learning rules
+// - **MEMORY**: Memory formation, retrieval, and consolidation
+// - **COGNITION**: Planning, attention, concept formation
+// - **SIMULATION**: Time steps, configuration, system state
+// - **PERFORMANCE**: Benchmarking, profiling, optimization metrics
+// - **ERROR_HANDLING**: Exceptions, recovery, system failures
+// - **SYSTEM**: Startup, shutdown, resource management
+//
+// Logger Usage Examples:
+// ---------------------
+// Example 1: Basic logging
+// NLM_LOG_INFO("Simulation started with {} neurons", neuronCount);
+// NLM_LOG_DEBUG("Spike detected at time {}", currentTime);
+//
+// Example 2: Error logging with context
+// NLM_LOG_ERROR("Failed to load model from {}", filepath);
+//
+// Example 3: Performance logging
+// NLM_LOG_INFO("Processed {} spikes in {} ms", spikeCount, elapsedMs);
+//
+// Example 4: Structured logging with streams
+// NLM_LOG_STREAM(nlm::LogLevel::Warning) << "Connection exceeded threshold: " << value;
+//
+// Log Entry Structure:
+// -------------------
+// Each log entry contains:
+// - Severity level (enum)
+// - Message text (string)
+// - Source location (file, line, function)
+// - Timestamp (system clock precision)
+//
+// Performance Considerations:
+// --------------------------
+// - Fast path: Check log level before formatting expensive operations
+// - Buffer management: Minimize memory allocations
+// - Sink optimization: Only log to enabled outputs
+// - Async logging: Separated for future high-throughput scenarios
+//
+// Configuration:
+// -------------
+// Global log level set via Logger::getGlobal().setLevel()
+// Per-sink configuration for different output formats
+// Runtime enable/disable of specific log categories
+//
+// Implementation Details:
+// ----------------------
+// - Uses Pimpl idiom for extensibility
+// - Thread-safe singleton pattern for global logger
+// - Circular buffer for high-volume scenarios (planned)
+// - Color-coded console output for improved readability
+
 // Log severity levels
 enum class LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Critical = 4
+    Debug = 0,      // Detailed debugging information, very verbose
+    Info = 1,        // General information about system operation
+    Warning = 2,     // Potential issues that don't prevent operation
+    Error = 3,       // Errors that affect functionality but don't crash
+    Critical = 4     // Severe errors that may cause system failure
 };
 
 // Log entry structure

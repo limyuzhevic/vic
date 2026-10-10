@@ -48,6 +48,50 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
+// Brain Architecture Overview:
+// ============================
+// The Brain class serves as the central coordinator of the NLM neural system,
+// orchestrating all computation and maintaining the global state of the simulation.
+// It follows a modular, layered architecture designed for biological plausibility
+// and computational efficiency.
+//
+// Key Features:
+// 1. **Event-driven computation**: Uses spike events for efficient simulation
+// 2. **Modular memory systems**: Integrated working memory, episodic memory, and associative memory
+// 3. **Prediction and cognition**: Neural planning, attention, and concept formation
+// 4. **Neuromodulation**: Reward, novelty, curiosity, and prediction error signals
+// 5. **Developmental stages**: Progression from initial to mature network configuration
+// 6. **Plasticity mechanisms**: STDP, Hebbian learning, and structural plasticity
+// 7. **Sparse connectivity**: Efficient memory and computation for large networks
+//
+// Data Flow (Phase 3):
+// 1. Sensory Input → Sensory Processing (Brain.receiveSensoryInput)
+// 2. Neural Computation (LIF dynamics) → Spike Processing
+// 3. Plasticity Updates (STDP, Hebbian, Reward-modulated)
+// 4. Development System updates (synaptogenesis, pruning, maturation)
+// 5. Neuromodulatory signals (dopamine, novelty, curiosity)
+//
+// Computational Principles:
+// - All computation is based on spiking neural dynamics
+// - No explicit deep learning frameworks - uses biologically-inspired mechanisms
+// - Event-driven rather than step-driven for efficiency
+// - Deterministic simulation via explicit random seeds
+// - Memory-grounded representation (not vector-based)
+//
+// Performance Considerations:
+// - Scales to millions of neurons via sparse connectivity
+// - Event-driven processing only updates active neurons
+// - Pre-allocated memory pools reduce allocation overhead
+// - Thread-safe for parallel processing (Phase 5+)
+//
+// Biological Inspiration:
+// - Neuron dynamics follow Leaky Integrate-and-Fire (LIF) models
+// - Synaptic plasticity based on spike timing (STDP)
+// - Working memory uses persistent activity in recurrent circuits
+// - Episodic memory stores experiences as neural patterns
+// - Attention uses lateral inhibition competition
+// - Planning uses learned predictive models
+
 class Brain {
 public:
     // Create brain with configuration
@@ -196,6 +240,13 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+
+    // Helper functions for accessing private members
+    static bool initDevelopmentSystem(Impl* impl);
+    static bool initNeuromodulationSystems(Impl* impl);
+    static void createRegions(Impl* impl, size_t neuronCount, size_t regionCount);
+    static void initializeConnectivity(Impl* impl, float connectionProbability);
+    static void loadConfigurationParameters(Impl* impl);
 };
 
 } // namespace nlm

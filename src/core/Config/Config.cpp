@@ -173,43 +173,48 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
+        std::visit([&oss](const auto& arg) {
+            // Use type-safe streaming for all possible ConfigValue types
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
-            } else {
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
                 oss << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double to avoid scientific notation for simple values
+                oss.precision(6);
+                oss << std::fixed << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss.precision(6);
+                    oss << std::fixed << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
+            } else {
+                // Fallback for unknown types
+                oss << "[unknown type]";
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
 } // namespace nlm

@@ -192,8 +192,8 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
                 // Probabilistic synapse formation
                 if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
                 
-                size_t idx1 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
-                size_t idx2 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
+                size_t idx1 = rng.uniformInt(static_cast<size_t>(0), static_cast<size_t>(static_cast<int>(neuronCount) - 1));
+                size_t idx2 = rng.uniformInt(static_cast<size_t>(0), static_cast<size_t>(static_cast<int>(neuronCount) - 1));
                 
                 if (idx1 != idx2) {
                     NeuronId src = activities[idx1].id;

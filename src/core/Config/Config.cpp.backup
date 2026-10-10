@@ -1,0 +1,805 @@
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <iomanip>
+#include <cctype>
+
+namespace nlm {
+
+// Exception for configuration errors
+class ConfigError : public std::runtime_error {
+public:
+    ConfigError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Detect file format based on extension
+static std::string detectFileFormat(const std::string& filepath) {
+    std::string ext;
+    size_t dot_pos = filepath.find_last_of('.');
+    if (dot_pos != std::string::npos) {
+        ext = filepath.substr(dot_pos + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    }
+    
+    if (ext == "json") {
+        return "json";
+    } else if (ext == "yaml" || ext == "yml") {
+        return "yaml";
+    } else {
+        return "ini"; // Default to key=value format (INI-like)
+    }
+}
+
+// Helper function to determine if a value is a vector type
+static bool isVectorType(const ConfigValue& value) {
+    return std::holds_alternative<std::vector<int>>(value) ||
+           std::holds_alternative<std::vector<double>>(value) ||
+           std::holds_alternative<std::vector<std::string>>(value);
+}
+
+// Helper function to format a ConfigValue as a string
+static std::string formatConfigValue(const ConfigValue& value) {
+    std::ostringstream oss;
+    
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Format double to remove trailing zeros if possible
+            oss << std::fixed << std::setprecision(6) << arg;
+            // Remove trailing zeros and possibly decimal point
+            std::string str = oss.str();
+            // Simple check for trailing zeros
+            if (str.find('.') != std::string::npos) {
+                size_t last_non_zero = str.find_last_not_of('0');
+                if (last_non_zero != std::string::npos && str[last_non_zero] == '.') {
+                    last_non_zero++;
+                }
+                str = str.substr(0, last_non_zero + 1);
+            }
+            oss.str("");
+            oss << str;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << std::fixed << std::setprecision(6) << arg[i];
+                std::string str = oss.str();
+                // Remove trailing zeros
+                if (str.find('.') != std::string::npos) {
+                    size_t last_non_zero = str.find_last_not_of('0');
+                    if (last_non_zero != std::string::npos && str[last_non_zero] == '.') {
+                        last_non_zero++;
+                    }
+                    str = str.substr(0, last_non_zero + 1);
+                }
+                oss.str("");
+                oss << str;
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    
+    return oss.str();
+}
+
+// Exception for configuration errors
+class ConfigError : public std::runtime_error {
+public:
+    ConfigError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Detect file format based on extension
+static std::string detectFileFormat(const std::string& filepath) {
+    std::string ext;
+    size_t dot_pos = filepath.find_last_of('.');
+    if (dot_pos != std::string::npos) {
+        ext = filepath.substr(dot_pos + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    }
+    
+    if (ext == "json") {
+        return "json";
+    } else if (ext == "yaml" || ext == "yml") {
+        return "yaml";
+    } else {
+        return "ini"; // Default to key=value format (INI-like)
+    }
+}
+
+// Parse JSON content (simple implementation)
+static std::string parseJson(const std::string& content, const std::string& key) {
+    // Simple JSON parser for key-value pairs only
+    // Looking for "key": "value" format
+    
+    std::string search_key = "\"" + key + "\"";
+    size_t pos = content.find(search_key);
+    if (pos == std::string::npos) {
+        search_key = "'" + key + "'";
+        pos = content.find(search_key);
+        if (pos == std::string::npos) {
+            return "";
+        }
+    }
+    
+    pos = content.find(':', pos);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    
+    // Find the value
+    size_t value_start = content.find_first_not_of(": \t\n\r", pos + 1);
+    if (value_start == std::string::npos) {
+        return "";
+    }
+    
+    // Look for string value in quotes or number value
+    if (content[value_start] == '\"' || content[value_start] == '\'') {
+        char quote = content[value_start];
+        size_t value_end = content.find(quote, value_start + 1);
+        if (value_end == std::string::npos) {
+            return "";
+        }
+        return content.substr(value_start + 1, value_end - value_start - 1);
+    } else {
+        // Number value
+        size_t value_end = value_start;
+        while (value_end < content.size() && 
+               (std::isdigit(content[value_end]) || 
+                content[value_end] == '.' || content[value_end] == '-' ||
+                content[value_end] == '+')) {
+            value_end++;
+        }
+        return content.substr(value_start, value_end - value_start);
+    }
+}
+
+// Parse YAML content (simple implementation)
+static std::string parseYaml(const std::string& content, const std::string& key) {
+    // Simple YAML parser for key-value pairs only
+    // Looking for "key: value" format
+    
+    std::istringstream stream(content);
+    std::string line;
+    while (std::getline(stream, line)) {
+        // Trim whitespace
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '%') {
+            continue;
+        }
+        
+        // Find key: value pattern
+        size_t colon_pos = line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string yaml_key = trim(line.substr(0, colon_pos));
+            if (yaml_key == key) {
+                // Extract value
+                std::string value = trim(line.substr(colon_pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                return value;
+            }
+        }
+    }
+    
+    return "";
+}
+
+// Convert string value to ConfigValue based on type hint
+
+// Parse string into various types and return as ConfigValue
+static std::optional<ConfigValue> parseStringValue(const std::string& value) {
+    // Try to parse as boolean
+    if (value == "true") {
+        return true;
+    } else if (value == "false") {
+        return false;
+    }
+    
+    // Try to parse as integer
+    try {
+        size_t pos;
+        int int_val = std::stoi(value, &pos);
+        if (pos == value.size()) {
+            return int_val;
+        }
+    } catch (...) {}
+    
+    // Try to parse as int64_t
+    try {
+        size_t pos;
+        int64_t int64_val = std::stoll(value, &pos);
+        if (pos == value.size()) {
+            return int64_val;
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        size_t pos;
+        double double_val = std::stod(value, &pos);
+        if (pos == value.size()) {
+            return double_val;
+        }
+    } catch (...) {}
+    
+    // Try to parse as vector of integers
+    if (value.size() >= 2 && value.front() == '[' && value.back() == ']') {
+        std::string content = value.substr(1, value.size() - 2);
+        std::istringstream stream(content);
+        std::string item;
+        std::vector<int> int_vec;
+        bool all_ints = true;
+        
+        while (std::getline(stream, item, ',')) {
+            item = trim(item);
+            if (item.empty()) continue;
+            
+            // Remove quotes if present
+            if ((item.size() >= 2 && item.front() == '\"' && item.back() == '\"') ||
+                (item.size() >= 2 && item.front() == '\'' && item.back() == '\'')) {
+                item = item.substr(1, item.size() - 2);
+            }
+            
+            try {
+                int_vec.push_back(std::stoi(item));
+            } catch (...) {
+                all_ints = false;
+                break;
+            }
+        }
+        
+        if (all_ints && !int_vec.empty()) {
+            return int_vec;
+        }
+    }
+    
+    // Try to parse as vector of doubles
+    if (value.size() >= 2 && value.front() == '[' && value.back() == ']') {
+        std::string content = value.substr(1, value.size() - 2);
+        std::istringstream stream(content);
+        std::string item;
+        std::vector<double> double_vec;
+        bool all_doubles = true;
+        
+        while (std::getline(stream, item, ',')) {
+            item = trim(item);
+            if (item.empty()) continue;
+            
+            // Remove quotes if present
+            if ((item.size() >= 2 && item.front() == '\"' && item.back() == '\"') ||
+                (item.size() >= 2 && item.front() == '\'' && item.back() == '\'')) {
+                item = item.substr(1, item.size() - 2);
+            }
+            
+            try {
+                double_vec.push_back(std::stod(item));
+            } catch (...) {
+                all_doubles = false;
+                break;
+            }
+        }
+        
+        if (all_doubles && !double_vec.empty()) {
+            return double_vec;
+        }
+    }
+    
+    // Try to parse as vector of strings
+    if (value.size() >= 2 && value.front() == '[' && value.back() == ']') {
+        std::string content = value.substr(1, value.size() - 2);
+        std::istringstream stream(content);
+        std::string item;
+        std::vector<std::string> string_vec;
+        
+        while (std::getline(stream, item, ',')) {
+            item = trim(item);
+            if (item.empty()) continue;
+            
+            // Remove quotes if present
+            if ((item.size() >= 2 && item.front() == '\"' && item.back() == '\"') ||
+                (item.size() >= 2 && item.front() == '\'' && item.back() == '\'')) {
+                item = item.substr(1, item.size() - 2);
+            }
+            
+            string_vec.push_back(item);
+        }
+        
+        if (!string_vec.empty()) {
+            return string_vec;
+        }
+    }
+    
+    // Return as string
+    return value;
+}
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Check if file exists
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    file.close();
+    
+    if (content.empty()) {
+        return false;
+    }
+    
+    // Detect file format
+    std::string format = detectFileFormat(filepath);
+    
+    try {
+        if (format == "json") {
+            // Parse JSON format
+            // Simple parsing for key-value pairs
+            // Looking for "key": "value" or "key": number format
+            size_t pos = 0;
+            while (pos < content.size()) {
+                // Find next "key" pattern
+                pos = content.find('"', pos);
+                if (pos == std::string::npos) break;
+                
+                size_t key_start = pos + 1;
+                pos = content.find('"', key_start);
+                if (pos == std::string::npos) break;
+                
+                std::string key = content.substr(key_start, pos - key_start);
+                pos++; // Skip closing quote
+                
+                // Find colon
+                pos = content.find(':', pos);
+                if (pos == std::string::npos) break;
+                
+                // Find value
+                size_t value_pos = content.find_first_not_of(": \t\n\r", pos + 1);
+                if (value_pos == std::string::npos) break;
+                
+                char quote_char = content[value_pos];
+                if (quote_char == '\"' || quote_char == '\'') {
+                    // String value
+                    size_t quote_end = content.find(quote_char, value_pos + 1);
+                    if (quote_end == std::string::npos) break;
+                    
+                    std::string value = content.substr(value_pos + 1, quote_end - value_pos - 1);
+                    set(key, value, ConfigSource::File);
+                    
+                    pos = quote_end + 1;
+                } else {
+                    // Number value
+                    size_t value_end = value_pos;
+                    while (value_end < content.size() && 
+                           (std::isdigit(content[value_end]) || 
+                            content[value_end] == '.' || content[value_end] == '-' ||
+                            content[value_end] == '+')) {
+                        value_end++;
+                    }
+                    
+                    if (value_end == value_pos) break;
+                    
+                    std::string value_str = content.substr(value_pos, value_end - value_pos);
+                    auto config_value_opt = parseStringValue(value_str);
+                    if (config_value_opt.has_value()) {
+                        set(key, config_value_opt.value(), ConfigSource::File);
+                    }
+                    
+                    pos = value_end;
+                }
+            }
+        else if (format == "yaml" || format == "yml") {
+            // Parse YAML format
+            std::istringstream stream(content);
+            std::string line;
+            while (std::getline(stream, line)) {
+                line = trim(line);
+                
+                // Skip comments and empty lines
+                if (line.empty() || line[0] == '#' || line[0] == '%') {
+                    continue;
+                }
+                
+                // Parse key: value pairs
+                size_t colon_pos = line.find(':');
+                if (colon_pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, colon_pos));
+                    std::string value = trim(line.substr(colon_pos + 1));
+                    
+                    // Handle quoted values
+                    if ((value.size() >= 2 && value.front() == '"' && value.back() == '"') ||
+                        (value.size() >= 2 && value.front() == '\'' && value.back() == '\'')) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    // Handle multi-line values (simple case: indented values)
+                    while (value.empty() && std::getline(stream, line)) {
+                        line = trim(line);
+                        if (line.empty() || line[0] == '#' || line[0] == '%') {
+                            continue;
+                        }
+                        if (line[0] != ' ' && line[0] != '\t') {
+                            // Not an indented value, put back
+                            // TODO: Handle more complex YAML structures
+                            break;
+                        }
+                        value = line;
+                    }
+                    
+                    // Extract description from previous comment lines
+                    std::string description = "";
+                    // TODO: Parse description from comments or YAML frontmatter
+                    
+                    auto config_value_opt = parseStringValue(value);
+                    if (config_value_opt.has_value()) {
+                        set(key, config_value_opt.value(), ConfigSource::File);
+                        // Note: Description support needs to be added here
+                    }
+                }
+            }
+        } else {
+            // Default: Parse key=value format (INI-like)
+            std::istringstream stream(content);
+            std::string line;
+            std::string current_description = "";
+            while (std::getline(stream, line)) {
+                line = trim(line);
+                
+                // Skip empty lines
+                if (line.empty()) {
+                    continue;
+                }
+                
+                // Check if line is a comment (description)
+                if (line[0] == '#') {
+                    current_description = line.substr(1);
+                    current_description = trim(current_description);
+                    continue;
+                }
+                
+                // Parse key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    // Try to parse complex values
+                    auto config_value_opt = parseStringValue(value);
+                    if (config_value_opt.has_value()) {
+                        // Set description when available
+                        if (!current_description.empty()) {
+                            set(key, config_value_opt.value(), ConfigSource::File);
+                            // Note: Description is stored in the ConfigEntry
+                            // but we need to update it after creation
+                            // TODO: Implement description storage and update
+                        } else {
+                            set(key, config_value_opt.value(), ConfigSource::File);
+                        }
+                    }
+                    
+                    // Reset description for next entry
+                    current_description = "";
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        return false;
+    }
+    
+    return true;
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+// Helper function to determine if a value is a vector type
+static bool isVectorType(const ConfigValue& value) {
+    return std::holds_alternative<std::vector<int>>(value) ||
+           std::holds_alternative<std::vector<double>>(value) ||
+           std::holds_alternative<std::vector<std::string>>(value);
+}
+
+// Helper function to format a ConfigValue as a string
+static std::string formatConfigValue(const ConfigValue& value) {
+    std::ostringstream oss;
+    
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Format double to remove trailing zeros if possible
+            oss << std::fixed << std::setprecision(6) << arg;
+            // Remove trailing zeros and possibly decimal point
+            std::string str = oss.str();
+            // Simple check for trailing zeros
+            if (str.find('.') != std::string::npos) {
+                size_t last_non_zero = str.find_last_not_of('0');
+                if (last_non_zero != std::string::npos && str[last_non_zero] == '.') {
+                    last_non_zero++;
+                }
+                str = str.substr(0, last_non_zero + 1);
+            }
+            oss.str("");
+            oss << str;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << std::fixed << std::setprecision(6) << arg[i];
+                std::string str = oss.str();
+                // Remove trailing zeros
+                if (str.find('.') != std::string::npos) {
+                    size_t last_non_zero = str.find_last_not_of('0');
+                    if (last_non_zero != std::string::npos && str[last_non_zero] == '.') {
+                        last_non_zero++;
+                    }
+                    str = str.substr(0, last_non_zero + 1);
+                }
+                oss.str("");
+                oss << str;
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    
+    return oss.str();
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        // Write description as comment
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key and value
+        file << entry.key << " = " << formatConfigValue(entry.value) << "\n";
+    }
+    
+    return true;
+}
+
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    try {
+        return std::get<T>(it->value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
+}
+
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+bool Config::has(const std::string& key) const {
+    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+}
+
+void Config::remove(const std::string& key) {
+    pImpl->entries.erase(
+        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }),
+        pImpl->entries.end()
+    );
+}
+
+std::vector<std::string> Config::getKeys() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    return keys;
+}
+
+void Config::clear() {
+    pImpl->entries.clear();
+}
+
+for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                oss << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << std::fixed << std::setprecision(6) << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
+
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+} // namespace nlm
