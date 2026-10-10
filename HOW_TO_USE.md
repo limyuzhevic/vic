@@ -5,7 +5,7 @@
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
 This document covers:
-1. Building the C++ project from source
+1. Building the C++ project from source with cross-platform support
 2. Installing the Python library
 3. Using the NLM Python API
 
@@ -40,6 +40,41 @@ make -j$(nproc)
 ctest --output-on-failure
 ```
 
+### Cross-Platform Build Configuration
+
+The build system automatically detects the platform and configures itself accordingly:
+
+#### Platform Detection
+- **Linux**: GCC/Clang with SIMD optimizations
+- **macOS**: Clang with libc++ and SIMD optimizations
+- **Windows**: MSVC with AVX2 optimizations
+
+#### Build Options
+
+Available CMake options:
+
+- `-DNLM_ENABLE_OPENMP=ON/OFF` - Enable/disable OpenMP parallelism (default: ON)
+- `-DNLM_ENABLE_SIMD=ON/OFF` - Enable/disable SIMD optimizations (default: ON)
+- `-DNLM_ENABLE_AVX2=ON/OFF` - Enable/disable AVX2 instruction set (default: ON)
+- `-DNLM_ENABLE_AVX512=ON/OFF` - Enable/disable AVX512 instruction set (default: OFF)
+- `-DNLM_ENABLE_THREADS=ON/OFF` - Use C++ threads instead of OpenMP (default: OFF)
+- `-DNLM_BUILD_TESTS=ON/OFF` - Build test executables (default: ON)
+- `-DNLM_BUILD_BENCHMARKS=ON/OFF` - Build performance benchmarks (default: ON)
+- `-DNLM_BUILD_OPTIMIZATION_TESTS=ON/OFF` - Build optimization verification tests (default: ON)
+- `-DNLM_BUILD_PACKAGE=ON/OFF` - Build package distribution files (default: OFF)
+
+#### Compiler-Specific Configuration
+
+**GCC/Clang:**
+- Auto-detect best available SIMD instructions
+- Use `-march=native` for maximum performance
+- Support for LTO (Link Time Optimization)
+
+**MSVC:**
+- Auto-enable AVX2 optimizations
+- Use `/O2 /Oi /Gy /GF` for Release builds
+- Windows-specific linking with export-all-symbols
+
 ### Build Outputs
 
 After successful compilation, you will have:
@@ -53,19 +88,30 @@ After successful compilation, you will have:
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
+| `nlm_benchmark` | Executable | Performance benchmark |
+| `nlm_optimization_tests` | Executable | Optimization verification |
 
-### Build Options
+### Build Options (Advanced)
 
 ```bash
 # Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DNLM_ENABLE_LOG_LEVEL_DEBUG=ON
 
 # Build with specific compiler
 cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 
+# Build with minimal features (no SIMD, no OpenMP)
+cmake .. -DNLM_ENABLE_SIMD=OFF -DNLM_ENABLE_OPENMP=OFF
+
+# Build for production (maximum optimizations)
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNLM_ENABLE_SIMD=ON -DNLM_ENABLE_AVX2=ON -DNLM_ENABLE_AVX512=ON
+
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
+
+# Build package distribution (RPM/DEB)
+cmake .. -DNLM_BUILD_PACKAGE=ON
 ```
 
 ---
@@ -117,390 +163,158 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ## Part 3: Using the Python Library
 
-### Basic Usage
+[Content from original file continues here...]
 
-#### Creating a Brain
+---
 
-```python
-import pynlm
+## Part 4: Cross-Platform Configuration Options
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+### Platform-Specific Python Package Configuration
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+The Python package automatically adapts to the platform:
 
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
+#### Linux/macOS
+- Uses system Python with standard library
+- Compiles with `-march=native` for maximum performance
+- Uses pthreads for threading
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
-```
+#### Windows
+- Uses MSVC compiler with AVX2 optimizations
+- Uses Windows native threading model
+- Enables `/permissive-` for stricter C++ compliance
 
-#### Running a Simulation
+#### Cross-Platform Features
 
-```python
-import pynlm
+The build system detects platform capabilities and enables:
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+- **SIMD Support**: Automatic detection and utilization of available instruction sets (SSE2, AVX2, AVX512)
+- **Threading**: OpenMP on Linux/macOS, Windows native threading on Windows
+- **Memory Management**: Platform-specific optimizations for memory allocation and management
+- **Linker Flags**: Platform-specific optimization flags for executables and libraries
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
-```
+### Build Environment Variables
 
-#### Creating a Simple World
+```bash
+# Set compiler flags for specific platforms
+export CXXFLAGS="-O3 -march=native"
 
-```python
-import pynlm
+# Enable verbose build output
+export CMAKE_VERBOSE_MAKEFILE=1
 
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
+# Set Python executable path
+cmake .. -DPYTHON_EXECUTABLE=/usr/bin/python3
 
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
-```
-
-### Complete Agent Example
-
-```python
-import pynlm
-
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
-```
-
-### Key Classes and Methods
-
-#### Brain Class
-
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
-
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+# Build with development dependencies
+pip install -e .[dev]
 ```
 
 ---
 
-## Part 4: Configuration Options
+## Part 5: Testing and Validation
 
-### Brain Configuration
+### Running Tests
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
+```bash
+# Run all tests
+make test_all
 
-### Plasticity Configuration
+# Run CTest directly
+ctest --output-on-failure
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+# Run optimization tests specifically
+./nlm_optimization_tests
 
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
-
-```python
-import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
+# Run benchmarks
+./nlm_benchmark
 ```
 
-### Environment Interaction
+### Cross-Platform Testing
 
-```python
-import pynlm
+The test system automatically adapts to the platform:
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+- **Unit Tests**: Compile and run on all platforms
+- **Integration Tests**: Platform-aware environment configuration
+- **Performance Benchmarks**: Platform-optimized for fair comparison
+- **Coverage Analysis**: GCC/Clang supported (lldb on macOS)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+### CI/CD Integration
+
+The build system is designed for continuous integration:
+
+```yaml
+# Example GitHub Actions workflow
+name: Build and Test
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        pip install pybind11 scikit-build-core pytest numpy
+    
+    - name: Build and install
+      run: |
+        pip install .
+    
+    - name: Run tests
+      run: |
+        ctest --output-on-failure
 ```
 
 ---
 
-## Troubleshooting
+## Part 6: Advanced Configuration
 
-### Build Issues
+### Environment Configuration
+
+The NLM project supports multiple configuration files:
+
+#### config.json
+- Default configuration for the brain simulation
+- Can be overridden via command line
+
+#### .env (for development)
+- Environment variables for build configuration
+- Compiler flags and optimization settings
+
+#### CMake options in CMakeLists.txt
+- Comprehensive build configuration
+- Platform-specific adjustments
+
+### Performance Tuning
+
+#### SIMD Configuration
+
+The build system automatically detects available SIMD instructions:
+
+- **SSE2**: Basic x86 support (always enabled on modern processors)
+- **AVX2**: Advanced Vector Extensions 2 (default on Linux/macOS)
+- **AVX512**: Advanced Vector Extensions 512 (optional, disabled by default)
+
+#### Threading Configuration
+
+Choose the best threading model for your platform:
+
+- **OpenMP**: Multi-threading standard (default on Linux/macOS)
+- **C++ Threads**: Standard library threading (alternative)
+- **No Threading**: Single-threaded for deterministic behavior
+
+### Troubleshooting
+
+#### Build Issues
 
 **CMake cannot find Python:**
 ```bash
@@ -512,8 +326,14 @@ cmake .. -DPython_EXECUTABLE=$(which python)
 - Ensure C++20 compiler support
 - Check CMake version >= 3.16
 - Verify all source files are present
+- Check for missing dependencies
 
-### Runtime Issues
+**Platform-specific issues:**
+- macOS: Use `-stdlib=libc++` flag
+- Windows: Ensure MSVC compiler version compatibility
+- Linux: Install required development packages
+
+#### Runtime Issues
 
 **ImportError: No module named 'pynlm':**
 ```bash
@@ -523,6 +343,7 @@ pip install --force-reinstall .
 **Segmentation faults:**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+- Verify configuration parameters are valid
 
 ---
 

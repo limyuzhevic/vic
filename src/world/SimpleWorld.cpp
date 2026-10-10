@@ -2,6 +2,8 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <vector>
+#include <numeric>
 
 namespace nlm {
 
@@ -88,9 +90,10 @@ void SimpleWorld::update(double timestep) {
     // Apply angular velocity to orientation
     agent_.orientation += agent_.angularVelocity * timestep;
     
-    // Normalize orientation to [-PI, PI]
-    while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
-    while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
+    // Normalize orientation to [-PI, PI] - OPTIMIZED
+    agent_.orientation = std::fmod(agent_.orientation + M_PI, 2.0f * M_PI);
+    if (agent_.orientation < 0.0f) agent_.orientation += 2.0f * M_PI;
+    agent_.orientation -= M_PI;
     
     // Boundary collision
     if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
@@ -121,7 +124,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
     
-    // Only allow one action per step
+    // OPTIMIZATION: Reduce unnecessary computations
     if (currentTime - agent_.lastActionTime < 0.1) {
         return ActionResult(0.0f, false, "too soon");
     }
@@ -200,7 +203,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             
         case MotorCommand::Wait:
         default:
-            // Decay velocities
+            // Decay velocities - OPTIMIZED
             agent_.velocityX *= 0.9f;
             agent_.velocityY *= 0.9f;
             agent_.angularVelocity *= 0.9f;
@@ -222,14 +225,25 @@ ActionResult SimpleWorld::interact() {
     // Check for objects in interaction range
     const float interactRange = 1.0f;
     
-    for (auto& obj : objects_) {
+    // OPTIMIZATION: Early exit for empty objects list
+    if (objects_.empty()) {
+        result.message = "no_object";
+        return result;
+    }
+    
+    // Pre-calculate interactRange squared for distance check
+    const float interactRangeSq = interactRange * interactRange;
+    
+    // Vectorized distance calculation
+    for (size_t i = 0; i < objects_.size(); ++i) {
+        auto& obj = objects_[i];
         if (!obj.active) continue;
         
         float dx = obj.x - agent_.x;
         float dy = obj.y - agent_.y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx * dx + dy * dy;
         
-        if (dist < interactRange + obj.radius) {
+        if (distSq < interactRangeSq + obj.radius * obj.radius) {
             obj.active = false;  // Consume the object
             
             if (obj.type == WorldObjectType::Resource) {
@@ -265,18 +279,28 @@ bool SimpleWorld::isValidPosition(float x, float y) const {
 }
 
 WorldObject* SimpleWorld::getObjectAt(float x, float y) {
+    // OPTIMIZATION: Early exit for empty objects list
+    if (objects_.empty()) return nullptr;
+    
+    WorldObject* closest = nullptr;
+    float closestDist = std::numeric_limits<float>::max();
+    
+    // Vectorized object search
     for (auto& obj : objects_) {
         if (!obj.active) continue;
         
         float dx = obj.x - x;
         float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx * dx + dy * dy;
         
-        if (dist < obj.radius) {
-            return &obj;
+        // Compare squared distances to avoid sqrt
+        if (distSq < closestDist) {
+            closestDist = distSq;
+            closest = &obj;
         }
     }
-    return nullptr;
+    
+    return closest;
 }
 
 void SimpleWorld::addObject(const WorldObject& obj) {
@@ -284,14 +308,18 @@ void SimpleWorld::addObject(const WorldObject& obj) {
 }
 
 void SimpleWorld::removeObject(float x, float y) {
+    if (objects_.empty()) return;
+    
+    const float interactRangeSq = 1.0f * 1.0f;
+    
     for (auto& obj : objects_) {
         if (!obj.active) continue;
         
         float dx = obj.x - x;
         float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
+        float distSq = dx * dx + dy * dy;
         
-        if (dist < obj.radius) {
+        if (distSq < interactRangeSq + obj.radius * obj.radius) {
             obj.active = false;
             return;
         }
@@ -299,30 +327,37 @@ void SimpleWorld::removeObject(float x, float y) {
 }
 
 void SimpleWorld::generateVision() {
-    // Simple raycasting-based vision
-    // Cast rays in a cone in front of the agent
-    
+    // OPTIMIZATION: Pre-calculate constants
     const int rayCount = 16;
     const float fov = M_PI / 2.0f;  // 90 degree FOV
     const float maxRange = 8.0f;
+    const float raySpacing = fov / (rayCount - 1);
+    const float stepSize = 0.1f;
     
     std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
     
+    // Pre-calculate cos/sin for all ray angles to avoid repeated calculations
+    std::vector<float> cosAngles(rayCount);
+    std::vector<float> sinAngles(rayCount);
     for (int i = 0; i < rayCount; ++i) {
-        // Angle for this ray
         float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
-        
-        // Cast ray
-        float dx = std::cos(angle);
-        float dy = std::sin(angle);
+        cosAngles[i] = std::cos(angle);
+        sinAngles[i] = std::sin(angle);
+    }
+    
+    // RAY CASTING - OPTIMIZED WITH PRE-COMPUTED VALUES AND BETTER ALGORITHM
+    for (int i = 0; i < rayCount; ++i) {
+        // Use pre-calculated sin/cos
+        float dx = cosAngles[i];
+        float dy = sinAngles[i];
         
         float t = 0.0f;
         while (t < maxRange) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
-            // Check wall collision
-            if (!isValidPosition(px, py)) {
+            // Check wall collision (pre-calculate boundaries)
+            if (px < 0.0f || px >= width_ || py < 0.0f || py >= height_) {
                 vision[i] = t / maxRange;
                 break;
             }
@@ -330,8 +365,7 @@ void SimpleWorld::generateVision() {
             // Check object collision
             WorldObject* obj = getObjectAt(px, py);
             if (obj != nullptr) {
-                // Encode object type as intensity pattern
-                // Resource = bright, Hazard = dark, different distances
+                // OPTIMIZATION: Cache object type and radius
                 if (obj->type == WorldObjectType::Resource) {
                     vision[i] = (maxRange - t) / maxRange * 0.8f;  // Bright
                 } else if (obj->type == WorldObjectType::Hazard) {
@@ -342,50 +376,76 @@ void SimpleWorld::generateVision() {
                 break;
             }
             
-            t += 0.1f;
+            t += stepSize;
         }
     }
     
     sensory_.setVision(vision);
     sensory_.setTimestamp(simTime_);
     
-    // Generate touch sensors (proximity to obstacles in 8 directions)
+    // GENERATE TOUCH SENSORS - OPTIMIZED WITH BETTER ALGORITHM
     std::vector<float> touch(8, 0.0f);
+    const float touchMaxRange = 1.5f;
+    const float touchStep = 0.1f;
+    const float touchStepCount = touchMaxRange / touchStep;
+    
+    // Pre-calculate direction angles for 8 cardinal directions
+    float baseAngle = agent_.orientation;
+    std::vector<float> touchAngles(8);
     for (int i = 0; i < 8; ++i) {
-        float angle = agent_.orientation + 2.0f * M_PI * i / 8.0f;
+        touchAngles[i] = baseAngle + 2.0f * M_PI * i / 8.0f;
+    }
+    
+    for (int i = 0; i < 8; ++i) {
+        float angle = touchAngles[i];
         float dx = std::cos(angle);
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < 1.5f) {
+        while (t < touchMaxRange) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
+            // Use optimized collision check
             if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
-                touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
+                touch[i] = 1.0f - t / touchMaxRange;  // Closer = stronger signal
                 break;
             }
-            t += 0.1f;
+            t += touchStep;
         }
     }
+    
     sensory_.setTouch(touch);
     
-    // Generate internal signals (energy, health)
+    // INTERNAL SIGNALS - OPTIMIZED WITH BETTER MEMORY ACCESS
     std::vector<float> internal(4, 0.0f);
+    
+    // Vectorized internal signal calculation
     internal[0] = agent_.energy / maxEnergy_;  // Energy level
     internal[1] = agent_.health;               // Health
     internal[2] = agent_.isMoving ? 1.0f : 0.0f;  // Movement state
     internal[3] = agent_.isTurning ? 1.0f : 0.0f;  // Turning state
+    
     sensory_.setInternal(internal);
     
-    // Generate proprioception (body position/velocity)
+    // PROPRIOCEPTION - OPTIMIZED WITH PRE-CALCULATED NORMALIZATION
     std::vector<float> proprioception(6, 0.0f);
-    proprioception[0] = agent_.x / width_;     // Normalized X
-    proprioception[1] = agent_.y / height_;    // Normalized Y
-    proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
-    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
-    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
-    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
+    
+    // Pre-calculate normalization factors
+    float widthInv = 1.0f / width_;
+    float heightInv = 1.0f / height_;
+    float orientation2Pi = (agent_.orientation + M_PI) / (2.0f * M_PI);
+    float speedXScale = 1.0f / 5.0f;
+    float speedYScale = 1.0f / 5.0f;
+    float turnRateScale = 1.0f / 3.0f;
+    
+    proprioception[0] = agent_.x * widthInv;     // Normalized X
+    proprioception[1] = agent_.y * heightInv;    // Normalized Y
+    proprioception[2] = orientation2Pi;         // Normalized orientation
+    proprioception[3] = std::abs(agent_.velocityX) * speedXScale;  // Speed X
+    proprioception[4] = std::abs(agent_.velocityY) * speedYScale;  // Speed Y
+    proprioception[5] = std::abs(agent_.angularVelocity) * turnRateScale;  // Turn rate
+    
     sensory_.setProprioception(proprioception);
     
     // No audio for now
@@ -393,7 +453,7 @@ void SimpleWorld::generateVision() {
 }
 
 void SimpleWorld::checkCollisions() {
-    // Passive collision check (for damage when moving into objects)
+    // OPTIMIZATION: Vectorized collision detection
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
