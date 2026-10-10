@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,126 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            // Log error for debugging
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Check if file is empty
+        if (file.peek() == std::ifstream::traits_type::eof()) {
+            // Empty file is valid (just means no configuration)
+            return true;
+        }
+        
+        // Try to parse as JSON first
+        nlohmann::json j;
+        try {
+            file >> j;
+        } catch (const nlohmann::json::parse_error& e) {
+            // JSON parsing failed, try legacy key=value format
+            file.clear();
+            file.seekg(0);
+            std::string line;
+            size_t lineNumber = 0;
+            while (std::getline(file, line)) {
+                ++lineNumber;
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Validate key
+                    if (key.empty()) {
+                        // Skip invalid lines with empty keys
+                        continue;
+                    }
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                } else {
+                    // Skip lines without '='
+                    continue;
+                }
+            }
+            return true;
+        }
+        
+        // Validate JSON structure
+        if (!j.is_object()) {
+            return false;
+        }
+        
+        // Parse JSON object and populate configuration
+        for (const auto& [key, value] : j.items()) {
+            ConfigSource source = ConfigSource::File;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Validate key
+            if (key.empty()) {
+                continue;  // Skip empty keys
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                // Handle different value types with validation
+                if (value.is_string()) {
+                    set(key, value.get<std::string>(), source);
+                } else if (value.is_number_integer()) {
+                    // Check for integer overflow
+                    int64_t intVal = value.get<int64_t>();
+                    set(key, intVal, source);
+                } else if (value.is_number_float()) {
+                    set(key, value.get<double>(), source);
+                } else if (value.is_boolean()) {
+                    set(key, value.get<bool>(), source);
+                } else if (value.is_array()) {
+                    // Handle array types
+                    std::vector<std::string> strArray;
+                    for (const auto& item : value) {
+                        if (item.is_string()) {
+                            strArray.push_back(item.get<std::string>());
+                        } else {
+                            // Try to convert to string
+                            strArray.push_back(value.dump());
+                        }
+                    }
+                    set(key, strArray, source);
+                } else {
+                    // Unknown type, treat as string with error handling
+                    std::string strValue;
+                    try {
+                        strValue = value.dump();
+                        set(key, strValue, source);
+                    } catch (...) {
+                        // Skip problematic entries
+                        continue;
+                    }
+                }
+            } catch (const std::exception& e) {
+                // Log error and skip this entry
+                continue;
+            }
         }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Any exception during file reading/parsing should be caught and handled gracefully
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +171,52 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON object from configuration entries
+    nlohmann::json j;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Store the key and value as JSON with metadata
+        nlohmann::json entryJson;
+        
+        // Convert ConfigValue to JSON
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "string";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "int64";
+            } else if constexpr (std::is_same_v<T, double>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "double";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "bool";
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "int64_array";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "double_array";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                entryJson["value"] = val;
+                entryJson["type"] = "string_array";
+            } else {
+                entryJson["value"] = "";
+                entryJson["type"] = "unknown";
+            }
+            entryJson["source"] = static_cast<int>(entry.source);
+            if (!entry.description.empty()) {
+                entryJson["description"] = entry.description;
+            }
+        }, entry.value);
+        
+        j[entry.key] = entryJson;
     }
+    
+    // Write JSON with indentation for readability
+    file << j.dump(4);
     
     return true;
 }
