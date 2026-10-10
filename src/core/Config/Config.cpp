@@ -86,7 +86,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the actual value, not placeholder
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -104,6 +115,41 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Try to convert string value to target type
+        if constexpr (std::is_same_v<T, int> && std::is_same_v<std::decay_t<decltype(it->value)>, std::string>) {
+            try {
+                return std::stoi(std::get<std::string>(it->value));
+            } catch (...) {
+                return std::nullopt;
+            }
+        } else if constexpr (std::is_same_v<T, double> && std::is_same_v<std::decay_t<decltype(it->value)>, std::string>) {
+            try {
+                return std::stod(std::get<std::string>(it->value));
+            } catch (...) {
+                return std::nullopt;
+            }
+        } else if constexpr (std::is_same_v<T, bool> && std::is_same_v<std::decay_t<decltype(it->value)>, std::string>) {
+            std::string str = std::get<std::string>(it->value);
+            if (str == "true" || str == "1" || str == "yes") return true;
+            if (str == "false" || str == "0" || str == "no") return false;
+            return std::nullopt;
+        } else if constexpr (std::is_same_v<T, std::vector<int>> && std::is_same_v<std::decay_t<decltype(it->value)>, std::string>) {
+            // TODO: Implement CSV parsing for vector<int>
+            return std::nullopt;
+        } else if constexpr (std::is_same_v<T, std::vector<double>> && std::is_same_v<std::decay_t<decltype(it->value)>, std::string>) {
+            // TODO: Implement CSV parsing for vector<double>
+            return std::nullopt;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>> && std::is_same_v<std::decay_t<decltype(it->value)>, std::string>) {
+            // TODO: Implement CSV parsing for vector<std::string>
+            return std::nullopt;
+        } else if constexpr (std::is_same_v<T, std::vector<int>> && std::is_same_v<std::decay_t<decltype(it->value)>, std::vector<int>>) {
+            return std::get<std::vector<int>>(it->value);
+        } else if constexpr (std::is_same_v<T, std::vector<double>> && std::is_same_v<std::decay_t<decltype(it->value)>, std::vector<double>>) {
+            return std::get<std::vector<double>>(it->value);
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>> && std::is_same_v<std::decay_t<decltype(it->value)>, std::vector<std::string>>) {
+            return std::get<std::vector<std::string>>(it->value);
+        }
+        
         return std::nullopt;
     }
 }
@@ -199,17 +245,30 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+// Explicit template instantiations for all supported types
+
+// Basic types
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
+// Vector types (newly added support)
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
+
+// getOr functions
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Vector getOr functions (newly added)
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
 
 } // namespace nlm
