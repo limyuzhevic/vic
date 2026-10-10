@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -100,6 +101,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    bool parseJSON(const std::string& content);
+    bool parseKeyValue(const std::string& content);
+    ConfigValue parseValue(const std::string& content, size_t& pos);
+    std::string parseString(const std::string& content, size_t& pos);
+    double parseNumber(const std::string& content, size_t& pos, size_t& endPos);
+    void skipWhitespace(const std::string& content, size_t& pos);
+    ConfigValue objToConfigValue(const std::map<std::string, ConfigValue>& obj);
 };
 
 } // namespace nlm

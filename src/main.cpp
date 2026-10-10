@@ -7,7 +7,8 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
+// Version definition
+#define NLM_VERSION "2.0.0"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -347,6 +348,18 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-help" || arg == "--h") {
+            std::cout << "Usage: " << argv[0] << " [options]\n"
+                      << "  --config=file.cfg    Load configuration from file\n"
+                      << "  --help, -h           Show this help message\n"
+                      << "  --version            Show version information\n"
+                      << "Other options are handled by the configuration system.\n";
+            return 0;
+        }
+        if (arg == "--version") {
+            std::cout << "NLM " << NLM_VERSION << " (Phase 2: Real Neural Computation)\n";
+            return 0;
+        }
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
