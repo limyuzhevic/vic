@@ -78,8 +78,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
+    // Constructor
+    explicit Impl(std::shared_ptr<Config> cfg)
+        : config(std::move(cfg))
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
@@ -95,7 +96,7 @@ struct Brain::Impl {
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        if (config && auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
@@ -157,19 +158,15 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(std::move(config))) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -204,13 +201,19 @@ bool Brain::initialize() {
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                const auto& neurons = sensoryPop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron) {  // Additional null check for safety
+                        pImpl->sensoryNeurons.push_back(neuron);
+                    }
                 }
             }
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                const auto& neurons = motorPop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron) {  // Additional null check for safety
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
                 }
             }
             
@@ -359,6 +362,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
+                        if (!syn) continue;  // Null check for synapse
                         syn->recordPostSpike(currentTime);
                     }
 
@@ -660,12 +664,16 @@ StructuralPlasticity* Brain::getStructuralPlasticity() {
     return pImpl->structuralPlasticity.get();
 }
 
-float Brain::getExcitationInhibitionRatio() const {
+    float Brain::getExcitationInhibitionRatio() const {
     float totalExcitatory = 0.0f;
     float totalInhibitory = 0.0f;
     
     for (const auto& region : pImpl->regions) {
+        if (!region) continue;  // Null check for region
+        
         for (const auto& syn : region->getSynapses()) {
+            if (!syn) continue;  // Null check for synapse
+            
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
