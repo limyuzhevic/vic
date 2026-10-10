@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "ConfigJSON.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 

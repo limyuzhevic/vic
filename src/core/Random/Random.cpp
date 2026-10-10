@@ -1,4 +1,5 @@
 #include "Random.hpp"
+#include "ErrorHandling/ErrorHandling.hpp"
 #include <stdexcept>
 
 namespace nlm {
@@ -40,7 +41,7 @@ uint64_t RandomGenerator::getSeed() const {
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        NLM_THROW_ERROR(NLMErrors::ConfigInvalidValue, "min must be <= max");
     }
     if (min == max) {
         return min;
@@ -51,7 +52,7 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        NLM_THROW_ERROR(NLMErrors::ConfigInvalidValue, "min must be <= max");
     }
     if (min == max) {
         return min;
@@ -62,7 +63,7 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 
 double RandomGenerator::uniformReal(double min, double max) {
     if (min >= max) {
-        throw std::invalid_argument("min must be < max");
+        NLM_THROW_ERROR(NLMErrors::ConfigInvalidValue, "min must be < max");
     }
     std::uniform_real_distribution<double> dist(min, max);
     return dist(pImpl->gen);
@@ -70,7 +71,7 @@ double RandomGenerator::uniformReal(double min, double max) {
 
 float RandomGenerator::uniformReal(float min, float max) {
     if (min >= max) {
-        throw std::invalid_argument("min must be < max");
+        NLM_THROW_ERROR(NLMErrors::ConfigInvalidValue, "min must be < max");
     }
     std::uniform_real_distribution<float> dist(min, max);
     return dist(pImpl->gen);
@@ -111,7 +112,7 @@ uint32_t RandomGenerator::randomBit() {
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
+        NLM_THROW_ERROR(NLMErrors::MemoryAllocationFailed, "Cannot pick from zero items");
     }
     return uniformInt(0, n - 1);
 }
@@ -132,3 +133,4 @@ const std::mt19937_64& RandomGenerator::engine() const {
 }
 
 } // namespace nlm
+
