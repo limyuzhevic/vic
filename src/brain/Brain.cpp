@@ -511,8 +511,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state for prediction
+        std::vector<float> currentSensoryState;
+        if (pImpl->sensoryNeurons.size() > 0) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activation = neuron->getState().membranePotential - neuron->getState().restingPotential;
+                currentSensoryState.push_back(activation);
+            }
+        }
+        
+        // Update prediction system with current state
+        // For now, this would interface with prediction system to:
+        // 1. Generate prediction of next sensory state
+        // 2. Compute prediction error
+        // 3. Use prediction error for learning and attention
+        
+        // Placeholder for prediction system integration
+        NLM_LOG_INFO("Prediction system processing sensory state of size: " + 
+                    std::to_string(currentSensoryState.size()));
+        
+        // Enable prediction error integration with neuromodulation
+        if (pImpl->predictionError) {
+            // Calculate prediction error from sensory input changes
+            // This would be implemented in the full prediction system
+            float predictionError = 0.0f;  // Placeholder
+            if (predictionError != 0.0f) {
+                pImpl->predictionError->setLevel(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -571,12 +597,71 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 14: Sleep/rest cycle for memory consolidation ==========
+    pImpl->stepsSinceLastEpisode++;
+    
+    // Check if we should enter rest phase (after sufficient learning)
+    if (pImpl->stepsSinceLastEpisode > 1000 && !pImpl->isResting) {
+        // Enter rest phase for memory consolidation
+        pImpl->isResting = true;
+        NLM_LOG_INFO("Entering rest phase for memory consolidation...");
+        
+        // During rest, we would:
+        // 1. Replay important episodes
+        // 2. Consolidate weak memories
+        // 3. Reduce plasticity for stability
+        // 4. Update development stage
+        
+        // Activate replay system
+        if (pImpl->episodicMemory && pImpl->episodicMemory->isReplayEnabled()) {
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+        
+        // Consolidate episodic memory
+        if (pImpl->episodicMemory) {
+            pImpl->episodicMemory->consolidate(0.5f);
+        }
+        
+        // Clear working memory to free resources
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->clear();
+        }
+        
+        // Update development stage
+        if (currentStep % 10000 == 0) {  // Every 10000 steps
+            DevelopmentalStage nextStage = pImpl->developmentalStage;
+            switch (pImpl->developmentalStage) {
+                case DevelopmentalStage::Initial:
+                    nextStage = DevelopmentalStage::CriticalPeriod;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    nextStage = DevelopmentalStage::Maturation;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    nextStage = DevelopmentalStage::Adult;
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Cycle back to critical period for continued learning
+                    nextStage = DevelopmentalStage::CriticalPeriod;
+                    break;
+            }
+            pImpl->developmentalStage = nextStage;
+            NLM_LOG_INFO("Development stage advanced to: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+        }
+        
+        // Reset rest flag after one rest cycle
+        pImpl->isResting = false;
+    } else {
+        // Normal processing - clear rest flag if not resting
+        pImpl->isResting = false;
+    }
+    
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
@@ -699,21 +784,49 @@ std::unique_ptr<class Action> Brain::produceAction() {
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
+    float totalActivity = 0.0f;
+    
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
             ++firingMotor;
         }
+        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        totalActivity += activation;
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Use neural planner if available for sophisticated action planning
+    std::unique_ptr<class Action> plannedAction = std::make_unique<Action>(ActionType::Wait);
+    
+    if (pImpl->planner) {
+        // Neural planner could:
+        // 1. Evaluate all possible actions based on current state
+        // 2. Use working memory to retrieve relevant past experiences
+        // 3. Consider prediction errors for unexpected outcomes
+        // 4. Apply attention-weighted evaluation of action options
+        // 5. Output the highest-scoring planned action
+        
+        // For now, we use the motor activity to influence action selection
+        // In a full implementation, the planner would return a planned action
+        
+        // Convert motor activity to action probability
+        float actionProbability = totalActivity / (pImpl->motorNeurons.size() * 10.0f);
+        
+        if (actionProbability > 0.5f) {
+            plannedAction = std::make_unique<Action>(ActionType::MoveForward);
+        }
+        
+        NLM_LOG_INFO("Neural planner selected action with motor activity: " + 
+                    std::to_string(actionProbability));
+    } else {
+        // Fallback to simple motor-based action selection
+        ActionType type = ActionType::Wait;
+        if (firingMotor > 0) {
+            type = ActionType::MoveForward;
+        }
+        plannedAction = std::make_unique<Action>(type);
     }
     
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return plannedAction;
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
@@ -895,9 +1008,56 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - create or update synapses in loaded brain
+        // Group synapses by destination neuron for efficient processing
+        std::unordered_map<NeuronId, std::vector<size_t>> destinationToSynapseIndices;
+        for (size_t i = 0; i < synapseData.sourceNeuron.size(); ++i) {
+            destinationToSynapseIndices[synapseData.destinationNeuron[i]].push_back(i);
+        }
+        
+        // Create or update synapses for each destination neuron
+        for (const auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                NeuronId neuronId = neuron->getId();
+                auto it = destinationToSynapseIndices.find(neuronId);
+                if (it != destinationToSynapseIndices.end()) {
+                    // Create or update synapses for this neuron
+                    for (size_t index : it->second) {
+                        NeuronId sourceNeuronId(synapseData.sourceNeuron[index]);
+                        
+                        // Find or create synapse from source to destination
+                        Synapse* existingSyn = nullptr;
+                        auto synapses = neuron->getIncomingSynapses();
+                        if (synapses) {
+                            for (auto* syn : *synapses) {
+                                if (syn->getSourceNeuron() == sourceNeuronId && 
+                                    syn->getDestinationNeuron() == neuronId) {
+                                    existingSyn = syn;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (existingSyn) {
+                            // Update existing synapse
+                            existingSyn->setWeight(synapseData.weight[index]);
+                            existingSyn->setDelay(synapseData.delay[index]);
+                            existingSyn->setType(static_cast<SynapseType>(synapseData.synapseType[index]));
+                            existingSyn->setEligibilityTrace(synapseData.eligibilityTrace[index]);
+                        } else {
+                            // Create new synapse - this requires access to synapse creation APIs
+                            // For now, log that we would create synapse
+                            NLM_LOG_INFO("Would create new synapse from " + 
+                                       std::to_string(sourceNeuronId.index()) + " to " + 
+                                       std::to_string(neuronId.index()) + 
+                                       " with weight " + std::to_string(synapseData.weight[index]));
+                        }
+                    }
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapse definitions");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

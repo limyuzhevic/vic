@@ -10,9 +10,88 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+namespace nlm {
 
-Config::~Config() = default;
+// Initialize default configuration for NLM Phase 6
+void initializeDefaultConfig(Config& config) {
+    // Neural network configuration
+    config.set("neuron_count", 1000, ConfigSource::Default);
+    config.set("region_count", 1, ConfigSource::Default);
+    config.set("connection_probability", 0.1, ConfigSource::Default);
+    
+    // Simulation parameters
+    config.set("simulation_timestep", 0.001, ConfigSource::Default);
+    config.set("random_seed", 42, ConfigSource::Default);
+    
+    // Memory system configuration
+    config.set("working_memory_capacity", 100, ConfigSource::Default);
+    config.set("episodic_memory_max_episodes", 1000, ConfigSource::Default);
+    config.set("replay_interval", 100, ConfigSource::Default);
+    config.set("consolidation_interval", 1000, ConfigSource::Default);
+    
+    // Prediction system configuration
+    config.set("prediction_horizon", 10, ConfigSource::Default);
+    config.set("prediction_error_weight", 0.5, ConfigSource::Default);
+    
+    // Planning system configuration
+    config.set("planning_depth", 5, ConfigSource::Default);
+    config.set("action_evaluation_method", "neural_weighted", ConfigSource::Default);
+    
+    // Neuromodulation configuration
+    config.set("dopamine_gain", 1.0, ConfigSource::Default);
+    config.set("curiosity_weight", 0.3, ConfigSource::Default);
+    config.set("novelty_decay_rate", 0.95, ConfigSource::Default);
+    
+    // Development system configuration
+    config.set("rest_phase_duration", 1000, ConfigSource::Default);
+    config.set("stage_advance_interval", 10000, ConfigSource::Default);
+    config.set("developmental_stage", 0, ConfigSource::Default); // 0=Initial, 1=CriticalPeriod, etc.
+    
+    // Attention system configuration
+    config.set("attention_inhibition_strength", 0.5, ConfigSource::Default);
+    config.set("attention_excitation_strength", 1.5, ConfigSource::Default);
+    config.set("attention_competition_threshold", 0.3, ConfigSource::Default);
+    
+    // Plasticity system configuration
+    config.set("stdp_ltp_weight", 0.01, ConfigSource::Default);
+    config.set("stdp_ltd_weight", 0.012, ConfigSource::Default);
+    config.set("stdp_tau", 20.0, ConfigSource::Default);
+    config.set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config.set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Checkpoint configuration
+    config.set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    config.set("checkpoint_interval", 10000, ConfigSource::Default);
+    config.set("max_checkpoints", 10, ConfigSource::Default);
+    
+    // Advanced features
+    config.set("enable_replay", true, ConfigSource::Default);
+    config.set("enable_development", true, ConfigSource::Default);
+    config.set("enable_prediction", true, ConfigSource::Default);
+    config.set("enable_planning", true, ConfigSource::Default);
+}
+
+// Get default configuration value if not set
+inline void ensureDefaultConfig(Config& config) {
+    static bool defaultsInitialized = false;
+    if (!defaultsInitialized) {
+        initializeDefaultConfig(config);
+        defaultsInitialized = true;
+    }
+}
+
+// Add this to the Config constructor
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    ensureDefaultConfig(*this);
+}
+
+// Also add a static helper function for users
+inline Config createDefaultConfig() {
+    Config config;
+    return config;
+}
+
+} // namespace nlm
 
 Config::Config(Config&&) noexcept = default;
 
