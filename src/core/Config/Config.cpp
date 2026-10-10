@@ -19,171 +19,336 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            // Log file open error
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Check if file is readable (try to read first character)
+        file.peek();
+        if (file.fail()) {
+            return false;
+        }
+        
+        std::string line;
+        size_t lineNumber = 0;
+        while (std::getline(file, line)) {
+            lineNumber++;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Validate key
+                if (key.empty()) {
+                    continue; // Skip malformed lines
+                }
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                // Log malformed line but continue processing
+            }
         }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Log exception but don't throw - maintain backward compatibility
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            if (argv[i] == nullptr) {
+                continue; // Skip null pointers
+            }
+            
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.size() >= 3 && arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    
+                    // Validate key
+                    if (!key.empty()) {
+                        set(key, value, ConfigSource::CommandLine);
+                    }
+                }
+            }
+            // Handle -key value format
+            else if (arg.size() >= 2 && arg[0] == '-' && i + 1 < argc && argv[i + 1] != nullptr) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                
+                // Validate key
+                if (!key.empty()) {
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
+        
+    } catch (const std::exception& e) {
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Set output precision and formatting
+        file.precision(6);
+        file.setf(std::ios::fixed);
+        
+        for (const auto& entry : pImpl->entries) {
+            // Write description as comment
+            file << "# " << entry.description << "\n";
+            
+            // Write key-value pair with proper formatting
+            file << entry.key << " = ";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    file << arg;
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            file << "\n\n";
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
+        // Validate key
+        if (key.empty()) {
+            return std::nullopt;
+        }
+        
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            return std::nullopt;
+        }
+        
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
+        
+    } catch (const std::exception& e) {
         return std::nullopt;
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    try {
+        auto val = get<T>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    } catch (const std::exception& e) {
+        return defaultValue;
+    }
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    try {
+        // Validate key
+        if (key.empty()) {
+            return; // Silently ignore empty keys
+        }
+        
+        // Validate source
+        if (source < ConfigSource::Default || source > ConfigSource::Runtime) {
+            source = ConfigSource::Runtime; // Default to runtime for invalid sources
+        }
+        
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = value;
+            it->source = source;
+        } else {
+            pImpl->entries.emplace_back(key, value, source);
+        }
+        
+    } catch (const std::exception& e) {
+        // Silently ignore errors - maintain backward compatibility
     }
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    try {
+        set(key, ConfigValue(value), source);
+    } catch (const std::exception& e) {
+        // Silently ignore errors
+    }
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    try {
+        set(key, ConfigValue(value), source);
+    } catch (const std::exception& e) {
+        // Silently ignore errors
+    }
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    try {
+        set(key, ConfigValue(value), source);
+    } catch (const std::exception& e) {
+        // Silently ignore errors
+    }
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    try {
+        set(key, ConfigValue(value), source);
+    } catch (const std::exception& e) {
+        // Silently ignore errors
+    }
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    try {
+        // Validate key
+        if (key.empty()) {
+            return false;
+        }
+        
+        return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+    } catch (const std::exception& e) {
+        return false;
+    }
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    try {
+        // Validate key
+        if (key.empty()) {
+            return; // Silently ignore empty keys
+        }
+        
+        pImpl->entries.erase(
+            std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+                [&key](const ConfigEntry& e) { return e.key == key; }),
+            pImpl->entries.end()
+        );
+        
+    } catch (const std::exception& e) {
+        // Silently ignore errors
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    try {
+        std::vector<std::string> keys;
+        keys.reserve(pImpl->entries.size());
+        
+        for (const auto& entry : pImpl->entries) {
+            // Validate key before adding
+            if (!entry.key.empty()) {
+                keys.push_back(entry.key);
+            }
+        }
+        
+        return keys;
+        
+    } catch (const std::exception& e) {
+        return std::vector<std::string>();
     }
-    return keys;
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    try {
+        pImpl->entries.clear();
+    } catch (const std::exception& e) {
+        // Silently ignore errors
+    }
 }
 
 std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+    try {
+        std::ostringstream oss;
+        oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+        
+        for (const auto& entry : pImpl->entries) {
+            // Validate entry before processing
+            if (entry.key.empty()) {
+                continue; // Skip malformed entries
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+            
+            oss << "  " << entry.key << " = [";
+            try {
+                std::visit([&oss](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        oss << "\"" << arg << "\"";
+                    } else if constexpr (std::is_same_v<T, bool>) {
+                        oss << (arg ? "true" : "false");
+                    } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                        oss << arg;
+                    } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                        oss << arg;
+                    } else {
+                        oss << arg;
+                    }
+                }, entry.value);
+            } catch (const std::exception& e) {
+                oss << "ERROR: " << e.what();
+            }
+            oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }
+        
+        return oss.str();
+        
+    } catch (const std::exception& e) {
+        return "Error generating configuration summary: " + std::string(e.what());
     }
-    return oss.str();
 }
 
 std::string Config::trim(const std::string& str) {

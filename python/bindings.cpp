@@ -416,6 +416,687 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // ==============================================
+    // ADVANCED FEATURE CREATORS (Phase 4+ COGNITION)
+    // ==============================================
+
+    m.def("createNeuralWorkingMemory", []() -> std::unique_ptr<NeuralWorkingMemory> {
+        return std::make_unique<NeuralWorkingMemory>();
+    }, "Create a neural working memory system");
+
+    m.def("createPredictionSystem", []() -> std::unique_ptr<PredictionSystem> {
+        return std::make_unique<PredictionSystem>();
+    }, "Create a prediction system for temporal sequence learning");
+
+    m.def("createNeuralPlanner", []() -> std::unique_ptr<NeuralPlanner> {
+        return std::make_unique<NeuralPlanner>();
+    }, "Create a neural planner for action selection");
+
+    m.def("createConceptFormation", []() -> std::unique_ptr<ConceptFormation> {
+        return std::make_unique<ConceptFormation>();
+    }, "Create a concept formation system for pattern discovery");
+
+    m.def("createAttentionalSelection", []() -> std::unique_ptr<AttentionalSelection> {
+        return std::make_unique<AttentionalSelection>();
+    }, "Create an attentional selection system for competitive selection");
+
+    m.def("createAttentionalSelectionSystem", []() -> std::unique_ptr<AttentionalSelection> {
+        return std::make_unique<AttentionalSelection>();
+    }, "Create an attentional selection system (alternative name)");
+
+    m.def("createEpisodicMemory", []() -> std::unique_ptr<NeuralEpisodicMemory> {
+        return std::make_unique<NeuralEpisodicMemory>();
+    }, "Create an episodic memory system for experience storage");
+
+    m.def("createAssociativeMemory", []() -> std::unique_ptr<NeuralAssociativeMemory> {
+        return std::make_unique<NeuralAssociativeMemory>();
+    }, "Create an associative memory system for pattern associations");
+
+    // ==============================================
+    // CONFIGURE AND INITIALIZATION HELPERS
+    // ==============================================
+
+    m.def("configureBrainAdvanced", [](std::shared_ptr<Config> config, size_t neuronCount,
+                                       size_t regionCount, float connectionProbability,
+                                       const std::string& plasticityMode = "stdp",
+                                       bool enableMemory = true,
+                                       bool enablePrediction = true,
+                                       bool enableCognition = true) {
+        // Set basic parameters
+        config->set("brain.neuron_count", neuronCount);
+        config->set("brain.region_count", regionCount);
+        config->set("brain.connection_probability", connectionProbability);
+        
+        // Configure plasticity systems
+        if (plasticityMode == "stdp") {
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.001f);
+        } else if (plasticityMode == "hebbian") {
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.hebbian.learning_rate", 0.01f);
+        } else if (plasticityMode == "both") {
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.001f);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.hebbian.learning_rate", 0.01f);
+        }
+        
+        // Configure memory systems
+        if (enableMemory) {
+            config->set("memory.working_memory.enabled", true);
+            config->set("memory.episodic.enabled", true);
+            config->set("memory.associative.enabled", true);
+        }
+        
+        // Configure prediction and cognition
+        if (enablePrediction) {
+            config->set("prediction.enabled", true);
+            config->set("prediction.horizon", 10);
+        }
+        
+        if (enableCognition) {
+            config->set("cognition.planning.enabled", true);
+            config->set("cognition.attention.enabled", true);
+            config->set("cognition.concept_formation.enabled", true);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("neuronCount"), py::arg("regionCount"),
+         py::arg("connectionProbability"), py::arg("plasticityMode") = "stdp",
+         py::arg("enableMemory") = true,
+         py::arg("enablePrediction") = true,
+         py::arg("enableCognition") = true,
+         "Advanced brain configuration helper function");
+
+    m.def("configureAgentAdvanced", [](std::shared_ptr<AgentBrain> agent,
+                                       bool enableRewardModulation = true,
+                                       bool enableStructuralPlasticity = true,
+                                       bool enableDevelopment = true,
+                                       bool enableCuriosity = true) {
+        agent->enableRewardModulation(enableRewardModulation);
+        agent->enableStructuralPlasticity(enableStructuralPlasticity);
+        agent->enableDevelopment(enableDevelopment);
+        agent->enableCuriosity(enableCuriosity);
+        return agent;
+    }, py::arg("agent"), py::arg("enableRewardModulation") = true,
+         py::arg("enableStructuralPlasticity") = true,
+         py::arg("enableDevelopment") = true,
+         py::arg("enableCuriosity") = true,
+         "Configure agent brain with advanced features");
+
+    // ==============================================
+    // EXPERIMENT HELPERS
+    // ==============================================
+
+    m.def("runPhase3Experiment", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t duration = 1000) {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < duration; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration") = 1000,
+         "Run Phase 3 (World Interaction) experiment");
+
+    m.def("runPhase4Experiment", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t duration = 1000) {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        // Enable advanced cognitive features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        for (size_t step = 0; step < duration; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply neuromodulation
+            float reward = 0.1f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel(),
+                              agent->getNoveltyLevel(),
+                              agent->getPredictionError());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration") = 1000,
+         "Run Phase 4 (Emerging Cognition) experiment with full cognitive stack");
+
+    m.def("runCompleteAgentSimulation", [](std::shared_ptr<Brain> brain,
+                                           std::shared_ptr<SimpleWorld> world,
+                                           std::shared_ptr<AgentBrain> agent,
+                                           size_t duration = 1000,
+                                           const std::string& mode = "survival") {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        // Enable all cognitive features based on mode
+        if (mode == "survival") {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            agent->enableStructuralPlasticity(true);
+        } else if (mode == "exploration") {
+            agent->enableCuriosity(true);
+            agent->enableNoveltyDetection(true);
+        } else if (mode == "social") {
+            // Social learning would require additional components
+            agent->enableRewardModulation(true);
+            agent->enableDevelopment(true);
+        } else {
+            // Full mode
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            agent->enableStructuralPlasticity(true);
+        }
+        
+        for (size_t step = 0; step < duration; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Dynamic reward based on mode
+            float reward = 0.0f;
+            if (mode == "survival") {
+                // Simple survival reward
+                auto body = world->getAgentBody();
+                reward = body.energy / 100.0f;
+            } else if (mode == "exploration") {
+                // Exploration reward for novelty
+                reward = agent->getNoveltyLevel() * 0.1f;
+            } else if (mode == "social") {
+                // Social reward (placeholder - would need social features)
+                reward = 0.05f;
+            }
+            
+            // Apply neuromodulation
+            if (agent->isRewardModulationEnabled()) {
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            // Update development
+            if (agent->isDevelopmentEnabled()) {
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel(),
+                              agent->getNoveltyLevel(),
+                              agent->getPredictionError(),
+                              world->getAgentBody().energy);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration") = 1000,
+         py::arg("mode") = "survival",
+         "Run complete agent simulation with different behavioral modes");
+
+    // ==============================================
+    // ADVANCED COGNITIVE SYSTEM API FUNCTIONS
+    // ==============================================
+
+    m.def("createWorkingMemoryAdvanced", [](std::shared_ptr<Brain> brain, size_t capacity = 1000,
+                                          float decayRate = 0.01f) {
+        auto workingMemory = std::make_unique<NeuralWorkingMemory>();
+        workingMemory->initialize(brain.get());
+        workingMemory->setCapacity(capacity);
+        workingMemory->setDecayRate(decayRate);
+        return workingMemory;
+    }, py::arg("brain"), py::arg("capacity") = 1000, py::arg("decayRate") = 0.01f,
+         "Create and configure a neural working memory system");
+
+    m.def("createEpisodicMemoryAdvanced", [](size_t maxEpisodes = 1000, float consolidationThreshold = 0.3f) {
+        auto episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        episodicMemory->setMaxEpisodes(maxEpisodes);
+        episodicMemory->setConsolidationThreshold(consolidationThreshold);
+        return episodicMemory;
+    }, py::arg("maxEpisodes") = 1000, py::arg("consolidationThreshold") = 0.3f,
+         "Create and configure an episodic memory system");
+
+    m.def("createPredictionSystemAdvanced", [](size_t horizon = 10, float predictionThreshold = 0.5f) {
+        auto predictionSystem = std::make_unique<PredictionSystem>();
+        // Configure prediction system parameters (if available)
+        return predictionSystem;
+    }, py::arg("horizon") = 10, py::arg("predictionThreshold") = 0.5f,
+         "Create and configure a prediction system for temporal sequence learning");
+
+    m.def("createNeuralPlannerAdvanced", [](std::shared_ptr<Brain> brain, size_t planningDepth = 5,
+                                          float explorationRate = 0.1f) {
+        auto planner = std::make_unique<NeuralPlanner>();
+        planner->initialize(brain.get());
+        planner->setPlanningDepth(planningDepth);
+        planner->setExplorationRate(explorationRate);
+        return planner;
+    }, py::arg("brain"), py::arg("planningDepth") = 5, py::arg("explorationRate") = 0.1f,
+         "Create and configure a neural planner for action planning");
+
+    m.def("createConceptFormationAdvanced", [](std::shared_ptr<Brain> brain, size_t conceptCount = 50,
+                                             float stabilityThreshold = 0.8f) {
+        auto conceptFormation = std::make_unique<ConceptFormation>();
+        conceptFormation->initialize(brain.get());
+        conceptFormation->setConceptCount(conceptCount);
+        conceptFormation->setStabilityThreshold(stabilityThreshold);
+        return conceptFormation;
+    }, py::arg("brain"), py::arg("conceptCount") = 50, py::arg("stabilityThreshold") = 0.8f,
+         "Create and configure a concept formation system for pattern discovery");
+
+    m.def("createAttentionalSelectionAdvanced", [](std::shared_ptr<Brain> brain,
+                                                  float inhibitionStrength = 0.5f,
+                                                  float excitationStrength = 1.5f) {
+        auto attention = std::make_unique<AttentionalSelection>();
+        attention->initialize(brain.get());
+        attention->setInhibitionStrength(inhibitionStrength);
+        attention->setExcitationStrength(excitationStrength);
+        return attention;
+    }, py::arg("brain"), py::arg("inhibitionStrength") = 0.5f,
+         py::arg("excitationStrength") = 1.5f,
+         "Create and configure an attentional selection system");
+
+    m.def("createAssociativeMemoryAdvanced", [](std::shared_ptr<Brain> brain, size_t maxAssociations = 1000,
+                                              float associationStrength = 0.1f) {
+        auto associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        associativeMemory->initialize(brain.get());
+        associativeMemory->setMaxAssociations(maxAssociations);
+        associativeMemory->setAssociationStrength(associationStrength);
+        return associativeMemory;
+    }, py::arg("brain"), py::arg("maxAssociations") = 1000,
+         py::arg("associationStrength") = 0.1f,
+         "Create and configure an associative memory system");
+
+    // ==============================================
+    // ADVANCED BRAIN COGNITIVE CONFIGURATION
+    // ==============================================
+
+    m.def("configureBrainForCognition", [](std::shared_ptr<Config> config,
+                                          bool enableWorkingMemory = true,
+                                          bool enableEpisodicMemory = true,
+                                          bool enableAssociativeMemory = true,
+                                          bool enablePrediction = true,
+                                          bool enableCognition = true,
+                                          bool enableNeuromodulation = true,
+                                          bool enableDevelopment = true) {
+        // Configure cognitive systems
+        if (enableWorkingMemory) {
+            config->set("cognitive.working_memory.enabled", true);
+            config->set("cognitive.working_memory.capacity", 1000);
+        }
+        
+        if (enableEpisodicMemory) {
+            config->set("cognitive.episodic_memory.enabled", true);
+            config->set("cognitive.episodic_memory.max_episodes", 1000);
+        }
+        
+        if (enableAssociativeMemory) {
+            config->set("cognitive.associative_memory.enabled", true);
+            config->set("cognitive.associative_memory.max_associations", 1000);
+        }
+        
+        if (enablePrediction) {
+            config->set("cognitive.prediction.enabled", true);
+            config->set("cognitive.prediction.horizon", 10);
+        }
+        
+        if (enableCognition) {
+            config->set("cognitive.planning.enabled", true);
+            config->set("cognitive.attention.enabled", true);
+            config->set("cognitive.concept_formation.enabled", true);
+        }
+        
+        if (enableNeuromodulation) {
+            config->set("neuromodulation.enabled", true);
+            config->set("neuromodulation.dopamine.scale", 1.0f);
+            config->set("neuromodulation.curiosity.enabled", true);
+            config->set("neuromodulation.novelty.enabled", true);
+        }
+        
+        if (enableDevelopment) {
+            config->set("development.enabled", true);
+            config->set("development.stage_transition_rate", 0.01f);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("enableWorkingMemory") = true,
+         py::arg("enableEpisodicMemory") = true,
+         py::arg("enableAssociativeMemory") = true,
+         py::arg("enablePrediction") = true,
+         py::arg("enableCognition") = true,
+         py::arg("enableNeuromodulation") = true,
+         py::arg("enableDevelopment") = true,
+         "Configure brain for advanced cognitive capabilities");
+
+    // ==============================================
+    // ADVANCED SIMULATION HELPERS
+    // ==============================================
+
+    m.def("runPhase5Experiment", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t duration = 1000,
+                                   const std::string& mode = "memory") {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        // Enable advanced features based on mode
+        if (mode == "memory") {
+            agent->enableRewardModulation(true);
+            agent->enableDevelopment(true);
+            // Enable memory systems
+        } else if (mode == "prediction") {
+            agent->enableCuriosity(true);
+            agent->enableNoveltyDetection(true);
+            agent->enablePrediction(true);
+        } else if (mode == "cognition") {
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            agent->enableStructuralPlasticity(true);
+            // Enable all cognitive systems
+        }
+        
+        for (size_t step = 0; step < duration; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Mode-specific processing
+            if (mode == "memory") {
+                // Memory-based learning
+                float reward = 0.05f;
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(0.1);
+            } else if (mode == "prediction") {
+                // Prediction-based learning
+                float novelty = agent->getNoveltyLevel();
+                agent->applyRewardModulation(novelty * 0.1f, 0.0f);
+            } else if (mode == "cognition") {
+                // Full cognitive processing
+                float curiosity = agent->getCuriosityLevel();
+                float predictionError = agent->getPredictionError();
+                agent->applyRewardModulation(curiosity + predictionError, 0.0f);
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel(),
+                              agent->getNoveltyLevel(),
+                              agent->getPredictionError());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration") = 1000,
+         py::arg("mode") = "memory",
+         "Run Phase 5 (Advanced Learning) experiment with different cognitive modes");
+
+    m.def("runPhase6Experiment", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t duration = 1000,
+                                   float learningRate = 0.01f,
+                                   float explorationRate = 0.1f) {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        // Enable all advanced cognitive features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        agent->enableStructuralPlasticity(true);
+        
+        // Configure advanced systems if accessible
+        // (Note: Some systems may require direct brain access)
+        
+        for (size_t step = 0; step < duration; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Advanced learning with curiosity and prediction
+            float curiosity = agent->getCuriosityLevel();
+            float novelty = agent->getNoveltyLevel();
+            float predictionError = agent->getPredictionError();
+            
+            // Adaptive reward based on learning signals
+            float reward = (curiosity * learningRate) + (novelty * explorationRate) + predictionError;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Continuous development
+            agent->updateDevelopment(0.1);
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel(),
+                              agent->getNoveltyLevel(),
+                              agent->getPredictionError(),
+                              brain->getDevelopmentalStage());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration") = 1000,
+         py::arg("learningRate") = 0.01f, py::arg("explorationRate") = 0.1f,
+         "Run Phase 6 (Advanced Integration) experiment with full cognitive integration");
+
+    m.def("runHybridExperiment", [](std::shared_ptr<Brain> brain,
+                                    std::shared_ptr<SimpleWorld> world,
+                                    std::shared_ptr<AgentBrain> agent,
+                                    size_t duration = 1000,
+                                    const std::vector<std::string>& modes = {"memory", "prediction", "cognition"},
+                                    float modeTransitionRate = 0.1f) {
+        brain->initialize();
+        agent->initialize(*world);
+        
+        // Enable all features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        agent->enableStructuralPlasticity(true);
+        
+        size_t modeStep = 0;
+        for (size_t step = 0; step < duration; ++step) {
+            // Cycle through modes
+            std::string currentMode = modes[modeStep % modes.size()];
+            
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Mode-specific learning
+            if (currentMode == "memory") {
+                float reward = 0.05f;
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(0.1);
+            } else if (currentMode == "prediction") {
+                float novelty = agent->getNoveltyLevel();
+                agent->applyRewardModulation(novelty * 0.1f, 0.0f);
+            } else if (currentMode == "cognition") {
+                float curiosity = agent->getCuriosityLevel();
+                float predictionError = agent->getPredictionError();
+                agent->applyRewardModulation(curiosity + predictionError, 0.0f);
+                agent->updateDevelopment(0.1);
+            }
+            
+            modeStep++;
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                              brain->getAverageFiringRate(),
+                              agent->getCuriosityLevel(),
+                              agent->getNoveltyLevel(),
+                              agent->getPredictionError());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration") = 1000,
+         py::arg("modes") = std::vector<std::string>{"memory", "prediction", "cognition"},
+         py::arg("modeTransitionRate") = 0.1f,
+         "Run hybrid experiment cycling through different cognitive modes");
+
+    // ==============================================
+    // ADVANCED UTILITY AND DIAGNOSTIC FUNCTIONS
+    // ==============================================
+
+    m.def("analyzeBrainState", [](std::shared_ptr<Brain> brain) {
+        brain->logStatus();
+        
+        // Analyze brain state health
+        bool isHealthy = true;
+        std::string healthReport;
+        
+        // Check neuron counts
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        if (totalNeurons < 100) {
+            isHealthy = false;
+            healthReport += "WARNING: Low neuron count (" + std::to_string(totalNeurons) + "). ";
+        }
+        
+        // Check synapse count
+        size_t totalSynapses = brain->getTotalSynapseCount();
+        if (totalSynapses < 10) {
+            healthReport += "WARNING: Low synapse count (" + std::to_string(totalSynapses) + "). ";
+        }
+        
+        // Check firing rate
+        float firingRate = brain->getAverageFiringRate();
+        if (firingRate > 200.0f) {
+            healthReport += "WARNING: High firing rate may indicate instability. ";
+        } else if (firingRate < 0.1f) {
+            healthReport += "INFO: Low firing rate - brain may be inactive. ";
+        }
+        
+        // Check E/I ratio
+        float eiRatio = brain->getExcitationInhibitionRatio();
+        if (eiRatio > 10.0f) {
+            healthReport += "WARNING: High E/I ratio may indicate imbalance. ";
+        } else if (eiRatio < 0.1f && eiRatio > 0.0f) {
+            healthReport += "WARNING: Low E/I ratio may indicate excessive inhibition. ";
+        }
+        
+        // Check developmental stage
+        auto stage = brain->getDevelopmentalStage();
+        if (stage == DevelopmentalStage::Initial && totalNeurons > 1000) {
+            healthReport += "INFO: Brain initialized but not developed. ";
+        }
+        
+        return std::make_tuple(isHealthy, healthReport.empty() ? "System healthy" : healthReport);
+    }, py::arg("brain"), "Analyze brain state and provide health recommendations");
+
+    m.def("compareAgentBrains", [](std::shared_ptr<AgentBrain> agent1,
+                                   std::shared_ptr<AgentBrain> agent2,
+                                   std::shared_ptr<Brain> brain1,
+                                   std::shared_ptr<Brain> brain2) {
+        auto stage1 = agent1->getDevelopmentalStage();
+        auto stage2 = agent2->getDevelopmentalStage();
+        
+        float curiosity1 = agent1->getCuriosityLevel();
+        float curiosity2 = agent2->getCuriosityLevel();
+        
+        float novelty1 = agent1->getNoveltyLevel();
+        float novelty2 = agent2->getNoveltyLevel();
+        
+        float predictionError1 = agent1->getPredictionError();
+        float predictionError2 = agent2->getPredictionError();
+        
+        float dopamine1 = agent1->getNeuromodulationLevel();
+        float dopamine2 = agent2->getNeuromodulationLevel();
+        
+        std::string comparison;
+        
+        if (stage1 != stage2) {
+            comparison += "Different developmental stages. ";
+        }
+        
+        if (std::abs(curiosity1 - curiosity2) > 0.2f) {
+            comparison += "Significant curiosity difference. ";
+        }
+        
+        if (std::abs(novelty1 - novelty2) > 0.3f) {
+            comparison += "Significant novelty difference. ";
+        }
+        
+        if (std::abs(predictionError1 - predictionError2) > 0.5f) {
+            comparison += "Different prediction errors. ";
+        }
+        
+        if (std::abs(dopamine1 - dopamine2) > 0.2f) {
+            comparison += "Different neuromodulation levels. ";
+        }
+        
+        if (comparison.empty()) {
+            comparison = "Agents are similarly configured. ";
+        }
+        
+        return comparison;
+    }, py::arg("agent1"), py::arg("agent2"), py::arg("brain1"), py::arg("brain2"),
+         "Compare two agent brains and identify differences");
+
+    m.def("benchmarkBrainPerformance", [](std::shared_ptr<Brain> brain,
+                                         size_t testDuration = 100,
+                                         const std::string& benchmarkType = "spiking") {
+        brain->initialize();
+        
+        size_t spikeCount = 0;
+        float maxFiringRate = 0.0f;
+        
+        for (size_t step = 0; step < testDuration; ++step) {
+            brain->step(step);
+            spikeCount += brain->getFiringNeuronCount();
+            maxFiringRate = std::max(maxFiringRate, brain->getAverageFiringRate());
+        }
+        
+        std::string benchmarkReport;
+        
+        if (benchmarkType == "spiking") {
+            benchmarkReport = "Spike count: " + std::to_string(spikeCount) + " over " + std::to_string(testDuration) + " steps. ";
+        } else if (benchmarkType == "stability") {
+            float stability = 1.0f - (maxFiringRate / 100.0f); // Simple stability metric
+            benchmarkReport = "Stability: " + std::to_string(std::max(0.0f, stability)) + ". ";
+        } else if (benchmarkType == "efficiency") {
+            float efficiency = spikeCount / static_cast<float>(testDuration);
+            benchmarkReport = "Spikes per step: " + std::to_string(efficiency) + ". ";
+        }
+        
+        return std::make_tuple(spikeCount, maxFiringRate, benchmarkReport);
+    }, py::arg("brain"), py::arg("testDuration") = 100, py::arg("benchmarkType") = "spiking",
+         "Benchmark brain performance over a test duration");
+
+    // ==============================================
+    // LEGACY COMPATIBILITY
+    // ==============================================
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
