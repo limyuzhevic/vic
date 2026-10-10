@@ -439,36 +439,174 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
+    // ========== STEP 6: Apply neuromodulation to synapses ==========
+    // Update novelty detection and prediction error
+    float noveltyLevel = 0.0f;
+    float predictionError = 0.0f;
+    
+    if (pImpl->novelty) {
+        noveltyLevel = pImpl->novelty->getLevel();
+    }
+    if (pImpl->predictionError) {
+        predictionError = pImpl->predictionError->getError();
+    }
+    
+    // ========== STEP 7: Apply comprehensive neuromodulation ==========
+    
+    // Update all neuromodulators
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects on neural excitability
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                    
+                    // Record post-synaptic activity for eligibility traces
+                    if (neuron->isFiring()) {
+                        pImpl->dopamine->recordPostSynapticActivity(neuron->getId(), 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+    
+    if (pImpl->predictionError) {
+        // Prediction error is updated externally through computeError
+    }
+    
+    // Acetylcholine integration
+    if (pImpl->dopamine && pImpl->dopamine->isBursting()) {
+        // When dopamine bursts, ACh should increase attention to relevant stimuli
+        float attentionBoost = 0.3f;
+        // Note: In full implementation, this would interface with attentional systems
+        // For now, we just update the state
+    }
+    
+    // Norepinephrine integration with novelty
+    if (pImpl->novelty) {
+        float novelty = pImpl->novelty->getLevel();
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(novelty * 0.1f - 0.05f);
+        }
+    }
+    
+    // Serotonin integration with negative prediction error
+    if (pImpl->dopamine) {
+        float tdError = pImpl->dopamine->getTDLearningError();
+        if (tdError < -0.1f) {
+            // Strong negative prediction error should increase serotonin
+            if (pImpl->serotonin) {
+                float negativeOutcome = std::min(1.0f, std::abs(tdError));
+                pImpl->serotonin->respondToNegativeOutcome(negativeOutcome);
+            }
+        }
+    }
+    
+    // ========== STEP 8: Apply plasticity rules with multi-neuromodulator integration ==========
+    // Calculate comprehensive neuromodulation factor for plasticity
+    float plasticityMod = 1.0f;
+    
+    if (pImpl->dopamine) {
+        plasticityMod *= pImpl->dopamine->getPlasticityFactor();
+    }
+    if (pImpl->acetylcholine) {
+        plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+    }
+    if (pImpl->serotonin) {
+        plasticityMod *= pImpl->serotonin->getPlasticityFactor();
+    }
+    
+    // NE modulation based on arousal and novelty
+    if (pImpl->novelty && pImpl->dopamine) {
+        float novelty = pImpl->novelty->getLevel();
+        float arousalMod = 1.0f + novelty * 0.5f;
+        plasticityMod *= arousalMod;
     }
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
+            // Apply STDP with multi-neuromodulator integration
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Update eligibility traces for reward-modulated learning
+                    if (pImpl->dopamine) {
+                        pImpl->dopamine->updateEligibilityTrace(syn->getId(), pImpl->timestep);
+                    }
+                    
+                    // Apply STDP with neuromodulation
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    
+                    // Apply neuromodulation to weight changes
+                    float weightChange = syn->getWeight() - syn->getPreviousWeight();
+                    
+                    // Modify weight change based on all neuromodulators
+                    if (pImpl->dopamine) {
+                        float tdError = pImpl->dopamine->getTDLearningError();
+                        weightChange *= (1.0f + tdError * 0.5f);
+                    }
+                    
+                    if (pImpl->acetylcholine) {
+                        float attentionLevel = pImpl->acetylcholine->getAttentionLevel();
+                        weightChange *= (1.0f + attentionLevel * 0.3f);
+                    }
+                    
+                    if (pImpl->serotonin) {
+                        float inhibition = pImpl->serotonin->isActionInhibited() ? 0.5f : 0.0f;
+                        weightChange *= (1.0f - inhibition * 0.2f);
+                    }
+                    
+                    // Apply the modified weight change
+                    float newWeight = syn->getWeight() + weightChange;
+                    syn->setWeight(newWeight);
                 }
             }
             
-            // Apply Hebbian learning
+            // Apply Hebbian learning with neuromodulation
             if (syn->getPlasticityFlags().hebbian) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Get neuromodulator influences
+                    float hebbianMod = 1.0f;
+                    
+                    if (pImpl->dopamine) {
+                        hebbianMod *= pImpl->dopamine->getLevel();
+                    }
+                    if (pImpl->acetylcholine) {
+                        hebbianMod *= pImpl->acetylcholine->getLevel();
+                    }
+                    if (pImpl->novelty) {
+                        float novelty = pImpl->novelty->getLevel();
+                        hebbianMod *= (1.0f + novelty * 0.3f);
+                    }
+                    
+                    // Update Hebbian learning
                     pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    
+                    // Apply neuromodulation
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (hebbianMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
                 }
             }
             

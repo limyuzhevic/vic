@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_enhanced_config {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -59,6 +63,15 @@ int main() {
     std::cout << "Running Config tests..." << std::endl;
     try {
         test_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Enhanced Config tests..." << std::endl;
+    try {
+        test_enhanced_config::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

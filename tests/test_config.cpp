@@ -75,6 +75,15 @@ void testConfigKeys() {
     auto keys = config.getKeys();
     assert(keys.size() == 3);
     
+    // Check that all keys are present
+    bool hasKey1 = false, hasKey2 = false, hasKey3 = false;
+    for (const auto& key : keys) {
+        if (key == "key1") hasKey1 = true;
+        if (key == "key2") hasKey2 = true;
+        if (key == "key3") hasKey3 = true;
+    }
+    assert(hasKey1 && hasKey2 && hasKey3);
+    
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
