@@ -3,14 +3,57 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "config/Constants.hpp"
+#include <iostream>
+
+namespace nlm {
+
+#include "../performance/CheckpointSystem.hpp"
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Track warnings and errors for better user feedback
+    std::vector<std::string> warnings;
+    std::vector<std::string> errors;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default configuration values for Phase 6
+    // This provides sensible defaults for neural simulation
+    
+    // Brain configuration
+    set("random_seed", static_cast<int64_t>(config::DEFAULT_RANDOM_SEED), ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(config::DEFAULT_NEURON_COUNT), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(config::DEFAULT_REGION_COUNT), ConfigSource::Default);
+    set("connection_probability", config::DEFAULT_CONNECTION_PROBABILITY, ConfigSource::Default);
+    
+    // STDP parameters
+    set("stdp_ltp_weight", config::DEFAULT_STDP_LTP_WEIGHT, ConfigSource::Default);
+    set("stdp_ltd_weight", config::DEFAULT_STDP_LTD_WEIGHT, ConfigSource::Default);
+    set("stdp_tau", config::DEFAULT_STDP_TAU, ConfigSource::Default);
+    
+    // Structural plasticity
+    set("synaptogenesis_rate", config::SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    set("pruning_rate", config::PRUNING_RATE, ConfigSource::Default);
+    
+    // Integration parameters
+    set("simulation_timestep", config::SIMULATION_TIMESTEP, ConfigSource::Default);
+    set("replay_interval", config::REPLAY_INTERVAL, ConfigSource::Default);
+    set("consolidation_interval", config::CONSOLIDATION_INTERVAL, ConfigSource::Default);
+    
+    // Memory system defaults
+    set("working_memory_capacity", static_cast<size_t>(config::DEFAULT_WORKING_MEMORY_CAPACITY), ConfigSource::Default);
+    set("max_episodes", static_cast<size_t>(config::DEFAULT_MAX_EPISODES), ConfigSource::Default);
+    
+    // Checkpointing
+    set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    set("checkpoint_compression", static_cast<int>(CompressionLevel::Balanced), ConfigSource::Default);
+}
 
 Config::~Config() = default;
 
@@ -24,11 +67,15 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        pImpl->errors.push_back("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +88,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                pImpl->warnings.push_back("Empty key on line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,10 +102,21 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // No '=' found - warn but continue
+            pImpl->warnings.push_back("Invalid format on line " + std::to_string(lineNumber) + ": missing '='");
         }
     }
     
-    return true;
+    // Log any warnings or errors
+    for (const auto& warning : pImpl->warnings) {
+        std::cerr << "[Config Warning] " << warning << std::endl;
+    }
+    for (const auto& error : pImpl->errors) {
+        std::cerr << "[Config Error] " << error << std::endl;
+    }
+    
+    return !pImpl->errors.empty(); // Return false if there were any critical errors
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

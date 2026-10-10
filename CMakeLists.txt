@@ -29,12 +29,14 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/config/Constants.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainFactory.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -89,6 +91,7 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain>
     $<INSTALL_INTERFACE:include>
 )
 
