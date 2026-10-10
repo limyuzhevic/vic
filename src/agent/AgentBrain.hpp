@@ -58,26 +58,40 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+// Cognitive planning integration
+    // Integrate with NeuralPlanner for action planning
+    bool planAction(const class NeuralPlanner* planner, const std::vector<float>& currentState);
+    bool executePlannedAction(MotorCommand plannedAction, const std::vector<float>& currentState);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Self-model integration for body awareness
+    // Integrate with NeuralSelfModel for body schema and prediction
+    bool updateSelfModel(const class NeuralSelfModel* selfModel, const std::vector<float>& beforeState, const std::vector<float>& afterState);
+    std::vector<float> predictConsequence(ActionType action, const std::vector<float>& currentState);
     
+    // Social learning integration for observation and imitation
+    // Integrate with NeuralSocialLearning for social knowledge
+    bool observeSocialAction(ActionType action, const std::vector<float>& observerState, const std::vector<float>& resultingState);
+    bool canImitate(ActionType action) const;
+    ActionType getImitationAction(const std::vector<float>& currentState) const;
+    
+    // Spatial representation integration for navigation
+    // Integrate with NeuralSpatialRepresentation for spatial knowledge
+    bool updateSpatialRepresentation(const class NeuralSpatialRepresentation* spatialRep, float x, float y, const std::vector<float>& sensoryCues);
+    std::pair<float, float> getPredictedPosition() const;
+    float getPositionActivation(float x, float y) const;
+    
+    // Concept formation integration for pattern discovery
+    // Integrate with ConceptFormation for knowledge formation
+    bool updateConceptFormation(const class ConceptFormation* conceptFormation, const std::vector<float>& currentPattern);
+    bool formConceptFromExperience(const std::vector<float>& experiencePattern);
+    
+    // Memory system integration for learning and consolidation
+    // Integrate with memory systems for experience storage
+    bool storeExperienceInMemory(const class NeuralWorkingMemory* workingMem, const std::vector<float>& currentState);
+    bool storeEpisodeInEpisodicMemory(const class NeuralEpisodicMemory* episodicMem, const std::vector<float>& experience);
+    bool consolidateMemory(const class NeuralEpisodicMemory* episodicMem, float consolidationThreshold = 0.5f);
+
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
@@ -112,6 +126,40 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive system integration state
+    std::shared_ptr<NeuralSelfModel> selfModel_;
+    std::shared_ptr<NeuralSocialLearning> socialLearning_;
+    std::shared_ptr<NeuralSpatialRepresentation> spatialRepresentation_;
+    std::shared_ptr<ConceptFormation> conceptFormation_;
+    std::shared_ptr<NeuralWorkingMemory> workingMem_;
+    std::shared_ptr<NeuralEpisodicMemory> episodicMem_;
+    
+    // Tracking variables
+    ActionType plannedAction_;
+    float currentX_, currentY_;
+    double currentTime_;
+    
+    // Action and social experience recording
+    struct ActionEffect {
+        std::vector<float> beforeState;
+        std::vector<float> afterState;
+        float confidence;
+        size_t observationCount;
+    };
+    std::vector<std::vector<ActionEffect>> recordedActions_;  // Indexed by ActionType
+    
+    struct SocialObservation {
+        ActionType action;
+        std::vector<float> observerState;
+        std::vector<float> resultingState;
+        float reward;
+    };
+    std::vector<SocialObservation> recordedSocialActions_;
+    
+    // Concept tracking
+    std::vector<std::vector<float>> currentConcepts_;
+    std::vector<std::vector<float>> formedConcepts_;
 };
 
 } // namespace nlm

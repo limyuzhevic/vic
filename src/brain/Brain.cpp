@@ -36,19 +36,16 @@ struct Brain::Impl {
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    // ========== INTEGRATED COGNITION SYSTEMS =========
     std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<NeuralSelfModel> selfModel;
     std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<NeuralSocialLearning> socialLearning;
+    std::unique_ptr<NeuralSpatialRepresentation> spatialRepresentation;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // ========== SEMANTIC AND PROCEDURAL MEMORY =========
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -118,7 +115,16 @@ struct Brain::Impl {
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
+        selfModel = std::make_unique<NeuralSelfModel>();
         conceptFormation = std::make_unique<ConceptFormation>();
+        socialLearning = std::make_unique<NeuralSocialLearning>();
+        spatialRepresentation = std::make_unique<NeuralSpatialRepresentation>();
+        
+        // Initialize semantic and procedural memory
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
+        
+        // Initialize attentional selection
         attention = std::make_unique<AttentionalSelection>();
         
         // Initialize development system
@@ -249,11 +255,22 @@ bool Brain::initialize() {
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
+    pImpl->spatialRepresentation->initialize(this);
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
+    pImpl->semanticMemory->setCapacity(neuronCount / 5);
+    
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
+    pImpl->proceduralMemory->setSkillCapacity(neuronCount / 10);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -528,16 +545,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Encode current brain state for concept learning
+        std::vector<float> currentPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto& neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentPattern.push_back(state.membranePotential);
+                }
+            }
+        }
+        
+        // Form concepts from current activity patterns
+        pImpl->conceptFormation->presentExperience(currentPattern, currentTime);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update self-model ==========
+    if (pImpl->selfModel) {
+        // Update internal self-model based on current experience
+        // Record that we took actions and observed consequences
+        if (pImpl->dopamine) {
+            float reward = pImpl->dopamine->getLevel();
+            pImpl->selfModel->recordAction(currentStep, reward);
+        }
+    }
+    
+    // ========== STEP 12: Update social learning ==========
+    if (pImpl->socialLearning) {
+        // Learn from social observations
+        pImpl->socialLearning->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 13: Update spatial representation ==========
+    if (pImpl->spatialRepresentation) {
+        // Update spatial map based on movement
+        pImpl->spatialRepresentation->integrateMovement(0.0f, 0.0f); // Movement will be integrated from agent
+    }
+    
+    // ========== STEP 14: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // ========== STEP 14: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +602,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 15: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -573,6 +629,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 16: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 17: Checkpoint management ==========
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 18: Collect statistics ==========
+    // Statistics are collected automatically in various methods
+    // This step is mostly for future enhancement
+    
+    // ========== STEP 19: Process prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current experience
+        // Prediction system can learn patterns for future behavior
+        // For now, basic prediction error computation
+        if (pImpl->dopamine && pImpl->predictionError) {
+            float predictionError = pImpl->dopamine->getLevel(); // Simplified
+            pImpl->predictionSystem->updatePredictionError(predictionError, currentTime);
         }
     }
     
@@ -1003,39 +1085,28 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
-
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+// ========== SEMANTIC AND PROCEDURAL MEMORY ==========
+    NeuralSemanticMemory* Brain::getSemanticMemory() {
+        return pImpl->semanticMemory.get();
+    }
+    
+    NeuralProceduralMemory* Brain::getProceduralMemory() {
+        return pImpl->proceduralMemory.get();
+    }
+    
+    // ========== COGNITION SYSTEM ACCESSORS ==========
+    
+    NeuralSelfModel* Brain::getSelfModel() {
+        return pImpl->selfModel.get();
+    }
+    
+    NeuralSocialLearning* Brain::getSocialLearning() {
+        return pImpl->socialLearning.get();
+    }
+    
+    NeuralSpatialRepresentation* Brain::getSpatialRepresentation() {
+        return pImpl->spatialRepresentation.get();
+    }
 
 // ========== DEVELOPMENT SYSTEM ==========
 

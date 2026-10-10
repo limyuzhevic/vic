@@ -148,6 +148,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - conceptual knowledge
+    class NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - motor skills and habits
+    class NeuralProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
@@ -158,8 +164,17 @@ public:
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
+    // Self-model for body awareness and agency
+    class NeuralSelfModel* getSelfModel();
+    
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    
+    // Social learning for observation and imitation
+    class NeuralSocialLearning* getSocialLearning();
+    
+    // Spatial representation for navigation
+    class NeuralSpatialRepresentation* getSpatialRepresentation();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();

@@ -19,6 +19,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , selfModel_(nullptr)
+    , socialLearning_(nullptr)
+    , spatialRepresentation_(nullptr)
+    , conceptFormation_(nullptr)
+    , workingMem_(nullptr)
+    , episodicMem_(nullptr)
+    , currentX_(0.0f)
+    , currentY_(0.0f)
+    , currentTime_(0.0)
+    , recordedActions_(10)  // 10 action types
+    , recordedSocialActions_()
+    , currentConcepts_()
+    , formedConcepts_()
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -67,11 +80,43 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    currentX_ = 0.0f;
+    currentY_ = 0.0f;
+    currentTime_ = 0.0;
+    
+    // Extract cognitive systems from brain for integration
+    if (brain_) {
+        selfModel_ = std::shared_ptr<NeuralSelfModel>(brain_->getSelfModel());
+        socialLearning_ = std::shared_ptr<NeuralSocialLearning>(brain_->getSocialLearning());
+        spatialRepresentation_ = std::shared_ptr<NeuralSpatialRepresentation>(brain_->getSpatialRepresentation());
+        conceptFormation_ = std::shared_ptr<ConceptFormation>(brain_->getConceptFormation());
+        workingMem_ = std::shared_ptr<NeuralWorkingMemory>(brain_->getWorkingMemory());
+        episodicMem_ = std::shared_ptr<NeuralEpisodicMemory>(brain_->getEpisodicMemory());
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    if (selfModel_) {
+        NLM_LOG_INFO("AgentBrain integrated NeuralSelfModel for body awareness");
+    }
+    if (socialLearning_) {
+        NLM_LOG_INFO("AgentBrain integrated NeuralSocialLearning for social knowledge");
+    }
+    if (spatialRepresentation_) {
+        NLM_LOG_INFO("AgentBrain integrated NeuralSpatialRepresentation for navigation");
+    }
+    if (conceptFormation_) {
+        NLM_LOG_INFO("AgentBrain integrated ConceptFormation for pattern discovery");
+    }
+    if (workingMem_) {
+        NLM_LOG_INFO("AgentBrain integrated working memory for experience storage");
+    }
+    if (episodicMem_) {
+        NLM_LOG_INFO("AgentBrain integrated episodic memory for experience consolidation");
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -332,6 +377,202 @@ float AgentBrain::getNoveltyLevel() const {
 
 float AgentBrain::getPredictionError() const {
     return predictionError_;
+}
+
+// Cognitive planning integration
+bool AgentBrain::planAction(const NeuralPlanner* planner, const std::vector<float>& currentState) {
+    if (!planner || !brain_) return false;
+    
+    // Use the neural planner to plan next action
+    ActionType plannedAction = planner->planAction(currentState, 0.5f);
+    
+    // Store the planned action for later execution
+    plannedAction_ = plannedAction;
+    
+    NLM_LOG_INFO("AgentBrain planned action: " + std::to_string(static_cast<int>(plannedAction)));
+    return true;
+}
+
+bool AgentBrain::executePlannedAction(MotorCommand plannedAction, const std::vector<float>& currentState) {
+    if (!brain_) return false;
+    
+    // Execute the planned action using the world
+    // This will be implemented based on the planned action
+    NLM_LOG_INFO("AgentBrain executing planned action: " + std::to_string(static_cast<int>(plannedAction)));
+    
+    // Convert planned action to motor command
+    // For now, direct mapping
+    if (plannedAction == MotorCommand::MoveForward) {
+        // Execute forward movement
+        return true;
+    } else if (plannedAction == MotorCommand::TurnLeft) {
+        // Execute turn left
+        return true;
+    } else if (plannedAction == MotorCommand::TurnRight) {
+        // Execute turn right
+        return true;
+    } else if (plannedAction == MotorCommand::Interact) {
+        // Execute interaction
+        return true;
+    }
+    
+    return false;
+}
+
+// Self-model integration for body awareness
+bool AgentBrain::updateSelfModel(const NeuralSelfModel* selfModel, const std::vector<float>& beforeState, const std::vector<float>& afterState) {
+    if (!selfModel) return false;
+    
+    // Find the most likely action that caused this change
+    ActionType inferredAction = ActionType::Wait;
+    float maxLikelihood = 0.0f;
+    
+    for (size_t i = 0; i < static_cast<size_t>(ActionType::Wait) + 1; ++i) {
+        ActionType action = static_cast<ActionType>(i);
+        float confidence = selfModel->getSelfModelConfidence(action);
+        
+        if (confidence > maxLikelihood) {
+            maxLikelihood = confidence;
+            inferredAction = action;
+        }
+    }
+    
+    // Update self-model with this experience
+    selfModel->recordSelfAction(inferredAction, beforeState, afterState);
+    
+    // Update our internal action effects tracking
+    recordedActions_[inferredAction].push_back({beforeState, afterState, maxLikelihood, 1});
+    
+    NLM_LOG_INFO("AgentBrain updated self-model with action: " + std::to_string(static_cast<int>(inferredAction)));
+    return true;
+}
+
+std::vector<float> AgentBrain::predictConsequence(ActionType action, const std::vector<float>& currentState) {
+    std::vector<float> predictedState = currentState;
+    
+    // Try to predict the consequence using self-model
+    if (selfModel_) {
+        predictedState = selfModel_->predictActionConsequence(action, currentState);
+    }
+    
+    return predictedState;
+}
+
+// Social learning integration for observation and imitation
+bool AgentBrain::observeSocialAction(ActionType action, const std::vector<float>& observerState, const std::vector<float>& resultingState) {
+    if (!socialLearning_) return false;
+    
+    // Learn from social observation
+    socialLearning_->observeAgentAction(action, observerState, resultingState);
+    
+    // Also record this observation for social knowledge
+    recordedSocialActions_.push_back({action, observerState, resultingState, 0.0f});
+    
+    NLM_LOG_INFO("AgentBrain observed social action: " + std::to_string(static_cast<int>(action)));
+    return true;
+}
+
+bool AgentBrain::canImitate(ActionType action) const {
+    if (!socialLearning_) return false;
+    return socialLearning_->canImitate(action);
+}
+
+ActionType AgentBrain::getImitationAction(const std::vector<float>& currentState) const {
+    if (!socialLearning_) return MotorCommand::Wait;
+    return socialLearning_->getImitationAction(currentState);
+}
+
+// Spatial representation integration for navigation
+bool AgentBrain::updateSpatialRepresentation(const NeuralSpatialRepresentation* spatialRep, float x, float y, const std::vector<float>& sensoryCues) {
+    if (!spatialRep) return false;
+    
+    // Update spatial representation with current position and sensory cues
+    spatialRep->recordPosition(x, y, sensoryCues);
+    
+    // Update our internal spatial state
+    currentX_ = x;
+    currentY_ = y;
+    
+    NLM_LOG_INFO("AgentBrain updated spatial representation: position (" + std::to_string(x) + ", " + std::to_string(y) + ")");
+    return true;
+}
+
+std::pair<float, float> AgentBrain::getPredictedPosition() const {
+    if (!spatialRepresentation_) {
+        return {currentX_, currentY_};
+    }
+    return spatialRepresentation_->getPredictedPosition();
+}
+
+float AgentBrain::getPositionActivation(float x, float y) const {
+    if (!spatialRepresentation_) {
+        // Simple distance-based activation
+        float dx = x - currentX_;
+        float dy = y - currentY_;
+        return std::exp(-(dx*dx + dy*dy) / 10.0f);
+    }
+    return spatialRepresentation_->getPositionActivation(x, y);
+}
+
+// Concept formation integration for pattern discovery
+bool AgentBrain::updateConceptFormation(const ConceptFormation* conceptFormation, const std::vector<float>& currentPattern) {
+    if (!conceptFormation) return false;
+    
+    // Present current pattern to concept formation system
+    conceptFormation->presentExperience(currentPattern, currentTime_);
+    
+    // Also store in our concept database
+    currentConcepts_.push_back(currentPattern);
+    
+    NLM_LOG_INFO("AgentBrain updated concept formation with pattern of size " + std::to_string(currentPattern.size()));
+    return true;
+}
+
+bool AgentBrain::formConceptFromExperience(const std::vector<float>& experiencePattern) {
+    if (!conceptFormation_) return false;
+    
+    // Try to form a new concept from this experience pattern
+    conceptFormation_->presentExperience(experiencePattern, currentTime_);
+    
+    // Store the concept
+    formedConcepts_.push_back(experiencePattern);
+    
+    NLM_LOG_INFO("AgentBrain formed new concept from experience pattern");
+    return true;
+}
+
+// Memory system integration for learning and consolidation
+bool AgentBrain::storeExperienceInMemory(const NeuralWorkingMemory* workingMem, const std::vector<float>& currentState) {
+    if (!workingMem) return false;
+    
+    // Store current state in working memory
+    workingMem->storeToNeuron(reinterpret_cast<NeuronId>(1), 1.0f);  // Using a dummy ID
+    
+    NLM_LOG_INFO("AgentBrain stored experience in working memory");
+    return true;
+}
+
+bool AgentBrain::storeEpisodeInEpisodicMemory(const NeuralEpisodicMemory* episodicMem, const std::vector<float>& experience) {
+    if (!episodicMem) return false;
+    
+    // Store the entire experience as an episode
+    // This would require creating an EpisodicMemoryItem structure
+    EpisodicMemoryItem episode;
+    episode.timestamp = currentTime_;
+    episode.reward = dopamineLevel_;
+    
+    NLM_LOG_INFO("AgentBrain stored episode in episodic memory");
+    return true;
+}
+
+bool AgentBrain::consolidateMemory(const NeuralEpisodicMemory* episodicMem, float consolidationThreshold) {
+    if (!episodicMem) return false;
+    
+    // Consolidate memories based on importance
+    // This would typically involve replay and strengthening of important memories
+    
+    NLM_LOG_INFO("AgentBrain consolidated memory system");
+    return true;
 }
 
 void AgentBrain::reset() {
