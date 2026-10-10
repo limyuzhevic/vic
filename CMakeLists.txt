@@ -139,6 +139,30 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Analysis tool executable
+add_executable(nlm_analysis
+    src/agent/AnalysisTool.cpp
+)
+target_link_libraries(nlm_analysis PUBLIC nlm_core nlm_agent)
+
+# Batch processing tool executable
+add_executable(nlm_batch
+    src/agent/BatchTool.cpp
+)
+target_link_libraries(nlm_batch PUBLIC nlm_core nlm_agent nlm_world)
+
+# Configuration management tool executable
+add_executable(nlm_config
+    src/agent/ConfigTool.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core nlm_agent nlm_world)
+
+# Performance profiler executable
+add_executable(nlm_profile
+    src/agent/ProfileTool.cpp
+)
+target_link_libraries(nlm_profile PUBLIC nlm_core nlm_agent nlm_world)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
