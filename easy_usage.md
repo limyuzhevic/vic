@@ -294,4 +294,6 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
+**Version**: `0.1.0`
+
 That's it! You're now ready to use NLM.
