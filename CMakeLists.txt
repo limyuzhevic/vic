@@ -38,6 +38,11 @@ add_library(nlm_core STATIC
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
+    src/dynamics/NeuralEventSystem.cpp
+    src/dynamics/NeuralDynamicsFactory.cpp
+    src/dynamics/IntegrateAndFireDynamics.cpp
+    src/dynamics/HodgkinHuxleyDynamics.cpp
+    src/dynamics/FitzHughNagumoDynamics.cpp
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
@@ -85,11 +90,21 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Refactored Brain
+    src/brain/ComponentFactory.cpp
+    src/brain/BrainRefactored.cpp
+    # New component implementations
+    src/brain/NeuralDynamicsComponent.cpp
+    src/brain/PlasticityComponent.cpp
+    src/brain/MemoryComponent.cpp
+    src/brain/PredictionComponent.cpp
 )
 
+# Include directories for all headers
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/dynamics>
 )
 
 # Agent system (body, sensory percept, agent-brain interface)

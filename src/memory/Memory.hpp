@@ -74,6 +74,9 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Calculate episode relevance (internal helper)
+    float calculateEpisodeRelevance(const EpisodicMemoryItem& episode, size_t index) const;
+    
 private:
     struct Impl;
     Impl* pImpl;
