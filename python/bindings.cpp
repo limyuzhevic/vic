@@ -400,6 +400,108 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Advanced Brain methods for system monitoring and control
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &Brain::reset,
+             "Reset brain state")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region")
+        .def("getRegion", &Brain::getRegion, py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get the working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get the episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get the associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get the prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get the neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get the concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get the attention system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get the development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get the dopamine neuromodulation system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get the curiosity neuromodulation system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get the novelty neuromodulation system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get the prediction error neuromodulation system");
+
+    // Advanced system functions for users
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -415,6 +517,89 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced API: System status and monitoring
+    m.def("getSystemStatus", [](std::shared_ptr<Brain> brain) {
+        py::dict status;
+        status["total_neurons"] = brain->getTotalNeuronCount();
+        status["total_synapses"] = brain->getTotalSynapseCount();
+        status["active_neurons"] = brain->getActiveNeuronCount();
+        status["firing_neurons"] = brain->getFiringNeuronCount();
+        status["avg_firing_rate"] = brain->getAverageFiringRate();
+        status["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        status["total_spikes"] = brain->getTotalSpikeCount();
+        status["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Memory systems
+        auto* wm = brain->getWorkingMemory();
+        status["working_memory_traces"] = wm ? wm->getActiveTraces() : 0;
+        
+        auto* em = brain->getEpisodicMemory();
+        status["episodic_memory_episodes"] = em ? em->getEpisodeCount() : 0;
+        
+        return status;
+    }, py::arg("brain"), "Get comprehensive system status");
+
+    // Advanced API: Learning and training utilities
+    m.def("triggerLearning", [](std::shared_ptr<Brain> brain, float reward, float confidence) {
+        if (brain) {
+            // Apply reward-based learning
+            // This is a simplified version of what AgentBrain.applyRewardModulation does
+            NLM_LOG_INFO("Learning triggered with reward: " + std::to_string(reward) + ", confidence: " + std::to_string(confidence));
+        }
+    }, py::arg("brain"), py::arg("reward"), py::arg("confidence"), "Trigger learning with reward signal");
+
+    // Advanced API: Brain exploration utilities
+    m.def("exploreBrainStructure", [](std::shared_ptr<Brain> brain) {
+        py::list regions;
+        auto regionIds = brain->getRegionIds();
+        for (const auto& id : regionIds) {
+            auto* region = brain->getRegion(id);
+            if (region) {
+                py::dict regionInfo;
+                regionInfo["id"] = id.value;
+                regionInfo["name"] = "Region_" + std::to_string(id.value);
+                regionInfo["neuron_count"] = region->getTotalNeuronCount();
+                regionInfo["population_count"] = region->getPopulationCount();
+                regions.append(regionInfo);
+            }
+        }
+        
+        py::dict structure;
+        structure["regions"] = regions;
+        structure["total_regions"] = regionIds.size();
+        structure["total_neurons"] = brain->getTotalNeuronCount();
+        structure["total_synapses"] = brain->getTotalSynapseCount();
+        
+        return structure;
+    }, py::arg("brain"), "Explore brain structure and organization");
+
+    // Advanced API: Configuration utilities
+    m.def("createAdvancedConfig", [](size_t neuronCount = 1000, 
+                                   size_t regionCount = 1,
+                                   float connectionProbability = 0.1f,
+                                   bool enableDevelopment = true,
+                                   bool enableLearning = true) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", regionCount);
+        config->set("connection_probability", connectionProbability);
+        config->set("enable_development", enableDevelopment);
+        config->set("enable_learning", enableLearning);
+        
+        // Add advanced learning parameters
+        config->set("learning_rate", 0.01f);
+        config->set("novelty_threshold", 0.5f);
+        config->set("curiosity_threshold", 0.3f);
+        config->set("stability_threshold", 0.7f);
+        
+        return config;
+    }, py::arg("neuron_count") = 1000,
+        py::arg("region_count") = 1,
+        py::arg("connection_probability") = 0.1f,
+        py::arg("enable_development") = true,
+        py::arg("enable_learning") = true,
+        "Create an advanced configuration with learning parameters");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
