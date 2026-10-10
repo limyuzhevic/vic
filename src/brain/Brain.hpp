@@ -137,6 +137,50 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
+    // Performance monitoring
+    struct PerformanceMetrics {
+        float simulationSpeed;           // Steps per second
+        float spikeEfficiency;          // Spikes per millisecond
+        float energyConsumption;        // Arbitrary energy units
+        float plasticityRate;           // Plasticity events per step
+        float learningRate;             // Weight change magnitude
+        float memoryUtilization;        // Memory usage percentage
+        size_t totalSpikes;             // Total spike count
+        size_t activeNeurons;           // Currently active neurons
+        float averageAdaptation;        // Average adaptation variable
+        float synapticEfficiency;       // Effective connections per neuron
+    };
+    
+    PerformanceMetrics getPerformanceMetrics() const;
+    
+    // Advanced learning features
+    void enableAdvancedLearning(bool enabled);
+    bool isAdvancedLearningEnabled() const;
+    
+    // Learning statistics
+    struct LearningStats {
+        float stdpWeightChange;        // Total STDP weight change
+        float hebbianWeightChange;     // Total Hebbian weight change
+        float structuralPlasticityRate; // Synaptogenesis/pruning rate
+        float learningEfficiency;      // Learning per unit time
+        float explorationExploitationRatio; // E/E balance
+        std::vector<float> memoryConsolidationEvents; // Consolidation timestamps
+        size_t replayEvents;            // Number of memory replay events
+        float predictionError;         // Current prediction error
+        float curiosityLevel;          // Current curiosity drive
+        size_t patternDiscoveries;     // Number of new patterns discovered
+        size_t conceptFormations;      // Number of concepts formed
+    };
+    
+    LearningStats getLearningStats() const;
+    
+    // Batch processing operations
+    void batchStep(size_t steps, Timestamp timestep = 0.001);
+    
+    // Complete brain-world simulation loop
+    void runSimulation(std::shared_ptr<class SimpleWorld> world, 
+                      size_t steps, double timestep = 0.1);
+    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information

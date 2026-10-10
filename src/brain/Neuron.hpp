@@ -134,7 +134,8 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Phase 2: Uses stepLIF for real integrate-and-fire dynamics
+    // stepLIF implements: dV/dt = (V_rest - V)/tau + I/C with exponential Euler
     void step(Timestamp currentTime);
     
     // Reset to initial state

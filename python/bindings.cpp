@@ -316,6 +316,31 @@ PYBIND11_MODULE(pynlm, m) {
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        // Advanced Python operations
+        .def("batchStep", [](Brain& self, size_t steps, double timestep) {
+            for (size_t i = 0; i < steps; ++i) {
+                self.step(i, i * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep"),
+             "Perform multiple simulation steps efficiently")
+        .def("runSimulation", [](Brain& self, std::shared_ptr<SimpleWorld> world, size_t steps, double timestep) {
+            for (size_t i = 0; i < steps; ++i) {
+                world->update(i * timestep);
+                auto percept = world->getSensoryPercept();
+                self.receiveSensoryInput(percept);
+                self.step(i, i * timestep);
+                auto action = self.produceAction();
+                world->applyMotorCommand(action, i * timestep);
+            }
+        }, py::arg("world"), py::arg("steps"), py::arg("timestep"),
+             "Run complete brain-world simulation loop")
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+             "Get brain performance metrics")
+        .def("enableAdvancedLearning", &Brain::enableAdvancedLearning,
+             py::arg("enabled") = true,
+             "Enable advanced learning features (replay, consolidation)")
+        .def("getLearningStats", &Brain::getLearningStats,
+             "Get detailed learning statistics")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),

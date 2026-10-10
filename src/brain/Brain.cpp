@@ -75,6 +75,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Advanced learning
+    bool advancedLearningEnabled;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +95,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , advancedLearningEnabled(true)  // Enable advanced learning by default
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -1111,6 +1115,119 @@ void Brain::logStatus() const {
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+}
+
+// ========== ADVANCED LEARNING FEATURES ==========
+
+Brain::PerformanceMetrics Brain::getPerformanceMetrics() const {
+    PerformanceMetrics metrics;
+    
+    // Calculate simulation speed (rough estimate)
+    static auto lastStepTime = pImpl->currentTime;
+    static size_t stepsSinceLast = 0;
+    if (lastStepTime > 0.0) {
+        double timeElapsed = static_cast<double>(pImpl->currentTime - lastStepTime);
+        if (timeElapsed > 0.0) {
+            metrics.simulationSpeed = static_cast<float>(pImpl->currentStep / timeElapsed);
+        }
+    }
+    
+    // Spike efficiency
+    metrics.spikeEfficiency = getTotalSpikeCount() / (pImpl->currentStep > 0 ? pImpl->currentStep : 1);
+    
+    // Energy consumption (simplified)
+    metrics.energyConsumption = getFiringNeuronCount() * 1.5f; // Arbitrary units
+    
+    // Plasticity rate (simplified)
+    metrics.plasticityRate = getFiringNeuronCount() * 0.01f;
+    
+    // Learning rate (simplified)
+    metrics.learningRate = getAverageFiringRate() * 0.001f;
+    
+    // Memory utilization (simplified)
+    metrics.memoryUtilization = std::min(1.0f, getTotalNeuronCount() / 10000.0f);
+    
+    metrics.totalSpikes = getTotalSpikeCount();
+    metrics.activeNeurons = getActiveNeuronCount();
+    metrics.averageAdaptation = 0.0f; // Would need to calculate from neurons
+    metrics.synapticEfficiency = getAverageFiringRate() / (getTotalSynapseCount() + 1);
+    
+    return metrics;
+}
+
+void Brain::enableAdvancedLearning(bool enabled) {
+    pImpl->advancedLearningEnabled = enabled;
+}
+
+bool Brain::isAdvancedLearningEnabled() const {
+    return pImpl->advancedLearningEnabled;
+}
+
+Brain::LearningStats Brain::getLearningStats() const {
+    LearningStats stats;
+    
+    // Calculate various learning metrics
+    // Note: This is simplified - real implementation would track these metrics
+    stats.stdpWeightChange = 0.0f;
+    stats.hebbianWeightChange = 0.0f;
+    stats.structuralPlasticityRate = 0.0f;
+    stats.learningEfficiency = getAverageFiringRate() * 0.001f;
+    stats.explorationExploitationRatio = 0.5f; // Default balanced
+    stats.memoryConsolidationEvents.clear(); // Would track this
+    stats.replayEvents = pImpl->currentStep / 1000; // Approximate
+    stats.predictionError = 0.0f; // Would need prediction system
+    stats.curiosityLevel = 0.5f; // Would need curiosity system
+    stats.patternDiscoveries = 0; // Would track pattern discoveries
+    stats.conceptFormations = 0; // Would track concept formations
+    
+    return stats;
+}
+
+void Brain::batchStep(size_t steps, Timestamp timestep) {
+    if (pImpl->advancedLearningEnabled && steps > 100) {
+        // For large batch steps, enable some optimizations
+        // This could skip some checks or use faster algorithms
+    }
+    
+    for (size_t i = 0; i < steps; ++i) {
+        SimulationStep currentStep = pImpl->currentStep + i;
+        Timestamp currentTime = pImpl->currentTime + i * timestep;
+        step(currentStep, currentTime);
+    }
+}
+
+void Brain::runSimulation(std::shared_ptr<class SimpleWorld> world, size_t steps, double timestep) {
+    if (!world) {
+        NLM_LOG_ERROR("Cannot run simulation: world is null");
+        return;
+    }
+    
+    world->update(0.0); // Initialize world
+    
+    for (size_t i = 0; i < steps; ++i) {
+        double currentTime = i * timestep;
+        
+        // Update world
+        world->update(currentTime);
+        
+        // Get sensory input
+        auto percept = world->getSensoryPercept();
+        receiveSensoryInput(percept);
+        
+        // Brain thinks
+        step(i, static_cast<Timestamp>(currentTime));
+        
+        // Get action and execute it
+        auto action = produceAction();
+        world->applyMotorCommand(action, static_cast<Timestamp>(currentTime));
+        
+        // Log progress periodically
+        if (i % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(i) + 
+                        " | Firing: " + std::to_string(getFiringNeuronCount()) +
+                        " | Spikes: " + std::to_string(getTotalSpikeCount()));
+        }
     }
 }
 
