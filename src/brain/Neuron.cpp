@@ -33,6 +33,20 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    
+    // Initialize state with biologically plausible values
+    pImpl->state.membranePotential = -70.0f;  // Resting potential (mV)
+    pImpl->state.restingPotential = -70.0f;
+    pImpl->state.threshold = -55.0f;         // Typical threshold (mV)
+    pImpl->state.resetPotential = -70.0f;
+    pImpl->state.leakConductance = 10.0f;    // Typical leak conductance (nS)
+    pImpl->state.firingRate = 0.0f;
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.refractoryPeriod = 5;
+    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.synapseConductance = 0.0f;
 }
 
 Neuron::~Neuron() = default;
@@ -204,7 +218,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Discrete approximation: V_new = V + dt * 1000 * ((V_rest - V)/tau + I/C)
+    // dt is in seconds, tau in ms, so need conversion factor of 1000
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -214,13 +229,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
+    // I is synaptic input (current), C is capacitance, so I/C gives dV/dt in mV/ms
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution: (V_rest - V)/tau gives dV/dt in mV/ms
     float leakContribution = (V_rest - V) / tau;
     
+    // Time conversion: dt is in seconds, need to convert to ms (multiply by 1000)
+    // Membrane potential change in mV
+    float voltageChange = static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + voltageChange;
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {

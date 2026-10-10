@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
+#include <ctime>
+#include <cstring>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,14 +23,52 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to detect file format
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Check if it's JSON (starts with { or contains key-value pairs in JSON format)
+    bool isJSON = false;
+    if (firstLine.find('{') == 0 || firstLine.find('{') != std::string::npos ||
+        (firstLine.find('"') != std::string::npos && firstLine.find('"') != std::string::npos)) {
+        isJSON = true;
+    }
+    
+    file.clear();
+    file.seekg(0);
+    
+    if (isJSON) {
+        // Parse JSON format
+        std::string jsonContent((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        return loadFromJSON(jsonContent);
+    }
+    
+    // Check if it's YAML (contains YAML-style key: value)
+    bool isYAML = false;
+    for (size_t i = 0; i < firstLine.size(); ++i) {
+        if (firstLine[i] == ':' && i > 0 && !isspace(firstLine[i - 1]) && !isspace(firstLine[i + 1])) {
+            isYAML = true;
+            break;
+        }
+    }
+    
+    if (!isYAML) {
+        // Default to simple key=value format
+        return loadFromSimpleFormat(file);
+    }
+    
+    // Try YAML parsing
+    return loadFromYAML(file);
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -37,6 +79,108 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& jsonContent) {
+    // Simplified JSON parsing for common NLM configuration format
+    // This is a basic implementation - for production would use a proper JSON library
+    
+    // Find opening brace
+    size_t start = jsonContent.find('{');
+    if (start == std::string::npos) {
+        return false;
+    }
+    
+    // Parse key-value pairs (simplified approach)
+    size_t pos = start + 1;
+    size_t braceCount = 1;
+    
+    std::string currentKey;
+    std::string currentValue;
+    bool inKey = true;
+    bool inQuotes = false;
+    char quoteChar = '"';
+    
+    while (pos < jsonContent.size() && braceCount > 0) {
+        char c = jsonContent[pos];
+        
+        if (!inQuotes) {
+            if (c == '"' || c == '\'') {
+                inQuotes = true;
+                quoteChar = c;
+            } else if (c == ':' && inKey) {
+                inKey = false;
+            } else if (c == ',' && !inKey) {
+                // Save current key-value pair
+                if (!currentKey.empty() && !currentValue.empty()) {
+                    set(currentKey, currentValue, ConfigSource::File);
+                }
+                currentKey.clear();
+                currentValue.clear();
+                inKey = true;
+            } else if (c == '{') {
+                braceCount++;
+            } else if (c == '}') {
+                braceCount--;
+            } else if (c == '\n' || c == '\r' || c == ' ') {
+                // Skip whitespace
+            } else {
+                if (inKey) {
+                    currentKey += c;
+                } else {
+                    currentValue += c;
+                }
+            }
+        } else {
+            if (c == quoteChar) {
+                inQuotes = false;
+            } else {
+                if (inKey) {
+                    currentKey += c;
+                } else {
+                    currentValue += c;
+                }
+            }
+        }
+        
+        pos++;
+    }
+    
+    // Save last key-value pair
+    if (!currentKey.empty() && !currentValue.empty()) {
+        set(currentKey, currentValue, ConfigSource::File);
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAML(std::ifstream& file) {
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '%') {
+            continue;
+        }
+        
+        // Parse YAML-style key: value
+        size_t pos = line.find(':');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
@@ -84,9 +228,43 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save as simple key=value format for now
+    // For production would implement proper JSON/YAML formatting
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
