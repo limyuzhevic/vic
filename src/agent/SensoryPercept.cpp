@@ -1,4 +1,6 @@
 #include "SensoryPercept.hpp"
+#include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -6,16 +8,24 @@ SensoryPercept::SensoryPercept()
     : visionWidth_(16)
     , visionHeight_(16)
     , timestamp_(0.0)
+    , vision_(16 * 16, 0.0f)
+    , touch_(8, 0.0f)
+    , internal_(4, 0.0f)
+    , proprioception_(6, 0.0f)
+    , audio_()  // Empty vector - initialized directly
 {
-    vision_.resize(16 * 16, 0.0f);
-    touch_.resize(8, 0.0f);
-    internal_.resize(4, 0.0f);
-    proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    // All vectors are now properly initialized with their final values
+    // in the initializer list, which is more efficient than resizing in the constructor body
 }
+
+SensoryPercept::~SensoryPercept() = default;
 
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
+    all.reserve(
+        vision_.size() + touch_.size() + internal_.size() + 
+        proprioception_.size() + audio_.size()
+    );
     
     // Vision (flattened)
     all.insert(all.end(), vision_.begin(), vision_.end());

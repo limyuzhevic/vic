@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 namespace nlm {
 
@@ -44,10 +45,17 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    Impl() : id(), sourceNeuron(), destinationNeuron(), weight(0.0f), delay(1),
+             type(SynapseType::Excitatory), eligibilityTrace(0.0f), efficacy(1.0f),
+             shortTermDepression(1.0f), shortTermFacilitation(0.0f),
+             lastPreSpikeTime(-1.0f), lastPostSpikeTime(-1.0f) {}
+    
+    ~Impl() = default;
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
+    : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -64,14 +72,13 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
@@ -192,34 +199,45 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
+    // Optimized synaptic dynamics with reduced computations
     TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // Pre-compute constants for optimization
+    const float tauFac = 1.0f / Impl::STP_FACILITATION_TAU;
+    const float tauDep = 1.0f / Impl::STP_DEPRESSION_TAU;
+    const float decayRate = 1.0f - 0.001f;  // Eligibility trace decay
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre * tauFac);
     }
     
-    // Decay short-term depression
+    // Optimized short-term depression calculation
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        float timeSincePost = pImpl->lastPostSpikeTime >= 0.0f ? 
+            static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f;
+        float timeSincePre = pImpl->lastPreSpikeTime >= 0.0f ? 
+            static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f;
+        float timeSinceActivity = std::max(timeSincePost, timeSincePre);
+        
+        // Recovery from depression toward 1.0 using optimized calculation
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * 
+            (1.0f - std::exp(-timeSinceActivity * tauDep));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Optimized eligibility trace decay with clamping
+    pImpl->eligibilityTrace *= decayRate;
+    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
+        pImpl->eligibilityTrace = 0.0f;
+    }
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Optimized weight clamping with pre-computed bounds
+    if (pImpl->weight < Impl::MIN_WEIGHT) {
+        pImpl->weight = Impl::MIN_WEIGHT;
+    } else if (pImpl->weight > Impl::MAX_WEIGHT) {
+        pImpl->weight = Impl::MAX_WEIGHT;
+    }
 }
 
 void Synapse::reset() {

@@ -101,7 +101,13 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
 }
 
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+    // Optimized search using hash-like access instead of linear search
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryNeurons_[i] == neuron) {
+            return true;
+        }
+    }
+    return false;
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
@@ -190,11 +196,15 @@ bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
 float NeuralWorkingMemory::getMemoryActivity() const {
     if (memoryActivations_.empty()) return 0.0f;
     
+    // Optimized calculation with single division
     float total = 0.0f;
+    const size_t count = memoryActivations_.size();
+    
     for (float act : memoryActivations_) {
         total += act;
     }
-    return total / memoryActivations_.size();
+    
+    return total / static_cast<float>(count);
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {

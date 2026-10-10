@@ -3,11 +3,16 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    Impl() = default;
+    
+    ~Impl() = default;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
