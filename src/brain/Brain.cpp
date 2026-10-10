@@ -115,20 +115,33 @@ struct Brain::Impl {
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+        // Initialize cognition systems with brain reference
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
+        
+// Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    developmentSystem->initialize(this);
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize neuromodulation systems with brain reference
+        dopamine->initialize(this);
+        curiosity->initialize(this);
+        predictionError->initialize(this);
+        novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);

@@ -12,10 +12,11 @@ class RandomGenerator;
 // Development system: orchestrates neural development
 // Implements developmental stages, plasticity modulation, and structural changes
 
-class DevelopmentSystem {
-public:
-    DevelopmentSystem();
+DevelopmentSystem();
     ~DevelopmentSystem();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
     // Get current developmental stage
     DevelopmentalStage getStage() const;

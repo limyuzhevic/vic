@@ -14,6 +14,13 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
+void PredictionSystem::initialize(Brain* brain) {
+    // Initialize prediction system with brain reference
+    // TODO: Store brain reference for integration with brain systems
+    // PLACEHOLDER: Initialize prediction system with default parameters
+    NLM_LOG_INFO("Prediction system initialized");
+}
+
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state

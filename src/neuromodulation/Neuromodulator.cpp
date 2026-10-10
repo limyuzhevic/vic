@@ -17,6 +17,14 @@ Dopamine::Dopamine() : pImpl(new Impl) {}
 
 Dopamine::~Dopamine() = default;
 
+void Dopamine::initialize(class Brain* brain) {
+    // Initialize dopamine system with brain reference
+    // TODO: Store brain reference for integration with brain systems
+    // PLACEHOLDER: Initialize dopamine with default parameters
+    pImpl->baseline = 0.0f;
+    pImpl->level = 0.0f;
+}
+
 const char* Dopamine::getName() const {
     return "DA";
 }
