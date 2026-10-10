@@ -21,7 +21,8 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Phase 6: Implements sophisticated neuromodulation with multiple interacting systems
+    // Modulates plasticity rates based on reward prediction errors, novelty, curiosity
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state

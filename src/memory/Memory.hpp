@@ -15,7 +15,8 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // Phase 6: Implements neural working memory with competitive dynamics
+    // Maintains active information with priority-based competition and decay
     void store(NeuronId neuron, float value);
     
     // Retrieve item

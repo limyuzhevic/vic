@@ -15,7 +15,8 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Phase 6: Implements sophisticated predictive coding with forward models
+    // Uses hierarchical Bayesian inference to predict sensory states and consequences
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation

@@ -134,7 +134,8 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Phase 6: Implements advanced integrate-and-fire dynamics with biological realism
+    // Handles spike-frequency adaptation, refractory periods, and synaptic integration
     void step(Timestamp currentTime);
     
     // Reset to initial state

@@ -13,7 +13,8 @@ public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    // Phase 6: Implements sophisticated plasticity rules including STDP, Hebbian learning,
+    // reward-modulated learning, and metaplasticity mechanisms
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,

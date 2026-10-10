@@ -15,7 +15,8 @@ public:
     ~MotorSystem();
     
     // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
+    // Phase 6: Implements sophisticated action selection with actor-critic methods
+    // Integrates motor cortex activity with reward prediction and action value estimation
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
     // Get available actions

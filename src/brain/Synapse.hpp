@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -71,7 +72,8 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 6: Implements advanced synaptic dynamics with short-term plasticity, 
+    // eligibility traces, and spike-timing dependent plasticity mechanisms
     void step(Timestamp currentTime);
     
     // Reset to initial state

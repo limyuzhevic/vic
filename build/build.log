@@ -1,0 +1,65 @@
+Consolidate compiler generated dependencies of target nlm_core
+[  1%] Building CXX object CMakeFiles/nlm_core.dir/src/core/Config/Config.cpp.o
+[  2%] Building CXX object CMakeFiles/nlm_core.dir/src/brain/NeuralPopulation.cpp.o
+[  4%] Building CXX object CMakeFiles/nlm_core.dir/src/brain/Synapse.cpp.o
+[  5%] Building CXX object CMakeFiles/nlm_core.dir/src/brain/Neuron.cpp.o
+In file included from /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Synapse.cpp:2:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp: In static member function ‘static constexpr nlm::RandomGenerator::result_type nlm::RandomGenerator::max()’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp:85:69: warning: conversion from ‘long unsigned int’ to ‘nlm::RandomGenerator::result_type’ {aka ‘unsigned int’} changes value from ‘18446744073709551615’ to ‘4294967295’ [-Woverflow]
+   85 |     static constexpr result_type max() { return std::mt19937_64::max(); }
+      |                                                 ~~~~~~~~~~~~~~~~~~~~^~
+In file included from /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Neuron.cpp:2:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp: In static member function ‘static constexpr nlm::RandomGenerator::result_type nlm::RandomGenerator::max()’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp:85:69: warning: conversion from ‘long unsigned int’ to ‘nlm::RandomGenerator::result_type’ {aka ‘unsigned int’} changes value from ‘18446744073709551615’ to ‘4294967295’ [-Woverflow]
+   85 |     static constexpr result_type max() { return std::mt19937_64::max(); }
+      |                                                 ~~~~~~~~~~~~~~~~~~~~^~
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Synapse.cpp: In member function ‘void nlm::Synapse::step(nlm::Timestamp)’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Synapse.cpp:200:22: warning: unused variable ‘dt’ [-Wunused-variable]
+  200 |     TimestepDuration dt = 0.001;  // 1ms timestep
+      |                      ^~
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Synapse.cpp: In member function ‘void nlm::Synapse::initializeRandom(nlm::RandomGenerator&)’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Synapse.cpp:251:53: error: call of overloaded ‘uniformInt(int, int)’ is ambiguous
+  251 |     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+      |                                       ~~~~~~~~~~~~~~^~~~~~
+In file included from /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Synapse.cpp:2:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp:39:14: note: candidate: ‘uint32_t nlm::RandomGenerator::uniformInt(uint32_t, uint32_t)’
+   39 |     uint32_t uniformInt(uint32_t min, uint32_t max);
+      |              ^~~~~~~~~~
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp:40:14: note: candidate: ‘uint64_t nlm::RandomGenerator::uniformInt(uint64_t, uint64_t)’
+   40 |     uint64_t uniformInt(uint64_t min, uint64_t max);
+      |              ^~~~~~~~~~
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Neuron.cpp: In member function ‘void nlm::Neuron::initializeRandom(nlm::RandomGenerator&)’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Neuron.cpp:289:73: error: call of overloaded ‘uniformInt(int, int)’ is ambiguous
+  289 |     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+      |                                                           ~~~~~~~~~~~~~~^~~~~~~
+In file included from /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/Neuron.cpp:2:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp:39:14: note: candidate: ‘uint32_t nlm::RandomGenerator::uniformInt(uint32_t, uint32_t)’
+   39 |     uint32_t uniformInt(uint32_t min, uint32_t max);
+      |              ^~~~~~~~~~
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/brain/../core/Random/Random.hpp:40:14: note: candidate: ‘uint64_t nlm::RandomGenerator::uniformInt(uint64_t, uint64_t)’
+   40 |     uint64_t uniformInt(uint64_t min, uint64_t max);
+      |              ^~~~~~~~~~
+make[2]: *** [CMakeFiles/nlm_core.dir/build.make:160: CMakeFiles/nlm_core.dir/src/brain/Synapse.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[2]: *** [CMakeFiles/nlm_core.dir/build.make:146: CMakeFiles/nlm_core.dir/src/brain/Neuron.cpp.o] Error 1
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp: In member function ‘bool nlm::Config::loadFromFile(const string&)’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp:73:28: error: qualified-id in declaration before ‘(’ token
+   73 | std::string Config::summary() const {
+      |                            ^
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp:112:25: error: qualified-id in declaration before ‘(’ token
+  112 | std::string Config::trim(const std::string& str) {
+      |                         ^
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp: At global scope:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp:119:2: error: expected ‘}’ at end of input
+  119 | } // namespace nlm
+      |  ^
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp:7:15: note: to match this ‘{’
+    7 | namespace nlm {
+      |               ^
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp: In member function ‘bool nlm::Config::loadFromFile(const string&)’:
+/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_1c64c9e3-1c4f-4162-bdaf-08442b805831/src/core/Config/Config.cpp:119:1: warning: control reaches end of non-void function [-Wreturn-type]
+  119 | } // namespace nlm
+      | ^
+make[2]: *** [CMakeFiles/nlm_core.dir/build.make:90: CMakeFiles/nlm_core.dir/src/core/Config/Config.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:114: CMakeFiles/nlm_core.dir/all] Error 2
+make: *** [Makefile:101: all] Error 2

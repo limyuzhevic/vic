@@ -14,20 +14,24 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // Phase 6: Implements activity-dependent synaptogenesis with homeostatic regulation
+    // Creates new connections based on correlated activity and developmental stage
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // Phase 6: Implements activity-dependent pruning with developmental regulation
+    // Eliminates weak or inappropriate connections during development and learning
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // Phase 6: Implements neurogenesis with developmental stage regulation
+    // Generates new neurons during critical periods and regulates overall population size
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // Phase 6: Implements selective neuron elimination with homeostatic control
+    // Removes damaged or unnecessary neurons while maintaining network stability
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate
