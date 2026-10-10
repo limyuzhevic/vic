@@ -51,17 +51,13 @@ void printBanner() {
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+    LearningExperiment(std::shared_ptr<Brain> b) 
+        : brain(b) {}
     
     void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
         // Record initial weights from first region
@@ -72,7 +68,7 @@ struct LearningExperiment {
         }
         
         NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        NLM_LOG_INFO("  Synapses: " + std::to_string(brain->getTotalSynapseCount()));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
@@ -89,8 +85,6 @@ struct LearningExperiment {
                 finalWeights.push_back(syn->getWeight());
             }
         }
-        
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -144,7 +138,6 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
@@ -159,12 +152,32 @@ struct LearningExperiment {
     }
 };
 
+// Helper functions for common operations
+NeuralRegion* getFirstRegion(std::shared_ptr<Brain> brain) {
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_WARNING("No regions found in brain");
+    }
+    return region;
+}
+
+void injectToNeurons(std::vector<Neuron*>& neurons, size_t count, float current, const std::string& description) {
+    if (neurons.empty()) return;
+    
+    size_t actualCount = std::min(count, neurons.size());
+    NLM_LOG_INFO("  " + description);
+    
+    for (size_t i = 0; i < actualCount; ++i) {
+        neurons[i]->injectCurrent(current);
+    }
+}
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
+    // Get first region and neurons
+    auto* region = getFirstRegion(brain);
     if (!region) return;
     
     auto neurons = region->getAllNeurons();
@@ -177,10 +190,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     size_t initialSpikes = brain->getTotalSpikeCount();
     
     // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
-    }
+    injectToNeurons(neurons, 10, 50.0f, "Injecting current into 10 neurons...");
     
     // Run a few steps
     for (SimulationStep step = 0; step < 50; ++step) {
@@ -202,17 +212,19 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Fix the duplicate function - remove duplicate runPlasticityExperiment
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
-    LearningExperiment experiment(brain, 42);
+    LearningExperiment experiment(brain);
     
     // Record initial state
     experiment.recordInitialState();
     
     // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
+    auto* region = getFirstRegion(brain);
+    if (region) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
@@ -245,6 +257,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
+// Restore the missing runStdpVerification function
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");

@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Improved parser that handles both simple key=value format and JSON-like format
+    // Supports: key=value, key="value with spaces", key=true/false, key=123, key=3.14
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,31 +28,97 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Handle JSON-like format (simplified)
+        if (line.find('{') == 0) {
+            // Very basic JSON object support - extract key-value pairs
+            // This is a simplified implementation for Phase 2
+            try {
+                // Find first "key": "value" pattern
+                size_t keyPos = line.find('"');
+                if (keyPos != std::string::npos) {
+                    size_t keyEnd = line.find('"', keyPos + 1);
+                    if (keyEnd != std::string::npos) {
+                        std::string key = trim(line.substr(keyPos + 1, keyEnd - keyPos - 1));
+                        
+                        size_t valuePos = line.find('"', keyEnd + 1);
+                        if (valuePos != std::string::npos) {
+                            size_t valueEnd = line.find('"', valuePos + 1);
+                            if (valueEnd != std::string::npos) {
+                                std::string value = trim(line.substr(valuePos + 1, valueEnd - valuePos - 1));
+                                set(key, value, ConfigSource::File);
+                            }
+                        }
+                    }
+                }
+            } catch (const std::exception&) {
+                // If JSON parsing fails, fall back to simple format
+                parseSimpleLine(line);
             }
-            
-            set(key, value, ConfigSource::File);
+        } else {
+            // Parse simple key=value pairs with enhanced support
+            parseSimpleLine(line);
         }
     }
     
     return true;
+}
+
+void Config::parseSimpleLine(const std::string& line) {
+    // Enhanced simple parser with better type detection
+    size_t pos = line.find('=');
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string valueStr = trim(line.substr(pos + 1));
+        
+        // Remove surrounding quotes
+        if (valueStr.size() >= 2 && 
+            ((valueStr.front() == '"' && valueStr.back() == '"') ||
+             (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+            valueStr = valueStr.substr(1, valueStr.size() - 2);
+        }
+        
+        // Detect value type and parse appropriately
+        if (valueStr.empty()) {
+            set(key, valueStr, ConfigSource::File);
+        } else if (valueStr == "true" || valueStr == "false") {
+            set(key, valueStr == "true", ConfigSource::File);
+        } else {
+            // Try to parse as number
+            try {
+                // Check if it's an integer
+                size_t posEnd;
+                int64_t intValue = std::stoll(valueStr, &posEnd);
+                if (posEnd == valueStr.size()) {
+                    set(key, intValue, ConfigSource::File);
+                    return;
+                }
+                
+                // Check if it's a floating point
+                double floatValue = std::stod(valueStr, &posEnd);
+                if (posEnd == valueStr.size()) {
+                    set(key, floatValue, ConfigSource::File);
+                    return;
+                }
+                
+                // If both fail, treat as string
+                set(key, valueStr, ConfigSource::File);
+                
+            } catch (const std::exception&) {
+                // If parsing fails, treat as string
+                set(key, valueStr, ConfigSource::File);
+            }
+        }
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -199,17 +265,50 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+void Config::parseSimpleLine(const std::string& line) {
+    // Enhanced simple parser with better type detection
+    size_t pos = line.find('=');
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string valueStr = trim(line.substr(pos + 1));
+        
+        // Remove surrounding quotes
+        if (valueStr.size() >= 2 && 
+            ((valueStr.front() == '"' && valueStr.back() == '"') ||
+             (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+            valueStr = valueStr.substr(1, valueStr.size() - 2);
+        }
+        
+        // Detect value type and parse appropriately
+        if (valueStr.empty()) {
+            set(key, valueStr, ConfigSource::File);
+        } else if (valueStr == "true" || valueStr == "false") {
+            set(key, valueStr == "true", ConfigSource::File);
+        } else {
+            // Try to parse as number
+            try {
+                // Check if it's an integer
+                size_t posEnd;
+                int64_t intValue = std::stoll(valueStr, &posEnd);
+                if (posEnd == valueStr.size()) {
+                    set(key, intValue, ConfigSource::File);
+                    return;
+                }
+                
+                // Check if it's a floating point
+                double floatValue = std::stod(valueStr, &posEnd);
+                if (posEnd == valueStr.size()) {
+                    set(key, floatValue, ConfigSource::File);
+                    return;
+                }
+                
+                // If both fail, treat as string
+                set(key, valueStr, ConfigSource::File);
+                
+            } catch (const std::exception&) {
+                // If parsing fails, treat as string
+                set(key, valueStr, ConfigSource::File);
+            }
+        }
+    }
+}

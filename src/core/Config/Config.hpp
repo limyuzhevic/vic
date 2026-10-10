@@ -100,6 +100,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    void parseSimpleLine(const std::string& line);
 };
 
 } // namespace nlm

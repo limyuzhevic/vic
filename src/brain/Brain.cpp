@@ -828,13 +828,47 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write inter-region connections
+        for (const auto& conn : pImpl->interRegionConnections) {
+            InterRegionConnectionCheckpointData interRegionData;
+            interRegionData.sourceRegion = conn.sourceRegion.index();
+            interRegionData.targetRegion = conn.targetRegion.index();
+            interRegionData.weight = conn.weight;
+            interRegionData.delay = conn.delay;
+            
+            if (!writer.writeInterRegionConnection(interRegionData)) {
+                NLM_LOG_ERROR("Failed to write inter-region connection to checkpoint");
+                return false;
+            }
+        }
+        
+        // Write development system state
+        if (pImpl->developmentSystem) {
+            DevelopmentSystemCheckpointData devData;
+            // TODO: Implement development system checkpoint support
+            // if (!writer.writeDevelopmentSystem(devData)) {
+            //     NLM_LOG_ERROR("Failed to write development system to checkpoint");
+            //     return false;
+            // }
+        }
+        
+        // Write neuromodulation system state
+        if (pImpl->dopamine) {
+            NeuromodulationCheckpointData neuromodData;
+            // TODO: Implement neuromodulation system checkpoint support
+            // if (!writer.writeNeuromodulationSystem(neuromodData)) {
+            //     NLM_LOG_ERROR("Failed to write neuromodulation system to checkpoint");
+            //     return false;
+            // }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
             return false;
         }
         
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        NLM_LOG_INFO("Brain state saved successfully (" + std::string(" + std::to_string(writer.getBytesWritten()) + " bytes)");
         return true;
         
     } catch (const std::exception& e) {
@@ -895,9 +929,68 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to recreate synapses in regions
+        NLM_LOG_INFO("Loading " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // First, create a mapping from neuron IDs to neuron pointers for quick lookup
+        std::unordered_map<NeuronId, Neuron*> neuronMap;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuronMap[neuron->getId()] = neuron;
+                }
+            }
+        }
+        
+        // Recreate synapses in their respective regions
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            NeuronId sourceId(synapseData.sourceNeuron[i]);
+            NeuronId destId(synapseData.destinationNeuron[i]);
+            
+            auto sourceIt = neuronMap.find(sourceId);
+            auto destIt = neuronMap.find(destId);
+            
+            if (sourceIt != neuronMap.end() && destIt != neuronMap.end()) {
+                // Find the region containing both neurons
+                for (auto& region : pImpl->regions) {
+                    // Check if both neurons belong to this region
+                    bool sourceInRegion = false;
+                    bool destInRegion = false;
+                    
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == sourceId) sourceInRegion = true;
+                            if (neuron->getId() == destId) destInRegion = true;
+                        }
+                    }
+                    
+                    if (sourceInRegion && destInRegion) {
+                        // Create new synapse
+                        auto synapse = std::make_unique<Synapse>(sourceId, destId, synapseData.weight[i], synapseData.delay[i]);
+                        synapse->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                        synapse->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                        
+                        // Add synapse to source neuron's outgoing list and destination neuron's incoming list
+                        sourceIt->second->addOutgoingSynapse(synapse.get());
+                        destIt->second->addIncomingSynapse(synapse.get());
+                        
+                        // Also add to region's synapse list
+                        region->addSynapse(std::move(synapse));
+                        
+                        NLM_LOG_DEBUG("Recreated synapse " + std::to_string(i) + 
+                                    " from neuron " + std::to_string(sourceId.index()) +
+                                    " to neuron " + std::to_string(destId.index()) +
+                                    " with weight " + std::to_string(synapseData.weight[i]));
+                        
+                        break;
+                    }
+                }
+            } else {
+                NLM_LOG_WARNING("Could not find neurons for synapse " + std::to_string(i) +
+                              " (source: " + std::to_string(sourceId.index()) +
+                              ", dest: " + std::to_string(destId.index()) + ")");
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

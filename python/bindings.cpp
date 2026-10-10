@@ -397,24 +397,84 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("getDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development system is enabled")
+        .def("getCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity system is enabled")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Create Pythonic factory functions for common use cases
+    m.def("create_brain_with_defaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create a brain with sensible default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create an agent brain interface for the given brain");
+
+    // Add Pythonic attributes for common constants
+    m.attr("NEURON_TYPE_EXCITATORY") = py::cast(NeuronType::Excitatory);
+    m.attr("NEURON_TYPE_INHIBITORY") = py::cast(NeuronType::Inhibitory);
+    m.attr("NEURON_TYPE_SENSORY") = py::cast(NeuronType::Sensory);
+    m.attr("NEURON_TYPE_MOTOR") = py::cast(NeuronType::Motor);
+    m.attr("NEURON_TYPE_INTERNAL") = py::cast(NeuronType::Internal);
+    m.attr("NEURON_TYPE_MODULATORY") = py::cast(NeuronType::Modulatory);
+
+    m.attr("SYNAPSE_TYPE_EXCITATORY") = py::cast(SynapseType::Excitatory);
+    m.attr("SYNAPSE_TYPE_INHIBITORY") = py::cast(SynapseType::Inhibitory);
+    m.attr("SYNAPSE_TYPE_MODULATORY") = py::cast(SynapseType::Modulatory);
+    m.attr("SYNAPSE_TYPE_ELECTRICAL") = py::cast(SynapseType::Electrical);
+    m.attr("SYNAPSE_TYPE_GAP_JUNCTION") = py::cast(SynapseType::GapJunction);
+
+    m.attr("DEVELOPMENTAL_STAGE_INITIAL") = py::cast(DevelopmentalStage::Initial);
+    m.attr("DEVELOPMENTAL_STAGE_CRITICAL_PERIOD") = py::cast(DevelopmentalStage::CriticalPeriod);
+    m.attr("DEVELOPMENTAL_STAGE_MATURATION") = py::cast(DevelopmentalStage::Maturation);
+    m.attr("DEVELOPMENTAL_STAGE_ADULT") = py::cast(DevelopmentalStage::Adult);
+    m.attr("DEVELOPMENTAL_STAGE_AGING") = py::cast(DevelopmentalStage::Aging);
+
+    m.attr("ACTION_TYPE_MOVE_FORWARD") = py::cast(ActionType::MoveForward);
+    m.attr("ACTION_TYPE_MOVE_BACKWARD") = py::cast(ActionType::MoveBackward);
+    m.attr("ACTION_TYPE_TURN_LEFT") = py::cast(ActionType::TurnLeft);
+    m.attr("ACTION_TYPE_TURN_RIGHT") = py::cast(ActionType::TurnRight);
+    m.attr("ACTION_TYPE_LOOK") = py::cast(ActionType::Look);
+    m.attr("ACTION_TYPE_INTERACT") = py::cast(ActionType::Interact);
+    m.attr("ACTION_TYPE_EAT") = py::cast(ActionType::Eat);
+    m.attr("ACTION_TYPE_DRINK") = py::cast(ActionType::Drink);
+    m.attr("ACTION_TYPE_REST") = py::cast(ActionType::Rest);
+    m.attr("ACTION_TYPE_WAIT") = py::cast(ActionType::Wait);
+
+    m.attr("WORLD_OBJECT_TYPE_EMPTY") = py::cast(WorldObjectType::Empty);
+    m.attr("WORLD_OBJECT_TYPE_RESOURCE") = py::cast(WorldObjectType::Resource);
+    m.attr("WORLD_OBJECT_TYPE_HAZARD") = py::cast(WorldObjectType::Hazard);
+    m.attr("WORLD_OBJECT_TYPE_WALL") = py::cast(WorldObjectType::Wall);
+    m.attr("WORLD_OBJECT_TYPE_MARKER") = py::cast(WorldObjectType::Marker);
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
