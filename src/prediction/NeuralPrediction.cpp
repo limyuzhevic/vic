@@ -1,5 +1,6 @@
 #include "NeuralPrediction.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -24,7 +25,13 @@ struct NeuralPrediction::Impl {
     std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
     std::vector<float> actionRewards;
     
-    Impl() : brain(nullptr) {}
+    // Enhanced prediction state
+    SimulationStep lastPredictionStep;
+    float predictionPrecision;  // How precise current predictions are
+    std::vector<float> predictionTrajectory;  // Predicted sequence of states
+    float learningRate;  // How fast predictions are updated
+    
+    Impl() : brain(nullptr), predictionPrecision(0.5f), learningRate(0.1f), lastPredictionStep(0) {}
 };
 
 NeuralPrediction::NeuralPrediction()
@@ -36,7 +43,12 @@ NeuralPrediction::NeuralPrediction()
     , brain_(nullptr)
     , predictionError_(0.0f)
     , predictionConfidence_(0.5f)
+    , lastPredictionStep_(0)
+    , predictionPrecision_(0.5f)
+    , learningRate_(0.1f)
 {
+    // Initialize additional prediction state
+    predictionTrajectory_.reserve(predictionHorizon_);
 }
 
 NeuralPrediction::~NeuralPrediction() = default;
@@ -74,17 +86,45 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
         return std::vector<float>();
     }
     
+    // Update prediction state
+    pImpl->lastPredictionStep = currentStep;
+    
     // Find best matching learned sequence
     const auto& currentState = recentSensoryStates_.back();
     
-    // Find most similar pattern we've seen
+    // Use enhanced prediction with neuromodulation integration
+    std::vector<float> predictedState = currentState;  // Default: predict no change
+    
+    // Apply neuromodulation effects to prediction accuracy
+    if (brain_) {
+        // Check if dopamine modulates prediction precision
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            float precisionEnhancement = 1.0f + dopamineLevel * 0.5f;
+            predictionPrecision_ = std::min(1.0f, predictionPrecision_ * precisionEnhancement);
+        }
+        
+        // Apply curiosity effects to prediction exploration
+        if (brain_->getCuriosity() && brain_->getCuriosity()->getExplorationDrive() > 0.5f) {
+            // High curiosity increases prediction exploration and innovation
+            predictionPrecision_ = std::min(1.0f, predictionPrecision_ + 0.1f);
+            // Add some noise to predictions to encourage exploration
+            for (float& val : predictedState) {
+                val += (rng_.nextFloat() - 0.5f) * 0.1f * predictionPrecision_;
+            }
+        }
+    }
+    
+    // Try to find matching pattern with enhanced similarity
     NeuronId bestMatch = INVALID_NEURON_ID;
     float bestSimilarity = 0.0f;
     
     for (size_t i = 0; i < pImpl->patternRepresentations.size(); ++i) {
         float sim = computeSimilarity(currentState, pImpl->patternRepresentations[i]);
-        if (sim > bestSimilarity) {
-            bestSimilarity = sim;
+        // Apply prediction precision weighting
+        float weightedSimilarity = sim * predictionPrecision_;
+        if (weightedSimilarity > bestSimilarity) {
+            bestSimilarity = weightedSimilarity;
             bestMatch = pImpl->patternNeurons[i];
         }
     }
@@ -97,7 +137,7 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
                 // Found association - return the associated pattern
                 for (size_t i = 0; i < pImpl->patternNeurons.size(); ++i) {
                     if (pImpl->patternNeurons[i] == assoc.second) {
-                        predictionConfidence_ = bestSimilarity;
+                        predictionConfidence_ = bestSimilarity * predictionPrecision_;
                         return pImpl->patternRepresentations[i];
                     }
                 }
@@ -105,9 +145,19 @@ std::vector<float> NeuralPrediction::generatePrediction(SimulationStep currentSt
         }
     }
     
+    // Apply prediction error-based modulation for next step
+    if (predictionError_ > 0.0f) {
+        // Higher prediction error increases exploration in predictions
+        predictionPrecision_ = std::max(0.1f, predictionPrecision_ - predictionError_ * 0.2f);
+        // Add exploration bias to predictions
+        for (float& val : predictedState) {
+            val += (rng_.nextFloat() - 0.5f) * 0.2f * (1.0f - predictionPrecision_);
+        }
+    }
+    
     // No good prediction - return current state as baseline
     predictionConfidence_ = 0.0f;
-    return currentState;
+    return predictedState;
 }
 
 float NeuralPrediction::updateWithObservation(const std::vector<float>& actualState,
@@ -115,25 +165,70 @@ float NeuralPrediction::updateWithObservation(const std::vector<float>& actualSt
     // Generate prediction first
     auto predicted = generatePrediction(currentStep);
     
-    // Compute error
+    // Compute error with enhanced prediction error integration
     if (predicted.empty()) {
         predictionError_ = 0.0f;
     } else {
         predictionError_ = computeSimilarity(predicted, actualState);
         predictionError_ = 1.0f - predictionError_;  // Convert to error
+        
+        // Enhanced error computation with neuromodulation
+        if (brain_) {
+            // Apply dopamine effects on prediction error sensitivity
+            if (brain_->getDopamine()) {
+                float dopamineLevel = brain_->getDopamine()->getLevel();
+                // Dopamine enhances sensitivity to prediction errors
+                float errorSensitivity = 1.0f + dopamineLevel * 0.8f;
+                predictionError_ = std::min(1.0f, predictionError_ * errorSensitivity);
+                
+                // Update prediction precision based on dopamine
+                float precisionAdjustment = dopamineLevel * 0.2f;
+                predictionPrecision_ = std::min(1.0f, predictionPrecision_ + precisionAdjustment);
+            }
+            
+            // Apply curiosity effects on prediction error
+            if (brain_->getCuriosity()) {
+                float curiosityLevel = brain_->getCuriosity()->getExplorationDrive();
+                if (curiosityLevel > 0.5f) {
+                    // High curiosity increases sensitivity to prediction errors
+                    // encouraging exploration to reduce errors
+                    predictionError_ = std::min(1.0f, predictionError_ * 1.2f);
+                    // Update learning rate based on curiosity
+                    learningRate_ = std::min(0.3f, learningRate_ + curiosityLevel * 0.1f);
+                }
+            }
+        }
+        
+        // Enhanced prediction error history with neuromodulation
+        errorHistory_.push_back(predictionError_);
+        if (errorHistory_.size() > 1000) {
+            errorHistory_.erase(errorHistory_.begin());
+        }
+        
+        // Record the actual state for future learning
+        recordSensoryState(actualState, currentStep);
+        
+        // Modulate learning based on error with enhanced neuromodulation
+        float reward = 1.0f - predictionError_;
+        
+        // Apply enhanced neuromodulation to prediction synapses
+        modulatePredictionSynapses(predictionError_, reward);
+        
+        // Update prediction trajectory with error information
+        if (!predicted.empty()) {
+            predictionTrajectory_.clear();
+            predictionTrajectory_.push_back(actualState);
+        }
+        
+        // Apply enhanced learning rate based on prediction error
+        if (predictionError_ > 0.5f) {
+            // High error = faster learning
+            learningRate_ = std::min(0.3f, learningRate_ * 1.5f);
+        } else if (predictionError_ < 0.1f) {
+            // Low error = slower learning (more confidence)
+            learningRate_ = std::max(0.01f, learningRate_ * 0.9f);
+        }
     }
-    
-    errorHistory_.push_back(predictionError_);
-    if (errorHistory_.size() > 1000) {
-        errorHistory_.erase(errorHistory_.begin());
-    }
-    
-    // Record the actual state for future learning
-    recordSensoryState(actualState, currentStep);
-    
-    // Modulate learning based on error
-    float reward = 1.0f - predictionError_;
-    modulatePredictionSynapses(predictionError_, reward);
     
     return predictionError_;
 }

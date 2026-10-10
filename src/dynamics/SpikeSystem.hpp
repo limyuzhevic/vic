@@ -48,6 +48,12 @@ public:
     // Process pending delayed spikes that should be delivered now
     void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
     
+    // Process spikes with delays (delegated to processDelayedSpikes internally)
+    void processSpikesWithDelays(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Cleanup stale events
+    void cleanup();
+    
     // Register spike handler callback (called when spikes are generated)
     using SpikeHandler = std::function<void(const DetailedSpikeEvent&)>;
     void registerHandler(SpikeHandler handler);
@@ -64,6 +70,18 @@ public:
     size_t getSpikeCount() const;
     size_t getPendingSpikeCount() const;
     size_t getPendingDelayedCount() const;
+    
+    // Get total spikes over all time (alias for getSpikeCount)
+    size_t getTotalSpikes() const;
+    
+    // Get spike events (alias for getSpikeHistory)
+    const std::vector<DetailedSpikeEvent>& getSpikeEvents() const;
+    
+    // Get delayed spike events
+    const std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>>& getDelayedSpikeEvents() const;
+    
+    // Get current simulation step
+    SimulationStep getCurrentStep() const;
     
     // Statistics
     float getAverageSpikeRate() const;

@@ -48,6 +48,21 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Enhanced neuromodulation methods
+    void enhanceSTDP(Synapse* synapse, const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes, TimestepDuration dt);
+    void enhanceHebbian(Synapse* synapse, const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes, TimestepDuration dt);
+    void enhanceStructuralPlasticity(Brain* brain, RandomGenerator& rng, float activityThreshold);
+    void updatePredictionIntegration(float predictionError, float reward);
+    
+    // Get enhanced neuromodulation factors
+    float getEnhancedSTDPFactor() const;
+    float getEnhancedHebbianFactor() const;
+    float getEnhancedStructuralFactor() const;
+    float getPredictionErrorWeight() const;
+    float getRewardPredictionWeight() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

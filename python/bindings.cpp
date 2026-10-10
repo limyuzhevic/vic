@@ -1,10 +1,4 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
+#include <optional>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -144,6 +138,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
+        // Simplified config interface
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
@@ -247,6 +242,7 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
+        // Simplified getters/setters with unified interface
         .def("getVision", &SensoryPercept::getVision)
         .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
         .def("getVisionWidth", &SensoryPercept::getVisionWidth)
@@ -270,12 +266,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
+        // Simplified method for applying motor command
+        .def("act", [](SimpleWorld& self, const ActionType& type, float currentTime) {
+            self.applyMotorCommand(type, currentTime);
+        }, py::arg("type"), py::arg("currentTime"),
+             "Apply a motor action at the given time")
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept)
+        .def("getAgentBody", &SimpleWorld::getAgentBody)
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
@@ -293,12 +290,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+        // Simplified step method with optional timestamp parameter
+        .def("step", [](Brain& self, SimulationStep currentStep, std::optional<Timestamp> currentTime) {
+            if (currentTime.has_value()) {
+                self.step(currentStep, currentTime.value());
+            } else {
+                self.step(currentStep);
+            }
+        }, py::arg("currentStep"), py::arg("currentTime") = std::nullopt,
+             "Perform a simulation step. Optional currentTime parameter enables time-based computations.")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -353,37 +353,38 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Simplified AgentBrain class with convenience methods
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+        .def("applyNeuromodulation", &AgentBrain::applyNeuromodulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+        // Convenience methods for common agent operations
+        .def("act", [](AgentBrain& self, const SensoryPercept& percept) {
+            self.processSensoryInput(percept);
+            return self.decodeMotorCommand();
+        }, py::arg("percept"),
+             "Complete action cycle: process input and produce output")
+        .def("learn", [](AgentBrain& self, float reward, float predictedReward) {
+            self.applyNeuromodulation(reward, predictedReward);
+        }, py::arg("reward"), py::arg("predictedReward"),
+             "Apply learning from experience")
+        .def("step", [](AgentBrain& self, const SensoryPercept& percept, float reward, float predictedReward, SimulationStep timestep) {
+            self.processSensoryInput(percept);
+            self.applyNeuromodulation(reward, predictedReward);
+            self.updateDevelopment(timestep);
+        }, py::arg("percept"), py::arg("reward"), py::arg("predictedReward"), py::arg("timestep"),
+             "Complete agent step with input, learning, and development")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
@@ -400,6 +401,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions for easy creation
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,6 +418,7 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
