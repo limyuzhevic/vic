@@ -213,7 +213,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        static const float MAX_EXPLORATION_CHANCE = 0.3f;
+        float exploreChance = curiosityLevel_ * MAX_EXPLORATION_CHANCE;
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {

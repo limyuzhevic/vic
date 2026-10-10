@@ -68,6 +68,12 @@ void Neuron::setThreshold(MembranePotential threshold) {
 
 void Neuron::setFiringState(FiringState state) {
     pImpl->state.firingState = state;
+    // Log state changes for debugging
+    if (state == FiringState::Spiking) {
+        NLM_LOG_DEBUG("Neuron " + std::to_string(pImpl->id) + " entered spiking state");
+    } else if (state == FiringState::Refractory) {
+        NLM_LOG_DEBUG("Neuron " + std::to_string(pImpl->id) + " entered refractory state");
+    }
 }
 
 void Neuron::decrementRefractory() {
