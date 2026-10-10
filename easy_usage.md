@@ -40,6 +40,7 @@ for i in range(100):
     brain.step(i)  # One step of thinking
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+print("Neurons:", brain.getTotalNeuronCount())
 ```
 
 ### Example 2: Brain in a Simple World
@@ -69,6 +70,41 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Enhanced Brain with Learning
+
+```python
+import pynlm
+
+# Create everything with learning capabilities
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run enhanced simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("Enhanced simulation complete!")
+print("Learning features enabled: Reward modulation, Structural plasticity, Development, Curiosity")
 ```
 
 ---
