@@ -28,22 +28,100 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    // Validate input parameters
+    if (id.value == 0) {
+        NLM_LOG_WARNING("Creating neuron with zero ID");
+    }
+    
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    
+    // Initialize neuron state with biologically plausible defaults
+    pImpl->state.membranePotential = -70.0f;  // Resting potential
+    pImpl->state.restingPotential = -70.0f;
+    pImpl->state.threshold = -55.0f;
+    pImpl->state.resetPotential = -70.0f;
+    pImpl->state.leakConductance = 10.0f;
+    pImpl->state.synapseConductance = 0.0f;
+    pImpl->state.firingRate = 0.0f;
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.refractoryPeriod = 5;
+    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Initialize other member variables
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
+    
+    // Initialize plasticity flags
+    pImpl->plasticityFlags.hebbian = false;
+    pImpl->plasticityFlags.stdp = false;
+    pImpl->plasticityFlags.reward_modulated = false;
+    
+    NLM_LOG_INFO("Neuron " + std::to_string(id.value) + " created");
+}
+
+Neuron::Neuron(NeuronId id, NeuronType type, MembranePotential threshold) : pImpl(new Impl) {
+    // Validate input parameters
+    if (id.value == 0) {
+        NLM_LOG_WARNING("Creating neuron with zero ID");
+    }
+    
+    if (threshold <= -70.0f) {
+        NLM_LOG_WARNING("Creating neuron with threshold <= resting potential");
+    }
+    
+    pImpl->id = id;
+    pImpl->type = type;
+    pImpl->regionId = INVALID_REGION_ID;
+    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->totalCurrent = 0.0f;
+    
+    // Initialize neuron state with provided parameters
+    pImpl->state.membranePotential = -70.0f;  // Default resting potential
+    pImpl->state.restingPotential = -70.0f;
+    pImpl->state.threshold = threshold;
+    pImpl->state.resetPotential = -70.0f;
+    pImpl->state.leakConductance = 10.0f;
+    pImpl->state.synapseConductance = 0.0f;
+    pImpl->state.firingRate = 0.0f;
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.refractoryPeriod = 5;
+    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Initialize other member variables
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
+    
+    // Initialize plasticity flags
+    pImpl->plasticityFlags.hebbian = false;
+    pImpl->plasticityFlags.stdp = false;
+    pImpl->plasticityFlags.reward_modulated = false;
+    
+    NLM_LOG_INFO("Neuron " + std::to_string(id.value) + " created (type=" + std::to_string(static_cast<int>(type)) + ", threshold=" + std::to_string(threshold) + ")");
 }
 
 Neuron::~Neuron() = default;
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
+    // After move, the other neuron should not be used
+    // All resources are transferred to this neuron
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        delete pImpl;  // Clean up existing resources
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

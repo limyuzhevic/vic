@@ -20,43 +20,133 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+    // Validate input parameter
+    if (!brain) {
+        NLM_LOG_WARNING("Creating AgentBrain with null brain pointer");
+        NLM_LOG_ERROR("Brain pointer cannot be null in AgentBrain constructor");
+        throw std::invalid_argument("Brain pointer cannot be null");
+    }
+    
+    try {
+        // Initialize motor and sensory neuron groups with validation
+        initializeNeuronGroups();
+        
+        NLM_LOG_INFO("AgentBrain constructor completed successfully");
+        NLM_LOG_INFO("Initialized " + std::to_string(motorForward_.size()) + " forward, " +
+                     std::to_string(motorBackward_.size()) + " backward, " +
+                     std::to_string(motorTurnLeft_.size()) + " turnLeft, " +
+                     std::to_string(motorTurnRight_.size()) + " turnRight, " +
+                     std::to_string(motorInteract_.size()) + " interact, " +
+                     std::to_string(motorWait_.size()) + " wait motor neurons");
+        NLM_LOG_INFO("Initialized " + std::to_string(sensoryVision_.size()) + " vision, " +
+                     std::to_string(sensoryTouch_.size()) + " touch, " +
+                     std::to_string(sensoryInternal_.size()) + " internal, " +
+                     std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons");
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception in AgentBrain constructor: " + std::string(e.what()));
+        // Clean up partially initialized state
+        motorForward_.clear();
+        motorBackward_.clear();
+        motorTurnLeft_.clear();
+        motorTurnRight_.clear();
+        motorInteract_.clear();
+        motorWait_.clear();
+        sensoryVision_.clear();
+        sensoryTouch_.clear();
+        sensoryInternal_.clear();
+        sensoryProprioception_.clear();
+        throw;
+    }
+}
+
+void AgentBrain::initializeNeuronGroups() {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot initialize neuron groups: brain_ is null");
+        return;
+    }
+    
+    bool hasNeurons = false;
+    
+    for (const auto& region : brain_->getRegions()) {
+        if (!region) {
+            NLM_LOG_WARNING("Region is null, skipping");
+            continue;
+        }
+        
+        for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_WARNING("Population is null, skipping");
+                continue;
+            }
+            
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                auto neurons = pop->getNeurons();
+                if (neurons.empty()) {
+                    NLM_LOG_WARNING("Motor population has no neurons");
+                } else {
+                    hasNeurons = true;
+                    distributeMotorNeurons(neurons);
+                }
+            } else if (type == NeuronType::Sensory) {
+                auto neurons = pop->getNeurons();
+                if (neurons.empty()) {
+                    NLM_LOG_WARNING("Sensory population has no neurons");
+                } else {
+                    hasNeurons = true;
+                    distributeSensoryNeurons(neurons);
                 }
             }
+        }
+    }
+    
+    if (!hasNeurons) {
+        NLM_LOG_WARNING("No neurons found in brain regions");
+        NLM_LOG_WARNING("AgentBrain will have empty neuron groups");
+    }
+}
+
+void AgentBrain::distributeMotorNeurons(const std::vector<Neuron*>& neurons) {
+    for (Neuron* n : neurons) {
+        if (!n) {
+            NLM_LOG_WARNING("Motor neuron pointer is null");
+            continue;
+        }
+        
+        // Distribute motor neurons to different action groups
+        size_t idx = motorForward_.size() + motorBackward_.size() + 
+                    motorTurnLeft_.size() + motorTurnRight_.size() +
+                    motorInteract_.size() + motorWait_.size();
+        
+        switch (idx % 6) {
+            case 0: motorForward_.push_back(n); break;
+            case 1: motorBackward_.push_back(n); break;
+            case 2: motorTurnLeft_.push_back(n); break;
+            case 3: motorTurnRight_.push_back(n); break;
+            case 4: motorInteract_.push_back(n); break;
+            case 5: motorWait_.push_back(n); break;
+        }
+    }
+}
+
+void AgentBrain::distributeSensoryNeurons(const std::vector<Neuron*>& neurons) {
+    for (Neuron* n : neurons) {
+        if (!n) {
+            NLM_LOG_WARNING("Sensory neuron pointer is null");
+            continue;
+        }
+        
+        // Distribute sensory neurons
+        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                    sensoryInternal_.size() + sensoryProprioception_.size();
+        
+        switch (idx % 4) {
+            case 0: sensoryVision_.push_back(n); break;
+            case 1: sensoryTouch_.push_back(n); break;
+            case 2: sensoryInternal_.push_back(n); break;
+            case 3: sensoryProprioception_.push_back(n); break;
         }
     }
 }

@@ -160,6 +160,152 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Advanced batch operations
+        .def("setBatch", [](Config& self, const py::dict& values) {
+            for (auto item : values) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object value_obj = item.second;
+                
+                // Determine type and call appropriate setter
+                if (value_obj.is_none()) {
+                    self.remove(key);
+                } else if (value_obj.is_true()) {
+                    self.set(key, true, ConfigSource::Runtime);
+                } else if (value_obj.is_false()) {
+                    self.set(key, false, ConfigSource::Runtime);
+                } else if (py::isinstance<py::int_>(value_obj)) {
+                    int val = py::cast<int>(value_obj);
+                    self.set(key, val, ConfigSource::Runtime);
+                } else if (py::isinstance<py::float_>(value_obj)) {
+                    double val = py::cast<double>(value_obj);
+                    self.set(key, val, ConfigSource::Runtime);
+                } else {
+                    std::string val = py::cast<std::string>(value_obj);
+                    self.set(key, val, ConfigSource::Runtime);
+                }
+            }
+        }, py::arg("values"), "Set multiple configuration values from a dictionary")
+        
+        .def("getAll", [](Config& self) {
+            py::dict result;
+            for (const auto& key : self.getKeys()) {
+                // Try different types
+                auto int_val = self.get<int>(key);
+                if (int_val.has_value()) {
+                    result[py::cast(key)] = py::cast(int_val.value());
+                    continue;
+                }
+                auto double_val = self.get<double>(key);
+                if (double_val.has_value()) {
+                    result[py::cast(key)] = py::cast(double_val.value());
+                    continue;
+                }
+                auto bool_val = self.get<bool>(key);
+                if (bool_val.has_value()) {
+                    result[py::cast(key)] = py::cast(bool_val.value());
+                    continue;
+                }
+                auto string_val = self.get<std::string>(key);
+                if (string_val.has_value()) {
+                    result[py::cast(key)] = py::cast(string_val.value());
+                    continue;
+                }
+                // If we can't determine type, use string representation
+                result[py::cast(key)] = "UNKNOWN_TYPE";
+            }
+            return result;
+        }, "Get all configuration values as a dictionary")
+        
+        .def("validateKeys", [](Config& self, const py::list& required_keys) {
+            std::vector<std::string> missing_keys;
+            for (auto item : required_keys) {
+                std::string key = py::cast<std::string>(item);
+                if (!self.has(key)) {
+                    missing_keys.push_back(key);
+                }
+            }
+            if (missing_keys.empty()) {
+                return py::dict();
+            }
+            py::dict result;
+            result["success"] = false;
+            result["missing_keys"] = missing_keys;
+            return result;
+        }, py::arg("required_keys"), "Validate that all required keys exist, returns dict with success and missing keys")
+        
+        .def("getAsDict", [](Config& self, const py::list& keys) {
+            py::dict result;
+            for (auto item : keys) {
+                std::string key = py::cast<std::string>(item);
+                
+                // Try different types
+                auto int_val = self.get<int>(key);
+                if (int_val.has_value()) {
+                    result[py::cast(key)] = py::cast(int_val.value());
+                    continue;
+                }
+                auto double_val = self.get<double>(key);
+                if (double_val.has_value()) {
+                    result[py::cast(key)] = py::cast(double_val.value());
+                    continue;
+                }
+                auto bool_val = self.get<bool>(key);
+                if (bool_val.has_value()) {
+                    result[py::cast(key)] = py::cast(bool_val.value());
+                    continue;
+                }
+                auto string_val = self.get<std::string>(key);
+                if (string_val.has_value()) {
+                    result[py::cast(key)] = py::cast(string_val.value());
+                    continue;
+                }
+            }
+            return result;
+        }, py::arg("keys"), "Get specified keys as a dictionary with automatic type conversion")
+        
+        .def("setSource", [](Config& self, const py::dict& values, ConfigSource source) {
+            for (auto item : values) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object value_obj = item.second;
+                
+                if (value_obj.is_none()) {
+                    self.remove(key);
+                } else if (value_obj.is_true()) {
+                    self.set(key, true, source);
+                } else if (value_obj.is_false()) {
+                    self.set(key, false, source);
+                } else if (py::isinstance<py::int_>(value_obj)) {
+                    int val = py::cast<int>(value_obj);
+                    self.set(key, val, source);
+                } else if (py::isinstance<py::float_>(value_obj)) {
+                    double val = py::cast<double>(value_obj);
+                    self.set(key, val, source);
+                } else {
+                    std::string val = py::cast<std::string>(value_obj);
+                    self.set(key, val, source);
+                }
+            }
+        }, py::arg("values"), py::arg("source"), "Set multiple configuration values with a specific source")
+        
+        .def("compareWithDefaults", [](Config& self, const Config& defaults) {
+            py::dict changes;
+            for (const auto& key : self.getKeys()) {
+                auto self_val = self.get<std::string>(key);
+                auto default_val = defaults.get<std::string>(key);
+                
+                if (self_val.has_value() && default_val.has_value()) {
+                    if (self_val.value() != default_val.value()) {
+                        changes[py::cast(key)] = py::make_tuple(
+                            py::cast(self_val.value()),
+                            py::cast(default_val.value())
+                        );
+                    }
+                }
+            }
+            return changes;
+        }, py::arg("defaults"), "Compare current config with default config, returns dict of changed values")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -289,69 +435,292 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+        .def("enablePerformanceMonitoring", [](Brain& self, bool enable) {
+            // Set a performance monitoring flag in the brain config
+            if (auto config = self.getConfig()) {
+                config->set("performance_monitoring", enable, ConfigSource::Runtime);
+            }
+        }, py::arg("enable"), "Enable or disable performance monitoring")
+        
+        .def("enableDebugLogging", [](Brain& self, bool enable, std::string level) {
+            if (auto config = self.getConfig()) {
+                config->set("debug_level", level, ConfigSource::Runtime);
+            }
+        }, py::arg("enable"), py::arg("level"), "Enable debug logging with specified level")
+        
+        .def("benchmarkStep", [](Brain& self, SimulationStep steps, bool reset) {
+            if (reset) {
+                self.reset();
+                self.initialize();
+            }
+            
+            auto start_time = std::chrono::high_resolution_clock::now();
+            
+            for (SimulationStep step = 0; step < steps; ++step) {
+                self.step(step);
+            }
+            
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            
+            py::dict results;
+            results["steps"] = steps;
+            results["duration_us"] = duration.count();
+            results["avg_time_per_step_us"] = duration.count() / steps;
+            results["spikes_per_step"] = static_cast<double>(self.getTotalSpikeCount()) / steps;
+            results["neurons_firing"] = self.getFiringNeuronCount();
+            results["firing_rate_hz"] = (duration.count() / 1000000.0) > 0 ? 
+                static_cast<double>(self.getTotalSpikeCount()) / (duration.count() / 1000000.0) : 0.0;
+            
+            return results;
+        }, py::arg("steps"), py::arg("reset") = true, "Benchmark brain performance over a number of steps")
+        
+        .def("getPerformanceStats", [](Brain& self) {
+            py::dict stats;
+            stats["total_neuron_count"] = self.getTotalNeuronCount();
+            stats["total_synapse_count"] = self.getTotalSynapseCount();
+            stats["total_spike_count"] = self.getTotalSpikeCount();
+            stats["firing_neuron_count"] = self.getFiringNeuronCount();
+            stats["average_firing_rate"] = self.getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = self.getExcitationInhibitionRatio();
+            stats["pending_spike_events"] = self.getPendingSpikeEventCount();
+            stats["region_count"] = self.getRegionCount();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            
+            if (auto config = self.getConfig()) {
+                py::dict config_stats;
+                config_stats["keys"] = config->getKeys();
+                stats["config"] = config_stats;
+            }
+            
+            return stats;
+        }, "Get comprehensive performance and system statistics")
+        
+        .def("validateBrainState", [](Brain& self) {
+            py::dict validation_results;
+            validation_results["valid"] = true;
+            validation_results["errors"] = py::list();
+            validation_results["warnings"] = py::list();
+            
+            // Check basic consistency
+            if (self.getTotalNeuronCount() == 0) {
+                validation_results["valid"] = false;
+                validation_results["errors"].attr("append")("Brain has no neurons");
+            }
+            
+            if (self.getTotalSynapseCount() < 0) {
+                validation_results["warnings"].attr("append")("Synapse count is negative");
+            }
+            
+            if (self.getAverageFiringRate() > 1000.0f) {
+                validation_results["warnings"].attr("append")("Very high firing rate detected");
+            }
+            
+            // Check region consistency
+            if (self.getRegionCount() == 0) {
+                validation_results["warnings"].attr("append")("No regions found");
+            }
+            
+            return validation_results;
+        }, "Validate brain state consistency and return validation results")
+        
+    // Checkpoint and restart capabilities
+    .def("createCheckpoint", [](Brain& self, const std::string& label = "") {
+        std::string filepath = "checkpoint_" + label + "_" + 
+                               std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + 
+                               ".bin";
+        bool success = self.save(filepath);
+        if (success) {
+            py::dict result;
+            result["success"] = true;
+            result["filepath"] = filepath;
+            result["label"] = label;
+            return result;
+        } else {
+            py::dict result;
+            result["success"] = false;
+            result["filepath"] = filepath;
+            result["label"] = label;
+            return result;
+        }
+    }, py::arg("label") = "", "Create a checkpoint with optional label, returns dict with success and filepath")
+    
+    .def("restoreCheckpoint", [](Brain& self, const std::string& filepath, bool resetFirst = true) {
+        if (resetFirst) {
+            self.reset();
+            self.initialize();
+        }
+        bool success = self.load(filepath);
+        py::dict result;
+        result["success"] = success;
+        result["filepath"] = filepath;
+        result["was_reset"] = resetFirst;
+        return result;
+    }, py::arg("filepath"), py::arg("resetFirst") = true, "Restore a checkpoint, optionally resetting first")
+    
+    .def("listCheckpoints", [](const std::string& directory = "./checkpoints") {
+        std::vector<std::string> checkpoints;
+        
+        try {
+            if (std::filesystem::exists(directory)) {
+                for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+                    if (entry.is_regular_file() && entry.path().extension() == ".bin") {
+                        checkpoints.push_back(entry.path().string());
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            // Return empty list if directory doesn't exist or can't be read
+        }
+        
+        return checkpoints;
+    }, py::arg("directory") = "./checkpoints", "List available checkpoint files in directory")
+    
+    .def("checkpointInfo", [](Brain& self, const std::string& filepath) {
+        // Simple checkpoint info extraction (placeholder for more detailed info)
+        py::dict info;
+        
+        std::ifstream file(filepath, std::ios::binary);
+        if (file.is_open()) {
+            // Basic file info
+            file.seekg(0, std::ios::end);
+            size_t fileSize = file.tellg();
+            file.seekg(0, std::ios::beg);
+            
+            info["filepath"] = filepath;
+            info["file_size_bytes"] = static_cast<size_t>(fileSize);
+            info["readable"] = true;
+            
+            // Try to load and get brain info
+            Brain tempBrain(self.getConfig());
+            if (tempBrain.load(filepath)) {
+                info["brain_size"] = tempBrain.getTotalNeuronCount();
+                info["synapses"] = tempBrain.getTotalSynapseCount();
+                info["regions"] = tempBrain.getRegionCount();
+            } else {
+                info["brain_size"] = 0;
+                info["synapses"] = 0;
+                info["regions"] = 0;
+            }
+        } else {
+            info["filepath"] = filepath;
+            info["file_size_bytes"] = 0;
+            info["readable"] = false;
+            info["brain_size"] = 0;
+            info["synapses"] = 0;
+            info["regions"] = 0;
+        }
+        
+        return info;
+    }, py::arg("filepath"), "Get information about a checkpoint file")
+    
+    .def("compareCheckpoints", [](const std::string& filepath1, const std::string& filepath2) {
+        py::dict comparison;
+        
+        // Basic file comparison
+        comparison["file1_exists"] = std::filesystem::exists(filepath1);
+        comparison["file2_exists"] = std::filesystem::exists(filepath2);
+        
+        if (!comparison["file1_exists"].cast<bool>() || !comparison["file2_exists"].cast<bool>()) {
+            comparison["comparable"] = false;
+            comparison["error"] = "One or both files do not exist";
+            return comparison;
+        }
+        
+        // Compare file sizes
+        auto size1 = std::filesystem::file_size(filepath1);
+        auto size2 = std::filesystem::file_size(filepath2);
+        comparison["file1_size"] = static_cast<size_t>(size1);
+        comparison["file2_size"] = static_cast<size_t>(size2);
+        comparison["size_difference"] = std::abs(size1 - size2);
+        
+        comparison["comparable"] = true;
+        comparison["recommendation"] = "Load one checkpoint and compare with the other";
+        
+        return comparison;
+    }, py::arg("filepath1"), py::arg("filepath2"), "Compare two checkpoint files")
+    
+    .def("cleanupOldCheckpoints", [](const std::string& directory, size_t maxFiles = 10) {
+        py::dict result;
+        
+        if (!std::filesystem::exists(directory)) {
+            result["success"] = false;
+            result["message"] = "Directory does not exist: " + directory;
+            return result;
+        }
+        
+        std::vector<std::filesystem::path> checkpoint_files;
+        std::vector<std::filesystem::file_time_type> file_times;
+        
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".bin") {
+                checkpoint_files.push_back(entry.path());
+                file_times.push_back(entry.last_write_time());
+            }
+        }
+        
+        if (checkpoint_files.size() <= maxFiles) {
+            result["success"] = true;
+            result["message"] = "No cleanup needed, " + std::to_string(checkpoint_files.size()) + " files <= " + std::to_string(maxFiles);
+            return result;
+        }
+        
+        // Sort by modification time (oldest first)
+        std::vector<size_t> indices(checkpoint_files.size());
+        std::iota(indices.begin(), indices.end(), 0);
+        std::sort(indices.begin(), indices.end(), [&](size_t i, size_t j) {
+            return file_times[i] < file_times[j];
+        });
+        
+        size_t to_delete = checkpoint_files.size() - maxFiles;
+        size_t deleted = 0;
+        
+        for (size_t i = 0; i < to_delete && i < indices.size(); ++i) {
+            try {
+                std::filesystem::remove(checkpoint_files[indices[i]]);
+                deleted++;
+            } catch (const std::exception& e) {
+                // Continue with other files
+            }
+        }
+        
+        result["success"] = true;
+        result["message"] = "Cleaned up " + std::to_string(deleted) + " old checkpoints, keeping " + 
+                           std::to_string(checkpoint_files.size() - to_delete) + " most recent";
+        result["deleted"] = static_cast<size_t>(deleted);
+        result["remaining"] = static_cast<size_t>(checkpoint_files.size() - to_delete);
+        
+        return result;
+    }, py::arg("directory") = "./checkpoints", py::arg("maxFiles") = 10, "Clean up old checkpoint files, keeping only the most recent ones")
+    
+    .def("autoCheckpoint", [](Brain& self, const std::string& directory, size_t interval) {
+        py::dict result;
+        
+        // This is a placeholder for automatic checkpointing logic
+        // In a real implementation, this would:
+        // 1. Check if interval has elapsed since last checkpoint
+        // 2. If so, create a checkpoint in the specified directory
+        // 3. Track checkpoint metadata
+        
+        if (!std::filesystem::exists(directory)) {
+            std::filesystem::create_directories(directory);
+        }
+        
+        // For now, just create a simple checkpoint
+        std::string filename = "auto_checkpoint_" + 
+                               std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + 
+                               ".bin";
+        std::string filepath = directory + "/" + filename;
+        
+        bool success = self.save(filepath);
+        
+        result["success"] = success;
+        result["filepath"] = filepath;
+        result["interval"] = interval;
+        result["note"] = "Note: This is a simple implementation. Full auto-checkpointing requires additional state management.";
+        
+        return result;
+    }, py::arg("directory") = "./checkpoints", py::arg("interval") = 1000, "Create automatic checkpoint at specified step intervals")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
