@@ -1,0 +1,87 @@
+{
+  "description": "NLM Research Environment Setup",
+  "version": "2.0.0",
+  "brain": {
+    "simulated_neurons": 2000,
+    "min_plasticity_rate": 0.0005,
+    "max_plasticity_rate": 0.2,
+    "development_stage_length": 1500,
+    "structure_formation": true,
+    "plasticity_rules": "custom",
+    "plasticity_config": {
+      "hebbian_weight": 0.7,
+      "stdp_alpha": 0.01,
+      "structural_plasticity": true
+    }
+  },
+  "world": {
+    "width": 30,
+    "height": 30,
+    "view_distance": 96,
+    "agent_start": [15, 15],
+    "grid_world": true,
+    "cell_size": 1.0,
+    "environment_complexity": "medium"
+  },
+  "neuromodulation": {
+    "dopamine_influence": 0.7,
+    "serotonin_influence": 0.6,
+    "curiosity_strength": 0.7,
+    "novelty_threshold": 0.4,
+    "neuromodulation_complexity": "advanced"
+  },
+  "expert": {
+    "performance_optimization": {
+      "memory_pool_enabled": true,
+      "simd_processor_enabled": true,
+      "parallel_processor_enabled": true,
+      "zero_copy_enabled": true,
+      "custom_allocator_enabled": true
+    },
+    "advanced_simulation": {
+      "custom_plasticity_rules_enabled": true,
+      "advanced_neuromodulation_enabled": true,
+      "custom_connectivity_patterns_enabled": true,
+      "neural_population_manager_enabled": true
+    },
+    "data_analysis": {
+      "neural_signal_processing_enabled": true,
+      "pattern_recognizer_enabled": true,
+      "ml_integration_enabled": true,
+      "feature_extractor_enabled": true
+    },
+    "custom_architecture": {
+      "custom_neuron_models_enabled": true,
+      "synaptic_dynamics_enabled": true,
+      "region_configuration_enabled": true,
+      "network_topology_enabled": true
+    },
+    "experiment_control": {
+      "custom_experiment_loop_enabled": true,
+      "parallel_experiment_execution_enabled": true,
+      "checkpointing_enabled": true,
+      "result_analysis_enabled": true,
+      "experiment_monitoring_enabled": true
+    },
+    "visualization": {
+      "advanced_plotting_enabled": true,
+      "real_time_visualization_enabled": true,
+      "custom_visualization_pipeline_enabled": true,
+      "data_export_enabled": true
+    }
+  },
+  "research": {
+    "experiments": [
+      "neural_development",
+      "plasticity_study",
+      "neuromodulation_effects",
+      "learning_curves",
+      "behavioral_analysis"
+    ],
+    "data_management": {
+      "structured_storage_enabled": true,
+      "version_control_enabled": true,
+      "collaboration_features_enabled": true
+    }
+  }
+}

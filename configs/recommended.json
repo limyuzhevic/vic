@@ -1,0 +1,30 @@
+{
+  "description": "NLM Recommended Configuration",
+  "version": "2.0.0",
+  "brain": {
+    "simulated_neurons": 1000,
+    "min_plasticity_rate": 0.001,
+    "max_plasticity_rate": 0.1,
+    "development_stage_length": 1000,
+    "structure_formation": true
+  },
+  "world": {
+    "width": 20,
+    "height": 20,
+    "view_distance": 64,
+    "agent_start": [10, 10],
+    "grid_world": true,
+    "cell_size": 1.0
+  },
+  "neuromodulation": {
+    "dopamine_influence": 0.8,
+    "curiosity_strength": 0.6,
+    "novelty_threshold": 0.5
+  },
+  "performance": {
+    "memory_pool_size": 8192,
+    "enable_ssimd": true,
+    "parallel_threads": 4,
+    "memory_profiling": false
+  }
+}

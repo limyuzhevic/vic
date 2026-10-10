@@ -37,6 +37,38 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_edge_cases {
+    void runAll();
+}
+
+namespace test_memory_management {
+    void runAll();
+}
+
+namespace test_plasticity_edge_cases {
+    void runAll();
+}
+
+namespace test_neuromodulation_edge_cases {
+    void runAll();
+}
+
+namespace test_configuration_edge_cases {
+    void runAll();
+}
+
+namespace test_integration_edge_cases {
+    void runAll();
+}
+
+namespace test_performance_edge_cases {
+    void runAll();
+}
+
+namespace test_development_edge_cases {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -119,12 +151,74 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
-        return 0;
-    } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
-        return 1;
+    std::cout << "Running Edge Cases tests..." << std::endl;
+    try {
+        test_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
     }
-}
+    
+    std::cout << "Running Memory Management tests..." << std::endl;
+    try {
+        test_memory_management::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity Edge Cases tests..." << std::endl;
+    try {
+        test_plasticity_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation Edge Cases tests..." << std::endl;
+    try {
+        test_neuromodulation_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Configuration Edge Cases tests..." << std::endl;
+    try {
+        test_configuration_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration Edge Cases tests..." << std::endl;
+    try {
+        test_integration_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Performance Edge Cases tests..." << std::endl;
+    try {
+        test_performance_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Development Edge Cases tests..." << std::endl;
+    try {
+        test_development_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }

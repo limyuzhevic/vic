@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -18,8 +18,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
+# Source and include directories
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(NLM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # Core library
 add_library(nlm_core STATIC
@@ -85,10 +86,24 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Design Patterns
+    include/nlm/DefaultFactories.cpp
+    include/nlm/AbstractFactoryImpl.hpp
+    include/nlm/EventSystemImpl.hpp
+    include/nlm/StrategyImpl.hpp
+    include/nlm/CommandImpl.hpp
+    include/nlm/RandomGeneratorImpl.hpp
+    include/nlm/MathUtilsImpl.hpp
+    # Debug and Profiling Infrastructure
+    include/nlm/DebugInfrastructure.cpp
+    include/nlm/DiagnosticTools.cpp
+    include/nlm/MonitoringInfrastructure.cpp
+    include/nlm/VisualizationInfrastructure.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -97,33 +112,54 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
+
+target_include_directories(nlm_agent PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
+
+target_include_directories(nlm_world PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
+
+target_include_directories(nlm_phase3 PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
+
+target_include_directories(nlm_phase4 PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
+)
+
+target_include_directories(nlm PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
@@ -131,13 +167,39 @@ target_link_libraries(nlm PUBLIC nlm_core)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
+target_include_directories(nlm_phase3_demo PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
+target_include_directories(nlm_phase4_demo PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Debug and Profiling Demo executable
+add_executable(nlm_debug_demo
+    src/demo/DemoApplication.cpp
+)
+
+target_include_directories(nlm_debug_demo PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${NLM_INCLUDE_DIR}>
+)
+target_link_libraries(nlm_debug_demo PUBLIC nlm_core)
+
+# Add demo to list of executables for installation
+install(TARGETS nlm_debug_demo
+    RUNTIME DESTINATION bin
+)
 
 # Testing
 enable_testing()
@@ -148,4 +210,9 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install headers
+install(DIRECTORY include/nlm/ DESTINATION include/nlm
+    FILES_MATCHING PATTERN "*.hpp"
 )

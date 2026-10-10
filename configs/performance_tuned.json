@@ -1,0 +1,39 @@
+{
+  "description": "NLM Performance-Tuned Configuration",
+  "version": "2.0.0",
+  "brain": {
+    "simulated_neurons": 5000,
+    "min_plasticity_rate": 0.0001,
+    "max_plasticity_rate": 0.05,
+    "development_stage_length": 2000,
+    "structure_formation": true,
+    "enable_vectorization": true
+  },
+  "world": {
+    "width": 50,
+    "height": 50,
+    "view_distance": 128,
+    "agent_start": [25, 25],
+    "grid_world": false,
+    "cell_size": 0.5
+  },
+  "neuromodulation": {
+    "dopamine_influence": 0.9,
+    "curiosity_strength": 0.8,
+    "novelty_threshold": 0.3
+  },
+  "performance": {
+    "memory_pool_size": 32768,
+    "enable_ssimd": true,
+    "parallel_threads": 8,
+    "memory_profiling": true,
+    "benchmark_mode": true,
+    "zero_copy_enabled": true
+  },
+  "expert": {
+    "memory_pool_enabled": true,
+    "simd_processor_enabled": true,
+    "parallel_processor_enabled": true,
+    "custom_allocator_enabled": true
+  }
+}
