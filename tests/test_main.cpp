@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Integrated Artificial Brain Tests
 
 #include <iostream>
 #include <cassert>
@@ -38,11 +38,13 @@ namespace test_brain {
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Tests ===" << std::endl;
+    std::cout << "Testing Integrated Artificial Brain Capabilities:" << std::endl;
+    std::cout << "  - Complete Brain Architecture" << std::endl;
+    std::cout << "  - Integrated Memory Systems" << std::endl;
+    std::cout << "  - Neuromodulation and Learning" << std::endl;
+    std::cout << "  - Cognitive Functions (Planning, Attention, Prediction)" << std::endl;
+    std::cout << "  - Developmental Plasticity" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -121,7 +123,7 @@ int main() {
     
     std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== All Phase 6 Tests PASSED ===" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;

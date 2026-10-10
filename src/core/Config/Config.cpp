@@ -114,7 +114,13 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+bool Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate the value before setting
+    if (!validateValue(key, value)) {
+        validationErrors.push_back("Invalid configuration value for key: " + key);
+        return false;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -124,6 +130,8 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    return true;
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -186,20 +194,153 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::validate() const {
+    validationErrors.clear();
+    
+    // Validate all configuration entries against schema
+    for (const auto& entry : pImpl->entries) {
+        if (!validateValue(entry.key, entry.value)) {
+            validationErrors.push_back("Invalid configuration for key: " + entry.key);
+        }
+    }
+    
+    // Validate required schema entries
+    for (const auto& schemaEntry : schema) {
+        if (schemaEntry.required && !has(schemaEntry.key)) {
+            validationErrors.push_back("Required configuration key missing: " + schemaEntry.key);
+        }
+    }
+    
+    return validationErrors.empty();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::getValidationErrors() const {
+    std::ostringstream oss;
+    if (validationErrors.empty()) {
+        oss << "Configuration is valid.";
+    } else {
+        oss << "Configuration validation errors:" << std::endl;
+        for (const auto& error : validationErrors) {
+            oss << "  - " << error << std::endl;
+        }
+    }
+    return oss.str();
+}
+
+bool Config::validateValue(const std::string& key, const ConfigValue& value) const {
+    // Find validation function for this key
+    for (const auto& schemaEntry : schema) {
+        if (schemaEntry.key == key && schemaEntry.validate) {
+            return schemaEntry.validate(key, value);
+        }
+    }
+    
+    // No specific validation found, use default validation based on key
+    return defaultValidation(key, value);
+}
+
+bool Config::defaultValidation(const std::string& key, const ConfigValue& value) const {
+    // Convert key to lowercase for case-insensitive matching
+    std::string lowerKey = toLower(key);
+    
+    // Validate based on key name
+    if (lowerKey == "neuron_count") {
+        return validateNeuronCount(key, value);
+    } else if (lowerKey == "region_count") {
+        return validateRegionCount(key, value);
+    } else if (lowerKey == "connection_probability") {
+        return validateConnectionProbability(key, value);
+    } else if (lowerKey == "simulation_timestep") {
+        return validatePositive(key, value);
+    } else if (lowerKey == "plasticity_learning_rate") {
+        return validateNonNegative(key, value);
+    } else if (lowerKey == "random_seed") {
+        return validateNonNegative(key, value);
+    } else if (lowerKey == "max_simulation_steps") {
+        return validateNonNegative(key, value);
+    } else if (lowerKey == "environment_width" || lowerKey == "environment_height") {
+        return validatePositive(key, value);
+    }
+    
+    // For array values, validate elements
+    return validateArrayElements(key, value);
+}
+
+bool Config::validatePositive(const std::string& key, const ConfigValue& value) const {
+    try {
+        double val = std::get<double>(value);
+        return val > 0.0;
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateNonNegative(const std::string& key, const ConfigValue& value) const {
+    try {
+        double val = std::get<double>(value);
+        return val >= 0.0;
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateRange(const std::string& key, const ConfigValue& value, double min, double max) const {
+    try {
+        double val = std::get<double>(value);
+        return val >= min && val <= max;
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateNeuronCount(const std::string& key, const ConfigValue& value) const {
+    try {
+        auto val = std::get<int64_t>(value);
+        return val > 0 && val <= 1000000; // Reasonable upper limit
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateRegionCount(const std::string& key, const ConfigValue& value) const {
+    try {
+        auto val = std::get<int64_t>(value);
+        return val > 0 && val <= 100; // Reasonable upper limit
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateConnectionProbability(const std::string& key, const ConfigValue& value) const {
+    try {
+        double val = std::get<double>(value);
+        return val >= 0.0 && val <= 1.0;
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool Config::validateArrayElements(const std::string& key, const ConfigValue& value) const {
+    try {
+        if (std::holds_alternative<std::vector<int>>(value)) {
+            const auto& vec = std::get<std::vector<int>>(value);
+            return !vec.empty(); // Non-empty arrays are valid
+        } else if (std::holds_alternative<std::vector<double>>(value)) {
+            const auto& vec = std::get<std::vector<double>>(value);
+            return !vec.empty(); // Non-empty arrays are valid
+        } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+            const auto& vec = std::get<std::vector<std::string>>(value);
+            return !vec.empty(); // Non-empty arrays are valid
+        }
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+    
+    return true;
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
