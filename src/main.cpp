@@ -1,5 +1,5 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
@@ -35,7 +35,7 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
@@ -324,7 +324,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 6 Final Integration...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 6: Final Integration ===");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
@@ -366,7 +366,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 6
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -430,9 +430,9 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
+    NLM_LOG_INFO("=== Phase 6 Complete ===");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
+    NLM_LOG_INFO("Phase 6 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
     NLM_LOG_INFO("  ✓ STDP plasticity rule");
