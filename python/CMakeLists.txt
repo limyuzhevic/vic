@@ -96,7 +96,28 @@ if(MSVC)
 endif()
 
 install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+    LIBRARY DESTINATION ${Python_SITEARCH}/pynlm
+    ARCHIVE DESTINATION ${Python_SITEARCH}/pynlm
+    RUNTIME DESTINATION ${Python_SITEARCH}/pynlm
+)
+
+# Install Python package files
+install(FILES
+    __init__.py
+    pynlm.py
+    DESTINATION ${Python_SITEARCH}/pynlm
+)
+
+# Create a setup.py for pip installation
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in
+    ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+    @ONLY
+)
+
+# Install setup.py for pip
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+    DESTINATION ${Python_SITEARCH}
+    RENAME setup.py
 )
