@@ -92,10 +92,11 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
+# Agent system (body, sensory percept, agent-brain interface, attentional selection)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/AttentionalSelection.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
