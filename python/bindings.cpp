@@ -25,53 +25,96 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Features:
+        - Enhanced Pythonic API with type safety
+        - Comprehensive error handling with custom exceptions
+        - NumPy integration for numerical operations
+        - Performance monitoring and optimization tools
+        - Advanced simulation control for power users
+        - Visualization and data export capabilities
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Custom exception classes for better error handling
+    py::class_<std::runtime_error>(m, "RuntimeError")
+        .def(py::init<const std::string&>());
+    
+    py::register_exception<std::invalid_argument>(m, "ValidationError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    py::register_exception<std::runtime_error>(m, "ConfigurationError");
+    py::register_exception<std::bad_alloc>(m, "MemoryError");
+    
+    // Helper function for validating brain configuration
+    m.def("validate_brain_config", [](std::shared_ptr<Config> config) {
+        if (!config->validate()) {
+            throw std::runtime_error("Invalid configuration for brain creation");
+        }
+        return true;
+    }, py::arg("config"), "Validate configuration before creating brain");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
+        .def(py::init<std::string>(), py::arg("hex_string"))  // Hex parsing constructor
         .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
+        .def("index", &NeuronId::index, "Get neuron index")
+        .def("to_hex", &NeuronId::to_hex, "Convert to hex string representation")
+        .def("is_valid", &NeuronId::is_valid, "Check if neuron ID is valid")
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return "NeuronId(" + std::to_string(id.value) + ")";
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
+        .def(py::init<std::string>(), py::arg("hex_string"))
         .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
+        .def("index", &SynapseId::index, "Get synapse index")
+        .def("to_hex", &SynapseId::to_hex, "Convert to hex string representation")
+        .def("is_valid", &SynapseId::is_valid, "Check if synapse ID is valid")
         .def("__eq__", &SynapseId::operator==)
         .def("__ne__", &SynapseId::operator!=)
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const SynapseId& id) {
+            return "SynapseId(" + std::to_string(id.value) + ")";
         });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
+        .def(py::init<std::string>(), py::arg("hex_string"))
         .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
+        .def("index", &RegionId::index, "Get region index")
+        .def("to_hex", &RegionId::to_hex, "Convert to hex string representation")
+        .def("is_valid", &RegionId::is_valid, "Check if region ID is valid")
         .def("__eq__", &RegionId::operator==)
         .def("__ne__", &RegionId::operator!=)
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const RegionId& id) {
+            return "RegionId(" + std::to_string(id.value) + ")";
         });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
+        .def(py::init<std::string>(), py::arg("hex_string"))
         .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
+        .def("index", &PopulationId::index, "Get population index")
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -144,22 +187,67 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def(py::init<std::string>(), py::arg("filepath"))  // Direct file loading constructor
+        .def("load", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("load_args", [](Config& self, std::vector<std::string> args) {
+            // Convert Python list to argv format
+            std::vector<char*> argv;
+            for (auto& arg : args) {
+                argv.push_back(const_cast<char*>(arg.c_str()));
+            }
+            return self.loadFromArgs(argv.size(), argv.data());
+        }, py::arg("args"), "Load configuration from argument list")
+        .def("save", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
+        .def("get_keys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate,
+             "Validate configuration completeness and consistency")
+        
+        // Advanced configuration methods for power users
+        .def("set_plasticity", &Config::setPlasticityRules,
+             py::arg("stdp"), py::arg("hebbian"), py::arg("reward_modulated"),
+             "Configure synaptic plasticity rules")
+        .def("set_development", &Config::setDevelopmentParameters,
+             py::arg("initial_age"), py::arg("critical_period"), py::arg("maturation_age"),
+             "Set developmental stage parameters")
+        .def("set_simulation", &Config::setSimulationParameters,
+             py::arg("timestep"), py::arg("max_neurons"), py::arg("max_synapses"),
+             "Configure simulation parameters")
+        .def("get_float", &Config::get<float>, py::arg("key"), py::arg("default")=0.0f,
+             "Get float value with default")
+        .def("get_int", &Config::get<int64_t>, py::arg("key"), py::arg("default")=0,
+             "Get integer value with default")
+        .def("get_string", &Config::get<std::string>, py::arg("key"), py::arg("default")="",
+             "Get string value with default")
+        .def("set_float", [](Config& self, const std::string& key, float value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set float configuration value")
+        .def("set_int", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set integer configuration value")
+        .def("set_string", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set string configuration value")
+        
+        // Type-safe property accessors
+        .def("get_neuron_count", &Config::getOr<int64_t>, "brain.neuron_count", 1000,
+             "Get neuron count with default")
+        .def("get_synapse_density", &Config::getOr<float>, "brain.synapse_density", 0.1f,
+             "Get synapse density with default")
+        .def("get_learning_rate", &Config::getOr<float>, "plasticity.stdp.learning_rate", 0.001f,
+             "Get learning rate with default")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
