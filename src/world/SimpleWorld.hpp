@@ -51,8 +51,17 @@ public:
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
+    // Observe world (get current percept) - for agent integration
+    SensoryPercept observe(class NeuralRegion* region);
+    
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
+    
+    // Apply action to world (legacy interface)
+    ActionResult applyAction(class NeuralRegion* region, const Action& action);
+    
+    // Compute reward for last action
+    float computeReward(class NeuralRegion* region) const;
     
     // Add object to world
     void addObject(const WorldObject& obj);

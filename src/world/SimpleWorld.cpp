@@ -401,3 +401,54 @@ void SimpleWorld::checkCollisions() {
 }
 
 } // namespace nlm
+
+SensoryPercept SimpleWorld::observe(NeuralRegion* region) {
+    (void)region;  // May be used for more advanced observation in future
+    return sensory_;
+}
+
+ActionResult SimpleWorld::applyAction(NeuralRegion* region, const Action& action) {
+    (void)region;  // May be used for region-specific actions
+    ActionType actionType = action.getType();
+    
+    // Convert to MotorCommand for standard processing
+    MotorCommand cmd;
+    switch (actionType) {
+        case ActionType::MoveForward: cmd = MotorCommand::MoveForward; break;
+        case ActionType::MoveBackward: cmd = MotorCommand::MoveBackward; break;
+        case ActionType::TurnLeft: cmd = MotorCommand::TurnLeft; break;
+        case ActionType::TurnRight: cmd = MotorCommand::TurnRight; break;
+        case ActionType::Look: cmd = MotorCommand::LookLeft; break;
+        case ActionType::LookUp: cmd = MotorCommand::LookUp; break;
+        case ActionType::LookDown: cmd = MotorCommand::LookDown; break;
+        case ActionType::Interact: cmd = MotorCommand::Interact; break;
+        case ActionType::Eat: cmd = MotorCommand::Wait; break;  // Eat treated as wait (energy gained via objects)
+        case ActionType::Drink: cmd = MotorCommand::Wait; break;  // Drink treated as wait
+        case ActionType::Rest: cmd = MotorCommand::Wait; break;
+        case ActionType::Wait: cmd = MotorCommand::Wait; break;
+        case ActionType::Custom: cmd = MotorCommand::Wait; break;
+        default: cmd = MotorCommand::Wait; break;
+    }
+    
+    return applyMotorCommand(cmd, simTime_);
+}
+
+float SimpleWorld::computeReward(NeuralRegion* region) const {
+    (void)region;  // May be used for region-specific rewards
+    
+    // Reward based on agent's internal state and energy
+    float reward = 0.0f;
+    
+    // Positive reward for having energy
+    reward += std::min(agent_.energy / maxEnergy_, 1.0f) * 0.1f;
+    
+    // Negative reward for low health
+    reward -= std::max(0.0f, 1.0f - agent_.health) * 0.2f;
+    
+    // Reward for being alive and active
+    if (agent_.health > 0.0f && agent_.energy > 0.0f) {
+        reward += 0.05f;
+    }
+    
+    return reward;
+}
