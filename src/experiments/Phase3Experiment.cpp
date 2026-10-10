@@ -11,15 +11,29 @@ struct ExperimentLogger::Impl {
     bool isOpen;
     
     Impl(const std::string& filename) : isOpen(false) {
-        file.open(filename);
-        if (file.is_open()) {
-            isOpen = true;
+        try {
+            file.open(filename);
+            if (file.is_open()) {
+                isOpen = true;
+                NLM_LOG_INFO("Experiment log file opened: " + filename);
+            } else {
+                NLM_LOG_WARNING("Failed to open experiment log file: " + filename);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING("Exception opening experiment log file " + filename + ": " + 
+                           std::string(e.what()));
         }
     }
     
     ~Impl() {
-        if (file.is_open()) {
-            file.close();
+        try {
+            if (file.is_open()) {
+                file.close();
+                NLM_LOG_INFO("Experiment log file closed");
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING("Exception closing experiment log file: " + 
+                           std::string(e.what()));
         }
     }
 };

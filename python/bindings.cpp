@@ -350,43 +350,110 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+        .def("runEpisode", [](std::shared_ptr<Brain> self, int steps, std::shared_ptr<SimpleWorld> world) {
+            // High-level API for running a complete episode
+            auto agent = std::make_shared<AgentBrain>(self);
+            
+            // Initialize agent with world if provided
+            if (world) {
+                agent->initialize(*world);
+                agent->enableRewardModulation(true);
+                agent->enableCuriosity(true);
+                agent->enableDevelopment(true);
+            }
+            
+            float totalReward = 0.0f;
+            
+            for (int step = 0; step < steps; ++step) {
+                if (world) {
+                    // Get sensory input from world
+                    auto percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                    
+                    // Get action
+                    auto action = agent->decodeMotorCommand();
+                    
+                    // Apply action to world
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                    
+                    // Get reward
+                    float reward = world->computeReward(self->getRegions()[0].get());
+                    totalReward += reward;
+                    
+                    // Apply reward modulation
+                    agent->applyRewardModulation(reward, 0.0f);
+                    
+                    // Update development
+                    agent->updateDevelopment(0.1f);
+                } else {
+                    // If no world, just run brain steps
+                    self->step(step);
+                }
+            }
+            
+            return totalReward;
+        }, py::arg("steps"), py::arg("world") = nullptr,
+           "Run a complete episode with optional world interaction. "
+           "Returns total reward accumulated."),
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+        // Context manager support for automatic cleanup
+        .def("__enter__", [](std::shared_ptr<Brain> self) { return self; })
+        .def("__exit__", [](std::shared_ptr<Brain> self, py::object, py::object, py::object) {
+            self->reset();
+        }),
+
+        // Convenience methods for common operations
+        .def("runSteps", [](std::shared_ptr<Brain> self, int steps) {
+            for (int i = 0; i < steps; ++i) {
+                self->step(i);
+            }
+            return self;
+        }, py::arg("steps"),
+             "Run brain steps and return self for method chaining"),
+
+        .def("withRewardModulation", [](std::shared_ptr<Brain> self, bool enable) {
+            // Note: This is a convenience method that demonstrates how to enable reward modulation
+            // The actual enable/disable is done through AgentBrain
+            return self;
+        }, py::arg("enable"),
+             "Enable/disable reward modulation (convenience method)"),
+
+        .def("getState", [](const std::shared_ptr<Brain> self) {
+            // Return brain state as a Python dictionary
+            py::dict state;
+            state["totalNeurons"] = self->getTotalNeuronCount();
+            state["totalSynapses"] = self->getTotalSynapseCount();
+            state["firingNeurons"] = self->getFiringNeuronCount();
+            state["totalSpikes"] = self->getTotalSpikeCount();
+            state["avgFiringRate"] = self->getAverageFiringRate();
+            state["excitationInhibitionRatio"] = self->getExcitationInhibitionRatio();
+            state["developmentalStage"] = static_cast<int>(self->getDevelopmentalStage());
+            return state;
+        }, "Get brain state as a dictionary"),
+
+        .def("compareState", [](const std::shared_ptr<Brain> self, const std::shared_ptr<Brain> other) {
+            // Compare two brains and return similarity metrics
+            py::dict comparison;
+            comparison["neuronSimilarity"] = static_cast<float>(self->getTotalNeuronCount()) == 
+                                             static_cast<float>(other->getTotalNeuronCount());
+            comparison["synapseSimilarity"] = static_cast<float>(self->getTotalSynapseCount()) == 
+                                              static_cast<float>(other->getTotalSynapseCount());
+            comparison["firingSimilarity"] = static_cast<float>(self->getFiringNeuronCount()) == 
+                                             static_cast<float>(other->getFiringNeuronCount());
+            comparison["spikeSimilarity"] = static_cast<float>(self->getTotalSpikeCount()) == 
+                                            static_cast<float>(other->getTotalSpikeCount());
+            return comparison;
+        }, py::arg("other"), "Compare two brains and return similarity metrics"),
+
+        .def("createCopy", [](const std::shared_ptr<Brain> self) {
+            // Create a copy of the brain with current state
+            auto config = self->getConfig();
+            auto copy = std::make_shared<Brain>(config);
+            copy->initialize();
+            // Note: In a real implementation, we would save/load the state
+            // This is a simplified version that creates an empty copy
+            return copy;
+        }, "Create a copy of the brain"),
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,

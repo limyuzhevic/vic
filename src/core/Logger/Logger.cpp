@@ -71,12 +71,28 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    try {
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_WARNING("Failed to open log file: " + filepath);
+        } else {
+            NLM_LOG_INFO("Log file opened: " + filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARNING("Exception opening log file " + filepath + ": " + 
+                       std::string(e.what()));
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    try {
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+            NLM_LOG_INFO("Log file closed");
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARNING("Exception closing log file: " + 
+                       std::string(e.what()));
     }
 }
 
