@@ -1,11 +1,15 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the final integration of all brain systems into a
+// coherent artificial neural substrate. The brain now includes:
+// - Complete memory systems (working, episodic, associative)
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Prediction systems with error correction
+// - Cognitive functions (planning, attention, concept formation)
+// - Developmental system with maturation
+// - Checkpointing and replay for memory consolidation
+// - Real-time interaction with environment
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +22,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +30,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
 using namespace nlm;
 
@@ -35,14 +41,10 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     A complete artificial brain with memory, neuromodulation,  ║
+    ║     prediction, cognition, and development systems.          ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
