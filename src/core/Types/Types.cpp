@@ -1,8 +1,9 @@
-#include "Types.hpp"
+#include "core/Types/Types.hpp"
 
 namespace nlm {
+namespace core {
 
-// Types.cpp - explicit template instantiations if needed
-// Most types are header-only for performance
+// Empty implementation for Types
 
+} // namespace core
 } // namespace nlm

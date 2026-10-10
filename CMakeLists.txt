@@ -6,10 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Enable profiling and benchmarking
+option(NLM_ENABLE_PROFILING "Enable profiling support" ON)
+option(NLM_ENABLE_BENCHMARKING "Enable benchmarking support" ON)
 
 # Enable warnings
 if(MSVC)
@@ -18,73 +17,36 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Build options
+option(NLM_BUILD_TESTS "Build NLM tests" ON)
+option(NLM_BUILD_EXAMPLES "Build examples" ON)
+option(NLM_BUILD_DOCS "Build documentation" OFF)
+option(NLM_ENABLE_VALIDATION "Enable validation checks" ON)
+
+# Platform-specific definitions
+if(WIN32)
+    add_definitions(-DNLM_WINDOWS)
+elseif(APPLE)
+    add_definitions(-DNLM_MACOS)
+elseif(UNIX)
+    add_definitions(-DNLM_LINUX)
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
+# Core module (contains fundamental types and utilities)
+add_library(nlm_core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -92,60 +54,76 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Neural system module (brain and dynamics)
+add_library(nlm_neural
+    src/brain/Neuron.cpp
+    src/brain/Synapse.cpp
+    src/brain/NeuralPopulation.cpp
+    src/brain/NeuralRegion.cpp
+    src/brain/Brain.cpp
+    src/dynamics/NeuralDynamics.cpp
+    src/dynamics/SpikeSystem.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
+target_include_directories(nlm_neural PUBLIC src)
+
+target_link_libraries(nlm_neural PUBLIC nlm_core)
+
+# Memory system module
+add_library(nlm_memory
+    src/memory/Memory.cpp
+    src/memory/NeuralWorkingMemory.cpp
+    src/memory/NeuralEpisodicMemory.cpp
+)
+
+target_include_directories(nlm_memory PUBLIC src)
+target_link_libraries(nlm_memory PUBLIC nlm_core)
+
+# Cognition system module
+add_library(nlm_cognition
+    src/cognition/NeuralPlanner.cpp
+    src/cognition/ConceptFormation.cpp
+    src/cognition/AttentionalSelection.cpp
+)
+
+target_include_directories(nlm_cognition PUBLIC src)
+target_link_libraries(nlm_cognition PUBLIC nlm_core)
+
+# Plasticity system module
+add_library(nlm_plasticity
+    src/plasticity/Hebbian.cpp
+    src/plasticity/STDP.cpp
+    src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/PlasticityRule.cpp
+)
+
+target_include_directories(nlm_plasticity PUBLIC src)
+target_link_libraries(nlm_plasticity PUBLIC nlm_core)
+
+# Systems module (high-level integration)
+add_library(nlm_systems
+    src/agent/AgentBrain.cpp
+    src/agent/SensoryPercept.cpp
     src/world/SimpleWorld.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_systems PUBLIC src)
+target_link_libraries(nlm_systems PUBLIC nlm_core nlm_neural nlm_memory nlm_cognition nlm_plasticity)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Testing
-enable_testing()
-add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# Installation targets
+install(TARGETS nlm
     RUNTIME DESTINATION bin
 )
+
+install(TARGETS nlm_core nlm_neural nlm_memory nlm_cognition nlm_plasticity nlm_systems
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+
+# Install headers
+install(DIRECTORY src/brain/include/ DESTINATION include/brain)
+install(DIRECTORY src/memory/include/ DESTINATION include/memory)
+install(DIRECTORY src/cognition/include/ DESTINATION include/cognition)
+install(DIRECTORY src/plasticity/include/ DESTINATION include/plasticity)
+install(DIRECTORY src/agent/include/ DESTINATION include/agent)
+install(DIRECTORY src/world/include/ DESTINATION include/world)
