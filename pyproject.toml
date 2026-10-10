@@ -1,21 +1,22 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "nlohmann_json>=3.11.2"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework - Enhanced with improved Python API"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,34 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Framework :: Pytest",
 ]
-
-dependencies = []
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.5",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+]
+performance = [
+    "numba>=0.56",
+    "cupy-cuda12x>=12.0; platform_system=='Linux'",
+]
+tutorials = [
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+    "ipywidgets>=7.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Discussions" = "https://github.com/nlm-project/nlm/discussions"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +62,39 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DCMAKE_POLICY_DEFAULT_CMP0074=NEW",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+Nlohmann_JSON_DIR = "${CMAKE_CURRENT_SOURCE_DIR}/deps/nlohmann_json"
+PYBIND11_DIR = "${CMAKE_CURRENT_SOURCE_DIR}/deps/pybind11"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["*Test", "*TestCase"]
+python_functions = ["test_*", "check_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m "not slow"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.pydocstyle]
+ignore = "D203,D212,D214,D400,D401,D402"
+
+[tool.ruff]
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "W605"]
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+indent-width = 4

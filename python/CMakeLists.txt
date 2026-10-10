@@ -10,6 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(nlohmann_json 3.11.2 REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
@@ -54,6 +55,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
+    ${NLM_SOURCE_DIR}/environment/Action.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
@@ -74,10 +76,7 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
     $<INSTALL_INTERFACE:include>
 )
-target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-)
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
 
 add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)

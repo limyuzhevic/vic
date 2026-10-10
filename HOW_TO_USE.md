@@ -1,13 +1,15 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - IMPROVED HOW TO USE
 
 ## Overview
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**This document covers the IMPROVED NLM Python API with enhanced features and user-friendly interface.**
+
 This document covers:
 1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+2. Installing the improved Python library
+3. Using the **IMPROVED** NLM Python API
 
 ---
 
@@ -70,7 +72,7 @@ make install
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 2: Installing the Improved Python Library
 
 ### From Source (Recommended for Development)
 
@@ -111,15 +113,19 @@ print(pynlm.__version__)
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+
+# Test improved API
+brain.enable_stats_collection()
+print("Improved API test successful!")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the IMPROVED NLM Python API
 
-### Basic Usage
+### Enhanced Basic Usage
 
-#### Creating a Brain
+#### Creating and Initializing a Brain
 
 ```python
 import pynlm
@@ -133,13 +139,14 @@ config = pynlm.createDefaultConfig()
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
+brain.enable_stats_collection()
 brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
-#### Running a Simulation
+#### Running a Simulation with Enhanced Features
 
 ```python
 import pynlm
@@ -147,18 +154,25 @@ import pynlm
 # Create brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
+brain.enable_stats_collection()
+
+# Initialize brain
 brain.initialize()
 
-# Run simulation for 1000 steps
+# Run simulation for 1000 steps with enhanced monitoring
 for step in range(1000):
     brain.step(step)
     
     # Log statistics periodically
     if step % 100 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+
+# Get final statistics
+print(f"Simulation complete!")
+print(f"Statistics: {brain.get_stats().get_summary()}")
 ```
 
-#### Creating a Simple World
+#### Creating an Enhanced World
 
 ```python
 import pynlm
@@ -180,23 +194,25 @@ world.reset()
 # Set agent starting position
 world.setAgentStart(10.0, 10.0)
 
-# Run world update
-world.update(timestep=0.1)
+# Run world update with enhanced status
+status = world.update(timestep=0.1)
+print(f"World status: {status}")
 ```
 
-### Complete Agent Example
+### Advanced Agent Example with Enhanced Features
 
 ```python
 import pynlm
 
 def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+    """Run a complete agent simulation with enhanced features."""
     
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
     
-    # 2. Create brain and initialize
+    # 2. Create brain and initialize with monitoring
     brain = pynlm.createBrain(config)
+    brain.enable_stats_collection()
     brain.initialize()
     
     # 3. Create agent brain interface
@@ -211,16 +227,16 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable all advanced features
     agent.enableRewardModulation(True)
     agent.enableStructuralPlasticity(True)
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
     
-    # 7. Run simulation loop
+    # 7. Run simulation loop with monitoring
     for step in range(num_steps):
         # Update world
-        world.update(timestep=0.1)
+        world_status = world.update(timestep=0.1)
         
         # Get sensory input from world
         percept = world.getSensoryPercept()
@@ -238,80 +254,100 @@ def run_agent_simulation(num_steps=1000):
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
         # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        reward = world_status.get('agent_energy', 0.0) / 10.0 if world_status.get('agent_energy') else 0.0
         agent.applyRewardModulation(reward, 0.0)
         
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Print progress with enhanced information
         if step % 100 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+            print(f"  Dev stage: {brain.getDevelopmentalStage()}")
+    
+    # 8. Return comprehensive results
+    return {
+        'brain_status': brain.get_status(),
+        'world_status': world.get_agent_status(),
+        'agent_status': {
+            'curiosity_level': agent.getCuriosityLevel(),
+            'novelty_level': agent.getNoveltyLevel(),
+            'neuromodulation_level': agent.getNeuromodulationLevel(),
+            'prediction_error': agent.getPredictionError(),
+            'developmental_stage': agent.getDevelopmentalStage(),
+        }
+    }
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the enhanced simulation
+results = run_agent_simulation(1000)
+print(f"Enhanced agent simulation complete!")
 ```
 
-### Key Classes and Methods
+### Key Classes and Methods (Enhanced API)
 
-#### Brain Class
+#### Enhanced Brain Class
 
 ```python
 # Creation
 brain = pynlm.createBrain(config)
+brain.enable_stats_collection()  # Enable monitoring
 
 # Initialization
 brain.initialize()
 
 # Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
+brain.step(step_number)                    # Run one simulation step
+brain.step(step_number, time)               # Run step with timestamp
+brain.reset()                               # Reset brain state
 
 # Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
+brain.receiveSensoryInput(sensory_input)    # Inject sensory data
 action = brain.produceAction()             # Get motor action
 
 # Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
+brain.getTotalNeuronCount()                 # Total neurons
+brain.getTotalSynapseCount()                # Total synapses
+brain.getFiringNeuronCount()                # Currently firing
+brain.getAverageFiringRate()                # Average firing rate
+brain.getExcitationInhibitionRatio()       # E/I balance
+brain.get_stats().get_summary()             # Enhanced statistics
+brain.get_developmental_stage_info()        # Development stage info
 
 # State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+brain.save("checkpoint.bin")                # Save state
+brain.load("checkpoint.bin")                # Load state
+brain.get_status()                          # Get comprehensive status
 ```
 
-#### Config Class
+#### Enhanced Config Class
 
 ```python
 # Create
 config = pynlm.createDefaultConfig()
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
+# Enhanced configuration with validation
 config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+config.set("brain.synapse_density", 0.1)
+config.set("simulation_timestep", 0.001)
 
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# Query and validation
+if config.has("brain.neuron_count"):
+    neurons = config.get("brain.neuron_count")
+    print(f"Neurons: {neurons}")
+
+# File I/O with error handling
+try:
+    config.loadFromFile("config.json")
+    config.saveToFile("config.json")
+except Exception as e:
+    print(f"Config error: {e}")
 ```
 
-#### AgentBrain Class
+#### Enhanced AgentBrain Class
 
 ```python
 # Creation
@@ -331,49 +367,56 @@ agent.applyRewardModulation(reward, predicted_reward)
 
 # Development
 agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
+agent.get_developmental_stage_info()        # Enhanced development info
 
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
+# Enhanced subsystem enable/disable
+agent.enableRewardModulation(True/False)    # With validation
 agent.enableStructuralPlasticity(True/False)
 agent.enableDevelopment(True/False)
 agent.enableCuriosity(True/False)
 
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Enhanced statistics
+agent.getCuriosityLevel()                   # Get curiosity level
+agent.getNoveltyLevel()                     # Get novelty level
+agent.getPredictionError()                  # Get prediction error
+agent.getNeuromodulationLevel()             # Get neuromodulation level
+agent.get_status()                          # Get comprehensive status
 ```
 
-#### SimpleWorld Class
+#### Enhanced SimpleWorld Class
 
 ```python
 # Creation
 world = pynlm.createSimpleWorld()
 
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+# Enhanced configuration with validation
+world.configure(
+    width=20,
+    height=20,
+    visionWidth=8,
+    visionHeight=8
+)
 
-# Control
+# Enhanced control
 world.reset()
 world.update(timestep)
 world.setRandomSeed(42)
 
-# Agent interaction
+# Enhanced agent interaction
 world.setAgentStart(x, y)
 world.applyMotorCommand(motor_cmd, current_time)
 
-# State access
+# Enhanced state access
 percept = world.getSensoryPercept()
+world_status = world.get_agent_status()    # Enhanced status
 body = world.getAgentBody()
 
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
+# Enhanced world objects with validation
+world.add_object(x, y, obj_type, value=1.0, radius=0.5)
 world.removeObject(x, y)
 world.isValidPosition(x, y)
 
-# Properties
+# Enhanced properties
 world.getWidth()
 world.getHeight()
 world.getSimulationTime()
@@ -381,18 +424,18 @@ world.getMaxEnergy()
 world.setMaxEnergy(100.0)
 ```
 
-### Enumerations
+### Enhanced Enumerations
 
 ```python
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
-# Developmental stages
+# Enhanced developmental stages
 pynlm.DevelopmentalStage.Initial
 pynlm.DevelopmentalStage.CriticalPeriod
 pynlm.DevelopmentalStage.Maturation
@@ -406,7 +449,7 @@ pynlm.ActionType.Interact
 pynlm.ActionType.Eat
 # ... and more
 
-# World object types
+# Enhanced world object types
 pynlm.WorldObjectType.Empty
 pynlm.WorldObjectType.Resource
 pynlm.WorldObjectType.Hazard
@@ -416,7 +459,7 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 4: Configuration Options
+## Part 4: Enhanced Configuration Options
 
 ### Brain Configuration
 
@@ -432,8 +475,9 @@ pynlm.WorldObjectType.Marker
 | `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
+| `simulation_timestep` | float | 0.001 | Simulation timestep (s) |
 
-### Plasticity Configuration
+### Enhanced Plasticity Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -444,90 +488,124 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+### Enhanced Neuromodulation Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `neuromod.prediction_error.enable` | bool | true | Enable prediction error signals |
 
 ---
 
-## Part 5: Example Scripts
+## Part 5: Enhanced Example Scripts
 
-### Minimal Example
+### Minimal Enhanced Example
 
 ```python
 import pynlm
 
-# Create and initialize
+# Create and initialize with monitoring
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
+brain.enable_stats_collection()
 brain.initialize()
 
 # Simulate
 for i in range(100):
     brain.step(i)
 
-print("Simulation complete!")
+print("Enhanced simulation complete!")
+print(f"Statistics: {brain.get_stats().get_summary()}")
 ```
 
-### Environment Interaction
+### Enhanced Environment Interaction
 
 ```python
 import pynlm
 
-# Setup
+# Setup with enhanced monitoring
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
+brain.enable_stats_collection()
 brain.initialize()
+
 agent = pynlm.createAgentBrain(brain)
 world = pynlm.createSimpleWorld()
 world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 agent.initialize(world)
 
-# Run episode
-for _ in range(500):
+# Run episode with enhanced monitoring
+for step in range(500):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
+    brain.step(step)
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+
+print(f"Enhanced episode complete!")
+print(f"Brain status: {brain.get_status()}")
+print(f"World status: {world.get_agent_status()}")
 ```
 
 ---
 
-## Troubleshooting
+## Enhanced Troubleshooting
 
 ### Build Issues
 
-**CMake cannot find Python:**
+**"CMake cannot find Python:"**
 ```bash
 pip install scikit-build-core pybind11
 cmake .. -DPython_EXECUTABLE=$(which python)
 ```
 
-**Compilation errors:**
+**"Compilation errors:"**
 - Ensure C++20 compiler support
 - Check CMake version >= 3.16
 - Verify all source files are present
 
 ### Runtime Issues
 
-**ImportError: No module named 'pynlm':**
+**`ImportError: No module named 'pynlm'`:**
 ```bash
 pip install --force-reinstall .
 ```
 
-**Segmentation faults:**
+**"Segmentation faults:"**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+- Verify configuration is valid before creating brain
+
+### Enhanced API Issues
+
+**"My brain isn't doing anything":**
+- Did you call `brain.initialize()`?
+- Try enabling stats collection: `brain.enable_stats_collection()`
+- Check developmental stage: `brain.get_developmental_stage_info()`
+
+**"The agent isn't moving":**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+- Verify agent's motor capabilities: `agent.get_motor_output_size()`
+
+**"Everything is 0":**
+- Brains need time to "warm up" - try more steps
+- Check statistics: `brain.get_stats().get_summary()`
+- Some neurons need input to fire - make sure sensory input is connected
+
+**"Enhanced API not working":**
+- Ensure you're using the latest pynlm module
+- Try importing the enhanced module: `import pynlm_improved as pynlm`
+- Check version compatibility
 
 ---
 
-## Further Reading
+## Enhanced Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Enhanced experiment descriptions
+- [enhanced_docs/README_ENHANCED.md](enhanced_docs/README_ENHANCED.md) - Enhanced API documentation
+- [enhanced_docs/ADVANCED_FEATURES.md](enhanced_docs/ADVANCED_FEATURES.md) - Advanced features guide

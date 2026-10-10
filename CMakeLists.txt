@@ -18,6 +18,11 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find required packages
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(nlohmann_json 3.11.2 REQUIRED)
+find_package(pybind11 CONFIG REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -92,6 +97,8 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -119,7 +126,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
