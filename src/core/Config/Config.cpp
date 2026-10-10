@@ -19,37 +19,75 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    // Enhanced file validation and error handling
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Configuration file path is empty");
         return false;
     }
     
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
+        return false;
+    }
+    
+    // Check file size for very large files
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    if (fileSize > 10 * 1024 * 1024) {  // 10MB limit
+        NLM_LOG_WARNING("Configuration file is large (" + std::to_string(fileSize) + " bytes)");
+    }
+    
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Enhanced parsing with error checking
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": missing '='")
+                         + " in line: " + line;
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": empty key");
+            continue;
+        }
+        
+        if (value.empty()) {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": empty value for key '" + key + "'");
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        try {
+            set(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error parsing configuration line " + std::to_string(lineNumber) + ": " + std::string(e.what()));
+        }
+    }
+    
+    if (lineNumber == 0) {
+        NLM_LOG_WARNING("Configuration file " + filepath + " is empty");
     }
     
     return true;

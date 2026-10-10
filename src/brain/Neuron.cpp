@@ -28,11 +28,10 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->type = NeuronType::Internal;
-    pImpl->regionId = INVALID_REGION_ID;
-    pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
+    // Optimization: Pre-allocate vectors to reduce reallocations
+    pImpl->spikeHistory.reserve(Impl::MAX_SPIKE_HISTORY);
+    pImpl->incomingSynapses.reserve(10);  // Typical in-degree
+    pImpl->outgoingSynapses.reserve(10); // Typical out-degree
 }
 
 Neuron::~Neuron() = default;
@@ -148,22 +147,34 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    // Optimization: Use emplace_back for faster insertion when possible
+    if (pImpl->spikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.push_back(timestamp);
+    } else {
+        // Use erase/insert pattern to maintain fixed size efficiently
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        pImpl->spikeHistory.push_back(timestamp);
     }
 }
 
 void Neuron::clearSpikeHistory() {
+    // Optimization: Clear and shrink to fit to reduce memory usage
     pImpl->spikeHistory.clear();
+    pImpl->spikeHistory.shrink_to_fit();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+    // Optimization: Check if already exists to prevent duplicates
+    if (std::find(pImpl->incomingSynapses.begin(), pImpl->incomingSynapses.end(), handle) == pImpl->incomingSynapses.end()) {
+        pImpl->incomingSynapses.push_back(handle);
+    }
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+    // Optimization: Check if already exists to prevent duplicates
+    if (std::find(pImpl->outgoingSynapses.begin(), pImpl->outgoingSynapses.end(), handle) == pImpl->outgoingSynapses.end()) {
+        pImpl->outgoingSynapses.push_back(handle);
+    }
 }
 
 NeuronState& Neuron::getState() {

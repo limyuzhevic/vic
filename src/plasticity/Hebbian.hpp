@@ -23,6 +23,20 @@ public:
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
     
+    // Advanced Hebbian learning features
+    void enableAdvancedMode(bool enabled);
+    bool isAdvancedModeEnabled() const;
+    void setHomeostaticStrength(float strength);
+    float getHomeostaticStrength() const;
+    void setWeightRange(float range);
+    float getWeightRange() const;
+    void setTimeConstants(float ltpTc, float ltdTc);
+    void setAdaptationStrength(float strength);
+    float getAdaptationStrength() const;
+    void recordSpikeStats(const std::vector<Timestamp>& spikes);
+    float getAdaptiveLearningRate() const;
+    void resetStats();
+    
 private:
     struct Impl;
     Impl* pImpl;

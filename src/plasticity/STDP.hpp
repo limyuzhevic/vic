@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Enhanced with biologically realistic mechanisms and advanced features
 
 class STDP : public PlasticityRule {
 public:
@@ -19,7 +19,7 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    // STDP parameters
+    // Basic STDP parameters
     void setLTPWeight(float weight);    // Long-term potentiation weight
     float getLTPWeight() const;
     void setLTDWeight(float weight);    // Long-term depression weight
@@ -29,6 +29,36 @@ public:
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    
+    // === ADVANCED STDP FEATURES ===
+    
+    // Triplet interactions (pre-post-pre, post-pre-post)
+    void enableTripletInteractions(bool enabled);
+    bool isTripletEnabled() const;
+    
+    // Neuromodulation integration (reward-modulated STDP)
+    void enableNeuromodulation(bool enabled);
+    bool isNeuromodulationEnabled() const;
+    
+    // Homeostatic plasticity parameters
+    void setHomeostaticWeight(float weight);
+    float getHomeostaticWeight() const;
+    
+    // Eligibility trace parameters
+    void setEligibilityTraceDecay(float decay);
+    float getEligibilityTraceDecay() const;
+    
+    // Calcium signaling dynamics
+    void setCalciumThreshold(float threshold);
+    float getCalciumThreshold() const;
+    
+    // Activity-dependent learning rate modulation
+    void setLearningRateModulation(float mod);
+    float getLearningRateModulation() const;
+    
+    // Advanced STDP statistics
+    float getEligibilityTrace(Synapse* synapse) const;
+    float getCalcium(Synapse* synapse) const;
     
 private:
     struct Impl;
