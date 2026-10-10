@@ -19,9 +19,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,11 +40,42 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to determine value type
+            if (value.find('.') != std::string::npos) {
+                // Try to parse as double
+                try {
+                    size_t pos;
+                    double double_val = std::stod(value, &pos);
+                    if (pos == value.size()) {
+                        set(key, double_val, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try to parse as integer
+            try {
+                size_t pos;
+                int64_t int_val = std::stoll(value, &pos);
+                if (pos == value.size()) {
+                    set(key, int_val, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {}
+            
+            // Try to parse as boolean
+            if (value == "true" || value == "false") {
+                bool bool_val = (value == "true");
+                set(key, bool_val, ConfigSource::File);
+                continue;
+            }
+            
+            // Default to string
             set(key, value, ConfigSource::File);
         }
     }
@@ -86,7 +114,41 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize different value types
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> ||
+                                std::is_same_v<T, double> || std::is_same_v<T, bool>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
