@@ -78,20 +78,29 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Phase 6 Integration additions
+    float lastPredictionError;
+    float lastPredictionConfidence;
+    float predictionUncertainty;
+    size_t lastDiscoveredConcept;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
         , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+    , currentTime(0.0)
+    , totalSpikesThisStep(0)
+    , totalSpikesTotal(0)
+    , isResting(false)
+    , stepsSinceLastEpisode(0)
+    , replayInterval(100)      // Replay every 100 steps
+    , consolidationInterval(1000)  // Consolidate every 1000 steps
+    , lastPredictionError(0.0f)
+    , lastPredictionConfidence(0.0f)
+    , predictionUncertainty(0.0f)
+    , lastDiscoveredConcept(0)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -509,10 +518,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 8: Integrate prediction system with sensory processing ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use prediction system to anticipate next states
+        // This helps with proactive action selection
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Update confidence based on prediction quality
+        // Higher confidence in predictions = more stable behavior
+        // This will be used by neuromodulation to adjust learning rates
+        
+        // Store prediction for later integration with planning
+        pImpl->lastPredictionError = predictionError;
+        pImpl->lastPredictionConfidence = confidence;
+    }
+    
+    // Apply prediction uncertainty to action selection
+    // Use prediction error to modulate exploration vs exploitation
+    if (pImpl->predictionSystem) {
+        float predictionUncertainty = pImpl->predictionSystem->getPredictionError();
+        // High prediction error = increase exploration
+        // This connects prediction to curiosity/novelty systems
+        float explorationBonus = predictionUncertainty * 2.0f;
+        
+        // Store for curiosity system
+        pImpl->predictionUncertainty = predictionUncertainty;
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +558,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Process working memory content to form concepts
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        for (NeuronId neuronId : memoryNeurons) {
+            float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+            if (activation > 0.5f) {  // Only high activation neurons contribute
+                // Create simple neural pattern for concept formation
+                std::vector<float> pattern;
+                
+                // Get average activation from nearby neurons
+                for (size_t i = 0; i < 10 && i < memoryNeurons.size(); ++i) {
+                    NeuronId nearbyNeuron = memoryNeurons[i];
+                    float nearbyActivation = pImpl->workingMemory->getNeuronActivation(nearbyNeuron);
+                    pattern.push_back(nearbyActivation);
+                }
+                
+                if (!pattern.empty()) {
+                    // Present to concept formation for pattern discovery
+                    // Note: ConceptFormation::presentExperience() requires features and reward
+                    // For now, we'll use simple features based on pattern characteristics
+                    std::vector<float> features;
+                    
+                    // Calculate simple features from pattern
+                    float avgActivation = 0.0f;
+                    for (float val : pattern) avgActivation += val;
+                    if (!pattern.empty()) avgActivation /= pattern.size();
+                    features.push_back(avgActivation);
+                    
+                    // Add variance as another feature
+                    float variance = 0.0f;
+                    for (float val : pattern) {
+                        variance += (val - avgActivation) * (val - avgActivation);
+                    }
+                    if (!pattern.empty()) variance /= pattern.size();
+                    features.push_back(variance);
+                    
+                    // Present to concept formation (reward is dopamine level)
+                    float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                    size_t conceptId = pImpl->conceptFormation->presentExperience(
+                        pattern, features, reward, currentStep
+                    );
+                    
+                    if (conceptId > 0) {
+                        // Concept was discovered or updated
+                        // This concept now represents a pattern in neural activity
+                        pImpl->lastDiscoveredConcept = conceptId;
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

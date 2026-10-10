@@ -287,7 +287,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Enhanced SimpleWorld API for advanced users
+        .def("getObjects", &SimpleWorld::getObjects)
+        .def("setWorldSize", [](SimpleWorld& self, float w, float h) {
+            self.configure(w, h, 8, 8);  // Default vision dimensions
+        }, py::arg("width"), py::arg("height"))
+        .def("getSensoryPercept", [](const SimpleWorld& self) {
+            auto percept = self.getSensoryPercept();
+            return percept;
+        })
+        .def("applyMotorCommand", [](SimpleWorld& self, const Action& cmd, float time) {
+            self.applyMotorCommand(cmd, time);
+        }, py::arg("cmd"), py::arg("currentTime"))
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
