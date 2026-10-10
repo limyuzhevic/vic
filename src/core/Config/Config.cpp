@@ -56,10 +56,97 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool helpRequested = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --help flag for usage information
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+            continue;
+        }
+        
+        // Handle --version flag for version information
+        if (arg == "--version") {
+            std::cout << "NLM Neural Learning Machine v2.0 (Phase 2)" << std::endl;
+            std::cout << "Real spiking neural computation with advanced plasticity rules." << std::endl;
+            return true;
+        }
+        
+        // Handle --batch for batch processing mode
+        if (arg == "--batch") {
+            set("batch_mode", true, ConfigSource::CommandLine);
+            continue;
+        }
+        
+        // Handle --output-file for logging output
+        if (arg.substr(0, 12) == "--output-file") {
+            std::string value;
+            if (arg.find('=') != std::string::npos) {
+                value = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                value = argv[++i];
+            }
+            if (!value.empty()) {
+                set("output_file", value, ConfigSource::CommandLine);
+            }
+            continue;
+        }
+        
+        // Handle --checkpoint-interval for checkpoint frequency
+        if (arg.substr(0, 23) == "--checkpoint-interval") {
+            float value = 100.0f;  // default
+            if (arg.find('=') != std::string::npos) {
+                value = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                value = std::stof(argv[++i]);
+            }
+            set("checkpoint_interval", value, ConfigSource::CommandLine);
+            continue;
+        }
+        
+        // Handle --neuron-count for quick overrides
+        if (arg.substr(0, 14) == "--neuron-count") {
+            int64_t value = 500;  // default
+            if (arg.find('=') != std::string::npos) {
+                value = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                value = std::stoll(argv[++i]);
+            }
+            set("neuron_count", value, ConfigSource::CommandLine);
+            continue;
+        }
+        
+        // Handle --region-count for quick overrides
+        if (arg.substr(0, 13) == "--region-count") {
+            int64_t value = 1;  // default
+            if (arg.find('=') != std::string::npos) {
+                value = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                value = std::stoll(argv[++i]);
+            }
+            set("region_count", value, ConfigSource::CommandLine);
+            continue;
+        }
+        
+        // Handle --enable-experimental to enable experimental features
+        if (arg == "--enable-experimental") {
+            set("experimental_features", true, ConfigSource::CommandLine);
+            continue;
+        }
+        
+        // Handle --save-state to enable state saving
+        if (arg == "--save-state") {
+            std::string value = "brain_state.nml";
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                value = argv[++i];
+            }
+            set("save_state_file", value, ConfigSource::CommandLine);
+            continue;
+        }
+        
+        // Handle standard --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
@@ -68,13 +155,41 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        // Handle standard -key value format
+        else if (arg[0] == '-' && i + 1 < argc && argv[i + 1][0] != '-') {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
     }
+    
+    // Show help if requested
+    if (helpRequested) {
+        std::cout << "=== NLM Neural Learning Machine ===" << std::endl;
+        std::cout << "Version: 2.0 (Phase 2 - Real Neural Computation)" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Usage: nlm [--config=<file>] [--help] [--version] [options]" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "General Options:" << std::endl;
+        std::cout << "  --help, -h                  Show this help message" << std::endl;
+        std::cout << "  --version                   Show version information" << std::endl;
+        std::cout << "  --config=<file>             Load configuration from file" << std::endl;
+        std::cout << "  --neuron-count=<n>          Override number of neurons" << std::endl;
+        std::cout << "  --region-count=<n>          Override number of regions" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Advanced Options:" << std::endl;
+        std::cout << "  --batch                     Run in batch mode" << std::endl;
+        std::cout << "  --output-file=<file>        Log output to file" << std::endl;
+        std::cout << "  --checkpoint-interval=<n>   Checkpoint every N steps" << std::endl;
+        std::cout << "  --enable-experimental       Enable experimental features" << std::endl;
+        std::cout << "  --save-state[=<file>]       Save/load brain state" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Configuration File Options:" << std::endl;
+        std::cout << "  Set custom configuration values in configs/ directory" << std::endl;
+        std::cout << "" << std::endl;
+        return true;
+    }
+    
     return true;
 }
 
@@ -112,6 +227,31 @@ template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
+}
+
+// Integer parameter setter
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+// Integer64 parameter setter  
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+// Float parameter setter
+void Config::set(const std::string& key, float value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+// Double parameter setter
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+// Boolean parameter setter
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

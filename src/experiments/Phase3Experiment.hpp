@@ -1,34 +1,14 @@
 #pragma once
 
-#include "../agent/AgentBody.hpp"
 #include <string>
+#include <map>
 #include <vector>
+#include <string>
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
-// Simple text logger for experiments
-class ExperimentLogger {
-public:
-    ExperimentLogger(const std::string& filename);
-    ~ExperimentLogger();
-    
-    void log(const std::string& message);
-    void logEpisodeStart(int episode);
-    void logEpisodeEnd(int episode, float totalReward, int steps, float finalNovelty);
-    void logStep(int step, float reward, float neuromod, float curiosity, 
-                 float energy, const std::string& action);
-    void logDevelopment(float age, const std::string& stage);
-    void logSynapticStats(size_t totalSynapses, float avgWeight, float maxWeight);
-    void logPhase3Header();
-    
-    void flush();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Metrics collector for Phase 3 experiments
+// Simple metrics collector for Phase 3 experiments
 struct ExperimentMetrics {
     // Episode metrics
     int episode;
@@ -58,9 +38,18 @@ struct ExperimentMetrics {
     int interactCount;
     int waitCount;
     
+    // Experimental tracking
+    std::string experimentName;
+    
     ExperimentMetrics();
     void reset();
     std::string toCSV() const;
+    
+    // Get experiment name
+    const std::string& getExperimentName() const { return experimentName; }
+    
+    // Set experiment name
+    void setExperimentName(const std::string& name) { experimentName = name; }
 };
 
 } // namespace nlm

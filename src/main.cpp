@@ -343,6 +343,43 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
+    // Check for help request before loading config
+    bool helpRequested = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+            break;
+        }
+    }
+    
+    if (helpRequested) {
+        // Display help and exit
+        std::cout << "=== NLM Neural Learning Machine ===" << std::endl;
+        std::cout << "Version: 2.0 (Phase 2 - Real Neural Computation)" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Usage: nlm [--config=<file>] [--help] [--version] [options]" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "General Options:" << std::endl;
+        std::cout << "  --help, -h                  Show this help message" << std::endl;
+        std::cout << "  --version                   Show version information" << std::endl;
+        std::cout << "  --config=<file>             Load configuration from file" << std::endl;
+        std::cout << "  --neuron-count=<n>          Override number of neurons" << std::endl;
+        std::cout << "  --region-count=<n>          Override number of regions" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Advanced Options:" << std::endl;
+        std::cout << "  --batch                     Run in batch mode" << std::endl;
+        std::cout << "  --output-file=<file>        Log output to file" << std::endl;
+        std::cout << "  --checkpoint-interval=<n>   Checkpoint every N steps" << std::endl;
+        std::cout << "  --enable-experimental       Enable experimental features" << std::endl;
+        std::cout << "  --save-state[=<file>]       Save/load brain state" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Configuration File Options:" << std::endl;
+        std::cout << "  Set custom configuration values in configs/ directory" << std::endl;
+        std::cout << "" << std::endl;
+        return 0;
+    }
+    
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
@@ -382,6 +419,18 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Enable experimental features if requested
+    if (config->has("experimental_features") && config->getOr<bool>("experimental_features", false)) {
+        config->set("experimental_features", true, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Experimental features enabled");
+    }
+    
+    // Enable batch mode if requested
+    if (config->has("batch_mode") && config->getOr<bool>("batch_mode", false)) {
+        config->set("batch_mode", true, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Running in batch mode");
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,6 +439,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Log experimental features if enabled
+    if (config->has("experimental_features") && config->getOr<bool>("experimental_features", false)) {
+        NLM_LOG_INFO("  experimental_features: true");
+    }
+    
+    if (config->has("batch_mode") && config->getOr<bool>("batch_mode", false)) {
+        NLM_LOG_INFO("  batch_mode: true");
+    }
+    
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
