@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
 
 namespace nlm {
 
@@ -12,6 +13,9 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string logfileName;
+    size_t maxFileSize = 10 * 1024 * 1024; // 10MB default
+    size_t currentFileSize = 0;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -32,9 +36,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add timestamp - use thread-safe approach
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    oss << std::put_time(std::gmtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) 
+        << std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()).count() % 1000;
     
     oss << " " << entry.message;
     
@@ -50,33 +58,64 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // File output if set
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
+        pImpl->currentFileSize += output.size() + 1; // +1 for newline
+        
+        // Check file size and rotate if needed
+        if (pImpl->currentFileSize >= pImpl->maxFileSize) {
+            pImpl->fileOut.close();
+            // Simple rotation - could be improved with backup names
+            std::string newName = pImpl->logfileName + ".1";
+            std::rename(pImpl->logfileName.c_str(), newName.c_str());
+            pImpl->fileOut.open(pImpl->logfileName, std::ios::app);
+            pImpl->currentFileSize = 0;
+        }
+        
         pImpl->fileOut.flush();
     }
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->logfileName = filepath;
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        std::cerr << "Warning: Could not open log file: " << filepath << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        pImpl->logfileName.clear();
+        pImpl->currentFileSize = 0;
     }
 }
 
@@ -106,20 +145,29 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    bool initialized;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->initialized = false;
+}
 
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        return;
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
+    pImpl->initialized = true;
 }
 
 void Logger::clearLoggers() {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.clear();
+    pImpl->initialized = false;
 }
 
 void Logger::setLevel(LogLevel level) {
@@ -133,6 +181,10 @@ void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    if (!pImpl->initialized || pImpl->loggers.empty()) {
+        return;
+    }
+    
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -142,7 +194,11 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.timestamp = std::chrono::system_clock::now();
     
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        try {
+            logger->log(entry);
+        } catch (const std::exception& e) {
+            std::cerr << "Logger error: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -191,7 +247,11 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    try {
+        Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    } catch (const std::exception& e) {
+        std::cerr << "LogStream error: " << e.what() << std::endl;
+    }
 }
 
 } // namespace nlm

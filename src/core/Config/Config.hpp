@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -31,16 +33,45 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration validation rules
+struct ConfigValidation {
+    std::string name;
+    std::string description;
+    bool required;
+    std::string defaultValue;
+    std::string type; // "int", "double", "string", "bool", "vector"
+    std::string validation; // Optional validation expression
+    std::vector<std::string> allowedValues; // For enumerated types
+};
+
+// Configuration schema
+class ConfigSchema {
+public:
+    void addEntry(const std::string& name, const ConfigValidation& validation);
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    std::optional<ConfigValidation> getValidation(const std::string& key) const;
+    std::vector<std::string> getAllKeys() const;
+    std::string getDescription(const std::string& key) const;
+    bool isRequired(const std::string& key) const;
+    
+private:
+    std::unordered_map<std::string, ConfigValidation> validations_;
+};
+
+// Enhanced configuration entry with metadata
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string type;
+    bool isInitialized;
+    std::string lastModified;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() 
+        : key(), value(), source(ConfigSource::Default), description(), type(), isInitialized(false), lastModified() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "", const std::string& t = "auto")
+        : key(k), value(v), source(s), description(desc), type(t), isInitialized(true), lastModified() {}
 };
 
 // Main configuration class
