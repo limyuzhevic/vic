@@ -27,6 +27,27 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Get working memory modulation strength for dopamine
+    virtual float getWorkingMemoryModulation() const { return 1.0f; }
+    
+    // Get attentional selection modulation strength for dopamine
+    virtual float getAttentionModulation() const { return 1.0f; }
+    
+    // Get episodic memory consolidation strength for dopamine
+    virtual float getMemoryConsolidationStrength() const { return 1.0f; }
+    
+    // Get prediction error integration weight for dopamine
+    virtual float getPredictionErrorWeight() const { return 1.0f; }
+    
+    // Get metaplasticity modulation for dopamine
+    virtual float getMetaPlasticityMod() const { return 1.0f; }
+    
+    // Get motivational state influence for dopamine
+    virtual float getMotivationalState() const { return 0.0f; }
+    
+    // Get curiosity integration weight for dopamine
+    virtual float getCuriosityWeight() const { return 1.0f; }
+    
 protected:
     Neuromodulator() = default;
 };
@@ -57,11 +78,60 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // ACh-specific effects
+    void configure(const Config& config) override;
+    void applyEffect(NeuralSystem& system) override;
+    
+    // Memory enhancement
+    float getWorkingMemoryModulation() const override;
+    float getMemoryRetrievalFacilitation() const;
+    
+    // Attention enhancement  
+    float getAttentionalSelection() const override;
+    float getSensoryProcessingGain() const;
+    
+    // Episodic memory
+    float getEpisodicMemoryEncoding() const override;
+    
+    // Sleep consolidation
+    float getSleepConsolidation() const;
+    
+    // Metaplasticity
+    float getMetaPlasticityMod() const override;
+    
+    // Cognitive control
+    float getCognitiveControl() const;
+    
+    // Working memory consolidation
+    void applyWorkingMemoryEffects(NeuralWorkingMemory* workingMemory);
+    
+    // Attentional selection effects
+    void applyAttentionEffects(AttentionalSelection* attention);
+    
+    // Episodic memory effects
+    void applyMemoryConsolidationEffects(NeuralEpisodicMemory* episodicMemory);
+    
+    // Plasticity effects
+    void applyPlasticityEffects(PlasticityRule* plasticity);
+    
+    // Sleep/rest cycle integration
+    void applySleepConsolidationEffects(Brain* brain);
+    
+    // Cognitive development effects
+    void applyDevelopmentEffects(DevelopmentSystem* development);
+
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance

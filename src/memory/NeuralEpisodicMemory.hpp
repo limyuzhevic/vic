@@ -41,11 +41,15 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Phase 6: Experience consolidation fields
+    bool isConsolidated;
+    float consolidationStrength;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0), isConsolidated(false), consolidationStrength(0.0f) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
@@ -70,6 +74,10 @@ public:
     // The experience is encoded as neural activity and can influence future processing
     void storeEpisode(const EpisodicMemoryItem& episode);
 
+    // Store experience with working memory consolidation
+    // Enhanced version that integrates with working memory consolidation
+    void storeExperience(const EpisodicMemoryItem& experience);
+
     // Retrieve episodes similar to a query pattern
     // Returns episodes ordered by relevance
     std::vector<const EpisodicMemoryItem*> retrieveSimilar(const std::vector<float>& sensoryPattern,
@@ -77,17 +85,17 @@ public:
 
     // Retrieve episodes from a specific time window
     std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
+                                                             SimulationStep endTime,
+                                                             size_t maxResults = 10) const;
 
     // Retrieve episodes by location
     std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
+                                                              float radius,
+                                                              size_t maxResults = 5) const;
 
     // Retrieve episodes following a specific action
     std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
+                                                               size_t maxResults = 5) const;
 
     // Replay an episode - reactivates the neural patterns associated with it
     // This allows the brain to "relive" the experience
@@ -127,7 +135,7 @@ public:
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
+                           const EpisodicMemoryItem& episode) const;
 
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,
@@ -173,16 +181,16 @@ public:
 
     // Retrieve patterns associated with a query pattern
     std::vector<std::vector<float>> retrieve(const std::vector<float>& queryPattern,
-                                            size_t maxResults = 5) const;
+                                             size_t maxResults = 5) const;
 
     // Get association strength between two patterns
     float getAssociationStrength(const std::vector<float>& patternA,
-                                const std::vector<float>& patternB) const;
+                                 const std::vector<float>& patternB) const;
 
     // Update association based on outcome
     void updateAssociation(const std::vector<float>& patternA,
-                          const std::vector<float>& patternB,
-                          float delta);
+                           const std::vector<float>& patternB,
+                           float delta);
 
     // Spread activation from cue pattern
     // Returns patterns that become activated through association chains
@@ -201,7 +209,7 @@ private:
 
     // Compute pattern similarity
     float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

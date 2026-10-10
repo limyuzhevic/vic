@@ -6,6 +6,12 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SparseConnectivity.hpp"
+#include "../performance/ParallelProcessing.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
 
@@ -25,9 +31,20 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Performance infrastructure forward declarations
+class MemoryPool;
+class SpikeRingBuffer;
+class DelayedSpikeQueue;
+class SparseConnectivity;
+class ParallelNeuralProcessor;
+class VectorizedLIF;
+class VectorizedSTDP;
+class CheckpointManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -174,6 +191,9 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

@@ -62,7 +62,8 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
+    # Performance and checkpointing
+    src/performance/Checkpoint.cpp
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
     # Sensory
