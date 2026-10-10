@@ -37,21 +37,29 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(const Neuron& other) : pImpl(new Impl(*other.pImpl)) {}
+
+Neuron& Neuron::operator=(const Neuron& other) {
+    if (this != &other) {
+        *pImpl = *other.pImpl;
+    }
+    return *this;
 }
 
-Neuron& Neuron::operator=(Neuron&& other) noexcept {
+Neuron& Neuron::operator=(const Neuron& other) {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = new Impl(*other.pImpl);
     }
     return *this;
 }
 
 void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
+    if (type == NeuronType::Internal || type == NeuronType::Excitatory || 
+        type == NeuronType::Inhibitory || type == NeuronType::Sensory || 
+        type == NeuronType::Motor || type == NeuronType::Modulatory) {
+        pImpl->type = type;
+    }
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
@@ -60,14 +68,21 @@ void Neuron::setMembranePotential(MembranePotential potential) {
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
     pImpl->state.membranePotential += delta;
+    // Clamp to reasonable biological range
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, -100.0f, 50.0f);
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    if (threshold >= -100.0f && threshold <= 50.0f) {
+        pImpl->state.threshold = threshold;
+    }
 }
 
 void Neuron::setFiringState(FiringState state) {
-    pImpl->state.firingState = state;
+    if (state == FiringState::Resting || state == FiringState::Active || 
+        state == FiringState::Refractory || state == FiringState::Inhibited) {
+        pImpl->state.firingState = state;
+    }
 }
 
 void Neuron::decrementRefractory() {
@@ -84,7 +99,9 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    if (conductance >= 0.0f) {
+        pImpl->state.leakConductance = conductance;
+    }
 }
 
 MembranePotential Neuron::getLeakConductance() const {
@@ -100,7 +117,9 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    if (potential >= -100.0f && potential <= 50.0f) {
+        pImpl->state.restingPotential = potential;
+    }
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -108,7 +127,9 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    if (potential >= -100.0f && potential <= 50.0f) {
+        pImpl->state.resetPotential = potential;
+    }
 }
 
 bool Neuron::checkThreshold() const {
@@ -122,13 +143,17 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    if (amplitude >= 0.0f) {
+        pImpl->synapticInput += amplitude;
+    }
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    if (amplitude >= 0.0f) {
+        pImpl->synapticInput -= amplitude;
+    }
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
@@ -148,10 +173,12 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    // Use circular buffer for efficient spike history management
+    if (pImpl->spikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Use rotation instead of erase for O(1) operation
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    pImpl->spikeHistory.push_back(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {

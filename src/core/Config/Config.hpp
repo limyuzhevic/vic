@@ -100,6 +100,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    static bool parseJSONFile(std::ifstream& file, const std::string& filepath);
+    };
 
 } // namespace nlm
