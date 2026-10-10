@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <sstream>
+#include <iostream>
 
 namespace nlm {
 
@@ -29,6 +31,22 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Error recovery mode
+enum class ErrorRecoveryMode {
+    Lenient,  // Skip malformed lines (default)
+    Strict    // Fail on first error
+};
+
+// Configuration error information
+struct ConfigError {
+    size_t lineNumber;
+    std::string errorMessage;
+    std::string lineContent;
+    
+    ConfigError(size_t line, const std::string& error, const std::string& content)
+        : lineNumber(line), errorMessage(error), lineContent(content) {}
 };
 
 // Configuration entry
@@ -90,10 +108,15 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Error recovery mode
+    ErrorRecoveryMode getErrorRecoveryMode() const;
+    bool setErrorRecoveryMode(ErrorRecoveryMode mode);
     
-private:
+    // Error information
+    size_t getSuccessfulParses() const;
+    size_t getErrorCount() const;
+    const std::vector<ConfigError>& getErrors() const;
+    std::string getErrorSummary() const;
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     

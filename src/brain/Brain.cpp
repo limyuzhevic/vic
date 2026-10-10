@@ -325,14 +325,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // Update internal state
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    // ORCHESTRATOR: Execute all 15+ phases of brain operation
+    processDelayedSpikes(currentStep, currentTime);
+    updateNeurons(currentTime);
+    detectAndScheduleSpikes(currentStep, currentTime);
+    processImmediateSpikes(currentStep);
+    updateWorkingMemory();
+    applyNeuromodulationEffects();
+    applyPlasticityRules(currentTime);
+    updateEpisodicMemory(currentStep, currentTime);
+    updatePredictionSystem();
+    updateAttentionSystem();
+    updateConceptFormation();
+    applyStructuralPlasticity(currentStep);
+    replayImportantMemories(currentStep);
+    applyDevelopmentEffects(currentStep, currentTime);
+    performMemoryConsolidation(currentStep);
+    checkpointManagement(currentStep, currentTime);
+}
+
+// ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+void Brain::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+}
+
+// ========== STEP 2: Update all neurons (LIF dynamics) ==========
+void Brain::updateNeurons(Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -340,8 +363,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+}
+
+// ========== STEP 3: Detect spikes and schedule spike events ==========
+void Brain::detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -397,16 +422,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // Process immediate spikes
+}
+
+// ========== Process immediate spikes (after STEP 3) ==========
+void Brain::processImmediateSpikes(SimulationStep currentStep) {
     pImpl->spikeSystem->processSpikes(currentStep);
-    
-    // ========== STEP 4: Update working memory ==========
+}
+
+// ========== STEP 4: Update working memory ==========
+void Brain::updateWorkingMemory() {
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
+}
+
+// ========== STEP 5: Apply neuromodulation effects ==========
+void Brain::applyNeuromodulationEffects() {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -438,8 +469,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+}
+
+// ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+void Brain::applyPlasticityRules(Timestamp currentTime) {
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -476,8 +509,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             syn->step(currentTime);
         }
     }
-    
-    // ========== STEP 7: Update episodic memory ==========
+}
+
+// ========== STEP 7: Update episodic memory ==========
+void Brain::updateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -508,14 +543,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
-    
-    // ========== STEP 8: Update prediction system ==========
+}
+
+// ========== STEP 8: Update prediction system ==========
+void Brain::updatePredictionSystem() {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
-    // ========== STEP 9: Update attention system ==========
+}
+
+// ========== STEP 9: Update attention system ==========
+void Brain::updateAttentionSystem() {
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -525,19 +564,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
-    // ========== STEP 10: Update concept formation ==========
+}
+
+// ========== STEP 10: Update concept formation ==========
+void Brain::updateConceptFormation() {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
     }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+}
+
+// ========== STEP 11: Apply structural plasticity ==========
+void Brain::applyStructuralPlasticity(SimulationStep currentStep) {
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
-    // ========== STEP 12: Replay important memories ==========
+}
+
+// ========== STEP 12: Replay important memories ==========
+void Brain::replayImportantMemories(SimulationStep currentStep) {
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -545,8 +590,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
-    // ========== STEP 13: Apply development effects ==========
+}
+
+// ========== STEP 13: Apply development effects ==========
+void Brain::applyDevelopmentEffects(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -575,14 +622,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
+}
+
+// ========== STEP 14: Periodic memory consolidation ==========
+void Brain::performMemoryConsolidation(SimulationStep currentStep) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
-    
-    // ========== STEP 15: Checkpoint management ==========
+}
+
+// ========== STEP 15: Checkpoint management ==========
+void Brain::checkpointManagement(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }

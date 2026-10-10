@@ -25,8 +25,121 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <cstring>
+#include <algorithm>
 
 using namespace nlm;
+
+// Version information
+const std::string PROJECT_NAME = "NLM — 熙然";
+const std::string PROJECT_VERSION = "0.1.0";
+const std::string PROJECT_DESCRIPTION = "Neural Learning Machine — An experimental artificial developmental brain";
+
+struct CommandLineOptions {
+    std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
+    bool showVersion = false;
+    bool validateOnly = false;
+};
+
+void printHelp(const std::string& programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM — Neural Learning Machine (熙然)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help          Print this help message and exit" << std::endl;
+    std::cout << "  -v, --version       Print version information and exit" << std::endl;
+    std::cout << "  --config=FILE        Specify configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --config FILE        Alternative syntax for configuration file" << std::endl;
+    std::cout << std::endl;
+    std::cout << "The program will run the NLM Phase 2 neural computation experiments:" << std::endl;
+    std::cout << "  1. Basic neural connectivity test" << std::endl;
+    std::cout << "  2. Plasticity learning experiment (Hebbian + STDP)" << std::endl;
+    std::cout << "  3. STDP verification (pre-before-post potentiation)" << std::endl;
+}
+
+bool isValidFile(const std::string& filepath) {
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Check for basic file path validity
+    for (char c : filepath) {
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            return false;
+        }
+    }
+    
+    // Check for suspicious patterns
+    if (filepath.find("..") != std::string::npos) {
+        return false;
+    }
+    
+    return true;
+}
+
+bool parseCommandLineArguments(int argc, char** argv, CommandLineOptions& options) {
+    if (argc < 1) {
+        return false;
+    }
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Check for help flag
+        if (arg == "--help" || arg == "-h") {
+            options.showHelp = true;
+            continue;
+        }
+        
+        // Check for version flag
+        if (arg == "--version" || arg == "-v") {
+            options.showVersion = true;
+            continue;
+        }
+        
+        // Check for config option (improved parsing)
+        if (arg.find("--config") == 0) {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                // --config=filename
+                std::string configFile = arg.substr(pos + 1);
+                if (!configFile.empty()) {
+                    options.configFile = configFile;
+                } else {
+                    std::cerr << "ERROR: Empty config file path after --config=" << std::endl;
+                    return false;
+                }
+            } else if (i + 1 < argc) {
+                // --config filename
+                std::string nextArg(argv[++i]);
+                if (nextArg.find('--') == 0) {
+                    // Next argument is another flag, treat current arg as empty
+                    std::cerr << "ERROR: Missing config file path after --config" << std::endl;
+                    return false;
+                }
+                options.configFile = nextArg;
+            } else {
+                std::cerr << "ERROR: Missing config file path after --config" << std::endl;
+                return false;
+            }
+            continue;
+        }
+        
+        // Check for unknown flags
+        if (arg.find('--') == 0) {
+            std::cerr << "ERROR: Unknown option: " << arg << std::endl;
+            return false;
+        }
+        
+        // Positional arguments are not expected, treat as error
+        std::cerr << "ERROR: Unexpected positional argument: " << arg << std::endl;
+        return false;
+    }
+    
+    return true;
+}
 
 void printBanner() {
     std::cout << R"(
@@ -48,7 +161,6 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -158,6 +270,11 @@ struct LearningExperiment {
         }
     }
 };
+
+void resetAndInitialize(std::shared_ptr<Brain> brain) {
+    brain->reset();
+    brain->initialize();
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -301,8 +418,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -322,6 +439,23 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    CommandLineOptions options;
+    if (!parseCommandLineArguments(argc, argv, options)) {
+        return 1; // Exit with error code if parsing failed
+    }
+    
+    // Handle help and version options (exit early)
+    if (options.showHelp) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    if (options.showVersion) {
+        printVersion();
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -343,24 +477,16 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    // Load config from file with validation
+    if (!isValidFile(options.configFile)) {
+        NLM_LOG_ERROR("Invalid config file path: " + options.configFile);
+        return 1;
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (config->loadFromFile(options.configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + options.configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found or invalid).");
     }
     
     // Override with command line args
@@ -413,15 +539,13 @@ int main(int argc, char** argv) {
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    resetAndInitialize(brain);
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
+    resetAndInitialize(brain);
     runStdpVerification(brain);
     
     // Final brain status

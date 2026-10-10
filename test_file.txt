@@ -1,0 +1,13 @@
+# Test file content
+This is a test file.
+
+## Part 1: Building the C++ Project from Source
+
+### Prerequisites
+
+- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher
+- **Python**: 3.8+ (for Python bindings)
+- **pybind11**: Version 2.11.0+ (for Python bindings)
+
+This is a test to see if the write tool works correctly.
