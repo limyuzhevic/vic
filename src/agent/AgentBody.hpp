@@ -65,15 +65,49 @@ enum class MotorCommand {
     Wait = 7           // No movement
 };
 
-// Action result from the world's perspective
+// Action result error codes
+enum class ActionResultCode {
+    Success = 0,
+    InvalidAction = 1,
+    OutOfRange = 2,
+    Collision = 3,
+    NoEnergy = 4,
+    InternalError = 5,
+    Unauthorized = 6,
+    InvalidState = 7,
+    Timeout = 8
+};
+
+// Action result from the world\'s perspective
 struct ActionResult {
     float reward;
     bool success;
     std::string message;
+    ActionResultCode errorCode;
     
-    ActionResult() : reward(0.0f), success(false), message("") {}
-    ActionResult(float r, bool s, const std::string& m = "") 
-        : reward(r), success(s), message(m) {}
+    ActionResult() : reward(0.0f), success(false), message("") , errorCode(ActionResultCode::InternalError) {}
+    ActionResult(float r, bool s, const std::string& m = "", ActionResultCode ec = ActionResultCode::InternalError) 
+        : reward(r), success(s), message(m), errorCode(ec) {}
+    
+    bool isSuccess() const { return success && errorCode == ActionResultCode::Success; }
+    bool isFailure() const { return !success; }
+    
+    static const char* getErrorDescription(ActionResultCode code) {
+        switch (code) {
+            case ActionResultCode::Success: return "Success";
+            case ActionResultCode::InvalidAction: return "Invalid action specified";
+            case ActionResultCode::OutOfRange: return "Action parameters out of range";
+            case ActionResultCode::Collision: return "Collision with obstacle";
+            case ActionResultCode::NoEnergy: return "Insufficient energy";
+            case ActionResultCode::InternalError: return "Internal system error";
+            case ActionResultCode::Unauthorized: return "Unauthorized action";
+            case ActionResultCode::InvalidState: return "Invalid agent or world state";
+            case ActionResultCode::Timeout: return "Action timed out";
+            default: return "Unknown error";
+        }
+    }
+    
+    const char* getErrorDescription() const { return getErrorDescription(errorCode); }
 };
 
 // Object types in the world (for rendering/debug only, NOT given to brain)
