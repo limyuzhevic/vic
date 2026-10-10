@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_config.a CMakeFiles/nlm_config.dir/core/Config/Config.cpp.o
+/usr/bin/ranlib libnlm_config.a

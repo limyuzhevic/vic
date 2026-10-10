@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_sensory.a CMakeFiles/nlm_sensory.dir/sensory/SensoryInput.cpp.o CMakeFiles/nlm_sensory.dir/sensory/Vision.cpp.o CMakeFiles/nlm_sensory.dir/sensory/Audio.cpp.o CMakeFiles/nlm_sensory.dir/sensory/InternalSignals.cpp.o
+/usr/bin/ranlib libnlm_sensory.a

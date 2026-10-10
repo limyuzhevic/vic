@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_dynamics.a CMakeFiles/nlm_dynamics.dir/dynamics/NeuralDynamics.cpp.o CMakeFiles/nlm_dynamics.dir/dynamics/SpikeSystem.cpp.o
+/usr/bin/ranlib libnlm_dynamics.a

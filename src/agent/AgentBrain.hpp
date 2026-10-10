@@ -49,6 +49,9 @@ public:
     // Get novelty level
     float getNoveltyLevel() const;
     
+    // Get prediction system
+    PredictionSystem* getPredictionSystem() { return brain_->getPredictionSystem(); }
+    
     // Get prediction error
     float getPredictionError() const;
     

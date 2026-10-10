@@ -27,12 +27,25 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
+    // Get prediction error
+    float getError() const { return getPredictionError(); }
+    
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
+    
+    // Get prediction count
+    size_t getPredictionCount() const;
+    
     void clearHistory();
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Reset prediction system
+    void reset();
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const { return getConfidence(); }
     
 private:
     struct Impl;

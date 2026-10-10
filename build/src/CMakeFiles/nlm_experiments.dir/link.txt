@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_experiments.a CMakeFiles/nlm_experiments.dir/experiments/Experiment.cpp.o CMakeFiles/nlm_experiments.dir/experiments/ExperimentRunner.cpp.o CMakeFiles/nlm_experiments.dir/experiments/Metrics.cpp.o
+/usr/bin/ranlib libnlm_experiments.a

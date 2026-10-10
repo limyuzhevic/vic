@@ -1,0 +1,292 @@
+[
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -fPIC -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_types.dir/core/Types/Types.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Types/Types.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Types/Types.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_config.dir/core/Config/Config.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Config/Config.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Config/Config.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_random.dir/core/Random/Random.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Random/Random.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Random/Random.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_logger.dir/core/Logger/Logger.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Logger/Logger.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/Logger/Logger.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_simulationclock.dir/core/SimulationClock/SimulationClock.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/SimulationClock/SimulationClock.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/core/SimulationClock/SimulationClock.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_brain.dir/brain/Neuron.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/Neuron.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/Neuron.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_brain.dir/brain/Synapse.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/Synapse.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/Synapse.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_brain.dir/brain/NeuralPopulation.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/NeuralPopulation.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/NeuralPopulation.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_brain.dir/brain/NeuralRegion.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/NeuralRegion.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/NeuralRegion.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_brain.dir/brain/Brain.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/Brain.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/brain/Brain.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_dynamics.dir/dynamics/NeuralDynamics.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/dynamics/NeuralDynamics.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/dynamics/NeuralDynamics.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_dynamics.dir/dynamics/SpikeSystem.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/dynamics/SpikeSystem.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/dynamics/SpikeSystem.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_plasticity.dir/plasticity/PlasticityRule.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/PlasticityRule.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/PlasticityRule.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_plasticity.dir/plasticity/Hebbian.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/Hebbian.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/Hebbian.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_plasticity.dir/plasticity/STDP.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/STDP.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/STDP.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_plasticity.dir/plasticity/StructuralPlasticity.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/StructuralPlasticity.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/plasticity/StructuralPlasticity.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_development.dir/development/DevelopmentSystem.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/DevelopmentSystem.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/DevelopmentSystem.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_development.dir/development/Synaptogenesis.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/Synaptogenesis.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/Synaptogenesis.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_development.dir/development/Pruning.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/Pruning.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/Pruning.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_development.dir/development/Maturation.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/Maturation.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/development/Maturation.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Neuromodulator.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Neuromodulator.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Neuromodulator.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Reward.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Reward.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Reward.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/PredictionError.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/PredictionError.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/PredictionError.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Novelty.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Novelty.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Novelty.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Curiosity.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Curiosity.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Curiosity.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Acetylcholine.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Acetylcholine.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Acetylcholine.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Norepinephrine.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Norepinephrine.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Norepinephrine.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_neuromodulation.dir/neuromodulation/Serotonin.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Serotonin.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/neuromodulation/Serotonin.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_memory.dir/memory/Memory.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/memory/Memory.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/memory/Memory.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_memory.dir/memory/NeuralWorkingMemory.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/memory/NeuralWorkingMemory.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/memory/NeuralWorkingMemory.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_memory.dir/memory/NeuralEpisodicMemory.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/memory/NeuralEpisodicMemory.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/memory/NeuralEpisodicMemory.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_cognition.dir/cognition/ConceptFormation.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/cognition/ConceptFormation.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/cognition/ConceptFormation.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_cognition.dir/cognition/NeuralPlanner.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/cognition/NeuralPlanner.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/cognition/NeuralPlanner.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_sensory.dir/sensory/SensoryInput.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/SensoryInput.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/SensoryInput.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_sensory.dir/sensory/Vision.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/Vision.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/Vision.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_sensory.dir/sensory/Audio.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/Audio.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/Audio.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_sensory.dir/sensory/InternalSignals.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/InternalSignals.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/sensory/InternalSignals.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_prediction.dir/prediction/PredictionSystem.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/prediction/PredictionSystem.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/prediction/PredictionSystem.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_prediction.dir/prediction/NeuralPrediction.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/prediction/NeuralPrediction.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/prediction/NeuralPrediction.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_motor.dir/motor/MotorSystem.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/motor/MotorSystem.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/motor/MotorSystem.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_environment.dir/environment/Environment.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/environment/Environment.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/environment/Environment.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_environment.dir/environment/Observation.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/environment/Observation.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/environment/Observation.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_experiments.dir/experiments/Experiment.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Experiment.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Experiment.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_experiments.dir/experiments/ExperimentRunner.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/ExperimentRunner.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/ExperimentRunner.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_experiments.dir/experiments/Metrics.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Metrics.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Metrics.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_visualization.dir/visualization/VisualizationInterface.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/visualization/VisualizationInterface.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/visualization/VisualizationInterface.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_main.dir/main.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/main.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/main.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_phase3_demo.dir/experiments/Phase3Demo.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Phase3Demo.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Phase3Demo.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/src",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_phase4_demo.dir/experiments/Phase4Demo.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Phase4Demo.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/src/experiments/Phase4Demo.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_main.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_main.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_main.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_types.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_types.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_types.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_config.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_config.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_config.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_random.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_random.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_random.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_clock.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_clock.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_clock.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_neuron.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_neuron.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_neuron.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_synapse.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_synapse.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_synapse.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_stdp.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_stdp.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_stdp.cpp"
+},
+{
+  "directory": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/build/tests",
+  "command": "/usr/bin/c++  -I/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/../src -g -O0 -g -DDEBUG -Wall -Wextra -Wpedantic -Werror -std=c++20 -o CMakeFiles/nlm_test.dir/test_brain.cpp.o -c /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_brain.cpp",
+  "file": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_bd1553f1-cdac-491d-9d7f-f454ccd4bf97/tests/test_brain.cpp"
+}
+]

@@ -1,0 +1,11 @@
+NLM Build Configuration:
+  Build type: Debug
+  Memory systems: ON
+  Neuromodulation: ON
+  Cognition: ON
+  Development: ON
+  Prediction: ON
+  Python bindings: OFF
+  Tests: ON
+  Performance optimizations: ON
+  Visualization: ON

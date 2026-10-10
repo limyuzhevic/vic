@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Test configuration
+# Simple test configuration for NLM
+
+# Include the main source directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-# Create test executable
+# Basic test executable
 add_executable(nlm_test
     test_main.cpp
     test_types.cpp

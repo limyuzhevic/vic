@@ -299,6 +299,58 @@ std::vector<NeuronId> NeuralPrediction::getSequenceNeurons() const {
     return result;
 }
 
+std::vector<float> NeuralPrediction::getPredictedState() const {
+    if (recentSensoryStates_.empty()) {
+        return std::vector<float>();
+    }
+    return recentSensoryStates_.back();
+}
+
+float NeuralPrediction::getErrorMagnitude() const {
+    return predictionError_;
+}
+
+void NeuralPrediction::updatePrediction() {
+    if (recentSensoryStates_.empty() || stateTimestamps_.empty()) {
+        return;
+    }
+    
+    SimulationStep currentStep = stateTimestamps_.back();
+    auto predicted = generatePrediction(currentStep);
+    
+    if (!predicted.empty()) {
+        // Update error based on predicted state
+        float error = 0.0f;
+        if (!recentSensoryStates_.empty()) {
+            error = computeSimilarity(predicted, recentSensoryStates_.back());
+            predictionError_ = 1.0f - error; // Convert to error
+        }
+    }
+}
+
+void NeuralPrediction::reset() {
+    clearHistory();
+    recentSensoryStates_.clear();
+    stateTimestamps_.clear();
+    predictionNeurons_.clear();
+    sequenceNeurons_.clear();
+    recentActions_.clear();
+    pImpl->learnedSequences.clear();
+    pImpl->sequenceAssociations.clear();
+    pImpl->patternNeurons.clear();
+    pImpl->patternRepresentations.clear();
+    pImpl->stateHistory.clear();
+    pImpl->actionConsequences.clear();
+    pImpl->actionRewards.clear();
+}
+
+SimulationStep NeuralPrediction::getPredictionTime() const {
+    if (stateTimestamps_.empty()) {
+        return SimulationStep(-1);
+    }
+    return stateTimestamps_.back();
+}
+
 void NeuralPrediction::clearHistory() {
     errorHistory_.clear();
     recentSensoryStates_.clear();
@@ -418,6 +470,211 @@ void ActionConsequencePredictor::updatePrediction(ActionType action,
                                                  const std::vector<float>& predicted,
                                                  const std::vector<float>& actual,
                                                  float reward) {
+    // This would update the internal model
+    // For now, just record the new experience
+    recordExperience(action, predicted, actual, reward);
+}
+
+float ActionConsequencePredictor::getActionQuality(ActionType action) const {
+    for (const auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            return aq.second;
+        }
+    }
+    return 0.0f;
+}
+
+void ActionConsequencePredictor::clear() {
+    pImpl->experiences.clear();
+    pImpl->actionQuality.clear();
+}
+
+// PredictionErrorSignal Implementation
+struct PredictionErrorSignal::Impl {
+    float lastIntensityError;
+    float lastSpatialError;
+    float lastTemporalError;
+    
+    Impl() : lastIntensityError(0.0f), lastSpatialError(0.0f), lastTemporalError(0.0f) {}
+};
+
+PredictionErrorSignal::PredictionErrorSignal()
+    : pImpl(new Impl)
+    , lastError_(0.0f)
+    , surpriseThreshold_(0.3f)
+{
+    errorComponents_.intensityError = 0.0f;
+    errorComponents_.spatialError = 0.0f;
+    errorComponents_.temporalError = 0.0f;
+    errorComponents_.totalError = 0.0f;
+}
+
+PredictionErrorSignal::~PredictionErrorSignal() = default;
+
+float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
+                                         const std::vector<float>& actual) {
+    if (predicted.empty() || actual.empty()) {
+        lastError_ = 0.0f;
+        return 0.0f;
+    }
+    
+    // Compute overall difference
+    float totalDiff = 0.0f;
+    float intensityDiff = 0.0f;
+    
+    for (size_t i = 0; i < std::min(predicted.size(), actual.size()); ++i) {
+        float diff = std::abs(predicted[i] - actual[i]);
+        totalDiff += diff;
+        intensityDiff += diff * diff;
+    }
+    
+    float meanError = totalDiff / predicted.size();
+    float meanSqError = intensityDiff / predicted.size();
+    
+    // Compute spatial error (variance of differences)
+    float spatialVar = 0.0f;
+    for (size_t i = 0; i < predicted.size(); ++i) {
+        float diff = predicted[i] - actual[i];
+        spatialVar += (diff - meanError) * (diff - meanError);
+    }
+    float spatialError = std::sqrt(spatialVar / predicted.size());
+    
+    // Update components
+    pImpl->lastIntensityError = std::sqrt(meanSqError);
+    pImpl->lastSpatialError = spatialError;
+    errorComponents_.intensityError = pImpl->lastIntensityError;
+    errorComponents_.spatialError = pImpl->lastSpatialError;
+    
+    // Compute total error (combining components)
+    lastError_ = std::sqrt(meanSqError + spatialError * spatialError);
+    errorComponents_.totalError = lastError_;
+    
+    return lastError_;
+}
+
+float PredictionErrorSignal::getModulationSignal() const {
+    // Convert error to modulation signal (0-1)
+    // Higher error = stronger modulation for learning
+    return std::min(1.0f, lastError_ * 2.0f);
+}
+
+void PredictionErrorSignal::recordError(float error, SimulationStep step) {
+    errorHistory_.push_back(error);
+    if (errorHistory_.size() > 10000) {
+        errorHistory_.erase(errorHistory_.begin());
+    }
+}
+
+// ActionConsequencePredictor Implementation
+struct ActionConsequencePredictor::Impl {
+    Brain* brain;
+    
+    // State-action -> consequence mappings
+    std::vector<std::pair<std::pair<std::vector<float>, ActionType>, std::vector<float>>> experiences;
+    
+    // Average reward per action
+    std::vector<std::pair<ActionType, float>> actionQuality;
+    
+    Impl() : brain(nullptr) {}
+};
+
+ActionConsequencePredictor::ActionConsequencePredictor()
+    : pImpl(new Impl)
+{
+}
+
+ActionConsequencePredictor::~ActionConsequencePredictor() = default;
+
+void ActionConsequencePredictor::initialize(Brain* brain) {
+    pImpl->brain = brain;
+}
+
+void ActionConsequencePredictor::recordExperience(ActionType action,
+                                                  const std::vector<float>& beforeState,
+                                                  const std::vector<float>& afterState,
+                                                  float reward) {
+    pImpl->experiences.push_back({{beforeState, action}, afterState});
+    pImpl->actionQuality.push_back({action, reward});
+    
+    // Update average reward for this action
+    float totalReward = 0.0f;
+    size_t count = 0;
+    for (const auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            totalReward += aq.second;
+            ++count;
+        }
+    }
+    
+    // Update or add to action quality
+    for (auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            aq.second = totalReward / count;
+            break;
+        }
+    }
+    
+    // Limit experience memory
+    if (pImpl->experiences.size() > 1000) {
+        pImpl->experiences.erase(pImpl->experiences.begin());
+    }
+}
+
+std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType action,
+                                                                 const std::vector<float>& currentState) {
+    // Find most similar previous experience with this action
+    float bestSimilarity = 0.0f;
+    std::vector<float> bestConsequence;
+    
+    for (const auto& exp : pImpl->experiences) {
+        if (exp.first.second == action) {
+            // Compute similarity between current state and stored before-state
+            const auto& before = exp.first.first;
+            const auto& after = exp.second;
+            
+            if (before.size() != currentState.size()) continue;
+            
+            float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
+            for (size_t i = 0; i < before.size(); ++i) {
+                dot += before[i] * currentState[i];
+                norm1 += before[i] * before[i];
+                norm2 += currentState[i] * currentState[i];
+            }
+            
+            float sim = (norm1 > 0.0001f && norm2 > 0.0001f) ? 
+                        dot / (std::sqrt(norm1) * std::sqrt(norm2)) : 0.0f;
+            
+            if (sim > bestSimilarity) {
+                bestSimilarity = sim;
+                bestConsequence = after;
+            }
+        }
+    }
+    
+    if (bestSimilarity > 0.5f && !bestConsequence.empty()) {
+        return bestConsequence;
+    }
+    
+    return currentState;  // Default: no predicted change
+}
+
+float ActionConsequencePredictor::getConsequenceConfidence(ActionType action,
+                                                           const std::vector<float>& currentState) const {
+    size_t matchingCount = 0;
+    for (const auto& exp : pImpl->experiences) {
+        if (exp.first.second == action) {
+            ++matchingCount;
+        }
+    }
+    
+    // More experiences = higher confidence
+    return std::min(1.0f, static_cast<float>(matchingCount) / 10.0f);
+}
+
+void ActionConsequencePredictor::updatePrediction(ActionType action,
+                                                  const std::vector<float>& predicted,
+                                                  const std::vector<float>& actual,
+                                                  float reward) {
     // This would update the internal model
     // For now, just record the new experience
     recordExperience(action, predicted, actual, reward);

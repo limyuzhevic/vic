@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_plasticity.a CMakeFiles/nlm_plasticity.dir/plasticity/PlasticityRule.cpp.o CMakeFiles/nlm_plasticity.dir/plasticity/Hebbian.cpp.o CMakeFiles/nlm_plasticity.dir/plasticity/STDP.cpp.o CMakeFiles/nlm_plasticity.dir/plasticity/StructuralPlasticity.cpp.o
+/usr/bin/ranlib libnlm_plasticity.a

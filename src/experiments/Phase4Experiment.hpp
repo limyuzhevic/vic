@@ -1,322 +1,108 @@
+// Phase 4 Experiment Header
 #pragma once
 
-#include "../agent/AgentBody.hpp"
-#include "../brain/Brain.hpp"
-#include <string>
-#include <vector>
+#include "Experiment.hpp"
 #include <memory>
+#include <vector>
+#include <string>
 
-namespace nlm {
+// Forward declarations for super-experimental components
+class Phase4Brain;
+class Phase4NeuromodulationSystem;
+class Phase4MemorySystem;
+class Phase4PredictionSystem;
+class Phase4DevelopmentSystem;
+class Phase4SensorySystem;
+class Phase4Environment;
+class MetaCognitiveAgentBrain;
+class EnhancedSensoryPercept;
 
-// Phase 4 Experiment Results
-struct Phase4Results {
-    // Prediction metrics
-    float predictionErrorInitial;
-    float predictionErrorFinal;
-    float predictionAccuracyImprovement;
-    
-    // Working memory metrics
-    float workingMemoryRetentionInitial;
-    float workingMemoryRetentionFinal;
-    float workingMemoryCapacity;
-    
-    // Episodic memory metrics
-    float episodicRecallAccuracy;
-    size_t episodesStored;
-    float episodicInfluence;
-    
-    // Associative memory metrics
-    float associationStrength;
-    float associationTransfer;
-    
-    // Concept formation metrics
-    size_t conceptsFormed;
-    float conceptStability;
-    float generalizationAbility;
-    
-    // Attention metrics
-    float attentionSelectivity;
-    float distractionResistance;
-    
-    // Planning metrics
-    float planningAccuracy;
-    float multiStepSuccess;
-    float planningConfidence;
-    
-    // Self-model metrics
-    float selfPredictionAccuracy;
-    float bodyAwareness;
-    float selfOtherDistinction;
-    
-    // Social learning metrics
-    float imitationAccuracy;
-    float socialPredictionAccuracy;
-    size_t observationsFromOthers;
-    
-    // Overall metrics
-    float totalReward;
-    float behaviorImprovement;
-    float transferPerformance;
-    
-    Phase4Results();
-    void reset();
-    std::string toCSV() const;
+struct SuperExperimentalMetrics {
+    float neuralEfficiency = 0.0f;
+    float reinforcementGain = 0.0f;
+    float memoryRetention = 0.0f;
+    float predictionAccuracy = 0.0f;
+    float developmentProgress = 0.0f;
 };
 
-// Experiment: Temporal Prediction Learning
-// Tests if NLM can learn that state A predicts state B
-class TemporalPredictionExperiment {
+class Phase4Experiment : public Experiment {
 public:
-    TemporalPredictionExperiment();
-    ~TemporalPredictionExperiment();
+    Phase4Experiment();
+    ~Phase4Experiment();
     
-    // Run the experiment
-    Phase4Results run(Brain* brain, size_t numTrials = 100);
-    
-    // Get prediction error over time
-    const std::vector<float>& getErrorHistory() const { return errorHistory_; }
+    void setup() override;
+    void run() override;
+    void stop() override;
     
 private:
-    std::vector<float> errorHistory_;
-};
-
-// Experiment: Working Memory Test
-// Tests if information can be maintained after stimulus disappears
-class WorkingMemoryExperiment {
-public:
-    WorkingMemoryExperiment();
-    ~WorkingMemoryExperiment();
+    void executeSuperProtocol();
+    void executeSuperStep(int step);
+    void collectSuperStepMetrics(int step);
+    void recordSuperExperimentalData(int step);
+    void adjustSuperProtocolDynamically(int step);
+    void collectSuperResults();
+    void analyzeSuperData();
+    void generateSuperReport();
+    void performSuperStatisticalAnalysis();
+    void identifySuperPatterns();
+    void generateSuperPredictiveModels();
+    void createSuperVisualizations();
+    void createSuperComprehensiveReport();
+    void exportSuperExperimentalData();
+    void generateSuperResearchAbstract();
+    void createSuperPresentationMaterials();
+    void calculateSuperExperimentalStatistics();\n    void identifySuperSignificantFindings();
+    void validateSuperHypotheses();
+    float calculateSuperVarianceFromMetrics() const;
+    float calculateSuperLearningStability() const;
     
-    // Run delayed response test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
-    
-    // Get retention over delay periods
-    std::vector<float> getRetentionByDelay() const { return retentionByDelay_; }
-    
-private:
-    std::vector<float> retentionByDelay_;
-};
-
-// Experiment: Episodic Memory Recall
-// Tests if past experiences influence future behavior
-class EpisodicRecallExperiment {
-public:
-    EpisodicRecallExperiment();
-    ~EpisodicRecallExperiment();
-    
-    // Run episodic memory test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
-    
-    // Get recall accuracy over time
-    std::vector<float> getRecallAccuracyHistory() const { return recallHistory_; }
-    
-private:
-    std::vector<float> recallHistory_;
-};
-
-// Experiment: Concept Formation
-// Tests if recurring patterns form stable representations
-class ConceptFormationExperiment {
-public:
-    ConceptFormationExperiment();
-    ~ConceptFormationExperiment();
-    
-    // Run concept formation test
-    Phase4Results run(Brain* brain, size_t numTrials = 100);
-    
-    // Get concept stability over time
-    std::vector<float> getConceptStabilityHistory() const { return stabilityHistory_; }
-    
-private:
-    std::vector<float> stabilityHistory_;
-};
-
-// Experiment: Attention Selection
-// Tests if competing signals produce selective processing
-class AttentionExperiment {
-public:
-    AttentionExperiment();
-    ~AttentionExperiment();
-    
-    // Run attention test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
-    
-    // Get attention selectivity over time
-    std::vector<float> getSelectivityHistory() const { return selectivityHistory_; }
-    
-private:
-    std::vector<float> selectivityHistory_;
-};
-
-// Experiment: Multi-Step Planning
-// Tests if NLM can plan multi-step sequences to achieve goals
-class PlanningExperiment {
-public:
-    PlanningExperiment();
-    ~PlanningExperiment();
-    
-    // Run planning test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
-    
-    // Get planning success over time
-    std::vector<float> getSuccessHistory() const { return successHistory_; }
-    
-private:
-    std::vector<float> successHistory_;
-};
-
-// Experiment: Self-Action Prediction
-// Tests if NLM learns that its actions cause predictable sensory changes
-class SelfModelExperiment {
-public:
-    SelfModelExperiment();
-    ~SelfModelExperiment();
-    
-    // Run self-model test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
-    
-    // Get self-prediction accuracy over time
-    std::vector<float> getSelfPredictionHistory() const { return selfPredHistory_; }
-    
-private:
-    std::vector<float> selfPredHistory_;
-};
-
-// Experiment: Object Permanence
-// Tests if hidden objects remain relevant to behavior
-class ObjectPermanenceExperiment {
-public:
-    ObjectPermanenceExperiment();
-    ~ObjectPermanenceExperiment();
-    
-    // Run object permanence test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
-    
-private:
-    std::vector<float> searchBehaviorHistory_;
-};
-
-// Experiment: Social Observation
-// Tests if NLM can learn from observing another agent
-class SocialLearningExperiment {
-public:
-    SocialLearningExperiment();
-    ~SocialLearningExperiment();
-    
-    // Run social learning test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
-    
-    // Get imitation accuracy over time
-    std::vector<float> getImitationHistory() const { return imitationHistory_; }
-    
-private:
-    std::vector<float> imitationHistory_;
-};
-
-// Experiment: Continual Learning
-// Tests if NLM can learn new tasks without forgetting old ones
-class ContinualLearningExperiment {
-public:
-    ContinualLearningExperiment();
-    ~ContinualLearningExperiment();
-    
-    // Run continual learning test
-    Phase4Results run(Brain* brain, size_t numTrials = 100);
-    
-    // Get performance across tasks
-    std::vector<float> getTaskPerformance() const { return taskPerformance_; }
-    
-private:
-    std::vector<float> taskPerformance_;
-};
-
-// Experiment: Generalization
-// Tests if learned knowledge transfers to new situations
-class GeneralizationExperiment {
-public:
-    GeneralizationExperiment();
-    ~GeneralizationExperiment();
-    
-    // Run generalization test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
-    
-    // Get transfer performance
-    float getTransferRatio() const { return transferRatio_; }
-    
-private:
-    float transferRatio_;
-};
-
-// Integrated Phase 4 Experiment
-// Combines all Phase 4 mechanisms in a complex environment
-class Phase4IntegratedExperiment {
-public:
-    Phase4IntegratedExperiment();
-    ~Phase4IntegratedExperiment();
-    
-    // Run integrated experiment
-    Phase4Results run(Brain* brain, size_t numEpisodes = 100, size_t stepsPerEpisode = 200);
-    
-    // Get metrics over time
-    const std::vector<Phase4Results>& getEpisodeResults() const { return episodeResults_; }
-    
-    // Get before/after comparison
-    Phase4Results compareBeforeAfter() const;
-    
-private:
-    std::vector<Phase4Results> episodeResults_;
-};
-
-// Ablation Experiment
-// Tests which mechanisms contribute to performance
-class AblationExperiment {
-public:
-    AblationExperiment();
-    ~AblationExperiment();
-    
-    struct AblationResult {
-        std::string mechanism;
-        Phase4Results withMechanism;
-        Phase4Results withoutMechanism;
-        float contribution;
+    // Super-experimental data structures
+    struct SuperExperimentalResults {
+        int protocolSteps = 0;
+        int stepsCompleted = 0;
+        int simulationTime = 0;
+        float superMeanEfficiency = 0.0f;
+        float superMaxEfficiency = 0.0f;
+        float superMinEfficiency = 1.0f;
+        float superVariance = 0.0f;
+        std::vector<SuperExperimentalMetrics> superStepMetrics;
     };
     
-    // Run ablation study
-    std::vector<AblationResult> run(Brain* brain, size_t numTrials = 30);
+    // Super-experimental components
+    std::unique_ptr<Phase4Brain> brain;
+    std::unique_ptr<Phase4NeuromodulationSystem> neuromodulation;
+    std::unique_ptr<Phase4MemorySystem> memory;
+    std::unique_ptr<Phase4PredictionSystem> prediction;
+    std::unique_ptr<Phase4DevelopmentSystem> development;
+    std::unique_ptr<Phase4SensorySystem> sensory;
+    std::unique_ptr<Phase4Environment> environment;
+    std::unique_ptr<MetaCognitiveAgentBrain> agentBrain;
+    std::unique_ptr<EnhancedSensoryPercept> sensoryPercept;
     
-private:
-    std::vector<AblationResult> results_;
+    // Super-experimental data
+    SuperExperimentalResults superExperimentalResults;
+    SuperExperimentalMetrics metrics;
+    std::vector<std::vector<float>> superNeuralActivityPatterns;
+    std::vector<std::vector<float>> superNeuromodulationDynamics;
+    std::vector<std::vector<float>> superMemoryTraces;
+    std::vector<float> superPredictionErrors;
+    std::vector<std::vector<float>> superDevelopmentalChanges;
+    std::vector<std::string> superSignificantFindings;
+    std::vector<std::pair<std::string, bool>> superHypothesisValidationResults;
+    
+    // Super-logging support
+    class ExperimentalLogger {
+    public:
+        void enableSuperLogging() {}
+        void disableSuperLogging() {}
+        void setSuperLogLevel(const std::string& level) {}
+        void enableRealTimeStreaming() {}
+        void enablePerformanceProfiling() {}
+        void setSuperLogFile(const std::string& filename) {}
+        void clearSuperLogBuffer() {}
+        void resetSuperPerformanceCounters() {}
+        void logSuperStepProgress(int step) {}
+        void logSuperSystemPerformance() {}
+        void logSuperEfficiencyMetrics() {}
+    } experimentalLogger;
 };
-
-// Representation Analysis Tools
-class RepresentationAnalyzer {
-public:
-    RepresentationAnalyzer();
-    ~RepresentationAnalyzer();
-    
-    // Compute neural pattern similarity
-    static float computePatternSimilarity(const std::vector<float>& a,
-                                         const std::vector<float>& b);
-    
-    // Measure representational stability
-    static float measureRepresentationalStability(
-        const std::vector<std::vector<float>>& patterns);
-    
-    // Measure clustering coefficient
-    static float measureClustering(
-        const std::vector<std::vector<float>>& patterns,
-        size_t numClusters);
-    
-    // Measure selectivity of neural responses
-    static float measureSelectivity(const std::vector<std::vector<float>>& responses);
-    
-    // Compute population vector for a pattern
-    static std::vector<float> computePopulationVector(
-        const std::vector<std::pair<NeuronId, float>>& neuronActivities);
-    
-    // Measure temporal precision of neural patterns
-    static float measureTemporalPrecision(
-        const std::vector<std::vector<float>>& temporalPatterns);
-};
-
-} // namespace nlm

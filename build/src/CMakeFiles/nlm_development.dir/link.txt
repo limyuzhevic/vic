@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_development.a CMakeFiles/nlm_development.dir/development/DevelopmentSystem.cpp.o CMakeFiles/nlm_development.dir/development/Synaptogenesis.cpp.o CMakeFiles/nlm_development.dir/development/Pruning.cpp.o CMakeFiles/nlm_development.dir/development/Maturation.cpp.o
+/usr/bin/ranlib libnlm_development.a

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_prediction.a CMakeFiles/nlm_prediction.dir/prediction/PredictionSystem.cpp.o CMakeFiles/nlm_prediction.dir/prediction/NeuralPrediction.cpp.o
+/usr/bin/ranlib libnlm_prediction.a

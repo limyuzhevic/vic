@@ -47,10 +47,22 @@ void Dopamine::signalReward(float reward) {
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+float Dopamine::getLearningRate() const {
+    // TODO PHASE 2: Implement real dopamine learning rate
+    // PLACEHOLDER: Fixed learning rate
+    return 0.1f;
+}
+
+float Dopamine::getTemporalDifference() const {
+    // TODO PHASE 2: Implement real temporal difference computation
+    // PLACEHOLDER: Returns current level as temporal difference proxy
+    return pImpl->level;
+}
+
+float Dopamine::getPlasticityFactorFor(const NeuronId& neuronId) const {
+    // TODO PHASE 2: Implement neuron-specific plasticity factor
+    // PLACEHOLDER: Higher level neurons get higher plasticity
+    return pImpl->level;
 }
 
 } // namespace nlm

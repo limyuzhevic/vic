@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_brain.a CMakeFiles/nlm_brain.dir/brain/Neuron.cpp.o CMakeFiles/nlm_brain.dir/brain/Synapse.cpp.o CMakeFiles/nlm_brain.dir/brain/NeuralPopulation.cpp.o CMakeFiles/nlm_brain.dir/brain/NeuralRegion.cpp.o CMakeFiles/nlm_brain.dir/brain/Brain.cpp.o
+/usr/bin/ranlib libnlm_brain.a

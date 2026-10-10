@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_simulationclock.a CMakeFiles/nlm_simulationclock.dir/core/SimulationClock/SimulationClock.cpp.o
+/usr/bin/ranlib libnlm_simulationclock.a

@@ -148,10 +148,13 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
-    
+// ========== PREDICTION SYSTEM ==========
+
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
+    
+    // Get prediction error
+    float getPredictionError() const;
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -174,6 +177,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and impulsivity regulation
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

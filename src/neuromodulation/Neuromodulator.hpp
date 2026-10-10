@@ -27,6 +27,13 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Get neuromodulator-specific properties
+    virtual float getLearningRate() const = 0;
+    virtual float getTemporalDifference() const = 0;
+    
+    // Get plasticity factor for specific neuron
+    virtual float getPlasticityFactorFor(NeuronId neuronId) const = 0;
+    
 protected:
     Neuromodulator() = default;
 };
@@ -48,6 +55,11 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Neuromodulator interface
+    float getLearningRate() const override;
+    float getTemporalDifference() const override;
+    float getPlasticityFactorFor(NeuronId neuronId) const override;
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -62,6 +74,18 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Neuromodulator interface
+    float getLearningRate() const override { return 0.0f; }
+    float getTemporalDifference() const override { return 0.0f; }
+    float getPlasticityFactorFor(NeuronId neuronId) const override { return 1.0f; }
+    
+    // Acetylcholine-specific properties
+    float getAttentionLevel() const { return 0.5f; }
+    void setAttentionLevel(float level) {}
+    float getFocusDepth() const { return 0.0f; }
+    void enhanceFocus(float duration) {}
+    float getModulationStrength() const { return 1.0f; }
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +97,19 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Neuromodulator interface
+    float getLearningRate() const override { return 0.0f; }
+    float getTemporalDifference() const override { return 0.0f; }
+    float getPlasticityFactorFor(NeuronId neuronId) const override { return 1.0f; }
+    
+    // Norepinephrine-specific properties
+    float getArousalLevel() const { return 0.5f; }
+    float getVigilance() const { return 0.5f; }
+    void increaseArousal(float amount) {}
+    void decreaseArousal(float amount) {}
+    void setVigilanceThreshold(float threshold) {}
+    float getArousalFor(const NeuronId& neuronId) const { return 0.0f; }
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +121,18 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Neuromodulator interface
+    float getLearningRate() const override { return 0.0f; }
+    float getTemporalDifference() const override { return 0.0f; }
+    float getPlasticityFactorFor(NeuronId neuronId) const override { return 1.0f; }
+    
+    // Serotonin-specific properties
+    float getMoodLevel() const { return 0.5f; }
+    float getImpulsivity() const { return 0.5f; }
+    void modulateMood(float moodAdjustment) {}
+    void setImpulsivity(float impulsivity) {}
+    float getSerotoninFor(const NeuronId& neuronId) const { return 0.0f; }
 };
 
 } // namespace nlm

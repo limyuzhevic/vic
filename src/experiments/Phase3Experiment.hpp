@@ -1,66 +1,93 @@
+// Phase 3 Experiment Header
 #pragma once
 
-#include "../agent/AgentBody.hpp"
-#include <string>
+#include "Experiment.hpp"
+#include <memory>
 #include <vector>
+#include <string>
 
-namespace nlm {
+// Forward declarations for experimental components
+class Phase3Brain;
+class Phase3NeuromodulationSystem;
+class Phase3MemorySystem;
+class Phase3PredictionSystem;
+class Phase3DevelopmentSystem;
+class Phase3SensorySystem;
+class Phase3Environment;
+class Phase3AgentBrain;
+class Phase3SensoryPercept;
 
-// Simple text logger for experiments
-class ExperimentLogger {
+struct ExperimentalMetrics {
+    float neuralEfficiency = 0.0f;
+    float reinforcementGain = 0.0f;
+    float memoryRetention = 0.0f;
+    float predictionAccuracy = 0.0f;
+    float developmentProgress = 0.0f;
+};
+
+class Phase3Experiment : public Experiment {
 public:
-    ExperimentLogger(const std::string& filename);
-    ~ExperimentLogger();
+    Phase3Experiment();
+    ~Phase3Experiment();
     
-    void log(const std::string& message);
-    void logEpisodeStart(int episode);
-    void logEpisodeEnd(int episode, float totalReward, int steps, float finalNovelty);
-    void logStep(int step, float reward, float neuromod, float curiosity, 
-                 float energy, const std::string& action);
-    void logDevelopment(float age, const std::string& stage);
-    void logSynapticStats(size_t totalSynapses, float avgWeight, float maxWeight);
-    void logPhase3Header();
-    
-    void flush();
+    void setup() override;
+    void run() override;
+    void stop() override;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    void executeProtocol();
+    void executeStep(int step);
+    void collectStepMetrics(int step);
+    void recordExperimentalData(int step);
+    void adjustProtocolDynamically(int step);
+    void collectResults();
+    void analyzeData();
+    void generateReport();
+    void performStatisticalAnalysis();
+    void identifyPatterns();
+    void generatePredictiveModels();
+    void createVisualizations();
+    void createComprehensiveReport();
+    void exportExperimentalData();
+    void generateResearchAbstract();
+    void createPresentationMaterials();
+    void calculateExperimentalStatistics();
+    void identifySignificantFindings();
+    void validateHypotheses();
+    float calculateVarianceFromMetrics() const;
+    float calculateLearningStability() const;
+    
+    // Experimental data structures
+    struct ExperimentalResults {
+        int protocolSteps = 0;
+        int stepsCompleted = 0;
+        int simulationTime = 0;
+        float meanEfficiency = 0.0f;
+        float maxEfficiency = 0.0f;
+        float minEfficiency = 0.0f;
+        float variance = 0.0f;
+        std::vector<ExperimentalMetrics> stepMetrics;
+    };
+    
+    // Experimental components
+    std::unique_ptr<Phase3Brain> brain;
+    std::unique_ptr<Phase3NeuromodulationSystem> neuromodulation;
+    std::unique_ptr<Phase3MemorySystem> memory;
+    std::unique_ptr<Phase3PredictionSystem> prediction;
+    std::unique_ptr<Phase3DevelopmentSystem> development;
+    std::unique_ptr<Phase3SensorySystem> sensory;
+    std::unique_ptr<Phase3Environment> environment;
+    std::unique_ptr<Phase3AgentBrain> agentBrain;
+    std::unique_ptr<Phase3SensoryPercept> sensoryPercept;
+    
+    // Experimental data
+    ExperimentalResults experimentalResults;
+    ExperimentalMetrics metrics;
+    std::vector<std::vector<float>> neuralActivityPatterns;
+    std::vector<std::vector<float>> neuromodulationDynamics;
+    std::vector<std::vector<float>> memoryTraces;
+    std::vector<float> predictionErrors;
+    std::vector<std::vector<float>> developmentalChanges;
+    std::vector<std::string> significantFindings;
+    std::vector<std::pair<std::string, bool>> hypothesisValidationResults;
 };
-
-// Metrics collector for Phase 3 experiments
-struct ExperimentMetrics {
-    // Episode metrics
-    int episode;
-    int steps;
-    float totalReward;
-    float finalEnergy;
-    float finalNovelty;
-    float finalCuriosity;
-    float predictionError;
-    
-    // Development
-    float developmentalAge;
-    std::string developmentalStage;
-    
-    // Network state
-    size_t totalSynapses;
-    float averageWeight;
-    float maxWeight;
-    size_t totalSpikes;
-    float averageFiringRate;
-    
-    // Motor behavior
-    int forwardCount;
-    int backwardCount;
-    int turnLeftCount;
-    int turnRightCount;
-    int interactCount;
-    int waitCount;
-    
-    ExperimentMetrics();
-    void reset();
-    std::string toCSV() const;
-};
-
-} // namespace nlm

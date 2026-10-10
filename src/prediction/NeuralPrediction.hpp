@@ -74,6 +74,21 @@ public:
     std::vector<NeuronId> getPredictionNeurons() const;
     std::vector<NeuronId> getSequenceNeurons() const;
 
+    // Get predicted sensory state
+    std::vector<float> getPredictedState() const;
+
+    // Get prediction error magnitude
+    float getErrorMagnitude() const;
+
+    // Reset prediction system state
+    void reset();
+
+    // Update prediction
+    void updatePrediction();
+
+    // Get prediction time
+    SimulationStep getPredictionTime() const;
+
 private:
     // Learn temporal sequence from sensory observations
     void learnTemporalSequence(const std::vector<float>& currentState,

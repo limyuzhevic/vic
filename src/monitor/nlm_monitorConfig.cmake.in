@@ -1,0 +1,17 @@
+# nlm_monitorConfig.cmake.in
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+find_dependency(nlm)
+
+# Import targets
+include("${CMAKE_CURRENT_LIST_DIR}/nlm_monitorTargets.cmake")
+
+# Handle RPATH
+nlm_check_build_type("${CMAKE_BINARY_DIR}" "${CMAKE_INSTALL_PREFIX}")
+
+# Provide helpful messages
+check_required_components(nlm_monitor)

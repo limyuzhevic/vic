@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_memory.a CMakeFiles/nlm_memory.dir/memory/Memory.cpp.o CMakeFiles/nlm_memory.dir/memory/NeuralWorkingMemory.cpp.o CMakeFiles/nlm_memory.dir/memory/NeuralEpisodicMemory.cpp.o
+/usr/bin/ranlib libnlm_memory.a

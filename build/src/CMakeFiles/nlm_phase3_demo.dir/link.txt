@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/nlm_phase3_demo.dir/experiments/Phase3Demo.cpp.o -o nlm_phase3_demo  libnlm_brain.a libnlm_sensory.a -lnlm_agent -lnlm_world -lnlm_phase3 libnlm_config.a libnlm_typesd.a libnlm_random.a libnlm_logger.a libnlm_simulationclock.a 

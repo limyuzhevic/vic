@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/nlm_main.dir/main.cpp.o -o nlm_main  libnlm_brain.a libnlm_config.a libnlm_typesd.a libnlm_random.a libnlm_logger.a libnlm_simulationclock.a 

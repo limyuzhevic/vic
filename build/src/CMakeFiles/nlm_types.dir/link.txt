@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_typesd.a CMakeFiles/nlm_types.dir/core/Types/Types.cpp.o
+/usr/bin/ranlib libnlm_typesd.a

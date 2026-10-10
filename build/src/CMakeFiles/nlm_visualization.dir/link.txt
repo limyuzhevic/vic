@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_visualization.a CMakeFiles/nlm_visualization.dir/visualization/VisualizationInterface.cpp.o
+/usr/bin/ranlib libnlm_visualization.a
