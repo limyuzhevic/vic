@@ -97,15 +97,6 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
@@ -121,6 +112,53 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+    
+    // Internal signals (4 values -> sensoryInternal_ neurons)
+    const auto& intern = percept.getInternal();
+    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+        if (sensoryInternal_[i]) {
+            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            sensoryInternal_[i]->injectCurrent(current);
+        }
+    // Store non-vision sensory states in brain's working memory for integration
+    if (brain_ && brain_->getWorkingMemory()) {
+        // Store touch, internal, and proprioception data
+        if (!touch.empty()) {
+            std::vector<float> touchPattern;
+            touchPattern.reserve(touch.size());
+            
+            for (float t : touch) {
+                touchPattern.push_back(t * 2.0f - 1.0f);  // Normalize to [-1, 1]
+            }
+            
+            // Store touch pattern
+            brain_->getWorkingMemory()->store(touchPattern, 1.0f);
+        }
+        
+        if (!intern.empty()) {
+            std::vector<float> internalPattern;
+            internalPattern.reserve(intern.size());
+            
+            for (float i : intern) {
+                internalPattern.push_back(i * 2.0f - 1.0f);  // Normalize to [-1, 1]
+            }
+            
+            // Store internal pattern
+            brain_->getWorkingMemory()->store(internalPattern, 0.8f);
+        }
+        
+        if (!proprio.empty()) {
+            std::vector<float> proprioPattern;
+            proprioPattern.reserve(proprio.size());
+            
+            for (float p : proprio) {
+                proprioPattern.push_back(p * 2.0f - 1.0f);  // Normalize to [-1, 1]
+            }
+            
+            // Store proprioception pattern
+            brain_->getWorkingMemory()->store(proprioPattern, 0.6f);
         }
     }
     
@@ -140,12 +178,26 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Store for next time
         previousVision_ = vision;
+        
+        // Store novelty in brain's working memory for integration
+        if (brain_ && brain_->getWorkingMemory()) {
+            brain_->getWorkingMemory()->storeToNeuron(
+                NeuronId(999),  // Special neuron ID for novelty
+                noveltyLevel_ * 2.0f);  // Scale for working memory strength
+        }
     }
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Store curiosity in brain's working memory for integration
+        if (brain_ && brain_->getWorkingMemory()) {
+            brain_->getWorkingMemory()->storeToNeuron(
+                NeuronId(998),  // Special neuron ID for curiosity
+                curiosityLevel_ * 1.5f);  // Scale for working memory strength
+        }
     }
 }
 
@@ -159,7 +211,58 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // Use neural planner for intelligent action selection when available
+    if (brain_ && brain_->getPlanner()) {
+        // Get current working memory state
+        auto* workingMem = brain_->getWorkingMemory();
+        if (workingMem && !workingMem->getMemoryNeurons().empty()) {
+            // Convert working memory to state vector
+            std::vector<float> currentState;
+            
+            // Build state from working memory activations
+            const auto& memoryNeurons = workingMem->getMemoryNeurons();
+            for (size_t i = 0; i < std::min(size_t(100), memoryNeurons.size()); ++i) {
+                currentState.push_back(workingMem->getNeuronActivation(memoryNeurons[i]));
+            }
+            
+            // Fill with zeros if state is too short
+            while (currentState.size() < 100) {
+                currentState.push_back(0.0f);
+            }
+            
+            // Use neural planner to suggest action based on current state
+            ActionType plannedAction = brain_->getPlanner()->planAction(currentState);
+            
+            // Convert planned action to motor command
+            MotorCommand plannedCmd = decodeActionToMotor(plannedAction);
+            
+            // Blend neural activity with planned action
+            // Higher curiosity = more weight on planned action
+            float blendWeight = std::min(curiosityLevel_, 1.0f);
+            if (blendWeight > 0.5f) {
+                // Use planned action more heavily
+                if (plannedCmd != MotorCommand::Wait) {
+                    decoded = plannedCmd;
+                }
+            }
+        }
+    }
+    
     return decoded;
+}
+
+MotorCommand AgentBrain::decodeActionToMotor(ActionType action) {
+    switch (action) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::LookLeft: return MotorCommand::LookLeft;
+        case ActionType::LookRight: return MotorCommand::LookRight;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Wait:
+        default: return MotorCommand::Wait;
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -244,6 +347,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
+    // Store expected reward in brain's working memory for integration
+    if (brain_ && brain_->getWorkingMemory()) {
+        brain_->getWorkingMemory()->storeToNeuron(
+            NeuronId(997),  // Special neuron ID for expected reward
+            expectedReward_ * 1.5f);  // Scale for working memory strength
+    }
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
