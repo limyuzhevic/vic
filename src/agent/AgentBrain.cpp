@@ -19,7 +19,27 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , systemHealthy_(true)
+    , systemEnergy_(100.0f)
+    , lastHealthCheck_(0)
+    , explorationBonus_(0.0f)
+    , confidenceLevel_(1.0f)
+    , noveltyAttenuation_(0.5f)
+    , rewardHistoryIndex_(0)
+    , maxHistorySize_(100)
+    , customPlasticityMultiplier_(1.0f)
+    , developmentProgress_(0.0f)
+    , curiosityThreshold_(0.3f)
 {
+    // Initialize motor and sensory neuron groups with defaults
+    configureMotorNeurons();
+    configureSensoryNeurons();
+    
+    // Initialize reward history with zeros
+    for (int i = 0; i < 10; ++i) {
+        rewardHistory_[i] = 0.0f;
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -132,8 +152,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             totalDiff += diff;
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Normalize with safe division
+        size_t visionSize = std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / static_cast<float>(visionSize);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -217,9 +238,9 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
+            // Random motor command from the MotorCommand enum
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);  // 8 possible commands
+            switch (static_cast<int>(choice)) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
@@ -227,8 +248,14 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;
+                default: return MotorCommand::Wait;  // Fallback for safety
             }
+        }
+    }
+    
+    return defaultCmd;
+}
         }
     }
     

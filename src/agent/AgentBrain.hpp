@@ -68,8 +68,86 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
+
 private:
+    // ===== MOTOR STRATEGY ENUM =====
+    enum class MotorCommandStrategy {
+        ActivityBased,      // Pure neural activity
+        CuriosityBased,     // Exploration-driven
+        RewardBased,        // Reinforcement learning
+        Hybrid,             // Combination
+        DevelopmentBased    // Development-stage specific
+    };
+    
+    // ===== ADVANCED STATE VARIABLES =====
+    
+    // System health and status
+    mutable bool systemHealthy_;
+    mutable float systemEnergy_;
+    mutable size_t lastHealthCheck_;
+    
+    // Advanced neuromodulation state
+    float explorationBonus_;
+    float confidenceLevel_;
+    float noveltyAttenuation_;
+    float rewardHistory_[10];  // Last 10 rewards
+    size_t rewardHistoryIndex_;
+    
+    // Motor command history for learning
+    struct MotorHistoryEntry {
+        MotorCommand command;
+        float activity;
+        float reward;
+        double timestamp;
+    };
+    std::vector<MotorHistoryEntry> motorHistory_;
+    size_t maxHistorySize_;
+    
+    // Advanced developmental state
+    float customPlasticityMultiplier_;
+    float developmentProgress_;
+    std::vector<float> developmentalWindows_;
+    
+    // Configuration for expert users
+    size_t motorGroupCounts_[6];  // [forward, backward, left, right, interact, wait]
+    size_t sensoryGroupCounts_[4]; // [vision, touch, internal, proprioception]
+    float curiosityThreshold_;  // Minimum curiosity for exploration
+    
+    // ===== ADVANCED PRIVATE METHODS =====
+    
+    // Motor decoding with different strategies
+    MotorCommand decodeActivityBased();
+    MotorCommand decodeCuriosityBased(MotorCommand defaultCmd);
+    MotorCommand decodeRewardBased();
+    MotorCommand decodeDevelopmentBased();
+    
+    // Advanced curiosity and exploration
+    MotorCommand selectWithAdvancedCuriosity(MotorCommand defaultCmd);
+    float calculateCuriosityComposite() const;
+    float calculateExplorationProbability() const;
+    
+    // Reward processing
+    float calculateRewardPrediction(float reward) const;
+    void updateRewardHistory(float reward);
+    float getAverageRecentReward(size_t count = 5) const;
+    
+    // Developmental systems
+    void updateDevelopmentalWindows();
+    float calculateStageSpecificPlasticity() const;
+    
+    // History-based learning
+    void updateMotorHistory(MotorCommand command, float activity, float reward, double timestamp);
+    MotorCommand selectBasedOnHistory(size_t lookbackSteps = 10);
+    
+    // System health and status
+    void updateSystemHealth() const;
+    void updateSystemEnergy() const;
+    
+    // Safety and robustness
+    bool validateMotorCommand(MotorCommand cmd) const;
+    bool validateSensoryConfig() const;
+    void ensureSystemConsistency() const;
+};
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
