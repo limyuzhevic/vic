@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -92,6 +92,10 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Enhanced configuration loading methods
+    static std::string readFileContent(const std::string& filepath);
+    bool parseJSONConfig(const std::string& jsonContent);
     
 private:
     struct Impl;

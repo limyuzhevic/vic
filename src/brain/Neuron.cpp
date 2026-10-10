@@ -51,26 +51,65 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::setType: Attempting to access null implementation");
+        return;
+    }
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::setMembranePotential: Attempting to access null implementation");
+        return;
+    }
+    // Validate potential is within reasonable bounds
+    if (std::abs(potential) > 1000.0f) {  // Prevent unrealistic potentials
+        NLM_LOG_WARNING("Neuron::setMembranePotential: Potential value " + 
+                       std::to_string(potential) + " is outside reasonable range");
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::addToMembranePotential: Attempting to access null implementation");
+        return;
+    }
+    // Validate delta is reasonable
+    if (std::abs(delta) > 1000.0f) {
+        NLM_LOG_WARNING("Neuron::addToMembranePotential: Delta " + 
+                       std::to_string(delta) + " is outside reasonable range");
+    }
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::setThreshold: Attempting to access null implementation");
+        return;
+    }
+    // Validate threshold is within reasonable bounds
+    if (threshold < -100.0f || threshold > 100.0f) {
+        NLM_LOG_WARNING("Neuron::setThreshold: Threshold " + std::to_string(threshold) + 
+                       " is outside typical range [-100, 100] mV");
+    }
     pImpl->state.threshold = threshold;
 }
 
 void Neuron::setFiringState(FiringState state) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::setFiringState: Attempting to access null implementation");
+        return;
+    }
     pImpl->state.firingState = state;
 }
 
 void Neuron::decrementRefractory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::decrementRefractory: Attempting to access null implementation");
+        return;
+    }
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
@@ -80,10 +119,28 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::setFiringRate: Attempting to access null implementation");
+        return;
+    }
+    // Validate firing rate is reasonable
+    if (rate < 0.0f || rate > 1000.0f) {
+        NLM_LOG_WARNING("Neuron::setFiringRate: Firing rate " + std::to_string(rate) + 
+                       " is outside reasonable range [0, 1000] Hz");
+    }
     pImpl->state.firingRate = rate;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Neuron::setLeakConductance: Attempting to access null implementation");
+        return;
+    }
+    // Validate conductance is reasonable
+    if (conductance < 0.0f || conductance > 1000.0f) {
+        NLM_LOG_WARNING("Neuron::setLeakConductance: Conductance " + 
+                       std::to_string(conductance) + " is outside reasonable range");
+    }
     pImpl->state.leakConductance = conductance;
 }
 

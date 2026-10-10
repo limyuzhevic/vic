@@ -589,25 +589,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::receiveSensoryInput: Attempting to access null implementation");
+        return;
+    }
     
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_WARNING("Brain::receiveSensoryInput: Received empty sensory input");
+        return;
+    }
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_ERROR("Brain::receiveSensoryInput: No sensory neurons available");
+        return;
+    }
     
-    // Distribute input across sensory neurons
+    // Distribute input across sensory neurons with bounds checking
     for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            // Validate input value is reasonable
+            float inputVal = static_cast<float>(values[i]);
+            if (std::abs(inputVal) > 1000.0f) {
+                NLM_LOG_WARNING("Brain::receiveSensoryInput: Input value " + std::to_string(inputVal) + 
+                               " is outside reasonable range");
+                inputVal = std::clamp(inputVal, -1000.0f, 1000.0f);
+            }
+            
+            normalizedValue = inputVal * 10.0f;  // Normalize to [-10, 10] mV
+        }
+        
+        // Validate current value
+        if (std::abs(normalizedValue) > 100.0f) {
+            NLM_LOG_WARNING("Brain::receiveSensoryInput: Current value " + std::to_string(normalizedValue) + 
+                           " is outside reasonable range");
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        if (pImpl->sensoryNeurons[i]) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        } else {
+            NLM_LOG_ERROR("Brain::receiveSensoryInput: Null sensory neuron at index " + std::to_string(i));
+        }
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
@@ -617,26 +642,64 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::injectCurrent: Attempting to access null implementation");
+        return;
+    }
+    
+    // Validate current value
+    if (std::abs(current) > 1000.0f) {
+        NLM_LOG_WARNING("Brain::injectCurrent: Current value " + std::to_string(current) + 
+                       " is outside reasonable range");
+        current = std::clamp(current, -1000.0f, 1000.0f);
+    }
+    
+    bool neuronFound = false;
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
-                return;
+                neuronFound = true;
+                break;
             }
         }
+        if (neuronFound) break;
+    }
+    
+    if (!neuronFound) {
+        NLM_LOG_WARNING("Brain::injectCurrent: Neuron " + std::to_string(static_cast<uint64_t>(neuron)) + 
+                       " not found in any region");
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::injectCurrentToNeurons: Attempting to access null implementation");
+        return;
+    }
+    
+    // Validate current value
+    if (std::abs(current) > 1000.0f) {
+        NLM_LOG_WARNING("Brain::injectCurrentToNeurons: Current value " + std::to_string(current) + 
+                       " is outside reasonable range");
+        current = std::clamp(current, -1000.0f, 1000.0f);
+    }
+    
+    bool neuronFound = false;
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
                     neuron->injectCurrent(current);
+                    neuronFound = true;
                 }
             }
         }
+    }
+    
+    if (!neuronFound) {
+        NLM_LOG_WARNING("Brain::injectCurrentToNeurons: No neurons found of type " + std::to_string(static_cast<int>(type)));
     }
 }
 

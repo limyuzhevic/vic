@@ -94,101 +94,116 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setWeight: Attempting to access null implementation");
+        return;
+    }
+    // Validate weight is within reasonable bounds
+    if (weight < Impl::MIN_WEIGHT - 0.1f || weight > Impl::MAX_WEIGHT + 0.1f) {
+        NLM_LOG_WARNING("Synapse::setWeight: Weight " + std::to_string(weight) + 
+                       " is outside valid range [" + std::to_string(Impl::MIN_WEIGHT) + ", " +
+                       std::to_string(Impl::MAX_WEIGHT) + "]");
+    }
+    pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
-}
-
-Delay Synapse::getDelay() const {
-    return pImpl->delay;
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::addToWeight: Attempting to access null implementation");
+        return;
+    }
+    // Validate delta is reasonable
+    if (std::abs(delta) > 10.0f) {  // Prevent unrealistic weight changes
+        NLM_LOG_WARNING("Synapse::addToWeight: Delta " + std::to_string(delta) + 
+                       " is outside reasonable range");
+    }
+    
+    float newWeight = pImpl->weight + delta;
+    if (newWeight < Impl::MIN_WEIGHT - 0.001f || newWeight > Impl::MAX_WEIGHT + 0.001f) {
+        NLM_LOG_WARNING("Synapse::addToWeight: Weight change would result in unstable value " + 
+                       std::to_string(newWeight) + ". Clamping to bounds.");
+    }
+    
+    pImpl->weight = std::clamp(newWeight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::setDelay(Delay delay) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setDelay: Attempting to access null implementation");
+        return;
+    }
+    // Validate delay is within reasonable bounds
+    if (delay < 0 || delay > 1000) {
+        NLM_LOG_WARNING("Synapse::setDelay: Delay " + std::to_string(delay) + 
+                       " is outside reasonable range [0, 1000] steps");
+    }
     pImpl->delay = delay;
 }
 
-SynapseType Synapse::getType() const {
-    return pImpl->type;
-}
-
 void Synapse::setType(SynapseType type) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::setType: Attempting to access null implementation");
+        return;
+    }
     pImpl->type = type;
 }
 
-bool Synapse::isExcitatory() const {
-    return pImpl->type == SynapseType::Excitatory;
-}
-
-bool Synapse::isInhibitory() const {
-    return pImpl->type == SynapseType::Inhibitory;
-}
-
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::recordPreSpike: Attempting to access null implementation");
+        return;
+    }
+    if (timestamp < 0.0f) {
+        NLM_LOG_WARNING("Synapse::recordPreSpike: Negative timestamp " + std::to_string(timestamp));
+    }
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        NLM_LOG_WARNING("Synapse::recordPreSpike: Spike history exceeds maximum capacity, trimming");
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::recordPostSpike: Attempting to access null implementation");
+        return;
+    }
+    if (timestamp < 0.0f) {
+        NLM_LOG_WARNING("Synapse::recordPostSpike: Negative timestamp " + std::to_string(timestamp));
+    }
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        NLM_LOG_WARNING("Synapse::recordPostSpike: Spike history exceeds maximum capacity, trimming");
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
     }
 }
 
-const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
-}
-
-const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
-}
-
 void Synapse::clearHistory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::clearHistory: Attempting to access null implementation");
+        return;
+    }
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
-}
-
-PlasticityFlags& Synapse::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
-}
-
-float Synapse::getEligibilityTrace() const {
-    return pImpl->eligibilityTrace;
-}
-
-void Synapse::setEligibilityTrace(float trace) {
-    pImpl->eligibilityTrace = trace;
+    pImpl->eligibilityTrace = 0.0f;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Synapse::decayEligibilityTrace: Attempting to access null implementation");
+        return;
+    }
+    if (decayRate < 0.0f || decayRate > 1.0f) {
+        NLM_LOG_WARNING("Synapse::decayEligibilityTrace: Decay rate " + std::to_string(decayRate) + 
+                       " is outside valid range [0, 1]");
+    }
+    
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
     }
-}
-
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
-}
-
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
 void Synapse::step(Timestamp currentTime) {

@@ -19,13 +19,23 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
+    
+    // Try to parse as JSON first
+    auto jsonContent = readFileContent(filepath);
+    if (!jsonContent.empty()) {
+        if (parseJSONConfig(jsonContent)) {
+            NLM_LOG_INFO("Successfully loaded configuration from JSON file: " + filepath);
+            return true;
+        }
+    }
+    
+    // Fall back to simple key=value format
+    NLM_LOG_INFO("Loading configuration from simple file format (fallback): " + filepath);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -210,6 +220,169 @@ template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Enhanced configuration loading methods
+std::string Config::readFileContent(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return "";
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+bool Config::parseJSONConfig(const std::string& jsonContent) {
+    // Simple JSON parsing for basic key-value pairs and arrays
+    // In a real implementation, this would use a proper JSON library
+    
+    if (jsonContent.empty()) {
+        return false;
+    }
+    
+    // For now, implement a very simple JSON parser that handles:
+    // - { "key": "value" }
+    // - { "key": 123 }
+    // - { "key": true/false }
+    // - { "key": [1, 2, 3] }
+    
+    try {
+        size_t pos = 0;
+        std::string content = jsonContent;
+        
+        while (pos < content.size()) {
+            // Find next key
+            pos = content.find('"', pos);
+            if (pos == std::string::npos) break;
+            
+            size_t keyEnd = content.find('"', pos + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace and :
+            while (pos < content.size() && std::isspace(content[pos])) pos++;
+            if (pos >= content.size() || content[pos] != ':') break;
+            pos++;
+            
+            // Skip whitespace
+            while (pos < content.size() && std::isspace(content[pos])) pos++;
+            
+            // Parse value
+            ConfigValue value;
+            bool parsed = false;
+            
+            // String value
+            if (pos < content.size() && content[pos] == '\"') {
+                size_t valueEnd = content.find('\"', pos + 1);
+                if (valueEnd != std::string::npos) {
+                    std::string strValue = content.substr(pos + 1, valueEnd - pos - 1);
+                    value = strValue;
+                    pos = valueEnd + 1;
+                    parsed = true;
+                }
+            }
+            // Boolean value
+            else if (content.substr(pos, 4) == "true") {
+                value = true;
+                pos += 4;
+                parsed = true;
+            }
+            else if (content.substr(pos, 5) == "false") {
+                value = false;
+                pos += 5;
+                parsed = true;
+            }
+            // Number value
+            else if (std::isdigit(content[pos]) || content[pos] == '-') {
+                size_t numEnd = pos;
+                while (numEnd < content.size() && (std::isdigit(content[numEnd]) || content[numEnd] == '.' || content[numEnd] == 'e' || content[numEnd] == 'E' || content[numEnd] == '+' || content[numEnd] == '-')) {
+                    numEnd++;
+                }
+                
+                std::string numStr = content.substr(pos, numEnd - pos);
+                try {
+                    // Try double first
+                    size_t decimalPos = numStr.find('.');
+                    if (decimalPos != std::string::npos) {
+                        value = std::stod(numStr);
+                    } else {
+                        // Try integer
+                        if (numStr.find('e') != std::string::npos || numStr.find('E') != std::string::npos) {
+                            value = std::stod(numStr);
+                        } else {
+                            // Try int64_t
+                            try {
+                                value = std::stoll(numStr);
+                            } catch (...) {
+                                value = std::stod(numStr);
+                            }
+                        }
+                    }
+                    pos = numEnd;
+                    parsed = true;
+                } catch (...) {
+                    break;
+                }
+            }
+            // Array value
+            else if (pos < content.size() && content[pos] == '[') {
+                size_t arrayEnd = content.find(']', pos);
+                if (arrayEnd != std::string::npos) {
+                    std::string arrayStr = content.substr(pos + 1, arrayEnd - pos - 1);
+                    
+                    // Parse array elements
+                    std::vector<double> arrayValues;
+                    size_t arrayPos = 0;
+                    while (arrayPos < arrayStr.size()) {
+                        // Skip whitespace
+                        while (arrayPos < arrayStr.size() && std::isspace(arrayStr[arrayPos])) arrayPos++;
+                        if (arrayPos >= arrayStr.size()) break;
+                        
+                        size_t elementEnd = arrayStr.find(',', arrayPos);
+                        if (elementEnd == std::string::npos) {
+                            elementEnd = arrayStr.size();
+                        }
+                        
+                        std::string elementStr = arrayStr.substr(arrayPos, elementEnd - arrayPos);
+                        try {
+                            arrayValues.push_back(std::stod(elementStr));
+                        } catch (...) {
+                            arrayValues.push_back(0.0);
+                        }
+                        
+                        arrayPos = elementEnd + 1;
+                    }
+                    
+                    // Convert to appropriate vector type based on element types
+                    // For now, use std::vector<double> as fallback
+                    value = arrayValues;
+                    pos = arrayEnd + 1;
+                    parsed = true;
+                }
+            }
+            
+            if (parsed) {
+                set(key, value, ConfigSource::File);
+                
+                // Skip whitespace and comma
+                while (pos < content.size() && std::isspace(content[pos])) pos++;
+                if (pos < content.size() && content[pos] == ',') pos++;
+            } else {
+                // Skip to next comma or }
+                while (pos < content.size() && content[pos] != ',' && content[pos] != '}') pos++;
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
 
 } // namespace nlm
