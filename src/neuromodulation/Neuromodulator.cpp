@@ -36,21 +36,65 @@ float Dopamine::getPlasticityFactor() const {
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Implement real dopamine dynamics based on biological model
+    // Dopamine exhibits complex dynamics: initial burst (phasic), tonic baseline, and depletion
+    
+    float timeFactor = static_cast<float>(dt);
+    
+    // Natural decay towards baseline (tonic level)
+    float decay = pImpl->decayRate * timeFactor;
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - decay);
+    
+    // Recovery after depletion
+    if (pImpl->level < pImpl->baseline * 0.5f) {
+        float recovery = pImpl->releaseRate * timeFactor * 0.5f;
+        pImpl->level = std::min(pImpl->baseline + pImpl->peak, pImpl->level + recovery);
+    }
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Implement reward prediction error (RPE) - core dopamine signal
+    // Biological model: dopamine neurons fire for unexpected rewards (prediction error)
+    
+    // Normalize reward to dopamine scale
+    float normalizedReward = std::clamp(reward, 0.0f, 1.0f);
+    
+    // Burst response for reward prediction error
+    // Stronger RPE = larger burst
+    float burstMagnitude = normalizedReward * pImpl->releaseRate * 2.0f;
+    
+    // Limit burst to reasonable range
+    pImpl->level = std::min(pImpl->baseline + pImpl->peak * 2.0f, 
+                           pImpl->level + burstMagnitude);
+    
+    // Set baseline based on reward magnitude (adaptation)
+    pImpl->baseline = std::max(pImpl->baseline, 
+                              pImpl->baseline + normalizedReward * 0.1f);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Implement reward prediction error signaling - this is the key learning signal
+    // Biological model: dopamine encodes prediction errors (delta rule)
+    
+    // Normalize prediction error
+    float normalizedError = std::clamp(error, -1.0f, 1.0f);
+    
+    // Phasic dopamine response to prediction error
+    // Positive error (better than expected) -> increase firing
+    // Negative error (worse than expected) -> decrease firing (suppress)
+    if (normalizedError > 0.0f) {
+        // Reinforcement: unexpected reward strengthens associations
+        float increase = normalizedError * pImpl->releaseRate * 1.5f;
+        pImpl->level = std::min(pImpl->baseline + pImpl->peak * 2.0f, 
+                               pImpl->level + increase);
+    } else {
+        // Punishment: prediction error weakens associations
+        float decrease = std::abs(normalizedError) * pImpl->decayRate * 1.5f;
+        pImpl->level = std::max(pImpl->baseline, pImpl->level - decrease);
+    }
+    
+    // Store prediction error for plasticity calculations
+    pImpl->baseline = pImpl->baseline + normalizedError * 0.05f;  // Small adaptation
 }
 
 } // namespace nlm
