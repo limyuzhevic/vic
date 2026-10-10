@@ -1,0 +1,62 @@
+{
+    "brain": {
+        "neuron_count": 1000,
+        "synapse_density": 0.1,
+        "connection_probability": 0.05,
+        "initial_weight_mean": 0.5,
+        "initial_weight_std": 0.1,
+        "v_thresh": -50.0,
+        "v_rest": -70.0,
+        "v_reset": -75.0,
+        "tau_mem": 20.0,
+        "tau_ref": 2.0
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.001,
+            "tau_plus": 20.0,
+            "tau_minus": 20.0
+        },
+        "hebbian": {
+            "enable": true
+        },
+        "structural": {
+            "enable": true,
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001
+        }
+    },
+    "neuromod": {
+        "dopamine": {
+            "scale": 1.0
+        },
+        "curiosity": {
+            "enable": true,
+            "exploration_rate": 0.1
+        },
+        "novelty": {
+            "enable": true,
+            "sensitivity": 0.5
+        }
+    },
+    "simulation": {
+        "timestep": 0.001,
+        "max_steps": 10000,
+        "time_limit": 3600.0
+    },
+    "logging": {
+        "level": "INFO",
+        "to_file": false,
+        "filename": "nlm.log",
+        "max_size_mb": 10,
+        "rotate_daily": true
+    },
+    "environment": {
+        "name": "GridWorld",
+        "width": 20,
+        "height": 20,
+        "vision_width": 8,
+        "vision_height": 8
+    }
+}
