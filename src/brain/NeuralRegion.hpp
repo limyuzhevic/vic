@@ -75,13 +75,19 @@ public:
                                       float meanWeight,
                                       float weightVariance);
     
-    // Get all neurons across all populations
-    std::vector<Neuron*> getAllNeurons();
-    std::vector<const Neuron*> getAllNeurons() const;
+    // Get neuron by ID across all populations
+    Neuron* getNeuronById(NeuronId id);
+    const Neuron* getNeuronById(NeuronId id) const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // Find synapse by source and destination
+    Synapse* findSynapse(NeuronId source, NeuronId destination);
+    const Synapse* findSynapse(NeuronId source, NeuronId destination) const;
+    
+    // Apply synapse checkpoint data
+    bool applySynapseData(const SynapseCheckpointData& data, size_t& synapseIndex);
+    
+    // Get synapse by ID (if needed for direct loading)
+    SynapseId getSynapseIdFor(NeuronId source, NeuronId destination) const;
+    
+    // Helper for checkpoint loading: find or create synapse with specific parameters
+    Synapse* ensureSynapse(NeuronId source, NeuronId destination, float weight = 0.0f, Delay delay = 1);

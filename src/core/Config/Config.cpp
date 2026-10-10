@@ -19,9 +19,94 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
     
+    // Fall back to YAML format
+    if (loadFromYAML(filepath)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Check if it's a simple key-value object
+        if (jsonConfig.is_object()) {
+            for (const auto& item : jsonConfig.items()) {
+                std::string key = item.key();
+                const auto& value = item.value();
+                
+                // Convert JSON value to ConfigValue
+                ConfigValue configValue;
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    configValue = value.get<int64_t>();
+                } else if (value.is_number_unsigned()) {
+                    configValue = value.get<uint64_t>();
+                } else if (value.is_number()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Handle arrays
+                    jsonConfigArray = value;
+                    if (value.empty()) {
+                        configValue = std::vector<int>();
+                    } else {
+                        // Check array element type
+                        bool allInts = std::all_of(value.begin(), value.end(), [](const auto& elem) { return elem.is_number_integer(); });
+                        bool allDoubles = std::all_of(value.begin(), value.end(), [](const auto& elem) { return elem.is_number(); });
+                        bool allStrings = std::all_of(value.begin(), value.end(), [](const auto& elem) { return elem.is_string(); });
+                        
+                        if (allInts) {
+                            configValue = value.get<std::vector<int64_t>>();
+                        } else if (allDoubles) {
+                            configValue = value.get<std::vector<double>>();
+                        } else if (allStrings) {
+                            configValue = value.get<std::vector<std::string>>();
+                        } else {
+                            // Mixed types, use double array
+                            configValue = std::vector<double>();
+                            for (const auto& elem : value) {
+                                std::get<std::vector<double>>(configValue).push_back(elem.get<double>());
+                            }
+                        }
+                    }
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+            return true;
+        }
+        
+    } catch (const std::exception& e) {
+        return false;
+    }
+    
+    return false;
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // YAML support requires external YAML library
+    // For now, return false to fall back to simple format
+    return false;
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -51,6 +136,72 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
+    
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    file << "  \"config_schema\": {\n";
+    file << "    \"version\": \"1.0\"\n";
+    file << "  },\n";
+    file << "  \"config_values\": {\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "    \"" << entry.key << "\": ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << "\"" << arg[j] << "\"";
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
+    }
+    
+    file << "  }\n";
+    file << "}\n";
     
     return true;
 }

@@ -94,10 +94,13 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
+        // Note: The config should have been set with a default value earlier
+        // This is a fallback in case no seed was configured
+        if (!config->has("random_seed")) {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
         }
+        
+        uint64_t seed = config->getOr<uint64_t>("random_seed", 42);
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems

@@ -1,5 +1,11 @@
-cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+# nlohmann_json dependency
+include(FetchContent)
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
@@ -26,6 +32,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigSchema.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -87,11 +94,10 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
+# Find nlohmann_json package
+find_package(nlohmann_json REQUIRED)
 
+# Add include directory for nlohmann_json
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -148,4 +154,31 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Plugin examples
+add_executable(nlm_plugin_examples
+    examples/plugin/CustomNeuralModelPlugin.cpp
+)
+
+target_link_libraries(nlm_plugin_examples PUBLIC nlm_core)
+target_compile_features(nlm_plugin_examples PRIVATE cxx_std_20)
+
+# Test plugin system
+add_executable(nlm_plugin_test
+    tests/test_plugin_system.cpp
+)
+
+target_link_libraries(nlm_plugin_test PUBLIC nlm_core nlm_phase3)
+target_compile_features(nlm_plugin_test PRIVATE cxx_std_20)
+
+add_test(NAME nlm_plugin_test COMMAND nlm_plugin_test)
+
+# Build all targets
+add_custom_target(nlm_build_all
+    DEPENDS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
+            nlm_phase3_demo nlm_phase4_demo
+            nlm_plugin_examples
+            nlm_plugin_test
+    COMMENT "Build all NLM targets including plugins"
 )

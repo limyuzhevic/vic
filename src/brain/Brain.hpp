@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -43,6 +44,15 @@ struct InterRegionConnection {
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
+
+// Forward declarations for new brain architecture
+class NeuralHardware;
+class WorkingMemorySystem;
+class PredictionSystem;
+class CognitiveProcessor;
+class NeuromodulationSystem;
+class DevelopmentSystem;
+class BrainOrchestrator;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
@@ -98,104 +108,90 @@ public:
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const class Neuromodulator& modulator);
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Development system access
+    DevelopmentSystem* getDevelopmentSystem();
+    const DevelopmentSystem* getDevelopmentSystem() const;
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
-    
-    // Reset brain state
-    void reset();
-    
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
-    
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
-    
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
-    
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
+    // Memory system access
     NeuralWorkingMemory* getWorkingMemory();
+    const NeuralWorkingMemory* getWorkingMemory() const;
     
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    const NeuralEpisodicMemory* getEpisodicMemory() const;
     
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    const NeuralAssociativeMemory* getAssociativeMemory() const;
     
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
+    // Prediction system access
     PredictionSystem* getPredictionSystem();
+    const PredictionSystem* getPredictionSystem() const;
     
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
+    // Cognition system access
     NeuralPlanner* getPlanner();
+    const NeuralPlanner* getPlanner() const;
     
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    const ConceptFormation* getConceptFormation() const;
     
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
+    const AttentionalSelection* getAttention() const;
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Neuromodulation system access
+    Dopamine* getDopamine();
+    const Dopamine* getDopamine() const;
+    
+    Curiosity* getCuriosity();
+    const Curiosity* getCuriosity() const;
+    
+    PredictionError* getPredictionError();
+    const PredictionError* getPredictionError() const;
+    
+    Novelty* getNovelty();
+    const Novelty* getNovelty() const;
+    
+    // System coordination
+    void integrateAllSystems();
+    void coordinatePredictionAndLearning();
+    void updateDevelopmentBasedOnExperience();
+    
+    // State management
+    void reset();
+    void checkpoint(const std::string& filepath);
+    bool loadCheckpoint(const std::string& filepath);
+    
+    // Configuration
+    void configureWith(const std::shared_ptr<Config>& config);
+    
+    // Statistics and monitoring
+    void logStatus() const;
+    
+    // Component access for testing and debugging
+    NeuralHardware* getNeuralHardware();
+    const NeuralHardware* getNeuralHardware() const;
+    
+    WorkingMemorySystem* getWorkingMemorySystem();
+    const WorkingMemorySystem* getWorkingMemorySystem() const;
+    
+    PredictionSystem* getPredictionSystem();
+    const PredictionSystem* getPredictionSystem() const;
+    
+    CognitiveProcessor* getCognitiveProcessor();
+    const CognitiveProcessor* getCognitiveProcessor() const;
+    
+    NeuromodulationSystem* getNeuromodulationSystem();
+    const NeuromodulationSystem* getNeuromodulationSystem() const;
     
     DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    const DevelopmentSystem* getDevelopmentSystem() const;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Architecture inspection
+    static std::string getArchitectureDescription();
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
