@@ -285,6 +285,87 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+### Building and Running C++ Code (Advanced Users)
+
+If you want to build the C++ neural engine directly (for maximum performance and advanced features):
+
+```bash
+# Standard CMake build
+cd /path/to/nlm
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run simulations
+./nlm                    # Main simulation
+cd build
+./nlm_phase3_demo        # Phase 3 demo
+./nlm_phase4_demo        # Phase 4 demo
+./nlm_phase6_demo        # Phase 6 integration demo
+
+# Run tests
+ctest --output-on-failure
+
+# Build with enhanced features (Phase 6)
+cd /path/to/nlm
+mkdir -p build
+cd build
+cmake .. -DENABLE_PHASE6_INTEGRATION=ON -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+```
+
+### Using the Enhanced Build Scripts
+
+The NLM project now includes enhanced build scripts for easier development:
+
+1. **`build.sh`** - Shell script for CMake-based builds
+2. **`nlm_build.py`** - Python script for cross-platform builds
+
+```bash
+# Make build scripts executable
+chmod +x build.sh nlm_build.py
+
+# Standard build
+./build.sh build
+
+# Build with tests
+./build.sh build
+./build.sh test
+
+# Cross-platform build (recommended)
+./nlm_build.py build
+./nlm_build.py test
+```
+
+---
+
+### Common Troubleshooting
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+- Check that neurons have connectivity
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+- Verify agent has motor neurons
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+**"Build fails"**
+- Check that CMake 3.16+ is installed
+- Verify C++ compiler supports C++20
+- Ensure Python 3.8+ for Python bindings
+
+**"Python bindings not working"**
+- Install dependencies: `pip install pybind11 scikit-build-core numpy`
+- Install library: `pip install -e .`
+- Try the build script for automated setup
+
 ---
 
 ## Next Steps
@@ -293,5 +374,7 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Use the enhanced build scripts for easier development
+5. Explore Phase 6 integration features
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with both Python and C++ options.

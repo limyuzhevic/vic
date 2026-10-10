@@ -23,21 +23,29 @@ This document covers:
 ### Build Steps
 
 ```bash
-# Navigate to the project directory
+# Standard CMake build (recommended)
 cd /path/to/nlm
-
-# Create a build directory
 mkdir -p build
 cd build
-
-# Configure with CMake (Release build for best performance)
 cmake .. -DCMAKE_BUILD_TYPE=Release
-
-# Build all targets
 make -j$(nproc)
 
 # Run tests (if built)
 ctest --output-on-failure
+```
+
+```bash
+# Using the enhanced build script (recommended for beginners)
+cd /path/to/nlm
+chmod +x build.sh
+./build.sh build
+./build.sh test
+
+# Using the Python build script (cross-platform)
+cd /path/to/nlm
+chmod +x nlm_build.py
+./nlm_build.py build
+./nlm_build.py test
 ```
 
 ### Build Outputs
@@ -53,6 +61,7 @@ After successful compilation, you will have:
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo (NEW) |
 
 ### Build Options
 
@@ -66,6 +75,38 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
+
+# Enable Phase 6 integration tests
+cmake .. -DENABLE_PHASE6_INTEGRATION=ON
+
+# Enable Python bindings (if pybind11 available)
+cmake .. -DPYTHON_EXECUTABLE=/usr/bin/python3
+```
+
+### Build and Installation Script Features
+
+The enhanced build system provides:
+
+1. **Automated dependency checking**
+2. **Cross-platform support** (Windows, Linux, macOS)
+3. **Parallel building** for faster compilation
+4. **Test automation** with `ctest` integration
+5. **Installation to system directories** (optional)
+6. **Progress reporting** and error handling
+7. **Configuration validation**
+
+```bash
+# Build with configuration
+./build.sh build --verbose
+
+# Install to system
+./build.sh install
+
+# Run comprehensive tests
+./build.sh test
+
+# Clean build artifacts
+./build.sh clean
 ```
 
 ---
