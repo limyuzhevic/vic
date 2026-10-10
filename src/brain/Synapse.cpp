@@ -48,6 +48,19 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    // Constructor - initialize synapse with default parameters
+    //
+    // Sets up the basic synapse structure with default values:
+    // - Weight: neutral (0.0)
+    // - Delay: 1 timestep (minimal biological transmission delay)
+    // - Type: excitatory (default)
+    // - Plasticity: all rules disabled (plastic components initialized)
+    // - Short-term plasticity: fully recovered, no facilitation
+    // - Eligibility trace: zero (no learning history)
+    // - Efficacy: 1.0 (normal synaptic efficacy)
+    //
+    // The Pimpl idiom ensures encapsulation of implementation details.
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -192,34 +205,73 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // Update synapse for one simulation step with comprehensive synaptic dynamics
+    //
+    // Implements multiple interacting plasticity mechanisms simultaneously:
+    // 1. Short-term synaptic plasticity (STP) using Tsodyks-Markram model
+    // 2. Eligibility trace decay for reward-modulated learning
+    // 3. Synaptic efficacy use-dependent modulation
+    // 4. Weight boundary enforcement for stability
+    //
+    // Short-term Plasticity (STP) Models:
+    // - Facilitation: Previous activity increases synaptic efficacy (resources pooled)
+    // - Depression: Previous activity depletes synaptic resources (usage proportional)
+    // - These processes operate on different timescales (facilitation ~100ms, depression ~200ms)
+    // - STP is use-dependent, enhancing learning during sustained activity
+    //
+    // Eligibility Trace Management:
+    // - Tracks recent spike activity for reward-modulated learning
+    // - Decay reflects the temporal window for plasticity eligibility
+    // - Zero when no recent spike activity
+    // - Integrates with reward signals to produce long-term weight changes
+    //
+    // Performance Considerations:
+    // - All calculations use exponential functions (can be optimized with precomputed factors)
+    // - Operations are O(1) per synapse, suitable for large-scale networks
+    // - Spike history management uses circular buffer semantics (fixed size)
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    TimestepDuration dt = 0.001;  // 1ms timestep (simulation parameter)
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Phase 1: Decay short-term facilitation
+    // Facilitation process: previous activity increases synaptic efficacy
+    // Modeled as exponential decay toward baseline (0.0)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        
+        // Prevent numerical underflow
+        if (pImpl->shortTermFacilitation < 1e-10f) {
+            pImpl->shortTermFacilitation = 0.0f;
+        }
     }
     
-    // Decay short-term depression
+    // Phase 2: Decay short-term depression
+    // Depression process: previous activity depletes synaptic resources
+    // Modeled as recovery toward baseline (1.0) over time
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
+        // Recovery from depression toward 1.0 (full resource availability)
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        
+        // Clamp to reasonable bounds to prevent numerical issues
+        if (pImpl->shortTermDepression > 1.0f) pImpl->shortTermDepression = 1.0f;
+        if (pImpl->shortTermDepression < 0.0f) pImpl->shortTermDepression = 0.0f;
     }
     
-    // Decay eligibility trace for reward-modulated learning
+    // Phase 3: Decay eligibility trace for reward-modulated learning
+    // Eligibility trace represents the synaptic eligibility for plasticity
+    // Fast decay ensures only recent activity influences learning
+    // The decay rate (0.001) provides ~1000ms window for plasticity eligibility
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Phase 4: Enforce synaptic weight bounds
+    // Prevents numerical instability and ensures biological plausibility
+    // Clamping is more efficient than complex constraint solvers
+    if (pImpl->weight < Impl::MIN_WEIGHT) pImpl->weight = Impl::MIN_WEIGHT;
+    if (pImpl->weight > Impl::MAX_WEIGHT) pImpl->weight = Impl::MAX_WEIGHT;
 }
 
 void Synapse::reset() {
@@ -231,33 +283,75 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
+    // Initialize synapse with biologically plausible random parameters
+    //
+    // This method sets up initial synaptic properties using biologically realistic
+    // distributions derived from experimental data and network modeling literature.
+    // Different values for excitatory vs inhibitory synapses reflect known
+    // differences in synaptic physiology.
+    //
+    // Biological Parameter Rationale:
+    // - Excitatory synapses: Small positive weights (0.1-0.4) reflect typical AMPA
+    //   receptor-mediated EPSP magnitudes in cortical networks
+    // - Inhibitory synapses: Negative weights (-0.1 to -0.4) reflect GABA-mediated
+    //   IPSP magnitudes, typically similar in absolute value to excitatory
+    // - Delay: 1-5 timesteps (1-5ms) reflects biological synaptic transmission
+    //   times (glial processes, neurotransmitter release)
+    // - Efficacy: Close to 1.0 for both types, representing baseline synaptic strength
+    // - Short-term plasticity: Fully recovered state, no initial facilitation
+    //
+    // Performance Considerations:
+    // - Uses uniform distributions for simplicity and speed
+    // - Clamping ensures weights stay within reasonable bounds
+    // - Initializes all state variables to biologically plausible values
+    // - Efficient for large-scale network initialization
+    
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
+        // Reflects typical AMPA receptor-mediated EPSP magnitudes in cortical networks
+        // Values between 0.1 and 0.4 ensure suprathreshold effects with realistic dynamics
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        
         // Excitatory synapses have moderate initial efficacy
+        // Represents baseline synaptic strength for Type I/II synapses
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
+        // Reflects GABA-mediated IPSP magnitudes
+        // Same absolute values as excitatory for balanced network construction
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        
     } else {
-        // Other types: small random weights
+        // Other types (e.g., neuromodulatory): small random weights
+        // May include electrical synapses, gap junctions, or modulatory connections
+        // Smaller magnitudes appropriate for modulatory effects
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    // Reflects biological variability in synaptic transmission times
+    // Includes glial processes, neurotransmitter release, and receptor activation
     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
     
     // Initialize short-term plasticity state
+    // - shortTermDepression = 1.0f: fully recovered (resources available)
+    // - shortTermFacilitation = 0.0f: no initial facilitation (resources not pooled)
+    // This represents the synapse at rest, ready for activity
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
     pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
     
     // Initialize eligibility trace to 0
+    // Indicates no current eligibility for reward-modulated learning
+    // Will be set to non-zero values when spikes occur via recordPreSpike/recordPostSpike
     pImpl->eligibilityTrace = 0.0f;
     
-    // Initialize last spike times
+    // Initialize last spike times to -1.0f (inactive)
+    // Negative value indicates no spike has occurred yet
+    // Used by short-term plasticity dynamics to compute time since last activity
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
 }

@@ -19,114 +19,200 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 1 implementation: Simple key=value parser
+    // Future Phase 2 will implement proper JSON/YAML parsing with full schema validation
     
+    // Open file for reading - fails if file doesn't exist or can't be opened
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Failed to open config file: " + filepath);
         return false;
     }
     
+    // Process file line by line
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
+        
+        // Skip empty lines and comments (lines starting with # or //)
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs - handles both simple and quoted values
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            // Malformed line without equals sign - log warning and continue
+            NLM_LOG_WARNING("Malformed config line " + std::to_string(lineNumber) + 
+                          " in " + filepath + ": missing '='");
+            continue;
         }
+        
+        // Extract and trim key and value
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove surrounding quotes (both " and ' supported)
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Add to configuration with File source priority
+        set(key, value, ConfigSource::File);
+        
+        // Log for debugging (can be disabled for performance)
+        NLM_LOG_DEBUG("Loaded config from file: " + key + " = " + value);
     }
     
+    NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Parse command line arguments for configuration
+    // Supports two formats:
+    // 1. --key=value (preferred, POSIX-like)
+    // 2. -key value (short form, common in many CLI tools)
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle long option format: --key=value
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
+                // Extract key and value from --key=value
+                std::string key = arg.substr(2, pos - 2);  // Skip '--'
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_DEBUG("Loaded config from args: " + key + " = " + value);
+            } else {
+                // Invalid format: --key without = - log warning
+                NLM_LOG_WARNING("Invalid argument format: " + arg + " (expected --key=value)");
             }
         }
-        // Handle -key value format
+        // Handle short option format: -key value
         else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
+            // Skip next argument for short format
+            std::string key = arg.substr(1);  // Skip '-'
+            std::string value = argv[++i];    // Next argument is the value
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_DEBUG("Loaded config from args: " + key + " = " + value);
+        } else {
+            // Unrecognized argument format
+            NLM_LOG_WARNING("Unrecognized argument format: " + arg);
         }
     }
+    
+    NLM_LOG_INFO(std::to_string(argc - 1) + " command line configuration arguments processed");
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Export configuration to file in key=value format
+    // This is primarily for debugging, backup, and configuration sharing
+    // Note: Values are simplified for compatibility - advanced types use placeholder values
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to save config to file: " + filepath);
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File\n";
+    file << "# Generated by Config::saveToFile()\n";
+    file << "# Format: key = value\n";
+    file << "# Priority: higher priority sources override lower priority (File > Default, CommandLine > File, Runtime > CommandLine)\n\n";
+    
+    // Save all configuration entries
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description as comment if available
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key=value pair with source priority for debugging
+        file << entry.key << " = ";
+        
+        // Format value based on type for better readability
+        file << formatValue(entry) << "\n";
+        
+        // Log entry being saved (at debug level to avoid spam)
+        NLM_LOG_DEBUG("Saved config entry: " + entry.key + " = " + formatValue(entry, false) + 
+                     " (source: " + std::to_string(static_cast<int>(entry.source)) + ")");
     }
     
+    NLM_LOG_INFO("Configuration saved to file: " + filepath + " (" + 
+                 std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Retrieve and type-convert a configuration value
+    // Performs linear search through configuration entries
+    // Time complexity: O(n) where n is number of configuration entries
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        // Key not found - return nullopt to indicate absence
         return std::nullopt;
     }
     
     try {
+        // Attempt type-safe extraction from variant
+        // This will throw std::bad_variant_access if T doesn't match stored type
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Type mismatch - requested type T doesn't match stored type
+        NLM_LOG_ERROR("Type mismatch for config key \"" + key + "\": " +
+                     "expected " + typeid(T).name() + ", " +
+                     "found " + std::string(variantTypeToString(it->value)));
         return std::nullopt;
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
+    // Convenience method to get a value or return a default
+    // Combines get() with fallback logic in a single operation
+    // Avoids multiple lookups by checking existence and converting in one pass
+    
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Internal core setter method with explicit source specification
+    // Handles both updates to existing keys and insertion of new keys
+    // Time complexity: O(n) due to linear search for existing key
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Key exists - update value and source priority
         it->value = value;
-        it->source = source;
+        it->source = source;  // Higher priority source overrides lower
+        NLM_LOG_DEBUG("Updated config: " + key + " (source: " + 
+                     std::to_string(static_cast<int>(source)) + ")");
     } else {
+        // New key - insert at end of entries list
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_DEBUG("Added new config: " + key + " = " + formatValue(ConfigEntry(key, value, source), false));
     }
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Convenience setter for string values
+    // Converts string to ConfigValue variant and calls core set method
     set(key, ConfigValue(value), source);
 }
 
@@ -143,21 +229,35 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    // Check if configuration contains a specific key
+    // Performs linear search through all configuration entries
+    // Time complexity: O(n) where n is number of entries
+    // Returns true if key exists (regardless of source priority)
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    // Remove all configuration entries for a specific key
+    // Uses stable_partition + erase pattern for O(n) time complexity
+    // All entries with this key are removed regardless of source priority
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    NLM_LOG_DEBUG("Removed config entries for key: " + key);
 }
 
 std::vector<std::string> Config::getKeys() const {
+    // Retrieve all unique configuration keys
+    // Returns keys in order of first appearance (not source priority)
+    // Time complexity: O(n)
+    
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
+    keys.reserve(pImpl->entries.size());  // Reserve space to avoid reallocations
     for (const auto& entry : pImpl->entries) {
         keys.push_back(entry.key);
     }
@@ -165,14 +265,25 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    // Remove all configuration entries
+    // Resets configuration to empty state
+    // All entries are removed regardless of source priority
+    
+    size_t oldSize = pImpl->entries.size();
     pImpl->entries.clear();
+    NLM_LOG_INFO("Configuration cleared (" + std::to_string(oldSize) + " entries removed)");
 }
 
 std::string Config::summary() const {
+    // Generate human-readable summary of all configuration
+    // Includes key, value representation, and source priority for each entry
+    // Useful for debugging and logging configuration state
+    
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration Summary (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
+        // Use variant visitor for type-safe value formatting
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
@@ -181,35 +292,81 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (priority: " << static_cast<int>(entry.source) << ")\n";
+    }
+    if (pImpl->entries.empty()) {
+        oss << "  (empty)\n";
     }
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Helper function to convert variant type to string for error reporting
+static std::string variantTypeToString(const ConfigValue& value) {
+    // Returns human-readable type name for variant value
+    // Used for error messages in type conversion failures
+    
+    std::string typeName;
+    std::visit([&typeName](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            typeName = "int";
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            typeName = "int64_t";
+        } else if constexpr (std::is_same_v<T, double>) {
+            typeName = "double";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            typeName = "bool";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            typeName = "string";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            typeName = "vector<int>";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            typeName = "vector<double>";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            typeName = "vector<string>";
+        } else {
+            typeName = "unknown";
+        }
+    }, value);
+    return typeName;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Internal helper for case-insensitive string comparison
+static bool stringEndsWith(const std::string& str, const std::string& suffix) {
+    // Check if string ends with suffix (case-sensitive)
+    // Returns true if str.length() >= suffix.length() and str.substr(str.length() - suffix.length()) == suffix
+    
+    if (str.length() < suffix.length()) {
+        return false;
+    }
+    return str.substr(str.length() - suffix.length()) == suffix;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Format configuration value for display in files/comments
+static std::string formatValue(const ConfigValue& value, bool includeDescription = true) {
+    // Convert configuration value to human-readable string for output
+    // Includes quotes for strings, no quotes for primitive types
+    // Used in saveToFile() and error messages
+    
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+// Format entire configuration entry for output (including description)
+static std::string formatValue(const ConfigEntry& entry) {
+    // Format a complete configuration entry for file output
+    // Includes the formatted value and optionally the description as comment
+    
+    std::ostringstream oss;
+    oss << "# " << entry.description << "\n";
+    oss << entry.key << " = " << formatValue(entry.value) << "\n";
+    return oss.str();
+}

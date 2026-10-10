@@ -157,9 +157,18 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {
+    // Constructor - initializes brain with configuration
+    // Uses Pimpl idiom for encapsulation and forward declaration
+    // The actual implementation details are hidden in the Impl struct
+    
+    NLM_LOG_INFO("NLM Brain created (Phase 6: Integrated Artificial Brain)");
+    NLM_LOG_INFO("Configuration loaded from " + std::to_string(pImpl->config.use_count()) + " references");
+}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    NLM_LOG_INFO("NLM Brain destroyed");
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
