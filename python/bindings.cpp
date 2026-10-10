@@ -404,9 +404,26 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createDefaultConfigWithParams", [](size_t neuronCount, size_t regionCount, 
+                                              float connectionProbability, float simulationTimestep) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", regionCount);
+        config->set("connection_probability", connectionProbability);
+        config->set("simulation_timestep", simulationTimestep);
+        config->set("random_seed", uint64_t(42));
+        
+        return config;
+    }, py::arg("neuronCount") = 1000UL, py::arg("regionCount") = 1UL, 
+       py::arg("connectionProbability") = 0.1f, py::arg("simulationTimestep") = 0.001,
+       "Create a configuration with sensible defaults");
+
+    m.def("createDefaultBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create a default brain with initialization");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -416,10 +433,315 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("runSimpleLearningExperiment", [](std::shared_ptr<Brain> brain, 
+                                           std::shared_ptr<SimpleWorld> world, 
+                                           size_t steps) -> std::string {
+        std::ostringstream oss;
+        oss << "=== Simple Learning Experiment ===\n";
+        oss << "Initial Brain State:\n";
+        oss << brain->logStatus();
+        oss << "\nStarting experiment with " << steps << " steps...\n";
+        
+        world->configure(100, 100, 20, 20);
+        world->reset();
+        world->setAgentStart(50, 50);
+        
+        world->setRandomSeed(42);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            oss << "\nStep " << step + 1 << ":\n";
+            
+            // Create a simple sensory input (random noise)
+            auto vision = std::make_shared<Vision>(20, 20, 3);
+            std::vector<float> data;
+            data.reserve(20 * 20 * 3);
+            for (size_t i = 0; i < 20 * 20 * 3; ++i) {
+                data.push_back((static_cast<float>(rand()) / RAND_MAX) * 2.0f - 1.0f);
+            }
+            vision->setData(data);
+            
+            // Get sensory percept and inject into brain
+            auto percept = world->getSensoryPercept();
+            percept->setVision(vision);
+            percept->setTimestamp(static_cast<double>(step));
+            
+            brain->receiveSensoryInput(*percept);
+            
+            brain->step(step, static_cast<double>(step) * 0.1);
+            
+            auto action = brain->produceAction();
+            world->applyMotorCommand(action->getType(), static_cast<double>(step));
+            
+            // Add some occasional world changes for learning
+            if (step % 50 == 0) {
+                world->update(step);
+            }
+            
+            if (step % 100 == 0) {
+                oss << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+                oss << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+                oss << "  Firing rate: " << brain->getAverageFiringRate() << "\n";
+            }
+        }
+        
+        oss << "\nExperiment completed!\n";
+        oss << "Final Brain State:\n";
+        oss << brain->logStatus();
+        
+        return oss.str();
+    }, py::arg("brain"), py::arg("world"), py::arg("steps") = 1000UL,
+       "Run a simple learning experiment with visual output");
 
-} // namespace nlm
+    m.def("visualizeBrainState", [](const std::shared_ptr<Brain>& brain, size_t maxRegions = 10) -> std::string {
+        std::ostringstream oss;
+        oss << "=== Brain State Visualization ===\n\n";
+        
+        oss << "Basic Statistics:\n";
+        oss << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+        oss << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        oss << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << "\n";
+        oss << "  Excitation/Inhibition ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        oss << "  Developmental stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        oss << "  Pending spike events: " << brain->getPendingSpikeEventCount() << "\n\n";
+        
+        oss << "Region Information (showing " << std::min(maxRegions, brain->getRegionCount()) 
+            << " of " << brain->getRegionCount() << " regions):\n";
+        
+        auto regionIds = brain->getRegionIds();
+        size_t regionsToShow = std::min(maxRegions, regionIds.size());
+        for (size_t i = 0; i < regionsToShow; ++i) {
+            auto region = brain->getRegion(regionIds[i]);
+            if (region) {
+                oss << "  Region " << region->getId().index() << 
+                    " (\"" << region->getName() << "\"):\n";
+                oss << "    Neurons: " << region->getTotalNeuronCount() << ", "
+                    << "Synapses: " << region->getSynapseCount() << "\n";
+                oss << "    Active: " << region->getActiveNeuronCount() << ", "
+                    << "Firing: " << region->getFiringNeuronCount() << "\n";
+                oss << "    Avg firing rate: " << region->getAverageFiringRate() << "\n";
+                oss << "    Avg synaptic weight: " << region->getAverageSynapticWeight() << "\n";
+                oss << "    Synaptic density: " << region->getSynapticDensity() << "\n";
+                if (i < regionsToShow - 1) oss << "\n";
+            }
+        }
+        
+        if (brain->getRegionCount() > maxRegions) {
+            oss << "  ... and " << (brain->getRegionCount() - maxRegions) << " more regions\n";
+        }
+        
+        return oss.str();
+    }, py::arg("brain"), py::arg("maxRegions") = 10UL,
+       "Simple text visualization of brain activity state");
+
+    m.def("example_basic_usage", []() -> std::string {
+        std::ostringstream oss;
+        oss << "=== Basic NLM Usage Example ===\n\n";
+        
+        oss << "1. Creating a default configuration...\n";
+        auto config = nlm::createDefaultConfig();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.15f);
+        oss << "   Config created with custom parameters\n\n";
+        
+        oss << "2. Creating a brain with the configuration...\n";
+        auto brain = nlm::createDefaultBrain(config);
+        oss << "   Brain initialized successfully\n\n";
+        
+        oss << "3. Creating a world...\n";
+        auto world = nlm::createSimpleWorld();
+        world->configure(50, 50, 10, 10);
+        world->reset();
+        world->setAgentStart(25, 25);
+        oss << "   World configured and reset\n\n";
+        
+        oss << "4. Running a learning experiment (200 steps)...\n";
+        auto experimentResult = nlm::runSimpleLearningExperiment(brain, world, 200UL);
+        oss << experimentResult << "\n";
+        
+        oss << "5. Visualizing brain state...\n";
+        auto visualization = nlm::visualizeBrainState(brain, 5UL);
+        oss << visualization << "\n";
+        
+        oss << "6. Saving brain state to file...\n";
+        bool saved = brain->save("./example_brain_checkpoint");
+        oss << "   Brain saved: " << (saved ? "Yes" : "No") << "\n\n";
+        
+        oss << "=== Example Complete ===\n";
+        oss << "This example demonstrates the basic workflow of creating, training, "
+            << "and visualizing an NLM brain.\n";
+        
+        return oss.str();
+    }, "Complete working example demonstrating basic NLM usage patterns");
+
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration (Python-friendly)");
+
+    m.def("create_default_config_with_params", [](size_t neuron_count, size_t region_count, 
+                                                  float connection_probability, float simulation_timestep) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        config->set("neuron_count", neuron_count);
+        config->set("region_count", region_count);
+        config->set("connection_probability", connection_probability);
+        config->set("simulation_timestep", simulation_timestep);
+        config->set("random_seed", uint64_t(42));
+        
+        return config;
+    }, py::arg("neuron_count") = 1000UL, py::arg("region_count") = 1UL, 
+       py::arg("connection_probability") = 0.1f, py::arg("simulation_timestep") = 0.001,
+       "Create a configuration with sensible defaults (Python-friendly)");
+
+    m.def("create_default_brain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create a brain with default parameters and initialize it (Python-friendly)");
+
+    m.def("run_simple_learning_experiment", [](std::shared_ptr<Brain> brain, 
+                                               std::shared_ptr<SimpleWorld> world, 
+                                               size_t steps) -> std::string {
+        std::ostringstream oss;
+        oss << "=== Simple Learning Experiment ===\n";
+        oss << "Initial Brain State:\n";
+        oss << brain->logStatus();
+        oss << "\nStarting experiment with " << steps << " steps...\n";
+        
+        world->configure(100, 100, 20, 20);
+        world->reset();
+        world->setAgentStart(50, 50);
+        
+        world->setRandomSeed(42);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            oss << "\nStep " << step + 1 << ":\n";
+            
+            // Create a simple sensory input (random noise)
+            auto vision = std::make_shared<Vision>(20, 20, 3);
+            std::vector<float> data;
+            data.reserve(20 * 20 * 3);
+            for (size_t i = 0; i < 20 * 20 * 3; ++i) {
+                data.push_back((static_cast<float>(rand()) / RAND_MAX) * 2.0f - 1.0f);
+            }
+            vision->setData(data);
+            
+            // Get sensory percept and inject into brain
+            auto percept = world->getSensoryPercept();
+            percept->setVision(vision);
+            percept->setTimestamp(static_cast<double>(step));
+            
+            brain->receiveSensoryInput(*percept);
+            
+            brain->step(step, static_cast<double>(step) * 0.1);
+            
+            auto action = brain->produceAction();
+            world->applyMotorCommand(action->getType(), static_cast<double>(step));
+            
+            // Add some occasional world changes for learning
+            if (step % 50 == 0) {
+                world->update(step);
+            }
+            
+            if (step % 100 == 0) {
+                oss << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+                oss << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+                oss << "  Firing rate: " << brain->getAverageFiringRate() << "\n";
+            }
+        }
+        
+        oss << "\nExperiment completed!\n";
+        oss << "Final Brain State:\n";
+        oss << brain->logStatus();
+        
+        return oss.str();
+    }, py::arg("brain"), py::arg("world"), py::arg("steps") = 1000UL,
+       "Run a simple learning experiment with visual output (Python-friendly)");
+
+    m.def("visualize_brain_state", [](const std::shared_ptr<Brain>& brain, size_t max_regions = 10) -> std::string {
+        std::ostringstream oss;
+        oss << "=== Brain State Visualization ===\n\n";
+        
+        oss << "Basic Statistics:\n";
+        oss << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+        oss << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        oss << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << "\n";
+        oss << "  Excitation/Inhibition ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        oss << "  Developmental stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        oss << "  Pending spike events: " << brain->getPendingSpikeEventCount() << "\n\n";
+        
+        oss << "Region Information (showing " << std::min(max_regions, brain->getRegionCount()) 
+            << " of " << brain->getRegionCount() << " regions):\n";
+        
+        auto regionIds = brain->getRegionIds();
+        size_t regionsToShow = std::min(max_regions, regionIds.size());
+        for (size_t i = 0; i < regionsToShow; ++i) {
+            auto region = brain->getRegion(regionIds[i]);
+            if (region) {
+                oss << "  Region " << region->getId().index() << 
+                    " (\"" << region->getName() << "\"):\n";
+                oss << "    Neurons: " << region->getTotalNeuronCount() << ", "
+                    << "Synapses: " << region->getSynapseCount() << "\n";
+                oss << "    Active: " << region->getActiveNeuronCount() << ", "
+                    << "Firing: " << region->getFiringNeuronCount() << "\n";
+                oss << "    Avg firing rate: " << region->getAverageFiringRate() << "\n";
+                oss << "    Avg synaptic weight: " << region->getAverageSynapticWeight() << "\n";
+                oss << "    Synaptic density: " << region->getSynapticDensity() << "\n";
+                if (i < regionsToShow - 1) oss << "\n";
+            }
+        }
+        
+        if (brain->getRegionCount() > max_regions) {
+            oss << "  ... and " << (brain->getRegionCount() - max_regions) << " more regions\n";
+        }
+        
+        return oss.str();
+    }, py::arg("brain"), py::arg("max_regions") = 10UL,
+       "Simple text visualization of brain activity state (Python-friendly)");
+
+    m.def("example_basic_usage", []() -> std::string {
+        std::ostringstream oss;
+        oss << "=== Basic NLM Usage Example ===\n\n";
+        
+        oss << "1. Creating a default configuration...\n";
+        auto config = create_default_config();
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.15f);
+        oss << "   Config created with custom parameters\n\n";
+        
+        oss << "2. Creating a brain with the configuration...\n";
+        auto brain = create_default_brain(config);
+        oss << "   Brain initialized successfully\n\n";
+        
+        oss << "3. Creating a world...\n";
+        auto world = create_simple_world();
+        world->configure(50, 50, 10, 10);
+        world->reset();
+        world->setAgentStart(25, 25);
+        oss << "   World configured and reset\n\n";
+        
+        oss << "4. Running a learning experiment (200 steps)...\n";
+        auto experimentResult = run_simple_learning_experiment(brain, world, 200UL);
+        oss << experimentResult << "\n";
+        
+        oss << "5. Visualizing brain state...\n";
+        auto visualization = visualize_brain_state(brain, 5UL);
+        oss << visualization << "\n";
+        
+        oss << "6. Saving brain state to file...\n";
+        bool saved = brain->save("./example_brain_checkpoint");
+        oss << "   Brain saved: " << (saved ? "Yes" : "No") << "\n\n";
+        
+        oss << "=== Example Complete ===\n";
+        oss << "This example demonstrates the basic workflow of creating, training, "
+            << "and visualizing an NLM brain.\n";
+        
+        return oss.str();
+    }, "Complete working example demonstrating basic NLM usage patterns");

@@ -24,6 +24,41 @@ That's it! NLM simulates all of this.
 
 ## Quick Start (Copy & Paste)
 
+### NEW: Easiest Brain Creation
+
+```python
+import pynlm
+
+# One simple line to create and initialize a brain!
+brain = nlm.create_default_brain()
+print("Brain created with ", brain.getTotalNeuronCount(), "neurons!")
+```
+
+### NEW: Python Convenience Functions
+
+```python
+import pynlm
+
+# Use the new Python-style convenience functions
+config = nlm.create_default_config_with_params(
+    neuron_count=500,
+    region_count=2
+)
+
+brain = nlm.create_default_brain(config)
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+
+world = nlm.create_simple_world()
+world.configure(20, 20, 10, 10)
+world.reset()
+
+experiment = nlm.run_simple_learning_experiment(brain, world, 200)
+print(experiment)  # See the learning in action!
+
+visualization = nlm.visualize_brain_state(brain)
+print(visualization)
+```
+
 ### Example 1: Simplest Brain
 
 ```python

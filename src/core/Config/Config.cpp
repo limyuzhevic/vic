@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,36 +20,136 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Try to parse as JSON first
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Try JSON parsing
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(content);
+        
+        // Convert JSON to Config entries
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            ConfigSource source = ConfigSource::File;
+            std::string description = "";
+            
+            // Extract value and handle type conversion
+            ConfigValue value;
+            try {
+                // Handle string values
+                if (it->is_string()) {
+                    value = it->get<std::string>();
+                }
+                // Handle numeric values
+                else if (it->is_number_integer()) {
+                    value = it->get<int64_t>();
+                }
+                else if (it->is_number_unsigned()) {
+                    value = static_cast<int64_t>(it->get<uint64_t>());
+                }
+                else if (it->is_number_float()) {
+                    value = it->get<double>();
+                }
+                // Handle boolean
+                else if (it->is_boolean()) {
+                    value = it->get<bool>();
+                }
+                // Handle arrays
+                else if (it->is_array()) {
+                    // Check array element type
+                    if (it->empty()) {
+                        continue; // Skip empty arrays
+                    }
+                    nlohmann::json firstElement = (*it)[0];
+                    if (firstElement.is_string()) {
+                        std::vector<std::string> strArray;
+                        for (const auto& elem : *it) {
+                            strArray.push_back(elem.get<std::string>());
+                        }
+                        value = strArray;
+                    }
+                    else if (firstElement.is_number_integer()) {
+                        std::vector<int64_t> intArray;
+                        for (const auto& elem : *it) {
+                            intArray.push_back(elem.get<int64_t>());
+                        }
+                        value = intArray;
+                    }
+                    else if (firstElement.is_number_float()) {
+                        std::vector<double> doubleArray;
+                        for (const auto& elem : *it) {
+                            doubleArray.push_back(elem.get<double>());
+                        }
+                        value = doubleArray;
+                    }
+                    else {
+                        continue; // Skip unsupported array types
+                    }
+                }
+                else {
+                    continue; // Skip unsupported value types
+                }
+            } catch (const std::exception& e) {
+                continue; // Skip invalid entries
+            }
+            
+            // Check if key already exists, preserve description if it does
+            auto existingIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                                         [&key](const ConfigEntry& e) { return e.key == key; });
+            if (existingIt != pImpl->entries.end()) {
+                // Preserve existing description
+                description = existingIt->description;
+            }
+            
+            set(key, value, source);
+            
+            // Set description if available in JSON
+            if (jsonData.contains(key + "_description")) {
+                description = jsonData[(key + "_description")].get<std::string>();
+                auto entryIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                                           [&key](const ConfigEntry& e) { return e.key == key; });
+                if (entryIt != pImpl->entries.end()) {
+                    entryIt->description = description;
+                }
+            }
+        }
+        
+        return !pImpl->entries.empty();
+    } catch (const nlohmann::json::parse_error& e) {
+        // If JSON parsing fails, fall back to key=value format
+    }
+    
+    // Fallback to key=value format
+    file.open(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+            std::string valueStr = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (valueStr.size() >= 2 && 
+                ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                 (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                valueStr = valueStr.substr(1, valueStr.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, valueStr, ConfigSource::File);
         }
     }
     
@@ -59,7 +160,6 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
@@ -68,7 +168,6 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
@@ -86,7 +185,42 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            }
+            else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << arg[i];
+                }
+                file << "\"]";
+            }
+            else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            }
+            else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            }
+            else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;

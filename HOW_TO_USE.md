@@ -91,12 +91,18 @@ pip install -e .
 # Install with scikit-build-core (used automatically by pip)
 pip install .
 
+# Install in development mode (for editing)
+pip install -e .
+
 # Build only (without installing)
 pip install build
 python -m build
 
 # Install specific build from wheel
 pip install dist/*.whl
+
+# For development - update after code changes
+pip install -e . --force-reinstall
 ```
 
 ### Verifying Installation
@@ -117,26 +123,150 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ## Part 3: Using the Python Library
 
-### Basic Usage
+### Advanced Python API - Convenience Functions
+
+The NLM Python library now includes high-level convenience functions that make getting started much easier:
+
+#### Quick Start Examples
+
+```python
+import pynlm
+
+# Option 1: One line to create brain with defaults
+brain = pynlm.create_default_brain()
+
+# Option 2: Custom configuration
+config = pynlm.create_default_config_with_params(
+    neuron_count=500,
+    region_count=2
+)
+brain = pynlm.create_default_brain(config)
+
+# Option 3: Complete learning experiment
+world = pynlm.create_simple_world()
+world.configure(50, 50, 10, 10)
+world.reset()
+
+# Run experiment with visualization
+result = pynlm.run_simple_learning_experiment(brain, world, 500)
+print(result)
+
+# Get brain state visualization
+viz = pynlm.visualize_brain_state(brain)
+print(viz)
+
+# Complete example with all functions
+complete_example = pynlm.example_basic_usage()
+print(complete_example)
+```
+
+#### Available Convenience Functions
+
+| Function | Description |
+|----------|-------------|
+| `create_default_config()` | Creates a config with sensible defaults |
+| `create_default_config_with_params()` | Creates config with custom parameters |
+| `create_default_brain()` | Creates and initializes a brain |
+| `create_simple_world()` | Creates a world instance |
+| `create_agent_brain()` | Creates agent brain interface |
+| `run_simple_learning_experiment()` | Runs basic learning experiment |
+| `visualize_brain_state()` | Gets text visualization of brain state |
+| `example_basic_usage()` | Complete working example |
+
+#### Parameter Options
+
+```python
+config = pynlm.create_default_config_with_params(
+    neuron_count=1000,           # Total neurons (default: 1000)
+    region_count=1,             # Number of regions (default: 1)
+    connection_probability=0.1, # Connection probability (default: 0.1)
+    simulation_timestep=0.001   # Time step (default: 0.001)
+)
+```
+
+### Basic Usage (Updated with Convenience Functions)
 
 #### Creating a Brain
 
 ```python
 import pynlm
 
-# Create a default configuration
+# Method 1: Using new convenience functions (EASIEST!)
+brain = pynlm.create_default_brain()
+
+# Method 2: Traditional way still works
 config = pynlm.createDefaultConfig()
-
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
 brain = pynlm.createBrain(config)
-brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
+
+#### Running a Simulation
+
+```python
+import pynlm
+
+# Create brain using convenience function
+brain = pynlm.create_default_brain()
+
+# Run simulation for 1000 steps
+for step in range(1000):
+    brain.step(step)
+    
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+```
+
+#### Creating a Complete Agent System
+
+```python
+import pynlm
+
+# Method 1: Using convenience functions (RECOMMENDED for learning)
+config = pynlm.create_default_config_with_params(
+    neuron_count=2000,
+    region_count=3
+)
+brain = pynlm.create_default_brain(config)
+
+world = pynlm.create_simple_world()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation with learning
+for step in range(1000):
+    world.update(timestep=0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}")
+```
+
+#### Getting Brain Statistics
+
+```python
+import pynlm
+
+brain = pynlm.create_default_brain()
+
+# Get comprehensive statistics
+stats = {
+    "Total neurons": brain.getTotalNeuronCount(),
+    "Firing neurons": brain.getFiringNeuronCount(),
+    "Total spikes": brain.getTotalSpikeCount(),
+    "Average firing rate": brain.getAverageFiringRate(),
+    "E/I ratio": brain.getExcitationInhibitionRatio(),
+    "Development stage": brain.getDevelopmentalStage(),
+    "Simulation time": brain.getSimulationTime()
+}
+
+for key, value in stats.items():
+    print(f"{key}: {value}")
 ```
 
 #### Running a Simulation
