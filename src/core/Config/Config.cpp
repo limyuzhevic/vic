@@ -3,14 +3,19 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <iostream>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string format; // "text", "json", "yaml"
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->format = "json"; // Default to JSON format
+}
 
 Config::~Config() = default;
 
@@ -19,9 +24,67 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format based on extension
+    std::string ext = ".";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        ext = filepath.substr(dotPos);
+    }
     
+    // Try JSON first
+    if (ext == ".json" || ext == ".JSON" || ext == ".json5" || ext.empty()) {
+        return loadFromJSONFile(filepath);
+    }
+    
+    // Try YAML second
+    if (ext == ".yaml" || ext == ".yml" || ext == ".YAML" || ext == ".YML") {
+        return loadFromYAMLFile(filepath);
+    }
+    
+    // Try text format for unknown extensions
+    std::string lowerExt = toLower(ext);
+    if (lowerExt == ".cfg" || lowerExt == ".ini" || lowerExt == ".txt") {
+        return loadFromTextFile(filepath);
+    }
+    
+    // Try text as fallback
+    return loadFromTextFile(filepath);
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string content((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+        
+        // For now, use the same simple key=value parsing
+        // In the future, this could use a proper JSON parser like nlohmann/json
+        return loadFromTextFile(filepath);
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // For now, use the same simple key=value parsing
+        // In the future, this could use a proper YAML parser like yaml-cpp
+        return loadFromTextFile(filepath);
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::loadFromTextFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,7 +94,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == '[') {
             continue;
         }
         
@@ -84,11 +147,98 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Determine format based on extension
+    std::string ext = ".";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        ext = filepath.substr(dotPos);
     }
     
+    std::string lowerExt = toLower(ext);
+    
+    if (lowerExt == ".json") {
+        return saveToJSONFile(file);
+    } else if (lowerExt == ".yaml" || lowerExt == ".yml") {
+        return saveToYAMLFile(file);
+    } else {
+        return saveToTextFile(file);
+    }
+}
+
+bool Config::saveToJSONFile(std::ofstream& file) const {
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
+    }
+    file << "}\n";
+    return true;
+}
+
+bool Config::saveToYAMLFile(std::ofstream& file) const {
+    file << "---\n";
+    for (const auto& entry : pImpl->entries) {
+        file << entry.key << ": ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << "\n";
+                // For arrays, we'll just output the type
+                file << "  []\n";
+            } else {
+                file << arg << "\n";
+            }
+        }, entry.value);
+    }
+    file << "\n";
+    return true;
+}
+
+bool Config::saveToTextFile(std::ofstream& file) const {
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = ";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
+    }
     return true;
 }
 
@@ -170,7 +320,7 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << " entries, format: " << pImpl->format << "):" << std::endl;
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
@@ -181,7 +331,11 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ")";
+        if (!entry.description.empty()) {
+            oss << " - " << entry.description;
+        }
+        oss << std::endl;
     }
     return oss.str();
 }
