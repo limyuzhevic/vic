@@ -1,21 +1,24 @@
+# NLM Python Package Configuration
+# This file defines the Python package configuration for the NLM neural simulation framework
+
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+requires = ["setuptools>=42", "wheel", "scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "pynlm"
+name = pynlm
 version = "0.1.0"
 description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
+license = {text = "MIT"}
 keywords = ["neural", "simulation", "spiking", "brain", "learning"]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
+    "Intended Audience :: Science/Research", 
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -26,32 +29,65 @@ classifiers = [
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "black>=21.0",
+    "isort>=5.0",
+    "mypy>=0.9",
 ]
 
 [project.urls]
-Homepage = "https://github.com/nlm-project/nlm"
-Documentation = "https://nlm.readthedocs.io"
-Repository = "https://github.com/nlm-project/nlm.git"
+homepage = "https://github.com/nlm-project/nlm"
+documentation = "https://nlm.readthedocs.io"
+repository = "https://github.com/nlm-project/nlm.git"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
+[tool.setuptools]
+packages = find:
+
+[tool.setuptools.find]
+where = .
+exclude = [
+    "tests*",
+    "build*", 
+    "dist*"
 ]
-
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.coverage.run]
+source = ["pynlm"]
+exclude_lines = [
+    pragma: no cover,
+    def __repr__,
+    raise AssertionError,
+    raise NotImplementedError,
+]
+
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
