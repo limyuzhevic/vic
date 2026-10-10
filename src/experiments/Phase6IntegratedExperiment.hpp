@@ -85,6 +85,12 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Additional configuration parameters
+    uint64_t randomSeed;  // Random seed for reproducible results
+    float simulationTimestep;  // Simulation timestep (seconds)
+    size_t replayInterval;      // Steps between replay events
+    size_t consolidationInterval; // Steps between memory consolidation
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +99,11 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , randomSeed(12345u)  // Fixed seed for reproducible experiments
+        , simulationTimestep(0.001f)
+        , replayInterval(100)
+        , consolidationInterval(1000) {}
 };
 
 /**

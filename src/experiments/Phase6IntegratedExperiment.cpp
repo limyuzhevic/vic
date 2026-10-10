@@ -32,6 +32,22 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    // Set random seed for reproducible results
+    cfg->set("random_seed", config.randomSeed);
+    // Set simulation timestep
+    cfg->set("simulation_timestep", config.simulationTimestep);
+    // Set replay and consolidation intervals
+    cfg->set("replay_interval", config.replayInterval);
+    cfg->set("consolidation_interval", config.consolidationInterval);
+    
+    // Configure checkpoint directory
+    std::string checkpointDir = "./checkpoints";
+    if (!config.checkpointPath.empty()) {
+        checkpointDir = config.checkpointPath;
+    }
+    if (!checkpointDir.empty()) {
+        cfg->set("checkpoint_dir", checkpointDir);
+    }
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);

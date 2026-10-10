@@ -206,7 +206,10 @@ float NeuralRegion::getSynapticDensity() const {
     
     // Maximum possible connections: N * (N-1) for directed graph
     size_t maxConnections = neuronCount * (neuronCount - 1);
-    if (maxConnections == 0) return 0.0f;
+    // Use safe division - check for zero to avoid division by zero
+    if (maxConnections == 0 || pImpl->synapses.empty()) {
+        return 0.0f;
+    }
     
     return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
 }
