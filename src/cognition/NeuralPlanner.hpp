@@ -28,6 +28,15 @@ struct PlanningCandidate {
 // - Evaluates potential futures through simulation
 // - Selects actions leading to high-value outcomes
 // - Adapts plans based on prediction confidence
+// - Integrates with working memory for maintaining action plans
+// - Adapts strategies across developmental stages
+// - Uses curiosity-driven exploration
+// - Implements reinforcement learning
+// - Uses neuromodulation gating
+// - Performs trial-and-error learning
+// - Supports transfer learning
+// - Implements hierarchical goals
+// - Switches adaptive strategies
 
 class NeuralPlanner {
 public:
@@ -96,6 +105,152 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // ===== ADVANCED PLANNING STRUCTURES =====
+    
+    // Hierarchical goal levels (abstract -> concrete)
+    struct HierarchicalGoal {
+        std::vector<float> goalVector;
+        float abstractionLevel;  // 0.0 = concrete, 1.0 = abstract
+        size_t priority;
+        float expectedReward;
+        
+        HierarchicalGoal() : abstractionLevel(0.0f), priority(1), expectedReward(0.0f) {}
+    };
+    
+    // Planning context with working memory integration
+    struct PlanningContext {
+        std::vector<float> currentState;
+        std::vector<float> goalState;
+        std::vector<float> actionPlan;
+        float rewardEstimate;
+        float predictionError;
+        float curiosityLevel;
+        float neuromodulationLevel;
+        DevelopmentalStage developmentalStage;
+        StrategyType currentStrategy;
+        std::vector<StrategyType> alternativeStrategies;
+        
+        PlanningContext() 
+            : rewardEstimate(0.0f), predictionError(0.0f), 
+              curiosityLevel(0.0f), neuromodulationLevel(1.0f), 
+              developmentalStage(DevelopmentalStage::Initial) {}
+    };
+    
+    // Strategy types for adaptive switching
+    enum class StrategyType {
+        RandomSearch,
+        Greedy,
+        TreeSearch,
+        MonteCarlo,
+        Evolutionary,
+        CuriosityDriven,
+        Developmental
+    };
+    
+    // Transfer learning memory (task -> plan mapping)
+    struct TransferMemory {
+        std::vector<std::vector<ActionType>> successfulPlan;
+        std::vector<float> resultingState;
+        float successProbability;
+        std::string taskSignature;
+        size_t executionCount;
+        
+        TransferMemory() : successProbability(0.0f), executionCount(0) {}
+    };
+    
+    // Trial-and-error learning statistics
+    struct TrialErrorStats {
+        std::vector<float> actionSequence;
+        std::vector<float> rewards;
+        std::vector<float> predictionErrors;
+        float learningRate;
+        float explorationRate;
+        
+        TrialErrorStats() : learningRate(0.1f), explorationRate(0.1f) {}
+    };
+    
+    // ===== ADVANCED PLANNING METHODS =====
+    
+    // Backward planning: goal to action sequence
+    std::vector<ActionType> planBackward(const std::vector<float>& goal,
+                                         const std::vector<float>& startState,
+                                         const PlanningContext& context);
+    
+    // Forward planning: action to predicted outcome
+    std::vector<float> predictForward(const std::vector<ActionType>& action,
+                                       const std::vector<float>& currentState,
+                                       const PlanningContext& context) const;
+    
+    // Integrated planning with working memory
+    PlanningCandidate planWithWorkingMemory(const std::vector<float>& currentState,
+                                           const PlanningContext& context);
+    
+    // Prediction error integration for planning
+    void incorporatePredictionError(const std::vector<ActionType>& actions,
+                                   float predictionError,
+                                   const PlanningContext& context);
+    
+    // Developmental stage-dependent planning
+    float getDevelopmentalPlanningGain(DevelopmentalStage stage) const;
+    
+    // Curiosity-driven exploration
+    std::vector<ActionType> generateCuriosityDrivenActions(const std::vector<float>& currentState,
+                                                         const PlanningContext& context) const;
+    
+    // Reinforcement learning planning
+    PlanningCandidate planWithRL(const std::vector<float>& currentState,
+                                const PlanningContext& context);
+    
+    // Neuromodulation gating
+    float getNeuromodulationGating(NeuromodulatorType type) const;
+    void applyNeuromodulationGating(PlanningContext& context) const;
+    
+    // Trial-and-error learning
+    void applyTrialErrorLearning(const std::vector<ActionType>& actions,
+                                float reward,
+                                const PlanningContext& context);
+    
+    // Transfer learning
+    float evaluateTransferLearning(const std::vector<ActionType>& actions,
+                                   const std::vector<float>& startState,
+                                   const std::string& taskId) const;
+    
+    // Hierarchical goal processing
+    float evaluateHierarchicalGoal(const HierarchicalGoal& goal,
+                                   const std::vector<float>& currentState) const;
+    
+    // Adaptive strategy selection and switching
+    StrategyType selectStrategy(const PlanningContext& context) const;
+    void switchStrategy(StrategyType newStrategy, PlanningContext& context);
+    void evaluateStrategyPerformance(StrategyType strategy, float reward, PlanningContext& context);
+    
+    // ===== ADVANCED DATA MEMBERS =====
+    
+    // Working memory integration
+    Brain* brain_;
+    
+    // Backward planning cache
+    std::unordered_map<std::string, std::vector<ActionType>> backwardPlanCache_;
+    
+    // Forward prediction models
+    std::vector<std::vector<float>> forwardPredictionModels_;
+    
+    // Transfer learning memory
+    std::vector<TransferMemory> transferMemory_;
+    
+    // Trial-and-error learning stats
+    TrialErrorStats trialErrorStats_;
+    
+    // Strategy performance tracking
+    std::unordered_map<StrategyType, float> strategyPerformance_;
+    std::vector<StrategyType> strategyHistory_;
+    
+    // Hierarchical goals
+    std::vector<HierarchicalGoal> hierarchicalGoals_;
+    
+    // Neuromodulation gating parameters
+    std::unordered_map<NeuromodulatorType, float> neuromodulationGating_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

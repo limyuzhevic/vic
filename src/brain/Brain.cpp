@@ -259,7 +259,57 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
-    // Register spike handlers for event-driven processing
+    // Initialize development system with planning integration
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize advanced planning systems
+    if (pImpl->planner) {
+        // Initialize advanced neural planning with biologically plausible mechanisms
+        pImpl->planner->initialize(this);
+        
+        // Configure advanced planning parameters
+        pImpl->planner->setPlanningDepth(5);
+        
+        // Configure neuromodulation gating for planning
+        float defaultGating = 1.0f;
+        pImpl->planner->setNeuromodulationGating(NeuromodulatorType::DOPAMINE, defaultGating);
+        pImpl->planner->setNeuromodulationGating(NeuromodulatorType::ACETYLCHOLINE, defaultGating);
+        pImpl->planner->setNeuromodulationGating(NeuromodulatorType::SEROTONIN, defaultGating);
+        pImpl->planner->setNeuromodulationGating(NeuromodulatorType::NORADRENALINE, defaultGating);
+        pImpl->planner->setNeuromodulationGating(NeuromodulatorType::ENDORPHIN, defaultGating);
+        
+        // Initialize working memory integration for planning
+        pImpl->planner->integrateWithWorkingMemory(pImpl->workingMemory.get());
+        
+        // Configure prediction error feedback for planning
+        pImpl->predictionError->initialize(this);
+        pImpl->planner->integrateWithPredictionError(pImpl->predictionError.get());
+        
+        // Configure curiosity-driven exploration for planning
+        pImpl->curiosity->initialize(this);
+        pImpl->planner->integrateWithCuriosity(pImpl->curiosity.get());
+        
+        // Configure reinforcement learning integration (using Neuromodulator for dopamine)
+        pImpl->planner->integrateWithReinforcementLearning(pImpl->dopamine.get());
+        
+        // Configure developmental stage-dependent planning
+        pImpl->developmentSystem->initialize(this);
+        pImpl->planner->integrateWithDevelopment(pImpl->developmentSystem.get());
+        
+        // Configure transfer learning
+        pImpl->planner->initializeTransferLearning();
+        
+        // Configure hierarchical goals
+        pImpl->planner->initializeHierarchicalGoals();
+        
+        // Configure adaptive strategy selection
+        pImpl->planner->initializeStrategyTracking();
+        
+        // Initialize all advanced planning systems
+        pImpl->planner->initializeAdvancedPlanning();
+        
+        NLM_LOG_INFO("Advanced neural planning systems integrated with brain");
+    }
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;

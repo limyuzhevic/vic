@@ -90,8 +90,11 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Development configuration
+    bool hasDevelopmentConfig() const;
+    void configureDevelopmentStage(const std::string& stage, double duration);
+    double getDevelopmentStageDuration(const std::string& stage) const;
+    std::vector<std::string> getDevelopmentStageNames() const;
     
 private:
     struct Impl;
