@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>  // Added for std::hash
 
 namespace nlm {
 
@@ -19,6 +20,11 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment
+    constexpr NeuronId operator++(int) { return NeuronId{value++}; }
+    // Prefix increment  
+    constexpr NeuronId& operator++() { return ++value, *this; }
 };
 
 // Synapse identifier
@@ -33,6 +39,11 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment
+    constexpr SynapseId operator++(int) { return SynapseId{value++}; }
+    // Prefix increment
+    constexpr SynapseId& operator++() { return ++value, *this; }
 };
 
 // Region identifier
@@ -47,6 +58,11 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment
+    constexpr RegionId operator++(int) { return RegionId{value++}; }
+    // Prefix increment
+    constexpr RegionId& operator++() { return ++value, *this; }
 };
 
 // Population identifier
@@ -61,6 +77,11 @@ struct PopulationId {
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Postfix increment
+    constexpr PopulationId operator++(int) { return PopulationId{value++}; }
+    // Prefix increment
+    constexpr PopulationId& operator++() { return ++value, *this; }
 };
 
 // Simulation step counter
@@ -109,7 +130,24 @@ enum class SynapseType : uint8_t {
     GapJunction
 };
 
-// Synaptic plasticity state flags
+// Typed enums for developmental stages
+enum class DevelopmentalStage : uint8_t {
+    Initial,
+    CriticalPeriod,
+    Maturation,
+    Adult,
+    Aging
+};
+
+// Typed enums for firing states
+enum class FiringState : uint8_t {
+    Resting,
+    Active,
+    Refractory,
+    Inhibited
+};
+
+// Plasticity flags
 struct PlasticityFlags {
     bool hebbian : 1;
     bool stdp : 1;
@@ -120,15 +158,6 @@ struct PlasticityFlags {
     constexpr PlasticityFlags() : hebbian(false), stdp(false), 
                                   reward_modulated(false), structural(false), 
                                   eligible(false) {}
-};
-
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
 };
 
 // Spike event for event-driven computation
@@ -171,14 +200,6 @@ struct DelayedSpikeEvent {
         , is_excitatory(type == SynapseType::Excitatory) {}
 };
 
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
-};
-
 // Generic handle types for efficiency
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
@@ -190,3 +211,94 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+namespace std {
+    template<>
+    struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+
+    template<>
+    struct hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+
+    template<>
+    struct hash<nlm::RegionId> {
+        size_t operator()(const nlm::RegionId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+
+    template<>
+    struct hash<nlm::PopulationId> {
+        size_t operator()(const nlm::PopulationId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+
+    template<>
+    struct hash<nlm::NeuronType> {
+        size_t operator()(const nlm::NeuronType& v) const {
+            return std::hash<uint8_t>{}(static_cast<uint8_t>(v));
+        }
+    };
+
+    template<>
+    struct hash<nlm::SynapseType> {
+        size_t operator()(const nlm::SynapseType& v) const {
+            return std::hash<uint8_t>{}(static_cast<uint8_t>(v));
+        }
+    };
+
+    template<>
+    struct hash<nlm::DevelopmentalStage> {
+        size_t operator()(const nlm::DevelopmentalStage& v) const {
+            return std::hash<uint8_t>{}(static_cast<uint8_t>(v));
+        }
+    };
+
+    template<>
+    struct hash<nlm::FiringState> {
+        size_t operator()(const nlm::FiringState& v) const {
+            return std::hash<uint8_t>{}(static_cast<uint8_t>(v));
+        }
+    };
+}
+
+// Convenience hash_combine function for std::unordered_map
+inline size_t hash_combine(size_t seed, const nlm::NeuronId& id) {
+    return seed ^ (std::hash<uint64_t>{}(id.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::SynapseId& id) {
+    return seed ^ (std::hash<uint64_t>{}(id.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::RegionId& id) {
+    return seed ^ (std::hash<uint64_t>{}(id.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::PopulationId& id) {
+    return seed ^ (std::hash<uint64_t>{}(id.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::NeuronType& v) {
+    return seed ^ (std::hash<uint8_t>{}(static_cast<uint8_t>(v)) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::SynapseType& v) {
+    return seed ^ (std::hash<uint8_t>{}(static_cast<uint8_t>(v)) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::DevelopmentalStage& v) {
+    return seed ^ (std::hash<uint8_t>{}(static_cast<uint8_t>(v)) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+inline size_t hash_combine(size_t seed, const nlm::FiringState& v) {
+    return seed ^ (std::hash<uint8_t>{}(static_cast<uint8_t>(v)) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}

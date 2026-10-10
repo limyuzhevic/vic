@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
+#include <type_traits>
 
 namespace nlm {
 
@@ -31,35 +33,35 @@ public:
     
     // Seed operations
     void seed(uint64_t seed);
-    uint64_t getSeed() const;
+    [[nodiscard]] uint64_t getSeed() const;
     
     // Random number generation
     // Uniform integer in [min, max]
-    uint32_t uniformInt(uint32_t min, uint32_t max);
-    uint64_t uniformInt(uint64_t min, uint64_t max);
+    [[nodiscard]] uint32_t uniformInt(uint32_t min, uint32_t max);
+    [[nodiscard]] uint64_t uniformInt(uint64_t min, uint64_t max);
     
     // Uniform real in [min, max)
-    double uniformReal(double min, double max);
-    float uniformReal(float min, float max);
+    [[nodiscard]] double uniformReal(double min, double max);
+    [[nodiscard]] float uniformReal(float min, float max);
     
     // Normal distribution
-    double normal(double mean, double stddev);
-    float normal(float mean, float stddev);
+    [[nodiscard]] double normal(double mean, double stddev);
+    [[nodiscard]] float normal(float mean, float stddev);
     
     // Bernoulli distribution
-    bool bernoulli(double p = 0.5);
+    [[nodiscard]] bool bernoulli(double p = 0.5);
     
     // Poisson distribution
-    uint32_t poisson(double lambda);
+    [[nodiscard]] uint32_t poisson(double lambda);
     
     // Exponential distribution
-    double exponential(double lambda);
+    [[nodiscard]] double exponential(double lambda);
     
     // Random boolean
-    bool randomBool();
+    [[nodiscard]] bool randomBool();
     
     // Random bit
-    uint32_t randomBit();
+    [[nodiscard]] uint32_t randomBit();
     
     // Shuffle container
     template<typename Container>
@@ -67,10 +69,10 @@ public:
     
     // Pick random element from container
     template<typename Container>
-    auto pickRandom(const Container& container) -> typename Container::const_reference;
+    [[nodiscard]] auto pickRandom(const Container& container) -> typename Container::const_reference;
     
     // Pick random index from 0 to n-1
-    uint64_t pickRandomIndex(uint64_t n);
+    [[nodiscard]] uint64_t pickRandomIndex(uint64_t n);
     
     // Fill range with random bytes
     void fillBytes(void* data, size_t size);
