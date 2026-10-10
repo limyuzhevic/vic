@@ -353,8 +353,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Define AgentBrainConfig struct
+    py::class_<AgentBrain::AgentBrainConfig>(m, "AgentBrainConfig")
+        .def(py::init<>())
+        .def_readwrite("balancedNeuronDistribution", &AgentBrain::AgentBrainConfig::balancedNeuronDistribution)
+        .def_readwrite("minNeuronsPerGroup", &AgentBrain::AgentBrainConfig::minNeuronsPerGroup)
+        .def_readwrite("motorThreshold", &AgentBrain::AgentBrainConfig::motorThreshold)
+        .def_readwrite("motorThresholdAdaptRate", &AgentBrain::AgentBrainConfig::motorThresholdAdaptRate)
+        .def_readwrite("motorThresholdMin", &AgentBrain::AgentBrainConfig::motorThresholdMin)
+        .def_readwrite("motorThresholdMax", &AgentBrain::AgentBrainConfig::motorThresholdMax)
+        .def_readwrite("maxMotorGroups", &AgentBrain::AgentBrainConfig::maxMotorGroups)
+        .def_readwrite("noveltySmoothingFactor", &AgentBrain::AgentBrainConfig::noveltySmoothingFactor)
+        .def_readwrite("noveltyMinDifference", &AgentBrain::AgentBrainConfig::noveltyMinDifference)
+        .def_readwrite("curiosityBaseExplorationRate", &AgentBrain::AgentBrainConfig::curiosityBaseExplorationRate)
+        .def_readwrite("curiosityAdaptationRate", &AgentBrain::AgentBrainConfig::curiosityAdaptationRate)
+        .def_readwrite("curiosityDecayRate", &AgentBrain::AgentBrainConfig::curiosityDecayRate)
+        .def_readwrite("predictionErrorInfluence", &AgentBrain::AgentBrainConfig::predictionErrorInfluence)
+        .def_readwrite("noveltyInfluence", &AgentBrain::AgentBrainConfig::noveltyInfluence)
+        .def_readwrite("maxVisionBufferSize", &AgentBrain::AgentBrainConfig::maxVisionBufferSize)
+        .def_readwrite("useDeltaEncoding", &AgentBrain::AgentBrainConfig::useDeltaEncoding)
+        .def_readwrite("strictNullChecks", &AgentBrain::AgentBrainConfig::strictNullChecks)
+        .def_readwrite("safetyClampMin", &AgentBrain::AgentBrainConfig::safetyClampMin)
+        .def_readwrite("safetyClampMax", &AgentBrain::AgentBrainConfig::safetyClampMax)
+        .def_readwrite("precomputeGroupStatistics", &AgentBrain::AgentBrainConfig::precomputeGroupStatistics)
+        .def_readwrite("groupActivitySmoothing", &AgentBrain::AgentBrainConfig::groupActivitySmoothing)
+        .def("__repr__", [](const AgentBrain::AgentBrainConfig& config) {
+            std::stringstream ss;
+            ss << "AgentBrainConfig(motorThreshold=" << config.motorThreshold
+               << ", curiosityEnabled=" << config.curiosityBaseExplorationRate
+               << ", maxMotorGroups=" << config.maxMotorGroups << ")";
+            return ss.str();
+        });
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def(py::init<std::shared_ptr<Brain>, AgentBrain::AgentBrainConfig>(), py::arg("brain"), py::arg("config"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
@@ -398,7 +431,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Configuration management methods
+        .def("setNeuronDistributionStrategy", &AgentBrain::setNeuronDistributionStrategy,
+             py::arg("strategy"))
+        .def("getNeuronDistributionStrategy", &AgentBrain::getNeuronDistributionStrategy)
+        .def("setMotorThreshold", &AgentBrain::setMotorThreshold,
+             py::arg("threshold"))
+        .def("setCuriosityParameters", &AgentBrain::setCuriosityParameters,
+             py::arg("baseRate"), py::arg("adaptationRate"), py::arg("decayRate"))
+        .def("enableMemoryEfficiency", &AgentBrain::enableMemoryEfficiency,
+             py::arg("enable"))
+        .def("setSafetyMode", &AgentBrain::setSafetyMode,
+             py::arg("strict"))
+        .def("getConfig", &AgentBrain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("updateConfig", &AgentBrain::updateConfig,
+             py::arg("newConfig"),
+             "Update configuration");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -414,7 +466,11 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface with default config");
+    
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain, AgentBrain::AgentBrainConfig config) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain, config);
+    }, py::arg("brain"), py::arg("config"), "Create a new agent brain interface with custom config");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
