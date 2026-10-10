@@ -353,6 +353,71 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 7) == "--neuron") {
+            // Handle --neuron-count
+            if (arg.find('=') != std::string::npos) {
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("neuron_count", static_cast<int64_t>(std::stoi(value)), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("neuron_count", static_cast<int64_t>(std::stoi(argv[++i])), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 14) == "--region-count") {
+            if (arg.find('=') != std::string::npos) {
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("region_count", static_cast<int64_t>(std::stoi(value)), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("region_count", static_cast<int64_t>(std::stoi(argv[++i])), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 22) == "--connection-prob") {
+            if (arg.find('=') != std::string::npos) {
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("connection_probability", static_cast<float>(std::stof(value)), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("connection_probability", static_cast<float>(std::stof(argv[++i])), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 10) == "--enable-cp") {
+            if (arg.find('=') != std::string::npos) {
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("enable_checkpoint", (value == "true" || value == "1"), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("enable_checkpoint", (std::string(argv[++i]) == "true" || std::string(argv[i]) == "1"), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 7) == "--steps") {
+            if (arg.find('=') != std::string::npos) {
+                std::string value = arg.substr(arg.find('=') + 1);
+                config->set("max_simulation_steps", static_cast<int64_t>(std::stoll(value)), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                config->set("max_simulation_steps", static_cast<int64_t>(std::stoll(argv[++i])), ConfigSource::CommandLine);
+            }
+        } else if (arg.substr(0, 4) == "--help") {
+            printBanner();
+            std::cout << R"(
+Usage: nlm [options]
+
+Basic Options:
+  --config <file>              Load configuration from file (default: configs/default.cfg)
+  --neuron-count <n>           Number of neurons (default: 500)
+  --region-count <n>           Number of regions (default: 1)
+  --connection-prob <f>        Connection probability (default: 0.15)
+
+Advanced Options:
+  --enable-checkpoint <bool>    Enable checkpointing (default: false)
+  --checkpoint-interval <n>     Checkpoint interval in steps (default: 1000)
+  --enable-replay <bool>        Enable memory replay (default: false)
+  --replay-interval <n>         Replay interval in steps (default: 100)
+  --use-synchronization <bool>  Use thread synchronization (default: false)
+  --use-sparse-connectivity     Use sparse connectivity (default: true)
+  --memory-pool-size <n>        Memory pool size in KB (default: 0 = auto)
+
+Examples:
+  ./nlm --neuron-count 1000 --steps 2000
+  ./nlm --config custom.json --enable-checkpoint true
+  ./nlm --neuron-count 2000 --connection-prob 0.05
+
+For more information, visit: https://github.com/nlm-project/nlm
+
+)" << std::endl;
+            return 0;
         }
     }
     
@@ -372,15 +437,26 @@ int main(int argc, char** argv) {
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+
+    // Advanced options
+    config->set("enable_checkpoint", false, ConfigSource::Default);
+    config->set("checkpoint_interval", 1000, ConfigSource::Default);
+    config->set("enable_replay", false, ConfigSource::Default);
+    config->set("replay_interval", 100, ConfigSource::Default);
+
+    // Performance optimization flags
+    config->set("use_synchronization", false, ConfigSource::Default);
+    config->set("use_sparse_connectivity", true, ConfigSource::Default);
+    config->set("memory_pool_size", 0, ConfigSource::Default);  // 0 = auto-detect
     
     // Log configuration summary
     NLM_LOG_INFO("");
