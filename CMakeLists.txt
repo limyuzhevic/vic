@@ -139,12 +139,50 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
+
+# Command Line Interface executable
+add_executable(nlm_cli
+    src/cli/NLMCommandLine.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Performance Profiling executable
+add_executable(nlm_profiler
+    src/profiling/NLMProfiler.cpp
+)
+target_link_libraries(nlm_profiler PUBLIC nlm_core)
+
+# Configuration Manager executable
+add_executable(nlm_config
+    src/config/NLMConfigManager.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+# Visualization executable
+add_executable(nlm_visualizer
+    src/visualization/NLMVisualizer.cpp
+)
+target_link_libraries(nlm_visualizer PUBLIC nlm_core)
+
+# Error Handling executable
+add_executable(nlm_error_handler
+    src/error/NLMErrors.cpp
+    src/error/ErrorHandler.cpp
+    src/error/ErrorRecovery.cpp
+)
+target_link_libraries(nlm_error_handler PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo nlm_cli nlm_profiler nlm_config nlm_visualizer nlm_error_handler
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
