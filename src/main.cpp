@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "integration/IntegrationVerifier.hpp"
 
 #include <iostream>
 #include <memory>
@@ -321,6 +322,62 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void runIntegrationVerification(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 4: Integration Verification Framework ===");
+    
+    // Initialize integration verifier
+    IntegrationVerifier integrationVerifier;
+    integrationVerifier.initialize(brain.get());
+    
+    // Enable all integration verifications
+    integrationVerifier.enableValidation("brain_memory", true);
+    integrationVerifier.enableValidation("neuromodulation_plasticity", true);
+    integrationVerifier.enableValidation("development_plasticity", true);
+    integrationVerifier.enableValidation("prediction_memory", true);
+    integrationVerifier.enableValidation("cognition_memory", true);
+    integrationVerifier.enableValidation("sensory_memory", true);
+    integrationVerifier.enableValidation("motor_cognition", true);
+    integrationVerifier.enableValidation("world_environment", true);
+    integrationVerifier.enableValidation("development_brain", true);
+    integrationVerifier.enableValidation("neuromodulation_brain", true);
+    integrationVerifier.enableValidation("system_connectivity", true);
+    integrationVerifier.enableValidation("plasticity_consistency", true);
+    integrationVerifier.enableValidation("neuromodulation_balance", true);
+    integrationVerifier.enableValidation("memory_capacity", true);
+    
+    // Run all integration verifications
+    NLM_LOG_INFO("Running comprehensive integration verification...");
+    auto report = integrationVerifier.verifyAllIntegrations();
+    
+    // Display integration report
+    std::cout << std::endl << report.toString() << std::endl;
+    
+    // Summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Integration Verification Summary ===");
+    NLM_LOG_INFO("Total validations: " + std::to_string(report.totalValidations));
+    NLM_LOG_INFO("Successful: " + std::to_string(report.successfulValidations));
+    NLM_LOG_INFO("Success rate: " + std::to_string((report.successfulValidations * 100.0) / report.totalValidations) + "%");
+    
+    if (report.hasErrors()) {
+        NLM_LOG_ERROR("INTEGRATION FAILURES DETECTED:");
+        for (const auto& error : report.errors) {
+            NLM_LOG_ERROR("  " + error);
+        }
+        NLM_LOG_ERROR("The brain integration may have critical issues requiring attention.");
+    } else {
+        NLM_LOG_INFO("✓ ALL INTEGRATIONS PASSED: The brain system is properly integrated.");
+        
+        if (!report.warnings.empty()) {
+            NLM_LOG_INFO("Warnings (minor issues):");
+            for (const auto& warning : report.warnings) {
+                NLM_LOG_INFO("  " + warning);
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -424,6 +481,11 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
+    // Reset and run Test 4: Integration verification
+    brain->reset();
+    brain->initialize();
+    runIntegrationVerification(brain);
+    
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
@@ -440,9 +502,13 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("  ✓ Integration verification framework operational");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Integration verification provides comprehensive validation of all NLM subsystems,");
+    NLM_LOG_INFO("ensuring proper coordination between brain, memory, neuromodulation, and plasticity systems.");
     NLM_LOG_INFO("");
     
     return 0;

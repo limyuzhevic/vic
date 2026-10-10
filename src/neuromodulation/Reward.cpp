@@ -10,7 +10,7 @@ struct Reward::Impl {
     Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
 };
 
-Reward::Reward() : pImpl(new Impl) {}
+Reward::Reward() : pImpl(std::make_unique<Impl>()) {}
 
 Reward::~Reward() = default;
 

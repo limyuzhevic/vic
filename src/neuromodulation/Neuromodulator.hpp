@@ -50,8 +50,8 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
-};
+    std::unique_ptr<Impl> pImpl;
+}
 
 // Acetylcholine: Attention and memory consolidation
 // PLACEHOLDER - Phase 2

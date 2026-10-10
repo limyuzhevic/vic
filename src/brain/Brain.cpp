@@ -157,19 +157,15 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -843,6 +839,107 @@ bool Brain::save(const std::string& filepath) const {
     }
 }
 
+// Helper functions for synapse restoration
+namespace {
+    // Helper function to find matching synapse in brain regions
+    Synapse* findMatchingSynapse(const Brain& brain, uint64_t sourceIdx, uint64_t destIdx, SynapseType synapseType) {
+        for (const auto& region : brain.pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                if (syn->getSourceNeuron().index() == sourceIdx && 
+                    syn->getDestinationNeuron().index() == destIdx) {
+                    // Check synapse type matches if specified
+                    if (synapseType == SynapseType::All || syn->getType() == synapseType) {
+                        return syn;
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
+    
+    // Helper function to restore synapse state from checkpoint data
+    bool restoreSynapseState(Synapse* synapse, const SynapseCheckpointData& checkpointData, 
+                             size_t synapseIndex, const std::string& context) {
+        if (!synapse) {
+            NLM_LOG_WARN("Cannot restore synapse state - synapse is null at index " + 
+                         std::to_string(synapseIndex) + " in " + context);
+            return false;
+        }
+        
+        // Validate checkpoint data
+        if (synapseIndex >= checkpointData.weight.size()) {
+            NLM_LOG_WARN("Synapse checkpoint data index " + std::to_string(synapseIndex) + 
+                         " out of bounds in " + context);
+            return false;
+        }
+        
+        // Restore synapse properties
+        synapse->setWeight(checkpointData.weight[synapseIndex]);
+        synapse->setDelay(checkpointData.delay[synapseIndex]);
+        synapse->setType(static_cast<SynapseType>(checkpointData.synapseType[synapseIndex]));
+        synapse->setEligibilityTrace(checkpointData.eligibilityTrace[synapseIndex]);
+        synapse->setEfficacy(checkpointData.efficacy[synapseIndex]);
+        
+        // Restore short-term plasticity state
+        synapse->setShortTermDepression(checkpointData.shortTermDepression[synapseIndex]);
+        synapse->setShortTermFacilitation(checkpointData.shortTermFacilitation[synapseIndex]);
+        
+        return true;
+    }
+    
+    // Helper function to validate synapse checkpoint data integrity
+    bool validateSynapseCheckpointData(const SynapseCheckpointData& checkpointData) {
+        bool isValid = true;
+        
+        if (checkpointData.weight.size() != checkpointData.sourceNeuron.size()) {
+            NLM_LOG_WARN("Synapse checkpoint data size mismatch: weight(" + 
+                         std::to_string(checkpointData.weight.size()) + ") != sourceNeuron(" +
+                         std::to_string(checkpointData.sourceNeuron.size()) + ")");
+            isValid = false;
+        }
+        
+        if (checkpointData.weight.size() != checkpointData.destinationNeuron.size()) {
+            NLM_LOG_WARN("Synapse checkpoint data size mismatch: weight(" + 
+                         std::to_string(checkpointData.weight.size()) + ") != destinationNeuron(" +
+                         std::to_string(checkpointData.destinationNeuron.size()) + ")");
+            isValid = false;
+        }
+        
+        if (checkpointData.weight.size() != checkpointData.delay.size()) {
+            NLM_LOG_WARN("Synapse checkpoint data size mismatch: weight(" + 
+                         std::to_string(checkpointData.weight.size()) + ") != delay(" +
+                         std::to_string(checkpointData.delay.size()) + ")");
+            isValid = false;
+        }
+        
+        // Check that all required vectors have the same size
+        std::vector<size_t> vectorSizes = {
+            checkpointData.weight.size(),
+            checkpointData.delay.size(),
+            checkpointData.synapseType.size(),
+            checkpointData.plasticityFlags.size(),
+            checkpointData.eligibilityTrace.size(),
+            checkpointData.efficacy.size(),
+            checkpointData.shortTermDepression.size(),
+            checkpointData.shortTermFacilitation.size()
+        };
+        
+        size_t uniqueSize = vectorSizes[0];
+        for (size_t i = 1; i < vectorSizes.size(); ++i) {
+            if (vectorSizes[i] != uniqueSize) {
+                NLM_LOG_WARN("Synapse checkpoint data inconsistency at index " + 
+                             std::to_string(i) + ": expected " + std::to_string(uniqueSize) + 
+                             " but got " + std::to_string(vectorSizes[i]));
+                isValid = false;
+            }
+        }
+        
+        return isValid;
+    }
+} // end of anonymous namespace
+
+
+
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
@@ -895,9 +992,74 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Validate synapse checkpoint data integrity
+        if (!validateSynapseCheckpointData(synapseData)) {
+            NLM_LOG_ERROR("Synapse checkpoint data validation failed");
+            return false;
+        }
+        
+        // Log detailed information about synapse restoration
+        NLM_LOG_INFO("Synapse checkpoint data: " + std::to_string(synapseData.weight.size()) + 
+                     " total synapses, " + std::to_string(synapseData.sourceNeuron.size()) + 
+                     " source neurons, " + std::to_string(synapseData.destinationNeuron.size()) + 
+                     " destination neurons");
+        
+        // Create a map for efficient synapse lookup: (source, destination) -> synapse pointer
+        std::unordered_map<std::pair<uint64_t, uint64_t>, Synapse*> synapseMap;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                uint64_t sourceIdx = syn->getSourceNeuron().index();
+                uint64_t destIdx = syn->getDestinationNeuron().index();
+                synapseMap[std::make_pair(sourceIdx, destIdx)] = syn;
+            }
+        }
+        
+        // Variables for tracking restoration statistics
+        size_t synapsesRestored = 0;
+        size_t synapsesCreated = 0;
+        size_t synapsesSkipped = 0;
+        size_t totalCheckpointSynapses = synapseData.weight.size();
+        
+        // Restore synapse states
+        for (size_t i = 0; i < totalCheckpointSynapses; ++i) {
+            uint64_t sourceIdx = synapseData.sourceNeuron[i];
+            uint64_t destIdx = synapseData.destinationNeuron[i];
+            SynapseType synapseType = static_cast<SynapseType>(synapseData.synapseType[i]);
+            
+            // Find matching synapse
+            Synapse* synapse = nullptr;
+            auto key = std::make_pair(sourceIdx, destIdx);
+            if (synapseMap.find(key) != synapseMap.end()) {
+                synapse = synapseMap[key];
+                
+                // Validate synapse indices match checkpoint data
+                if (synapse->getSourceNeuron().index() != sourceIdx || 
+                    synapse->getDestinationNeuron().index() != destIdx) {
+                    NLM_LOG_WARN("Synapse index mismatch for synapse at checkpoint position " + 
+                                 std::to_string(i) + ". Possible neuron index mapping issue.");
+                }
+                
+                // Restore synapse state
+                if (restoreSynapseState(synapse, synapseData, i, "load()")) {
+                    synapsesRestored++;
+                } else {
+                    synapsesSkipped++;
+                }
+            } else {
+                // Synapse not found in current brain - skip for now
+                // TODO: Implement synapse creation if needed
+                synapsesSkipped++;
+                NLM_LOG_DEBUG("Checkpoint synapse not found in current brain: " + 
+                              std::to_string(sourceIdx) + " -> " + std::to_string(destIdx) +
+                              " (type: " + std::to_string(static_cast<int>(synapseType)) + ")");
+            }
+        }
+        
+        // Log detailed restoration statistics
+        NLM_LOG_INFO("Synapse restoration completed: " + std::to_string(synapsesRestored) + 
+                     " restored, " + std::to_string(synapsesCreated) + " created, " +
+                     std::to_string(synapsesSkipped) + " skipped, " +
+                     std::to_string(totalCheckpointSynapses) + " total checkpoint synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;

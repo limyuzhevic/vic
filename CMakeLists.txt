@@ -77,14 +77,15 @@ add_library(nlm_core STATIC
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance optimization infrastructure
+    src/performance/Performance.hpp
+    src/performance/PerformanceMonitor.hpp
+    src/performance/PerformanceMonitor.cpp
+    src/performance/PerformanceInstrumentation.hpp
+    src/performance/PerformanceInstrumentation.cpp
+    src/performance/PerformanceReport.hpp
+    src/performance/PerformanceReport.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -114,18 +115,15 @@ add_library(nlm_phase3 STATIC
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Integration verification framework
+add_library(nlm_integration
+    integration/IntegrationVerifier.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
-add_executable(nlm
-    src/main.cpp
+target_include_directories(nlm_integration PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integration>
+    $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_integration PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

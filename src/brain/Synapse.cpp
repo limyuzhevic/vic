@@ -47,7 +47,7 @@ struct Synapse::Impl {
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
+    : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -64,15 +64,11 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -183,8 +179,36 @@ void Synapse::decayEligibilityTrace(float decayRate) {
     }
 }
 
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
+}
+
+void Synapse::setShortTermDepression(float depression) {
+    pImpl->shortTermDepression = depression;
+}
+
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::setShortTermFacilitation(float facilitation) {
+    pImpl->shortTermFacilitation = facilitation;
+}
+
+float Synapse::getLastPreSpikeTime() const {
+    return pImpl->lastPreSpikeTime;
+}
+
+void Synapse::setLastPreSpikeTime(float time) {
+    pImpl->lastPreSpikeTime = time;
+}
+
+float Synapse::getLastPostSpikeTime() const {
+    return pImpl->lastPostSpikeTime;
+}
+
+void Synapse::setLastPostSpikeTime(float time) {
+    pImpl->lastPostSpikeTime = time;
 }
 
 void Synapse::setEfficacy(float efficacy) {

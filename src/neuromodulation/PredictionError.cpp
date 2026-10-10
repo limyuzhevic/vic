@@ -14,7 +14,7 @@ struct PredictionError::Impl {
     Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::PredictionError() : pImpl(std::make_unique<Impl>()) {}
 
 PredictionError::~PredictionError() = default;
 

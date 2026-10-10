@@ -327,7 +327,9 @@ agent.processSensoryInput(percept)
 motor_cmd = agent.decodeMotorCommand()
 
 # Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
+        # Apply reward-based neuromodulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
 
 # Development
 agent.updateDevelopment(timestep)
