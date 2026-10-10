@@ -6,6 +6,10 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <memory>
 #include <string>
 
@@ -25,6 +29,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -172,17 +179,14 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

@@ -15,6 +15,16 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -416,6 +426,147 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Neuromodulation system bindings
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator - reward and reinforcement)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Dopamine::getName)
+        .def("getLevel", &Dopamine::getLevel)
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("update", &Dopamine::update, py::arg("dt"))
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"))
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"));
+
+    py::class_<Acetylcholine>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator - attention and memory consolidation)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Acetylcholine::getName)
+        .def("getLevel", &Acetylcholine::getLevel)
+        .def("setLevel", &Acetylcholine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Acetylcholine::getPlasticityFactor)
+        .def("update", &Acetylcholine::update, py::arg("dt"))
+        .def("signalAttention", &Acetylcholine::signalAttention, py::arg("attention"))
+        .def("enhanceMemoryConsolidation", &Acetylcholine::enhanceMemoryConsolidation, py::arg("memoryStrength"))
+        .def("getAttentionFactor", &Acetylcholine::getAttentionFactor)
+        .def("setAttentionFactor", &Acetylcholine::setAttentionFactor, py::arg("factor"));
+
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator - arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName)
+        .def("getLevel", &Norepinephrine::getLevel)
+        .def("setLevel", &Norepinephrine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor)
+        .def("update", &Norepinephrine::update, py::arg("dt"))
+        .def("signalArousal", &Norepinephrine::signalArousal, py::arg("arousal"))
+        .def("increaseVigilance", &Norepinephrine::increaseVigilance, py::arg("vigilance"))
+        .def("setStressLevel", &Norepinephrine::setStressLevel, py::arg("stress"))
+        .def("getStressLevel", &Norepinephrine::getStressLevel)
+        .def("getVigilanceFactor", &Norepinephrine::getVigilanceFactor)
+        .def("setVigilanceFactor", &Norepinephrine::setVigilanceFactor, py::arg("factor"));
+
+    py::class_<Serotonin>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator - mood, impulsivity, and social behavior)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Serotonin::getName)
+        .def("getLevel", &Serotonin::getLevel)
+        .def("setLevel", &Serotonin::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor)
+        .def("update", &Serotonin::update, py::arg("dt"))
+        .def("signalReward", &Serotonin::signalReward, py::arg("reward"))
+        .def("signalPunishment", &Serotonin::signalPunishment, py::arg("punishment"))
+        .def("increaseSocialEngagement", &Serotonin::increaseSocialEngagement, py::arg("sociality"))
+        .def("getImpulsivityFactor", &Serotonin::getImpulsivityFactor)
+        .def("setImpulsivityFactor", &Serotonin::setImpulsivityFactor, py::arg("factor"))
+        .def("getSocialFactor", &Serotonin::getSocialFactor)
+        .def("setSocialFactor", &Serotonin::setSocialFactor, py::arg("factor"))
+        .def("getDominantMood", &Serotonin::getDominantMood);
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator - exploration motivation)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Curiosity::getName)
+        .def("getLevel", &Curiosity::getLevel)
+        .def("setLevel", &Curiosity::setLevel, py::arg("level"))
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"))
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive)
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"))
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"))
+        .def("reset", &Curiosity::reset);
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty neuromodulator - novelty detection)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Novelty::getName)
+        .def("getLevel", &Novelty::getLevel)
+        .def("setLevel", &Novelty::setLevel, py::arg("level"))
+        .def("detectNovelty", &Novelty::detectNovelty)
+        .def("update", &Novelty::update, py::arg("dt"))
+        .def("getHistory", &Novelty::getHistory)
+        .def("clearHistory", &Novelty::clearHistory);
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &PredictionError::getName)
+        .def("getLevel", &PredictionError::getLevel)
+        .def("setLevel", &PredictionError::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &PredictionError::getPlasticityFactor)
+        .def("update", &PredictionError::update, py::arg("dt"))
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"))
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("newPrediction"))
+        .def("getHistory", &PredictionError::getHistory)
+        .def("clearHistory", &PredictionError::clearHistory);
+
+    // Phase 6 Experiment bindings
+    py::class_<Phase6Config>(m, "Phase6Config", R"pbdoc(Configuration for Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &Phase6Config::connectionProbability)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &Phase6Config::checkpointPath);
+
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", R"pbdoc(Result of Phase 6 integration experiment)pbdoc")
+        .def_readonly("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readonly("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readonly("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readonly("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readonly("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readonly("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readonly("replayWorks", &Phase6IntegrationResult::replayWorks)
+        .def_readonly("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readonly("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readonly("avgSynapticWeight", &Phase6IntegrationResult::avgSynapticWeight)
+        .def_readonly("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readonly("noveltyLevel", &Phase6IntegrationResult::noveltyLevel)
+        .def_readonly("curiosityLevel", &Phase6IntegrationResult::curiosityLevel)
+        .def_readonly("dopamineLevel", &Phase6IntegrationResult::dopamineLevel);
+
+    // Helper functions
+    m.def("runPhase6Integration", []() -> Phase6IntegrationResult {
+        Phase6IntegratedExperiment experiment;
+        Phase6Config config;
+        return experiment.run(config);
+    }, "Run the complete Phase 6 integration experiment");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Utility functions
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
