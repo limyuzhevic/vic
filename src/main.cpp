@@ -1,51 +1,42 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This program provides a comprehensive command-line interface for NLM.
+// Use 'nlm --help' to see available commands and options.
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
+#include "cli/CLI.hpp"
 #include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+int main(int argc, char** argv) {
+    try {
+        cli::CLI cli(argc, argv);
+        
+        // Register available subcommands
+        cli.registerSubcommand(std::make_unique<cli::VersionSubcommand>());
+        cli.registerSubcommand(std::make_unique<cli::ConfigSubcommand>());
+        cli.registerSubcommand(std::make_unique<cli::BenchmarkSubcommand>());
+        
+        // Parse and execute
+        if (!cli.parseArguments(argc, argv)) {
+            std::cerr << "Failed to parse command line arguments." << std::endl;
+            return 1;
+        }
+        
+        if (!cli.execute()) {
+            std::cerr << "Command execution failed." << std::endl;
+            return 1;
+        }
+        
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "ERROR: Unknown exception occurred." << std::endl;
+        return 1;
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
