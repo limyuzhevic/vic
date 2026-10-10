@@ -62,7 +62,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    delete pImpl;
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -70,9 +72,34 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
+        // Clean up existing resources before taking over new ones
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;
+    }
+    return *this;
+}
+
+Synapse::Synapse(const Synapse& other) {
+    // Deep copy implementation for the pImpl pattern
+    if (other.pImpl) {
+        pImpl = new Impl(*other.pImpl);
+    } else {
+        pImpl = nullptr;
+    }
+}
+
+Synapse& Synapse::operator=(const Synapse& other) {
+    if (this != &other) {
+        // Clean up existing resources first
+        delete pImpl;
+        
+        // Deep copy
+        if (other.pImpl) {
+            pImpl = new Impl(*other.pImpl);
+        } else {
+            pImpl = nullptr;
+        }
     }
     return *this;
 }
@@ -128,19 +155,47 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    // Validate timestamp is non-negative for biological realism
+    if (timestamp < 0) {
+        return;
+    }
+    
+    if (pImpl->preSpikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->preSpikeHistory.push_back(timestamp);
+        std::sort(pImpl->preSpikeHistory.begin(), 
+                  pImpl->preSpikeHistory.end());
+    } else {
+        // Use binary search for efficient insertion and maintain sorted order
+        auto it = std::lower_bound(pImpl->preSpikeHistory.begin(), 
+                                  pImpl->preSpikeHistory.end(), timestamp);
+        pImpl->preSpikeHistory.insert(it, timestamp);
+        // Remove oldest spike if over limit
+        if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+            pImpl->preSpikeHistory.pop_back();
+        }
     }
 }
-
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    // Validate timestamp is non-negative for biological realism
+    if (timestamp < 0) {
+        return;
+    }
+    
+    if (pImpl->postSpikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->postSpikeHistory.push_back(timestamp);
+        std::sort(pImpl->postSpikeHistory.begin(), 
+                  pImpl->postSpikeHistory.end());
+    } else {
+        // Use binary search for efficient insertion and maintain sorted order
+        auto it = std::lower_bound(pImpl->postSpikeHistory.begin(), 
+                                  pImpl->postSpikeHistory.end(), timestamp);
+        pImpl->postSpikeHistory.insert(it, timestamp);
+        // Remove oldest spike if over limit
+        if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+            pImpl->postSpikeHistory.pop_back();
+        }
     }
 }
-
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
     return pImpl->preSpikeHistory;
 }

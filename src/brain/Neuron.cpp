@@ -148,9 +148,24 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
+    // Validate timestamp is positive for biological realism
+    if (timestamp < 0) {
+        return;
+    }
+    
+    // Check if spike already recorded (prevent duplicates)
+    auto it = std::lower_bound(pImpl->spikeHistory.begin(), 
+                              pImpl->spikeHistory.end(), timestamp);
+    if (it != pImpl->spikeHistory.end() && *it == timestamp) {
+        return; // Spike already recorded
+    }
+    
+    // Insert maintaining sorted order for efficient spike analysis
+    pImpl->spikeHistory.insert(it, timestamp);
+    
+    // Limit history size to prevent memory leaks
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        pImpl->spikeHistory.pop_back();
     }
 }
 

@@ -321,24 +321,198 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+void printHelp() {
     printBanner();
+    std::cout << R"(
+USAGE: nlm [OPTIONS]
+
+Options:
+  --config <file>          Load configuration from file
+  --neuron-count <N>       Number of neurons (default: 500)
+  --region-count <N>       Number of brain regions (default: 1)
+  --timestep <sec>          Simulation timestep in seconds (default: 0.001)
+  --seed <N>               Random seed for reproducibility (default: 42)
+  --stdp-ltp <weight>       STDP LTP weight (default: 0.02)
+  --stdp-ltd <weight>       STDP LTD weight (default: 0.015)
+  --stdp-tau <tau>          STDP time constant (default: 20.0)
+  --synaptogenesis <rate>   Structural synaptogenesis rate (default: 0.0001)
+  --pruning <rate>          Structural pruning rate (default: 0.00001)
+  --help                    Show this help message
+  --version                 Show version information
+
+Examples:
+  nlm --neuron-count 1000 --seed 123
+  nlm --config myconfig.cfg --timestep 0.0001
+  nlm --stdp-ltp 0.05 --stdp-ltd 0.02
+
+Phase 2 implements:
+  ✓ Real LIF neuron dynamics
+  ✓ Event-driven spike propagation with delays
+  ✓ STDP and Hebbian plasticity rules
+  ✓ Structural plasticity (synaptogenesis/pruning)
+  ✓ Learning experiment with measurable weight changes
+  ✓ Network activity-dependent synaptic modification
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Neural Learning Machine v0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Real Spiking Neural Computation with Integrated Plasticity" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+}
+
+void validateConfiguration(const Config& config) {
+    // Validate configuration values for biological realism
+    auto neuronCount = config.getOr<size_t>("neuron_count", 500);
+    if (neuronCount < 10) {
+        NLM_LOG_WARN("Warning: Low neuron count may not produce meaningful results");
+    }
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    auto regionCount = config.getOr<size_t>("region_count", 1);
+    if (regionCount < 1) {
+        NLM_LOG_WARN("Warning: Region count must be at least 1");
+    }
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    auto timestep = config.getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        NLM_LOG_WARN("Warning: Timestep should be positive and reasonably small");
+    }
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    auto connectionProb = config.getOr<float>("connection_probability", 0.15f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_WARN("Warning: Connection probability should be between 0 and 1");
+    }
+    
+    // Validate STDP parameters
+    auto stdpLtp = config.getOr<float>("stdp_ltp_weight", 0.02f);
+    auto stdpLtd = config.getOr<float>("stdp_ltd_weight", 0.015f);
+    auto stdpTau = config.getOr<float>("stdp_tau", 20.0f);
+    
+    if (stdpLtp <= 0.0f) {
+        NLM_LOG_WARN("Warning: STDP LTP weight should be positive");
+    }
+    
+    if (stdpLtd <= 0.0f) {
+        NLM_LOG_WARN("Warning: STDP LTD weight should be positive");
+    }
+    
+    if (stdpTau <= 0.0f) {
+        NLM_LOG_WARN("Warning: STDP time constant should be positive");
+    }
+}
+
+std::string parseArgs(int argc, char** argv, std::string& configFile) {
+    // First pass: find config file
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            printHelp();
+            exit(0);
+        } else if (arg == "--version") {
+            printVersion();
+            exit(0);
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    
+    // Second pass: process other arguments and update config
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") continue;
+        if (arg == "--version") continue;
+        
+        // Handle options with and without '=' syntax
+        if (arg.substr(0, 7) == "--config") continue;
+        
+        size_t pos = arg.find('=');
+        std::string key, value;
+        if (pos != std::string::npos) {
+            key = arg.substr(0, pos);
+            value = arg.substr(pos + 1);
+        } else {
+            // Option without '=' value must be next argument
+            if (i + 1 >= argc) {
+                NLM_LOG_WARN("Warning: Missing value for option " + arg);
+                continue;
+            }
+            key = arg;
+            value = argv[++i];
+        }
+        
+        // Process known options
+        if (key == "--neuron-count") {
+            try {
+                size_t val = std::stoul(value);
+                config->set("neuron_count", static_cast<int64_t>(val), ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid neuron count value: " + value);
+            }
+        } else if (key == "--region-count") {
+            try {
+                size_t val = std::stoul(value);
+                config->set("region_count", static_cast<int64_t>(val), ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid region count value: " + value);
+            }
+        } else if (key == "--timestep") {
+            try {
+                double val = std::stod(value);
+                config->set("simulation_timestep", val, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid timestep value: " + value);
+            }
+        } else if (key == "--seed") {
+            try {
+                uint64_t val = std::stoull(value);
+                config->set("random_seed", static_cast<int64_t>(val), ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid seed value: " + value);
+            }
+        } else if (key == "--stdp-ltp") {
+            try {
+                float val = std::stof(value);
+                config->set("stdp_ltp_weight", val, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid STDP LTP weight value: " + value);
+            }
+        } else if (key == "--stdp-ltd") {
+            try {
+                float val = std::stof(value);
+                config->set("stdp_ltd_weight", val, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid STDP LTD weight value: " + value);
+            }
+        } else if (key == "--stdp-tau") {
+            try {
+                float val = std::stof(value);
+                config->set("stdp_tau", val, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid STDP tau value: " + value);
+            }
+        } else if (key == "--synaptogenesis") {
+            try {
+                float val = std::stof(value);
+                config->set("synaptogenesis_rate", val, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid synaptogenesis rate value: " + value);
+            }
+        } else if (key == "--pruning") {
+            try {
+                float val = std::stof(value);
+                config->set("pruning_rate", val, ConfigSource::CommandLine);
+            } catch (...) {
+                NLM_LOG_WARN("Warning: Invalid pruning rate value: " + value);
+            }
+        }
+    }
+    
+    return configFile;
+}
     
     // Load configuration
     auto config = std::make_shared<Config>();

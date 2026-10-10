@@ -13,15 +13,15 @@ class Neuron;
 class Synapse {
 public:
     // Create synapse with IDs
-    Synapse(SynapseId id, NeuronId source, NeuronId destination);
+    explicit Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
     ~Synapse();
     
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    Synapse(Synapse&& other) noexcept;
+    Synapse& operator=(Synapse&& other) noexcept;
     
     // Identity
     SynapseId getId() const;
