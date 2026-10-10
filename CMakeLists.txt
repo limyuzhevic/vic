@@ -6,17 +6,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
+# Find dependencies
+find_package(nlohmann_json 3.11.0 REQUIRED)
+find_package(yaml-cpp 0.7.0 REQUIRED)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -26,6 +25,8 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Exceptions/NLMExceptions.cpp
+    src/core/Validation/ConfigValidator.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -87,25 +88,28 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+# Include dependency directories
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
-)
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+# Add nlohmann_json and yaml-cpp include directories
+if(TARGET nlohmann_json::nlohmann_json)
+    target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
+else()
+    target_include_directories(nlm_core PUBLIC ${nlohmann_json_INCLUDE_DIRS})
+endif()
+
+target_include_directories(nlm_core PUBLIC ${yaml-cpp_INCLUDE_DIRS})
+target_link_libraries(nlm_core PUBLIC yaml-cpp)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_link_libraries(nlm_world PUBLIC nlm_core yaml-cpp)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC

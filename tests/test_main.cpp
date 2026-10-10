@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Updated to include comprehensive error handling and validation tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +38,18 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_error_handling {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << std::endl;
+    std::cout << "  - Error Handling and Validation" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +120,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Error Handling and Validation tests..." << std::endl;
+    try {
+        test_error_handling::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

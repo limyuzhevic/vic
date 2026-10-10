@@ -8,6 +8,8 @@
 // - Structural plasticity (synaptogenesis/pruning)
 
 #include "core/Config/Config.hpp"
+#include "core/Exceptions/NLMExceptions.hpp"
+#include "core/Validation/ConfigValidator.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -25,6 +27,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include "CLI11.hpp"
 
 using namespace nlm;
 
@@ -326,9 +329,80 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Initialize CLI11
+    CLI::App app("NLM - Neural Learning Machine (熙然)");
+    
+    // Configuration options
+    std::string configFile = "configs/default.cfg";
+    app.add_option("-c,--config", configFile, "Configuration file path")->default_val("configs/default.cfg");
+    
+    // Enable verbose logging
+    bool verbose = false;
+    app.add_flag("--verbose, -v", verbose, "Enable verbose logging");
+    
+    // Simulation parameters
+    int64_t neuronCount = 500;
+    int64_t regionCount = 1;
+    double simulationTimestep = 0.001;
+    double connectionProbability = 0.15;
+    
+    app.add_option("--neuron-count", neuronCount, "Number of neurons in the brain");
+    app.add_option("--region-count", regionCount, "Number of brain regions");
+    app.add_option("--simulation-timestep", simulationTimestep, "Simulation timestep in seconds");
+    app.add_option("--connection-probability", connectionProbability, "Connection probability for random connectivity");
+    
+    // STDP parameters
+    double stdpLtpWeight = 0.02;
+    double stdpLtdWeight = 0.015;
+    double stdpTau = 20.0;
+    
+    app.add_option("--stdp-ltp-weight", stdpLtpWeight, "STDP LTP weight");
+    app.add_option("--stdp-ltd-weight", stdpLtdWeight, "STDP LTD weight");
+    app.add_option("--stdp-tau", stdpTau, "STDP time constant");
+    
+    // Structural plasticity parameters
+    double synaptogenesisRate = 0.0001;
+    double pruningRate = 0.00001;
+    
+    app.add_option("--synaptogenesis-rate", synaptogenesisRate, "Synaptogenesis rate");
+    app.add_option("--pruning-rate", pruningRate, "Pruning rate");
+    
+    // Environment parameters
+    std::string environmentName = "GridWorld";
+    int64_t environmentWidth = 10;
+    int64_t environmentHeight = 10;
+    
+    app.add_option("--environment-name", environmentName, "Environment name");
+    app.add_option("--environment-width", environmentWidth, "Environment width");
+    app.add_option("--environment-height", environmentHeight, "Environment height");
+    
+    // Simulation parameters
+    int64_t maxSimulationSteps = 10000;
+    double simulationTimeLimit = 0.0;
+    
+    app.add_option("--max-simulation-steps", maxSimulationSteps, "Maximum simulation steps");
+    app.add_option("--simulation-time-limit", simulationTimeLimit, "Simulation time limit in seconds");
+    
+    // Visualization parameters
+    bool visualizationEnabled = false;
+    double visualizationUpdateRate = 30.0;
+    
+    app.add_flag("--visualization-enabled", visualizationEnabled, "Enable visualization");
+    app.add_option("--visualization-update-rate", visualizationUpdateRate, "Visualization update rate in Hz");
+    
+    // Random seed
+    int64_t randomSeed = 42;
+    app.add_option("--random-seed", randomSeed, "Random seed for reproducible experiments");
+    
+    // Parse command line arguments
+    CLI11_PARSE(app, argc, argv)
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    }
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -343,19 +417,6 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
@@ -363,24 +424,37 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("random_seed", randomSeed, ConfigSource::Default);
+    config->set("simulation_timestep", simulationTimestep, ConfigSource::Default);
+    config->set("neuron_count", neuronCount, ConfigSource::Default);
+    config->set("region_count", regionCount, ConfigSource::Default);
+    config->set("connection_probability", connectionProbability, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", stdpLtpWeight, ConfigSource::Default);
+    config->set("stdp_ltd_weight", stdpLtdWeight, ConfigSource::Default);
+    config->set("stdp_tau", stdpTau, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", synaptogenesisRate, ConfigSource::Default);
+    config->set("pruning_rate", pruningRate, ConfigSource::Default);
+    
+    // Environment parameters
+    config->set("environment_name", environmentName, ConfigSource::Default);
+    config->set("environment_width", environmentWidth, ConfigSource::Default);
+    config->set("environment_height", environmentHeight, ConfigSource::Default);
+    
+    // Simulation parameters
+    config->set("max_simulation_steps", maxSimulationSteps, ConfigSource::Default);
+    config->set("simulation_time_limit", simulationTimeLimit, ConfigSource::Default);
+    
+    // Visualization parameters
+    config->set("visualization_enabled", visualizationEnabled, ConfigSource::Default);
+    config->set("visualization_update_rate", visualizationUpdateRate, ConfigSource::Default);
+    
+    // Load from environment variables
+    config->loadFromEnvironment("NLM_");
     
     // Log configuration summary
     NLM_LOG_INFO("");

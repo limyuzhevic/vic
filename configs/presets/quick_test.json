@@ -1,0 +1,11 @@
+{
+  "random_seed": 42,
+  "simulation_timestep": 0.001,
+  "neuron_count": 100,
+  "region_count": 1,
+  "connection_probability": 0.1,
+  "stdp_ltp_weight": 0.01,
+  "stdp_ltd_weight": 0.012,
+  "stdp_tau": 10.0,
+  "visualization_enabled": false
+}

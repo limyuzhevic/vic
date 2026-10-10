@@ -1,0 +1,31 @@
+{
+  "description": "Basic NLM configuration template",
+  "version": "2.0",
+  "parameters": {
+    "random_seed": {
+      "type": "integer64",
+      "default": 42,
+      "description": "Random seed for reproducible experiments"
+    },
+    "simulation_timestep": {
+      "type": "float",
+      "default": 0.001,
+      "description": "Simulation timestep in seconds"
+    },
+    "neuron_count": {
+      "type": "integer64",
+      "default": 500,
+      "description": "Number of neurons in the brain"
+    },
+    "region_count": {
+      "type": "integer64",
+      "default": 1,
+      "description": "Number of brain regions"
+    },
+    "connection_probability": {
+      "type": "float",
+      "default": 0.15,
+      "description": "Connection probability for random connectivity"
+    }
+  }
+}

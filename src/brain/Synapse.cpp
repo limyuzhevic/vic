@@ -1,4 +1,6 @@
 #include "Synapse.hpp"
+#include "../core/Exceptions/NLMExceptions.hpp"
+#include "../core/Validation/ConfigValidator.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -98,9 +100,20 @@ void Synapse::setWeight(SynapticWeight weight) {
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Validate weight change against bounds
+    float newWeight = pImpl->weight + delta;
+    
+    if (newWeight < Impl::MIN_WEIGHT) {
+        throw SynapseException(ErrorCode::SYNAPSE_WEIGHT_BOUNDS_VIOLATION,
+            "Weight cannot be decreased below minimum: " + std::to_string(newWeight) + " < " + std::to_string(Impl::MIN_WEIGHT));
+    }
+    if (newWeight > Impl::MAX_WEIGHT) {
+        throw SynapseException(ErrorCode::SYNAPSE_WEIGHT_BOUNDS_VIOLATION,
+            "Weight cannot be increased above maximum: " + std::to_string(newWeight) + " > " + std::to_string(Impl::MAX_WEIGHT));
+    }
+    
+    // Apply weight change
+    pImpl->weight = newWeight;
 }
 
 Delay Synapse::getDelay() const {

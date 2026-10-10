@@ -1,0 +1,171 @@
+{
+  "description": "Complete documentation for NLM configuration parameters",
+  "version": "2.0",
+  "parameters": {
+    "random_seed": {
+      "type": "integer64",
+      "default": 42,
+      "description": "Random seed for reproducible experiments",
+      "range": {"min": 0, "max": 2147483647},
+      "category": "simulation",
+      "required": false
+    },
+    "simulation_timestep": {
+      "type": "float",
+      "default": 0.001,
+      "description": "Simulation timestep in seconds",
+      "range": {"min": 0.0001, "max": 1.0},
+      "category": "simulation",
+      "required": false
+    },
+    "neuron_count": {
+      "type": "integer64",
+      "default": 500,
+      "description": "Number of neurons in the brain",
+      "range": {"min": 1, "max": 1000000},
+      "category": "brain",
+      "required": false
+    },
+    "region_count": {
+      "type": "integer64",
+      "default": 1,
+      "description": "Number of brain regions",
+      "range": {"min": 1, "max": 1000},
+      "category": "brain",
+      "required": false
+    },
+    "connection_probability": {
+      "type": "float",
+      "default": 0.15,
+      "description": "Connection probability for random connectivity",
+      "range": {"min": 0.0, "max": 1.0},
+      "category": "connectivity",
+      "required": false
+    },
+    "stdp_ltp_weight": {
+      "type": "float",
+      "default": 0.02,
+      "description": "STDP LTP weight",
+      "range": {"min": 0.0, "max": 0.1},
+      "category": "plasticity",
+      "required": false
+    },
+    "stdp_ltd_weight": {
+      "type": "float",
+      "default": 0.015,
+      "description": "STDP LTD weight",
+      "range": {"min": 0.0, "max": 0.1},
+      "category": "plasticity",
+      "required": false
+    },
+    "stdp_tau": {
+      "type": "float",
+      "default": 20.0,
+      "description": "STDP time constant",
+      "range": {"min": 1.0, "max": 100.0},
+      "category": "plasticity",
+      "required": false
+    },
+    "synaptogenesis_rate": {
+      "type": "float",
+      "default": 0.0001,
+      "description": "Synaptogenesis rate",
+      "range": {"min": 0.0, "max": 1.0},
+      "category": "development",
+      "required": false
+    },
+    "pruning_rate": {
+      "type": "float",
+      "default": 0.00001,
+      "description": "Pruning rate",
+      "range": {"min": 0.0, "max": 1.0},
+      "category": "development",
+      "required": false
+    },
+    "environment_name": {
+      "type": "string",
+      "default": "GridWorld",
+      "description": "Environment name",
+      "category": "environment",
+      "required": false
+    },
+    "environment_width": {
+      "type": "integer64",
+      "default": 10,
+      "description": "Environment width",
+      "range": {"min": 1, "max": 1000},
+      "category": "environment",
+      "required": false
+    },
+    "environment_height": {
+      "type": "integer64",
+      "default": 10,
+      "description": "Environment height",
+      "range": {"min": 1, "max": 1000},
+      "category": "environment",
+      "required": false
+    },
+    "log_level": {
+      "type": "string",
+      "default": "INFO",
+      "description": "Logging level (Debug, Info, Warning, Error)",
+      "category": "logging",
+      "required": false
+    },
+    "log_to_file": {
+      "type": "boolean",
+      "default": false,
+      "description": "Log to file",
+      "category": "logging",
+      "required": false
+    },
+    "log_filename": {
+      "type": "string",
+      "default": "nlm.log",
+      "description": "Log filename",
+      "category": "logging",
+      "required": false
+    },
+    "max_simulation_steps": {
+      "type": "integer64",
+      "default": 10000,
+      "description": "Maximum simulation steps",
+      "range": {"min": 0, "max": 1000000},
+      "category": "simulation",
+      "required": false
+    },
+    "simulation_time_limit": {
+      "type": "float",
+      "default": 0.0,
+      "description": "Simulation time limit in seconds",
+      "range": {"min": 0.0, "max": 1000000.0},
+      "category": "simulation",
+      "required": false
+    },
+    "visualization_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable visualization",
+      "category": "visualization",
+      "required": false
+    },
+    "visualization_update_rate": {
+      "type": "float",
+      "default": 30.0,
+      "description": "Visualization update rate in Hz",
+      "range": {"min": 0.0, "max": 1000.0},
+      "category": "visualization",
+      "required": false
+    }
+  },
+  "categories": {
+    "simulation": "Simulation parameters",
+    "brain": "Brain structure parameters",
+    "connectivity": "Connectivity parameters",
+    "plasticity": "Plasticity parameters",
+    "development": "Development parameters",
+    "environment": "Environment parameters",
+    "logging": "Logging parameters",
+    "visualization": "Visualization parameters"
+  }
+}

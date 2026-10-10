@@ -1,0 +1,21 @@
+{
+  "random_seed": 999,
+  "simulation_timestep": 0.0005,
+  "neuron_count": 2000,
+  "region_count": 2,
+  "connection_probability": 0.2,
+  "stdp_ltp_weight": 0.025,
+  "stdp_ltd_weight": 0.01,
+  "stdp_tau": 15.0,
+  "synaptogenesis_rate": 5e-05,
+  "pruning_rate": 2e-05,
+  "environment_name": "CorticalColumns",
+  "environment_width": 30,
+  "environment_height": 30,
+  "visualization_enabled": false,
+  "log_level": "Debug",
+  "log_to_file": true,
+  "log_filename": "nlm_research.log",
+  "max_simulation_steps": 50000,
+  "simulation_time_limit": 1000.0
+}

@@ -1,4 +1,6 @@
 #include "Neuron.hpp"
+#include "../core/Exceptions/NLMExceptions.hpp"
+#include "../core/Validation/ConfigValidator.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -63,6 +65,22 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    // Validate threshold against biophysical constraints
+    if (threshold < -100.0f) {
+        throw NeuronException(ErrorCode::NEURON_VALIDATION_FAILED,
+            "Threshold too low: " + std::to_string(threshold) + " (minimum: -100.0)");
+    }
+    if (threshold > 50.0f) {
+        throw NeuronException(ErrorCode::NEURON_VALIDATION_FAILED,
+            "Threshold too high: " + std::to_string(threshold) + " (maximum: 50.0)");
+    }
+    
+    // Ensure threshold is greater than resting potential
+    if (threshold <= pImpl->state.restingPotential) {
+        throw NeuronException(ErrorCode::NEURON_VALIDATION_FAILED,
+            "Threshold must be greater than resting potential: " + std::to_string(threshold) + " <= " + std::to_string(pImpl->state.restingPotential));
+    }
+    
     pImpl->state.threshold = threshold;
 }
 

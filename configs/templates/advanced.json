@@ -1,0 +1,81 @@
+{
+  "description": "Advanced NLM configuration template with plasticity",
+  "version": "2.0",
+  "parameters": {
+    "random_seed": {
+      "type": "integer64",
+      "default": 12345,
+      "description": "Random seed for reproducible experiments"
+    },
+    "simulation_timestep": {
+      "type": "float",
+      "default": 0.001,
+      "description": "Simulation timestep in seconds"
+    },
+    "neuron_count": {
+      "type": "integer64",
+      "default": 2000,
+      "description": "Number of neurons in the brain"
+    },
+    "region_count": {
+      "type": "integer64",
+      "default": 2,
+      "description": "Number of brain regions"
+    },
+    "connection_probability": {
+      "type": "float",
+      "default": 0.2,
+      "description": "Connection probability for random connectivity"
+    },
+    "stdp_ltp_weight": {
+      "type": "float",
+      "default": 0.02,
+      "description": "STDP LTP weight"
+    },
+    "stdp_ltd_weight": {
+      "type": "float",
+      "default": 0.015,
+      "description": "STDP LTD weight"
+    },
+    "stdp_tau": {
+      "type": "float",
+      "default": 20.0,
+      "description": "STDP time constant"
+    },
+    "synaptogenesis_rate": {
+      "type": "float",
+      "default": 0.0001,
+      "description": "Synaptogenesis rate"
+    },
+    "pruning_rate": {
+      "type": "float",
+      "default": 1e-05,
+      "description": "Pruning rate"
+    },
+    "environment_name": {
+      "type": "string",
+      "default": "GridWorld",
+      "description": "Environment name"
+    },
+    "environment_width": {
+      "type": "integer64",
+      "default": 20,
+      "description": "Environment width"
+    },
+    "environment_height": {
+      "type": "integer64",
+      "default": 20,
+      "description": "Environment height"
+    },
+    "visualization_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable visualization"
+    },
+    "visualization_update_rate": {
+      "type": "float",
+      "default": 60.0,
+      "description": "Visualization update rate in Hz"
+    }
+  }
+}
