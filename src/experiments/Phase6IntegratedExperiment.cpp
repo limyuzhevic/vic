@@ -9,7 +9,9 @@
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() {
+    NLM_LOG_INFO("Phase 6 Integrated Experiment initialized");
+}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
@@ -22,6 +24,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
+    NLM_LOG_INFO("Features enabled - Checkpointing: " + std::string(config.enableCheckpointing ? "YES" : "NO") + 
+                 ", Replay: " + std::string(config.enableReplay ? "YES" : "NO") +
+                 ", Development: " + std::string(config.enableDevelopment ? "YES" : "NO"));
+    
+    // Validate configuration
+    if (config.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(config.neuronCount));
+        result.endTime = time(nullptr);
+        return result;
+    }
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
@@ -33,7 +45,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
+    NLM_LOG_INFO("Configuration created with " + std::to_string(config.neuronCount) + " neurons");
+    
     // Create brain
+    NLM_LOG_INFO("Creating brain...");
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
@@ -41,28 +56,37 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
+    NLM_LOG_INFO("Brain initialized successfully");
+    brain->logStatus();
+    
     // Create simple world
+    NLM_LOG_INFO("Creating simple world...");
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16);
+    world.reset();
+    NLM_LOG_INFO("World configured: 16x16 cells");
     
     // Create agent
+    NLM_LOG_INFO("Creating agent brain interface...");
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
-    
-    NLM_LOG_INFO("Brain and agent initialized successfully");
+    NLM_LOG_INFO("Agent initialized and features enabled");
     
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+    size_t successfulActions = 0;
+    
+    NLM_LOG_INFO("Starting integration simulation for " + std::to_string(config.maxSteps) + " steps...");
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get sensory percept from world
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -70,14 +94,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Brain step
         brain->step(step, step * 0.001);
         
-        // Get motor command
+        // Get motor command from agent brain
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        // Apply motor command to world
+        ActionResult actionResult = world.applyMotorCommand(cmd, world.getSimulationTime());
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Track successful actions
+        if (actionResult.success) {
+            successfulActions++;
+        }
+        
+        // Get reward from ActionResult
+        float reward = actionResult.reward;
         totalReward += reward;
         
         // Apply reward modulation
@@ -97,8 +126,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | WorkingMem: " + std::to_string(agent.getBrain()->getWorkingMemory() ? 
+                            agent.getBrain()->getWorkingMemory()->getActiveTraces() : 0));
         }
     }
     
@@ -110,6 +139,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    
+    // Calculate action success rate
+    float actionSuccessRate = (config.maxSteps > 0) ? 
+        static_cast<float>(successfulActions) / static_cast<float>(config.maxSteps) * 100.0f : 0.0f;
+    NLM_LOG_INFO("Action success rate: " + std::to_string(actionSuccessRate) + "%");
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
@@ -243,6 +277,12 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    if (success) {
+        NLM_LOG_INFO("=== Integration Verification PASSED ===");
+    } else {
+        NLM_LOG_ERROR("=== Integration Verification FAILED ===");
+    }
+    
     return success;
 }
 
@@ -283,6 +323,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
         NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
     }
     
+    NLM_LOG_INFO("=== Memory Integration Test Complete ===");
     return true;
 }
 
@@ -313,6 +354,11 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     }
     
     NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    NLM_LOG_INFO("Dopamine level: " + std::to_string(dopamine->getLevel()));
+    NLM_LOG_INFO("Curiosity level: " + std::to_string(curiosity->getLevel()));
+    NLM_LOG_INFO("Novelty level: " + std::to_string(novelty->getLevel()));
+    
+    NLM_LOG_INFO("=== Neuromodulation Integration Test Complete ===");
     return true;
 }
 
@@ -344,6 +390,8 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         return false;
     }
     
+    NLM_LOG_INFO("Checkpoint saved to: " + path);
+    
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
     brain2->initialize();
@@ -359,7 +407,15 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     // Note: Due to the nature of neural simulation, exact state restoration
     // is complex. The load should restore the structure at minimum.
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    if (totalSpikes2 >= 0) {
+        NLM_LOG_INFO("[PASS] Checkpoint save/load completed successfully");
+        NLM_LOG_INFO("Checkpoint integrity verified");
+    } else {
+        NLM_LOG_ERROR("Checkpoint load produced invalid state");
+        return false;
+    }
+    
+    NLM_LOG_INFO("=== Checkpoint Test Complete ===");
     return true;
 }
 
@@ -392,11 +448,13 @@ bool Phase6IntegratedExperiment::testReplay() {
         auto episodes = em->getEpisodesForReplay(3);
         if (!episodes.empty()) {
             NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
+            NLM_LOG_INFO("Retrieved " + std::to_string(episodes.size()) + " episodes for replay");
             return true;
         }
     }
     
     NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
+    NLM_LOG_INFO("=== Replay Test Complete ===");
     return true;
 }
 

@@ -62,6 +62,59 @@ std::string LifetimeExperimentResult::summary() const {
 }
 
 // ============================================================================
+// LifetimeExperimentResult
+// ============================================================================
+
+std::string LifetimeExperimentResult::toJSON() const {
+    std::ostringstream oss;
+    oss << "{\n";
+    oss << "  \"totalReward\": " << totalReward << ",\n";
+    oss << "  \"avgRewardPerStep\": " << avgRewardPerStep << ",\n";
+    oss << "  \"overallLearningEfficiency\": " << overallLearningEfficiency << ",\n";
+    oss << "  \"finalPerformance\": " << finalPerformance << ",\n";
+    oss << "  \"memoryCapacity\": " << memoryCapacity << ",\n";
+    oss << "  \"predictionAccuracy\": " << predictionAccuracy << ",\n";
+    oss << "  \"generalizationAbility\": " << generalizationAbility << ",\n";
+    oss << "  \"phases\": [\n";
+    
+    for (size_t i = 0; i < phaseResults.size(); ++i) {
+        const auto& phase = phaseResults[i];
+        oss << "    {\n";
+        oss << "      \"name\": \"" << phase.phaseName << "\",\n";
+        oss << "      \"startStep\": " << phase.startStep << ",\n";
+        oss << "      \"endStep\": " << phase.endStep << ",\n";
+        oss << "      \"reward\": " << phase.totalReward << "\n";
+        oss << "    }";
+        if (i < phaseResults.size() - 1) oss << ",";
+        oss << "\n";
+    }
+    
+    oss << "  ]\n";
+    oss << "}\n";
+    return oss.str();
+}
+
+std::string LifetimeExperimentResult::summary() const {
+    std::ostringstream oss;
+    oss << "=== NLM Phase 5 Lifetime Experiment Results ===\n\n";
+    oss << "Total Reward: " << std::fixed << std::setprecision(2) << totalReward << "\n";
+    oss << "Avg Reward/Step: " << avgRewardPerStep << "\n";
+    oss << "Learning Efficiency: " << overallLearningEfficiency << "\n\n";
+    oss << "Final Capabilities:\n";
+    oss << "  Performance: " << finalPerformance << "\n";
+    oss << "  Memory: " << memoryCapacity << "\n";
+    oss << "  Prediction: " << predictionAccuracy << "\n";
+    oss << "  Generalization: " << generalizationAbility << "\n\n";
+    oss << "Phases:\n";
+    for (const auto& phase : phaseResults) {
+        oss << "  " << phase.phaseName << ": steps " << phase.startStep 
+            << "-" << phase.endStep << ", reward=" << std::fixed << std::setprecision(2) 
+            << phase.totalReward << "\n";
+    }
+    return oss.str();
+}
+
+// ============================================================================
 // Phase5IntegratedExperiment
 // ============================================================================
 
