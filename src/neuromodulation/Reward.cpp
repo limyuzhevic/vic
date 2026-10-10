@@ -10,9 +10,22 @@ struct Reward::Impl {
     Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
 };
 
-Reward::Reward() : pImpl(new Impl) {}
+Reward::~Reward() {
+    delete pImpl;
+}
 
-Reward::~Reward() = default;
+Reward::Reward(Reward&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Reward& Reward::operator=(Reward&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 float Reward::getValue() const {
     return pImpl->currentValue;

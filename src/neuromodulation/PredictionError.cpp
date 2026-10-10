@@ -14,9 +14,22 @@ struct PredictionError::Impl {
     Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
 };
 
-PredictionError::PredictionError() : pImpl(new Impl) {}
+PredictionError::~PredictionError() {
+    delete pImpl;
+}
 
-PredictionError::~PredictionError() = default;
+PredictionError::PredictionError(PredictionError&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+PredictionError& PredictionError::operator=(PredictionError&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 void PredictionError::initialize(Brain* brain) {
     pImpl->brain = brain;

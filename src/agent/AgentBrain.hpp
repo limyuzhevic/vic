@@ -69,6 +69,21 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== PHASE 6: ADDITIONAL AGENT BRAIN METHODS ==========
+    
+    // Spike system access through underlying brain
+    SpikeSystem* getSpikeSystem() { return brain_ ? brain_->getSpikeSystem() : nullptr; }
+    const SpikeSystem* getSpikeSystem() const { return brain_ ? brain_->getSpikeSystem() : nullptr; }
+    
+    // Neuromodulation control
+    bool isNeuromodulationEnabled() const { return neuromodulationEnabled_; }
+    
+    // Curiosity parameters
+    void setCuriosityParameters(float noveltyWeight, float predictionErrorWeight);
+    
+    // Prediction error management
+    void resetPredictionError();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -108,10 +123,15 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool neuromodulationEnabled_;  // New flag for neuromodulation control
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Curiosity parameters
+    float noveltyWeight_;
+    float predictionErrorWeight_;
 };
 
 } // namespace nlm

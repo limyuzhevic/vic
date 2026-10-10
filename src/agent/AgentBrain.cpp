@@ -18,7 +18,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , neuromodulationEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , noveltyWeight_(0.5f)
+    , predictionErrorWeight_(0.5f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -61,9 +64,22 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
-
-void AgentBrain::initialize(const SimpleWorld& world) {
+AgentBrain::~AgentBrain() {
+    // Clear all neuron group vectors to prevent memory leaks
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    previousVision_.clear();
+}
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
@@ -345,6 +361,47 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+} // namespace nlm
+
+// Implementation of new Phase 6 methods for AgentBrain
+
+SpikeSystem* AgentBrain::getSpikeSystem() {
+    return brain_ ? brain_->getSpikeSystem() : nullptr;
+}
+
+const SpikeSystem* AgentBrain::getSpikeSystem() const {
+    return brain_ ? brain_->getSpikeSystem() : nullptr;
+}
+
+bool AgentBrain::isNeuromodulationEnabled() const {
+    return neuromodulationEnabled_;
+}
+
+void AgentBrain::setCuriosityParameters(float noveltyWeight, float predictionErrorWeight) {
+    noveltyWeight_ = std::clamp(noveltyWeight, 0.0f, 1.0f);
+    predictionErrorWeight_ = std::clamp(predictionErrorWeight, 0.0f, 1.0f);
+    
+    // Update curiosity calculation with new weights
+    if (brain_) {
+        auto* curiosity = brain_->getCuriosity();
+        if (curiosity) {
+            curiosity->setNoveltyWeight(noveltyWeight_);
+            curiosity->setPredictionErrorWeight(predictionErrorWeight_);
+        }
+    }
+}
+
+void AgentBrain::resetPredictionError() {
+    predictionError_ = 0.0f;
+    
+    if (brain_) {
+        auto* predictionError = brain_->getPredictionErrorSignal();
+        if (predictionError) {
+            predictionError->reset();
+        }
+    }
 }
 
 } // namespace nlm

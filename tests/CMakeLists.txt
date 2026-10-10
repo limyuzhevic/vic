@@ -14,6 +14,21 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_neuromodulation.cpp
+    test_memory.cpp
+    test_development.cpp
+    test_prediction.cpp
+    test_cognition.cpp
+    test_sensory.cpp
+    test_motor.cpp
+    test_environment.cpp
+    test_world.cpp
+    test_visualization.cpp
+    test_performance.cpp
+    test_experiment.cpp
+    test_cli.cpp
+    test_agent.cpp
+    test_plasticity.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

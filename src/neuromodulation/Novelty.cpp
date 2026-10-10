@@ -16,9 +16,22 @@ struct Novelty::Impl {
     Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
 };
 
-Novelty::Novelty() : pImpl(new Impl) {}
+Novelty::~Novelty() {
+    delete pImpl;
+}
 
-Novelty::~Novelty() = default;
+Novelty::Novelty(Novelty&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Novelty& Novelty::operator=(Novelty&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 void Novelty::initialize(Brain* brain) {
     pImpl->brain = brain;

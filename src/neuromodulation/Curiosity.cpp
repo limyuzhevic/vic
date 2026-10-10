@@ -18,9 +18,22 @@ struct Curiosity::Impl {
         , decayRate(0.05f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::~Curiosity() {
+    delete pImpl;
+}
 
-Curiosity::~Curiosity() = default;
+Curiosity::Curiosity(Curiosity&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Curiosity& Curiosity::operator=(Curiosity&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
 
 void Curiosity::initialize(Brain* brain) {
     pImpl->brain = brain;

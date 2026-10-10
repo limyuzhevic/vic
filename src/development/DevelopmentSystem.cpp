@@ -13,9 +13,25 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::~DevelopmentSystem() {
+    delete pImpl;
+}
 
-DevelopmentSystem::~DevelopmentSystem() = default;
+DevelopmentSystem::DevelopmentSystem(DevelopmentSystem&& other) noexcept : pImpl(other.pImpl), age_(other.age_) {
+    other.pImpl = nullptr;
+    other.age_ = 0.0;
+}
+
+DevelopmentSystem& DevelopmentSystem::operator=(DevelopmentSystem&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        age_ = other.age_;
+        other.pImpl = nullptr;
+        other.age_ = 0.0;
+    }
+    return *this;
+}
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;

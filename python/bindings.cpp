@@ -342,6 +342,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +353,111 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // ========== PHASE 6: INTEGRATED BRAIN SYSTEMS ==========
+        
+        // Memory Systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Access working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Access episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Access associative memory system")
+        
+        // Prediction System
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Access prediction system")
+        
+        // Cognition Systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Access neural planner for action planning")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Access concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Access attentional selection system")
+        
+        // Development System
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Access development system")
+        
+        // Neuromodulation Systems
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Access dopamine neuromodulation system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Access curiosity neuromodulation system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Access novelty detection system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Access prediction error signal system")
+        
+        // Plasticity Systems
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Access STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Access Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Access structural plasticity system")
+        
+        // Spike System
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Access spike generation system")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Access spike generation system (const)")
+        
+        // Enhanced Statistics
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Access random number generator")
+        .def("getWorkingMemorySize", &Brain::getWorkingMemorySize,
+             "Get working memory size")
+        .def("getEpisodicMemorySize", &Brain::getEpisodicMemorySize,
+             "Get episodic memory size")
+        .def("getAssociativeMemorySize", &Brain::getAssociativeMemorySize,
+             "Get associative memory size")
+        .def("getPredictionSystemSize", &Brain::getPredictionSystemSize,
+             "Get prediction system size")
+        .def("getCognitionSystemSize", &Brain::getCognitionSystemSize,
+             "Get cognition system size")
+        .def("getDevelopmentSystemSize", &Brain::getDevelopmentSystemSize,
+             "Get development system size")
+        .def("getNeuromodulationSystemSize", &Brain::getNeuromodulationSystemSize,
+             "Get neuromodulation system size")
+        .def("getPlasticitySystemSize", &Brain::getPlasticitySystemSize,
+             "Get plasticity system size")
+        .def("getSpikeSystemSize", &Brain::getSpikeSystemSize,
+             "Get spike system size")
+        .def("getMemoryUtilization", &Brain::getMemoryUtilization,
+             "Get memory utilization percentage")
+        .def("getProcessingEfficiency", &Brain::getProcessingEfficiency,
+             "Get processing efficiency metric")
+        .def("getSynapticDensity", &Brain::getSynapticDensity,
+             "Get synaptic density")
+        .def("getNeuralConnectivity", &Brain::getNeuralConnectivity,
+             "Get neural connectivity matrix")
+        .def("getNetworkTopography", &Brain::getNetworkTopography,
+             "Get network topography analysis")
+        .def("getSystemLoad", &Brain::getSystemLoad,
+             "Get overall system load")
+        .def("getIntegrationLevel", &Brain::getIntegrationLevel,
+             "Get integration level (0.0 to 1.0)");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +504,27 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // ========== PHASE 6: ADDITIONAL AGENT BRAIN METHODS ==========
+        
+        .def("getSpikeSystem", &AgentBrain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Access spike system through underlying brain")
+        .def("isNeuromodulationEnabled", &AgentBrain::isNeuromodulationEnabled,
+             "Check if neuromodulation is enabled")
+        .def("setCuriosityParameters", [](AgentBrain& self, float noveltyWeight, float predictionErrorWeight) {
+            if (self.getBrain()) {
+                auto* curiosity = self.getBrain()->getCuriosity();
+                if (curiosity) {
+                    curiosity->setNoveltyWeight(noveltyWeight);
+                    curiosity->setPredictionErrorWeight(predictionErrorWeight);
+                }
+            }
+        }, py::arg("noveltyWeight"), py::arg("predictionErrorWeight"),
+             "Set curiosity system parameters")
+        .def("resetPredictionError", &AgentBrain::resetPredictionError,
+             "Reset prediction error signal");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +542,35 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createVisualizationInterface", []() -> std::unique_ptr<VisualizationInterface> {
+        return std::make_unique<VisualizationInterface>();
+    }, "Create a new visualization interface");
 
-} // namespace nlm
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface for debugging and analysis)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &VisualizationInterface::initialize,
+             "Initialize visualization")
+        .def("update", &VisualizationInterface::update,
+             "Update visualization data")
+        .def("render", &VisualizationInterface::render,
+             "Render current state")
+        .def("close", &VisualizationInterface::close,
+             "Close visualization")
+        .def("isActive", &VisualizationInterface::isActive,
+             "Check if visualization is active")
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate,
+             py::arg("hz"), "Set update rate")
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate,
+             "Get update rate")
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork,
+             py::arg("brain"), "Visualize neural network")
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity,
+             py::arg("brain"), "Visualize neural activity")
+        .def("visualizeSpikes", &VisualizationInterface::visualizeSpikes,
+             py::arg("spikes"), "Visualize spike raster plot")
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights,
+             py::arg("brain"), "Visualize synaptic weights");
+
+    m.def("createVisualizationInterface", []() -> std::unique_ptr<VisualizationInterface> {
+        return std::make_unique<VisualizationInterface>();
+    }, "Create a new visualization interface");
