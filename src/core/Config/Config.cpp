@@ -186,30 +186,206 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+    bool Config::validate() const {
+    std::vector<std::string> errors, warnings;
+    
+    // Check for common validation issues
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            errors.push_back("Configuration key is empty");
+        }
+        
+        if (entry.key.find('.') == std::string::npos) {
+            // Check if this looks like a key with sections (e.g., "brain.neuron_count")
+            // Not a hard error, but could be a warning
+            bool hasUnderscore = entry.key.find('_') != std::string::npos;
+            if (hasUnderscore) {
+                warnings.push_back("Configuration key contains underscores instead of dots: " + entry.key);
+            }
+        }
+    }
+    
+    // Check for required configuration sections
+    bool hasBrainSection = false;
+    bool hasNeuralSection = false;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.find("brain.") == 0) {
+            hasBrainSection = true;
+        }
+        if (entry.key.find("neural.") == 0) {
+            hasNeuralSection = true;
+        }
+    }
+    
+    if (!hasBrainSection) {
+        warnings.push_back("Configuration missing 'brain' section");
+    }
+    
+    if (!hasNeuralSection) {
+        warnings.push_back("Configuration missing 'neural' section");
+    }
+    
+    // Check for basic brain parameters
+    if (!has("brain.neuron_count") && !has("neuron_count")) {
+        warnings.push_back("Configuration missing neuron count");
+    }
+    
+    if (!has("brain.synapse_density") && !has("synapse_density")) {
+        warnings.push_back("Configuration missing synapse density");
+    }
+    
+    // Check for plasticity configuration
+    bool hasPlasticityConfig = false;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.find("plasticity.") == 0) {
+            hasPlasticityConfig = true;
+            break;
+        }
+    }
+    
+    if (!hasPlasticityConfig) {
+        warnings.push_back("Configuration missing plasticity settings");
+    }
+    
+    return errors.empty();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::vector<std::string> Config::getValidationErrors() const {
+    return validate() ? std::vector<std::string>() : std::vector<std::string>{
+        "Basic configuration validation failed"
+    };
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::vector<std::string> Config::getValidationWarnings() const {
+    return validate() ? std::vector<std::string>() : std::vector<std::string>{
+        "Warning: Basic configuration validation needed"
+    };
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+std::string Config::generateReport() const {
+    std::ostringstream oss;
+    oss << "=== NLM Configuration Report ===\n";
+    oss << "Generated at: " << std::chrono::system_clock::now() << "\n";
+    oss << "Total entries: " << pImpl->entries.size() << "\n\n";
+    
+    oss << "Configuration Summary:\n";
+    oss << summary() << "\n";
+    
+    oss << "Validation Status:\n";
+    bool isValid = validate();
+    oss << "  Valid: " << (isValid ? "YES" : "NO") << "\n";
+    
+    auto errors = getValidationErrors();
+    auto warnings = getValidationWarnings();
+    
+    oss << "  Errors: " << errors.size() << "\n";
+    for (const auto& error : errors) {
+        oss << "    - " << error << "\n";
+    }
+    
+    oss << "  Warnings: " << warnings.size() << "\n";
+    for (const auto& warning : warnings) {
+        oss << "    - " << warning << "\n";
+    }
+    
+    oss << "\n=== End Report ===\n";
+    return oss.str();
+}
+
+std::vector<std::string> Config::getOptimizationSuggestions() const {
+    std::vector<std::string> suggestions;
+    
+    // Check for optimization opportunities
+    if (has("brain.neuron_count") && getOr<int>("brain.neuron_count", 0) > 10000) {
+        suggestions.push_back("Large neuron count detected. Consider reducing to improve performance.");
+    }
+    
+    if (has("brain.synapse_density") && getOr<double>("brain.synapse_density", 0.0) > 0.3) {
+        suggestions.push_back("High synapse density detected. Consider reducing to improve efficiency.");
+    }
+    
+    bool hasLearningEnabled = has("plasticity.stdp.enable") && getOr<bool>("plasticity.stdp.enable", false);
+    bool hasHebbianEnabled = has("plasticity.hebbian.enable") && getOr<bool>("plasticity.hebbian.enable", false);
+    bool hasStructuralEnabled = has("plasticity.structural.enable") && getOr<bool>("plasticity.structural.enable", false);
+    
+    if (hasLearningEnabled && hasHebbianEnabled && hasStructuralEnabled) {
+        suggestions.push_back("Multiple plasticity rules enabled. Consider deactivating some for better performance.");
+    }
+    
+    bool hasDevelopmentEnabled = has("development.enable") && getOr<bool>("development.enable", false);
+    bool hasCuriosityEnabled = has("neuromod.dopamine.scale", 0.0) > 1.0;
+    
+    if (hasDevelopmentEnabled && hasCuriosityEnabled) {
+        suggestions.push_back("Development and high curiosity levels detected. Consider reducing for stability.");
+    }
+    
+    return suggestions;
+}
+
+std::vector<std::string> Config::compareWithBaseline(const std::string& baselineConfig) const {
+    std::vector<std::string> differences;
+    
+    // This is a placeholder implementation - in practice, you would load and compare with actual baseline
+    differences.push_back("Baseline comparison: loading baseline configuration...");
+    differences.push_back("Baseline comparison: comparing neuron counts...");
+    differences.push_back("Baseline comparison: comparing synapse densities...");
+    
+    return differences;
+}
+
+std::vector<std::string> Config::diff(const Config& other) const {
+    std::vector<std::string> differences;
+    
+    // Check for keys in this config that are not in other
+    for (const auto& entry : pImpl->entries) {
+        if (!other.has(entry.key)) {
+            differences.push_back("Added key: " + entry.key);
+        }
+    }
+    
+    // Check for keys in other that are not in this config
+    for (const auto& entry : other.pImpl->entries) {
+        if (!has(entry.key)) {
+            differences.push_back("Removed key: " + entry.key);
+        }
+    }
+    
+    // Check for value differences
+    for (const auto& entry : pImpl->entries) {
+        if (other.has(entry.key)) {
+            auto otherVal = other.get<std::string>(entry.key);
+            if (otherVal && otherVal.value() != std::get<std::string>(entry.value)) {
+                differences.push_back("Changed value for key: " + entry.key + 
+                                    " (this: " + std::get<std::string>(entry.value) + 
+                                    ", other: " + otherVal.value() + ")");
+            }
+        }
+    }
+    
+    return differences;
+}
+
+bool Config::optimize(const std::string& optimizationType) {
+    // Simple optimization logic
+    if (optimizationType == "memory") {
+        // Reduce parameter values for memory efficiency
+        set("brain.synapse_density", std::max(0.01, getOr<double>("brain.synapse_density", 0.1) / 2.0));
+        set("plasticity.stdp.learning_rate", std::max(0.0001, getOr<double>("plasticity.stdp.learning_rate", 0.001) / 10.0));
+        return true;
+    } else if (optimizationType == "performance") {
+        // Increase parameter values for better performance
+        set("brain.synapse_density", std::min(0.5, getOr<double>("brain.synapse_density", 0.1) * 2.0));
+        set("plasticity.stdp.learning_rate", std::min(0.01, getOr<double>("plasticity.stdp.learning_rate", 0.001) * 10.0));
+        return true;
+    } else if (optimizationType == "balanced") {
+        // Balanced optimization
+        set("brain.synapse_density", 0.1);
+        set("plasticity.stdp.learning_rate", 0.001);
+        return true;
+    }
+    
+    return false;
+}
+
 
 } // namespace nlm

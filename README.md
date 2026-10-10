@@ -2,7 +2,23 @@
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
+## Documentation
+
+### Quick Start
+
+For beginners, start with:
+1. **[easy_usage.md](easy_usage.md)** - Get started quickly with simple examples
+2. **[HOW_TO_USE.md](HOW_TO_USE.md)** - Complete technical documentation with all details
+3. **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Understand how it all works
+
+### What You'll Find
+
+- **easy_usage.md**: Beginner-friendly guide with step-by-step examples
+- **HOW_TO_USE.md**: Comprehensive documentation with code examples, configuration, and troubleshooting
+- **docs/SCIENCE.md**: Scientific background and brain theory
+- **docs/EXPERIMENTS.md**: Experiment descriptions and results
+
+## Project Overview
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
@@ -82,34 +98,49 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+## Documentation Quick Reference
+
+### For New Users
+- **Start here:** `easy_usage.md` - 15-minute quick start guide
+- **Build it:** `HOW_TO_USE.md` - C++ and Python installation
+- **Learn concepts:** `docs/SCIENCE.md` - Brain theory background
+- **See results:** `docs/EXPERIMENTS.md` - What we've discovered
+
+### For Developers
+- **Architecture:** `docs/ARCHITECTURE.md` - System design
+- **Code examples:** `HOW_TO_USE.md` - Complete API documentation
+- **Troubleshooting:** `HOW_TO_USE.md` - Common issues and solutions
+
 ## Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
+├── easy_usage.md              # Quick start guide
+├── HOW_TO_USE.md              # Complete documentation
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   ├── ARCHITECTURE.md       # System architecture
+│   ├── SCIENCE.md           # Scientific background
+│   ├── ROADMAP.md           # Development roadmap
+│   ├── EXPERIMENTS.md       # Experiment results
+│   ├── LIMITATIONS.md       # Current limitations
+│   └── PHASE6_FINAL_AUDIT.md # Phase 6 audit
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   ├── core/                # Core utilities
+│   ├── brain/               # Neural components (integrated)
+│   ├── dynamics/            # Neural dynamics
+│   ├── plasticity/          # Plasticity rules
+│   ├── development/         # Developmental system
+│   ├── neuromodulation/     # Neuromodulators (integrated)
+│   ├── memory/             # Memory systems (integrated)
+│   ├── prediction/          # Prediction systems (integrated)
+│   ├── cognition/          # Cognitive mechanisms (integrated)
+│   ├── sensory/            # Sensory processing
+│   ├── motor/              # Motor system
+│   ├── environment/        # Environment interface
+│   ├── experiments/        # Experiment framework (Phase 6)
+│   └── visualization/      # Visualization
 ├── tests/
 └── configs/
 ```
@@ -220,6 +251,23 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+## Learning Path
+
+### For Absolute Beginners
+1. Read `easy_usage.md` for quick start
+2. Try the simple examples
+3. Understand the brain-world-agent connection
+
+### For Intermediate Users
+1. Read `HOW_TO_USE.md` for complete documentation
+2. Try the advanced examples
+3. Experiment with different configurations
+
+### For Advanced Users
+1. Study `docs/ARCHITECTURE.md` for deep understanding
+2. Read `docs/EXPERIMENTS.md` for research insights
+3. Contribute to the project
 
 ## License
 

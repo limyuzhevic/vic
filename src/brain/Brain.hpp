@@ -61,6 +61,44 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // Visualization APIs
+    void plotActivity(const std::string& outputPath = "activity_plot.png");
+    void visualizeConnectivity(const std::string& outputPath = "connectivity_matrix.png");
+    void generateReport(const std::string& outputPath = "brain_report.txt");
+    void createAnimation(const std::string& outputPath = "brain_animation.gif", 
+                        double duration = 10.0, int fps = 30);
+    
+    // Enhanced Monitoring APIs
+    void startMonitoring();
+    bool isMonitoring() const;
+    std::vector<MonitoringStats> getMonitoringStats() const;
+    void setMonitoringThresholds(const MonitoringThresholds& thresholds);
+    std::vector<EventLogEntry> getEventLog(size_t limit = 100) const;
+    
+    // Advanced Analysis APIs
+    std::vector<SpikingPatternAnalysis> analyzeSpikingPatterns() const;
+    std::vector<ConnectivityMetrics> calculateConnectivityMetrics() const;
+    std::vector<ReplayEvent> detectReplayEvents() const;
+    std::vector<PlasticityEffect> measurePlasticityEffects(size_t steps = 1000) const;
+    
+    // Export and Import APIs
+    bool exportState(const std::string& filepath, ExportFormat format = ExportFormat::Binary);
+    bool importState(const std::string& filepath, ImportFormat format = ImportFormat::Auto);
+    std::vector<std::vector<double>> generateSessionData(size_t steps) const;
+    std::vector<double> analyzeSessionData(const std::vector<std::vector<double>>& data) const;
+    
+    // Debug and Diagnostics APIs
+    std::vector<NeuronDiagnostics> getNeuronDiagnostics(NeuronId neuronId = NeuronId()) const;
+    std::vector<RegionDiagnostics> getRegionDiagnostics(RegionId regionId = RegionId()) const;
+    void tracePlasticityEvents(size_t maxEvents = 100, PlasticityEventType type = PlasticityEventType::All);
+    std::vector<std::string> identifyBottlenecks() const;
+    
+    // Configuration and Validation APIs
+    ConfigValidationResult validateAll() const;
+    std::string generateReport() const;
+    std::vector<ConfigComparison> compareWithBaseline(const std::string& baselineConfig) const;
+    std::vector<ConfigOptimization> suggestOptimizations() const;
+    
     // Initialize brain with configuration
     bool initialize();
     
@@ -192,6 +230,56 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== ENHANCED VISUALIZATION APIs =========
+    
+    // Visualization APIs
+    void plotActivity(const std::string& outputPath = "activity_plot.png");
+    void visualizeConnectivity(const std::string& outputPath = "connectivity_matrix.png");
+    void generateReport(const std::string& outputPath = "brain_report.txt");
+    void createAnimation(const std::string& outputPath = "brain_animation.gif", 
+                        double duration = 10.0, int fps = 30);
+    
+    // ========== ENHANCED MONITORING APIs =========
+    
+    // Enhanced Monitoring APIs
+    void startMonitoring();
+    bool isMonitoring() const;
+    std::vector<MonitoringStats> getMonitoringStats() const;
+    void setMonitoringThresholds(const MonitoringThresholds& thresholds);
+    std::vector<EventLogEntry> getEventLog(size_t limit = 100) const;
+    
+    // ========== ADVANCED ANALYSIS APIs =========
+    
+    // Advanced Analysis APIs
+    std::vector<SpikingPatternAnalysis> analyzeSpikingPatterns() const;
+    std::vector<ConnectivityMetrics> calculateConnectivityMetrics() const;
+    std::vector<ReplayEvent> detectReplayEvents() const;
+    std::vector<PlasticityEffect> measurePlasticityEffects(size_t steps = 1000) const;
+    
+    // ========== EXPORT AND IMPORT APIs =========
+    
+    // Export and Import APIs
+    bool exportState(const std::string& filepath, ExportFormat format = ExportFormat::Binary);
+    bool importState(const std::string& filepath, ImportFormat format = ImportFormat::Auto);
+    std::vector<std::vector<double>> generateSessionData(size_t steps) const;
+    std::vector<double> analyzeSessionData(const std::vector<std::vector<double>>& data) const;
+    
+    // ========== DEBUG AND DIAGNOSTICS APIs =========
+    
+    // Debug and Diagnostics APIs
+    std::vector<NeuronDiagnostics> getNeuronDiagnostics(NeuronId neuronId = NeuronId()) const;
+    std::vector<RegionDiagnostics> getRegionDiagnostics(RegionId regionId = RegionId()) const;
+    void tracePlasticityEvents(size_t maxEvents = 100, PlasticityEventType type = PlasticityEventType::All);
+    std::vector<std::string> identifyBottlenecks() const;
+    
+    // ========== CONFIGURATION AND VALIDATION APIs =========
+    
+    // Configuration and Validation APIs
+    ConfigValidationResult validateAll() const;
+    std::string generateReport() const;
+    std::vector<ConfigComparison> compareWithBaseline(const std::string& baselineConfig) const;
+    std::vector<ConfigOptimization> suggestOptimizations() const;
     
 private:
     struct Impl;

@@ -93,6 +93,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    std::vector<std::string> getValidationWarnings() const;
+    
+    // Configuration analysis
+    std::string generateReport() const;
+    std::vector<std::string> getOptimizationSuggestions() const;
+    
+    // Configuration comparison
+    std::vector<std::string> compareWithBaseline(const std::string& baselineConfig) const;
+    std::vector<std::string> diff(const Config& other) const;
+    
+    // Configuration optimization
+    bool optimize(const std::string& optimizationType = "balanced");
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
