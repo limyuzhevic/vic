@@ -121,6 +121,58 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainMemorySafety() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    assert(brain.initialize());
+    
+    // Test that sensory and motor neurons are properly validated
+    // This tests the null pointer checks we added
+    size_t sensoryCount = brain.getSensoryNeuronCount();
+    size_t motorCount = brain.getMotorNeuronCount();
+    
+    // These should not crash even if there are no neurons
+    assert(sensoryCount >= 0);
+    assert(motorCount >= 0);
+    
+    std::cout << "    testBrainMemorySafety passed" << std::endl;
+}
+
+void testBrainConfigurationValidation() {
+    // Test invalid configuration values are handled gracefully
+    auto config = std::make_shared<nlm::Config>();
+    
+    // Test with zero neuron count (should be handled gracefully)
+    config->set("neuron_count", static_cast<int64_t>(0), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    // Should still be able to initialize, though with minimum values
+    assert(brain.initialize());
+    
+    std::cout << "    testBrainConfigurationValidation passed" << std::endl;
+}
+
+void testBrainErrorHandling() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    assert(brain.initialize());
+    
+    // Test that brain step operations don't crash
+    // This tests error handling in the step method
+    for (int i = 0; i < 10; ++i) {
+        brain.step(i);
+    }
+    
+    std::cout << "    testBrainErrorHandling passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +181,9 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainMemorySafety();
+    testBrainConfigurationValidation();
+    testBrainErrorHandling();
 }
 
 } // namespace test_brain

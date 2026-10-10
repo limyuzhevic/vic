@@ -66,8 +66,11 @@ struct LearningExperiment {
         
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+            auto synapses = region->getSynapses();
+            for (const auto& syn : synapses) {
+                if (syn != nullptr) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -77,6 +80,8 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("No valid synapses found in region for weight recording");
         }
     }
     
@@ -85,8 +90,11 @@ struct LearningExperiment {
         
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+            auto synapses = region->getSynapses();
+            for (const auto& syn : synapses) {
+                if (syn != nullptr) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -98,6 +106,8 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("No valid synapses found in region for final weight recording");
         }
     }
     

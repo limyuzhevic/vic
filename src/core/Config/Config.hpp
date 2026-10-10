@@ -71,6 +71,15 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
+    // Validate configuration parameters
+    void validateConfiguration();
+    
+    // Check if a parameter is valid
+    bool validateParameter(const std::string& key, const ConfigValue& value) const;
+    
+    // Get parameter value as string for validation/error messages
+    std::string getParameterValueString(const ConfigValue& value) const;
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);

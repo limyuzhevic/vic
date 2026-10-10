@@ -49,8 +49,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
-        }
-    }
+    // Validate configuration parameters
+    validateConfiguration();
     
     return true;
 }
@@ -193,10 +193,136 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Configuration validation
+void Config::validateConfiguration() {
+    for (const auto& entry : pImpl->entries) {
+        if (!validateParameter(entry.key, entry.value)) {
+            NLM_LOG_WARNING("Invalid configuration parameter: " + entry.key + 
+                           " with value: " + getParameterValueString(entry.value));
+        }
+    }
+}
+
+bool Config::validateParameter(const std::string& key, const ConfigValue& value) const {
+    // Get the parameter value as a string for validation
+    std::string valueStr = getParameterValueString(value);
+    
+    // Validate neuron count
+    if (key == "neuron_count") {
+        try {
+            int64_t count = std::get<int64_t>(value);
+            if (count <= 0) {
+                return false;
+            }
+            if (count > 1000000) {  // Reasonable upper bound
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate region count
+    if (key == "region_count") {
+        try {
+            int64_t count = std::get<int64_t>(value);
+            if (count <= 0 || count > 1000) {
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate connection probability
+    if (key == "connection_probability") {
+        try {
+            float prob = std::get<float>(value);
+            if (prob < 0.0f || prob > 1.0f) {
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate STDP parameters
+    if (key == "stdp_ltp_weight" || key == "stdp_ltd_weight") {
+        try {
+            float weight = std::get<float>(value);
+            if (weight < 0.0f || weight > 1.0f) {
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate simulation timestep
+    if (key == "simulation_timestep") {
+        try {
+            double timestep = std::get<double>(value);
+            if (timestep <= 0.0 || timestep > 1.0) {  // Maximum 1 second timestep
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate plasticity rates
+    if (key == "synaptogenesis_rate" || key == "pruning_rate") {
+        try {
+            float rate = std::get<float>(value);
+            if (rate < 0.0f || rate > 0.1f) {  // Reasonable rate bounds
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate log level
+    if (key == "log_level") {
+        try {
+            std::string logLevel = std::get<std::string>(value);
+            // Check if it's a valid log level string
+            if (logLevel != "Debug" && logLevel != "Info" && 
+                logLevel != "Warning" && logLevel != "Error" && 
+                logLevel != "Critical") {
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    // Validate environment dimensions
+    if (key == "environment_width" || key == "environment_height") {
+        try {
+            int64_t dim = std::get<int64_t>(value);
+            if (dim <= 0 || dim > 10000) {
+                return false;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+std::string Config::getParameterValueString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << arg;
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
 }
 
 // Explicit template instantiations

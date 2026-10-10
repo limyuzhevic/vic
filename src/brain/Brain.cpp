@@ -200,17 +200,24 @@ bool Brain::initialize() {
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+            // Collect sensory and motor neurons for I/O with null checks
             auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                auto neurons = sensoryPop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron != nullptr) {
+                        pImpl->sensoryNeurons.push_back(neuron);
+                    }
                 }
             }
+            
+            auto* motorPop = region->getPopulation(motorPopId);
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                auto neurons = motorPop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron != nullptr) {
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
                 }
             }
             
@@ -272,7 +279,7 @@ bool Brain::initialize() {
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
+                if (neuron != nullptr && neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
                     if (event.is_excitatory) {
@@ -994,6 +1001,10 @@ size_t Brain::getFiringNeuronCount() const {
     return pImpl->totalSpikesThisStep;
 }
 
+size_t Brain::getFiringNeuronCount() const {
+    return pImpl->totalSpikesThisStep;
+}
+
 float Brain::getAverageFiringRate() const {
     if (pImpl->regions.empty()) return 0.0f;
     float sum = 0.0f;
@@ -1001,6 +1012,15 @@ float Brain::getAverageFiringRate() const {
         sum += region->getAverageFiringRate();
     }
     return sum / static_cast<float>(pImpl->regions.size());
+}
+
+// Get sensory and motor neuron counts
+ size_t Brain::getSensoryNeuronCount() const {
+    return pImpl->sensoryNeurons.size();
+}
+
+ size_t Brain::getMotorNeuronCount() const {
+    return pImpl->motorNeurons.size();
 }
 
 // ========== MEMORY SYSTEM ACCESSORS ==========

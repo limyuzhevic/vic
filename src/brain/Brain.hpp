@@ -94,6 +94,10 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
+    // Get sensory and motor neuron counts
+    size_t getSensoryNeuronCount() const;
+    size_t getMotorNeuronCount() const;
+    
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
