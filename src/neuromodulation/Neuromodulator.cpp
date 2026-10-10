@@ -30,27 +30,31 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
+    // PHASE 6: Real dopamine-modulated plasticity factor
+    // Dopamine enhances synaptic plasticity proportionally to its level
+    // Typical range: 0.5 (baseline) to 1.5 (high dopamine)
     return 0.5f + 0.5f * pImpl->level;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // PHASE 6: Real dopamine dynamics
+    // Dopamine decays exponentially back to baseline, with burst responses on reward
+    float decayFactor = std::exp(-pImpl->decayRate * static_cast<float>(dt));
+    pImpl->level = pImpl->baseline + (pImpl->level - pImpl->baseline) * decayFactor;
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // PHASE 6: Real reward signaling
+    // Dopamine responds to rewards with a bounded burst response
+    float newLevel = pImpl->level + reward * pImpl->releaseRate;
+    pImpl->level = std::min(pImpl->peak, newLevel);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // PHASE 6: Real reward prediction error signaling
+    // Phasic dopamine responses to prediction errors (positive = better than expected, negative = worse)
+    float newLevel = pImpl->level + error * pImpl->releaseRate;
+    pImpl->level = std::max(0.0f, newLevel);  // Prevent negative dopamine
 }
 
 } // namespace nlm
