@@ -416,6 +416,219 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+        // ========== ENHANCED FACTORY FUNCTIONS FOR PYTHON ==========
+    
+    m.def("create_simple_brain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        return std::make_shared<Brain>(config);
+    }, "Create a simple brain with default configuration");
+    
+    m.def("create_brain_for_simulation", [](size_t neuronCount, size_t regionCount) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", regionCount);
+        config->set("simulation_timestep", 0.001f);
+        config->set("connection_probability", 0.1f);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount"), py::arg("regionCount"), "Create a brain configured for simulation");
+    
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create an agent brain interface");
+    
+    m.def("create_agent_for_world", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an agent brain for a world");
+    
+    // ========== CONFIGURATION PRESETS ==========
+    
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("create_learning_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("reward_modulation", true);
+        config->set("structural_plasticity", true);
+        config->set("development_enabled", true);
+        config->set("curiosity_enabled", true);
+        config->set("reward_decay", 0.95f);
+        config->set("curiosity_threshold", 0.1f);
+        config->set("novelty_threshold", 0.05f);
+        return config;
+    }, "Create a configuration optimized for learning");
+    
+    m.def("create_exploratory_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("reward_modulation", true);
+        config->set("structural_plasticity", true);
+        config->set("development_enabled", true);
+        config->set("curiosity_enabled", true);
+        config->set("curiosity_threshold", 0.05f);
+        config->set("novelty_threshold", 0.02f);
+        return config;
+    }, "Create a configuration optimized for exploration");
+    
+    m.def("create_exploitative_config", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("reward_modulation", true);
+        config->set("structural_plasticity", true);
+        config->set("development_enabled", true);
+        config->set("curiosity_enabled", true);
+        config->set("curiosity_threshold", 0.2f);
+        config->set("novelty_threshold", 0.1f);
+        return config;
+    }, "Create a configuration optimized for exploitation");
+    
+    // ========== BRAIN BUILDER CLASS FOR PYTHON ==========
+    
+    py::class_<BrainBuilder>(m, "BrainBuilder", "Helper class for building configured brains")
+        .def(py::init<>(), "Create a BrainBuilder with default configuration")
+        .def(py::init<const Config&>(), py::arg("config"), "Create a BrainBuilder with custom configuration")
+        .def("with_neuron_count", &BrainBuilder::withNeuronCount, py::arg("count"), "Set the number of neurons")
+        .def("with_region_count", &BrainBuilder::withRegionCount, py::arg("count"), "Set the number of regions")
+        .def("enable_learning", &BrainBuilder::enableLearning, py::arg("enable"), "Enable or disable all learning features")
+        .def("set_learning_style", &BrainBuilder::setLearningStyle, py::arg("style"), "Set learning style ('exploratory' or 'exploitative')")
+        .def("build", &BrainBuilder::build, "Build the configured brain");
+    
+    // ========== UTILITY FUNCTIONS FOR BEGINNERS ==========
+    
+    m.def("run_simple_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, size_t steps) {
+        if (!brain || !world) {
+            throw std::runtime_error("Brain or world is null");
+        }
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            const auto& percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + ": " +
+                             std::to_string(brain->getFiringNeuronCount()) + " firing neurons");
+            }
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("steps"), "Run a simple simulation");
+    
+    m.def("print_brain_status", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        NLM_LOG_INFO(agent->getStatusString());
+    }, py::arg("agent"), "Print brain status information");
+    
+    // ========== ADVANCED ANALYSIS FUNCTIONS ==========
+    
+    py::class_<AgentBrain::BrainStats>(m, "BrainStats", "Brain statistics for analysis")
+        .def_readonly("total_neurons", &AgentBrain::BrainStats::totalNeurons)
+        .def_readonly("total_synapses", &AgentBrain::BrainStats::totalSynapses)
+        .def_readonly("active_neurons", &AgentBrain::BrainStats::activeNeurons)
+        .def_readonly("firing_neurons", &AgentBrain::BrainStats::firingNeurons)
+        .def_readonly("average_firing_rate", &AgentBrain::BrainStats::averageFiringRate)
+        .def_readonly("excitation_inhibition_ratio", &AgentBrain::BrainStats::excitationInhibitionRatio)
+        .def_readonly("developmental_age", &AgentBrain::BrainStats::developmentalAge)
+        .def_readonly("plasticity_modifier", &AgentBrain::BrainStats::plasticityModifier)
+        .def_readonly("neuromodulation_level", &AgentBrain::BrainStats::neuromodulationLevel)
+        .def_readonly("curiosity_level", &AgentBrain::BrainStats::curiosityLevel)
+        .def_readonly("novelty_level", &AgentBrain::BrainStats::noveltyLevel)
+        .def_readonly("prediction_error", &AgentBrain::BrainStats::predictionError);
+    
+    m.def("get_brain_stats", [](std::shared_ptr<AgentBrain> agent) -> AgentBrain::BrainStats {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        return agent->getBrainStats();
+    }, py::arg("agent"), "Get detailed brain statistics");
+    
+    m.def("print_detailed_stats", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        NLM_LOG_INFO(agent->getDetailedStatsString());
+    }, py::arg("agent"), "Print detailed brain statistics");
+    
+    // ========== NEUROMODULATION UTILITIES ==========
+    
+    m.def("boost_curiosity", [](std::shared_ptr<AgentBrain> agent, float amount) {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        agent->boostCuriosity(amount);
+    }, py::arg("agent"), py::arg("amount"), "Boost curiosity level");
+    
+    m.def("reset_curiosity", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        agent->resetCuriosity();
+    }, py::arg("agent"), "Reset curiosity level");
+    
+    m.def("boost_novelty", [](std::shared_ptr<AgentBrain> agent, float amount) {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        agent->boostNovelty(amount);
+    }, py::arg("agent"), py::arg("amount"), "Boost novelty level");
+    
+    m.def("reset_novelty", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw std::runtime_error("Agent is null");
+        }
+        agent->resetNovelty();
+    }, py::arg("agent"), "Reset novelty level");
+    
+    // ========== CONFIGURATION UTILITIES ==========
+    
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        if (!config) {
+            errors.push_back("Config is null");
+        } else {
+            if (!config->has("neuron_count")) errors.push_back("Missing neuron_count");
+            if (!config->has("region_count")) errors.push_back("Missing region_count");
+            if (!config->has("simulation_timestep")) errors.push_back("Missing simulation_timestep");
+            if (!config->has("connection_probability")) errors.push_back("Missing connection_probability");
+        }
+        return errors;
+    }, py::arg("config"), "Validate configuration and return errors");
+    
+    m.def("print_config", [](std::shared_ptr<Config> config) {
+        if (config) {
+            NLM_LOG_INFO(config->summary());
+        }
+    }, py::arg("config"), "Print configuration summary");
+    
+    // ========== QUICK RUN UTILITIES ==========
+    
+    m.def("run_agent_for_steps", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, size_t steps) {
+        if (!agent || !world) {
+            throw std::runtime_error("Agent or world is null");
+        }
+        agent->runForSteps(steps, world);
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"), "Run agent for specified number of steps");
+    
+    // ========== LEGACY COMPATIBILITY ==========
+    
+    // Keep original factory functions for backward compatibility
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Legacy: Create a new brain with configuration");
+    
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Legacy: Create a new agent brain interface");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

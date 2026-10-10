@@ -5,6 +5,122 @@
 
 namespace nlm {
 
+// ========== FACTORY FUNCTIONS FOR USER-FRIENDLY API ==========
+
+std::shared_ptr<AgentBrain> createSimpleAgentBrain(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot create AgentBrain: brain is null");
+        return nullptr;
+    }
+    return std::make_shared<AgentBrain>(brain);
+}
+
+std::shared_ptr<AgentBrain> createAgentBrainForWorld(std::shared_ptr<Brain> brain, const SimpleWorld& world) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot create AgentBrain: brain is null");
+        return nullptr;
+    }
+    
+    auto agent = std::make_shared<AgentBrain>(brain);
+    agent->initialize(world);
+    return agent;
+}
+
+// ========== FACTORY CONFIGURATION PRESETS ==========
+
+Config createBrainConfigForSimulation(size_t neuronCount, size_t regionCount) {
+    Config config;
+    
+    // Basic configuration
+    config.set("neuron_count", neuronCount);
+    config.set("region_count", regionCount);
+    config.set("simulation_timestep", 0.001f);
+    
+    // Default connection probability
+    config.set("connection_probability", 0.1f);
+    config.set("stdp_ltp_weight", 0.01f);
+    config.set("stdp_ltd_weight", 0.012f);
+    config.set("stdp_tau", 20.0f);
+    
+    // Memory system parameters
+    config.set("working_memory_capacity", neuronCount / 10);
+    config.set("max_episodes", 1000);
+    
+    // Neuromodulation parameters
+    config.set("synaptogenesis_rate", 0.0001f);
+    config.set("pruning_rate", 0.00001f);
+    
+    // Random seed
+    config.set("random_seed", 42ull);
+    
+    return config;
+}
+
+Config createDefaultLearningConfig() {
+    Config config;
+    
+    // Enable all learning features
+    config.set("reward_modulation", true);
+    config.set("structural_plasticity", true);
+    config.set("development_enabled", true);
+    config.set("curiosity_enabled", true);
+    
+    // Learning parameters
+    config.set("reward_decay", 0.95f);
+    config.set("curiosity_threshold", 0.1f);
+    config.set("novelty_threshold", 0.05f);
+    
+    // Development parameters
+    config.set("plasticity_decay_rate", 0.99f);
+    config.set("critical_period_start", 100);
+    config.set("critical_period_end", 500);
+    
+    return config;
+}
+
+// ========== UTILITY FUNCTIONS FOR BEGINNERS ==========
+
+class BrainBuilder {
+public:
+    explicit BrainBuilder(const Config& config = createBrainConfigForSimulation(1000, 1)) : config_(config) {}
+    
+    BrainBuilder& withNeuronCount(size_t count) {
+        config_.set("neuron_count", count);
+        return *this;
+    }
+    
+    BrainBuilder& withRegionCount(size_t count) {
+        config_.set("region_count", count);
+        return *this;
+    }
+    
+    BrainBuilder& enableLearning(bool enable) {
+        config_.set("reward_modulation", enable);
+        config_.set("structural_plasticity", enable);
+        config_.set("development_enabled", enable);
+        config_.set("curiosity_enabled", enable);
+        return *this;
+    }
+    
+    BrainBuilder& setLearningStyle(const std::string& style) {
+        if (style == "exploratory") {
+            config_.set("curiosity_threshold", 0.05f);
+            config_.set("novelty_threshold", 0.02f);
+        } else if (style == "exploitative") {
+            config_.set("curiosity_threshold", 0.2f);
+            config_.set("novelty_threshold", 0.1f);
+        }
+        return *this;
+    }
+    
+    std::shared_ptr<Brain> build() {
+        return std::make_shared<Brain>(config_);
+    }
+    
+private:
+    Config config_;
+};
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -30,8 +146,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +162,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;

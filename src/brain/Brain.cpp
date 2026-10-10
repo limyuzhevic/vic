@@ -19,6 +19,12 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <limits>
+#include <numeric>
+#include <vector>
+#include <unordered_map>
+#include <set>
+#include <mutex>
 
 namespace nlm {
 
