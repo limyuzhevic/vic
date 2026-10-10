@@ -1,4 +1,5 @@
-#pragma once
+#if !defined(BRAIN_HPP)
+#define BRAIN_HPP
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
@@ -8,6 +9,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -198,4 +200,4 @@ private:
     Impl* pImpl;
 };
 
-} // namespace nlm
+#endif // BRAIN_HPP
