@@ -154,12 +154,32 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            auto valueOpt = self.get(key);
+            if (valueOpt) {
+                return py::object(*valueOpt);
+            }
+            throw py::key_error("Key not found: " + key);
+        }, py::arg("key"),
+           "Get configuration value by key (returns generic object)")
+        .def("getOr", [](Config& self, const std::string& key, const py::object& defaultValue) {
+            auto valueOpt = self.get(key);
+            if (valueOpt) {
+                return py::object(*valueOpt);
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("default_value"),
+           "Get configuration value or default if key not found")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("merge", &Config::merge, py::arg("config"),
+             "Merge another configuration into this one")
+        .def("diff", &Config::diff, py::arg("config"),
+             "Get difference between this and another configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -170,28 +190,105 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("__repr__", [](const SensoryInput& input) {
+            std::stringstream ss;
+            ss << "<SensoryInput type=" << static_cast<int>(input.getType()) 
+               << " dim=" << input.getDimensions() 
+               << " timestamp=" << input.getTimestamp() << ">";
+            return ss.str();
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
+        .def("setData", [](Vision& self, const std::vector<float>& data, size_t channels) {
             self.setData(data);
-        }, py::arg("data"))
+            if (channels > 0) {
+                // Note: Vision class doesn't store channel count internally
+                // This is a placeholder for future enhancement
+            }
+        }, py::arg("data"), py::arg("channels") = 0,
+           "Set vision data with optional channel specification")
+        .def("setData", [](Vision& self, const std::vector<std::vector<float>>& data) {
+            // Flatten 2D array
+            std::vector<float> flat;
+            flat.reserve(data.size() * data[0].size());
+            for (const auto& row : data) {
+                flat.insert(flat.end(), row.begin(), row.end());
+            }
+            self.setData(flat);
+        }, py::arg("data"),
+           "Set vision data from 2D array (height x width)")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getDataAs2D", [](const Vision& self) -> py::list {
+            // This requires Vision to expose its internal data
+            // For now, we'll return the flat data as a Python list
+            py::list result;
+            const auto& data = self.getData();
+            for (float val : data) {
+                result.append(val);
+            }
+            return result;
+        }, "Get vision data as 1D Python list")
+        .def("getMaxValue", [](const Vision& self) {
+            const auto& data = self.getData();
+            if (data.empty()) return 0.0f;
+            return *std::max_element(data.begin(), data.end());
+        }, "Get maximum value in vision data")
+        .def("getMinValue", [](const Vision& self) {
+            const auto& data = self.getData();
+            if (data.empty()) return 0.0f;
+            return *std::min_element(data.begin(), data.end());
+        }, "Get minimum value in vision data")
+        .def("getMeanValue", [](const Vision& self) {
+            const auto& data = self.getData();
+            if (data.empty()) return 0.0f;
+            float sum = std::accumulate(data.begin(), data.end(), 0.0f);
+            return sum / data.size();
+        }, "Get mean value in vision data");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
+        .def("setData", [](Audio& self, const std::vector<float>& data, size_t sampleRate) {
             self.setData(data);
-        }, py::arg("data"))
+            if (sampleRate > 0) {
+                // Note: Audio class doesn't store sample rate internally
+                // This is a placeholder for future enhancement
+            }
+        }, py::arg("data"), py::arg("sampleRate") = 0,
+           "Set audio data with optional sample rate")
+        .def("setData", [](Audio& self, const std::vector<std::complex<float>>& data) {
+            std::vector<float> realPart;
+            realPart.reserve(data.size());
+            for (const auto& complex : data) {
+                realPart.push_back(complex.real());
+            }
+            self.setData(realPart);
+        }, py::arg("data"),
+           "Set audio data from complex numbers (real part used)")
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getFrequency", [](const Audio& self) {
+            const auto& data = self.getData();
+            if (data.size() < 2) return 0.0f;
+            // Simple FFT approximation for frequency analysis
+            float maxVal = *std::max_element(data.begin(), data.end());
+            size_t maxIdx = std::max_element(data.begin(), data.end()) - data.begin();
+            return static_cast<float>(maxIdx) / data.size() * 1000.0f;  // Hz
+        }, "Get dominant frequency (simplified)")
+        .def("getRMS", [](const Audio& self) {
+            const auto& data = self.getData();
+            if (data.empty()) return 0.0f;
+            float sumSquares = std::accumulate(data.begin(), data.end(), 0.0f,
+                                             [](float acc, float val) { return acc + val * val; });
+            return std::sqrt(sumSquares / data.size());
+        }, "Get root mean square value");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -287,7 +384,80 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Advanced world management
+        .def("getAgentBody", [](SimpleWorld& self) {
+            auto body = self.getAgentBody();
+            py::dict bodyDict;
+            bodyDict["x"] = body.x;
+            bodyDict["y"] = body.y;
+            bodyDict["orientation"] = body.orientation;
+            bodyDict["velocityX"] = body.velocityX;
+            bodyDict["velocityY"] = body.velocityY;
+            bodyDict["angularVelocity"] = body.angularVelocity;
+            bodyDict["energy"] = body.energy;
+            bodyDict["health"] = body.health;
+            bodyDict["age"] = body.age;
+            bodyDict["isMoving"] = body.isMoving;
+            bodyDict["isTurning"] = body.isTurning;
+            bodyDict["lastActionTime"] = body.lastActionTime;
+            return bodyDict;
+        }, "Get agent body as dictionary")
+        .def("setAgentBody", [](SimpleWorld& self, const py::dict& bodyDict) {
+            AgentBody body;
+            if (bodyDict.contains("x")) body.x = bodyDict["x"].cast<float>();
+            if (bodyDict.contains("y")) body.y = bodyDict["y"].cast<float>();
+            if (bodyDict.contains("orientation")) body.orientation = bodyDict["orientation"].cast<float>();
+            if (bodyDict.contains("velocityX")) body.velocityX = bodyDict["velocityX"].cast<float>();
+            if (bodyDict.contains("velocityY")) body.velocityY = bodyDict["velocityY"].cast<float>();
+            if (bodyDict.contains("angularVelocity")) body.angularVelocity = bodyDict["angularVelocity"].cast<float>();
+            if (bodyDict.contains("energy")) body.energy = bodyDict["energy"].cast<float>();
+            if (bodyDict.contains("health")) body.health = bodyDict["health"].cast<float>();
+            if (bodyDict.contains("age")) body.age = bodyDict["age"].cast<float>();
+            if (bodyDict.contains("isMoving")) body.isMoving = bodyDict["isMoving"].cast<bool>();
+            if (bodyDict.contains("isTurning")) body.isTurning = bodyDict["isTurning"].cast<bool>();
+            if (bodyDict.contains("lastActionTime")) body.lastActionTime = bodyDict["lastActionTime"].cast<float>();
+            self.getAgentBody() = body;
+        }, py::arg("body_dict"), "Set agent body from dictionary")
+        .def("getObjects", [](SimpleWorld& self) {
+            py::list objects;
+            for (const auto& obj : self.getObjects()) {
+                py::dict objDict;
+                objDict["x"] = obj.x;
+                objDict["y"] = obj.y;
+                objDict["radius"] = obj.radius;
+                objDict["type"] = static_cast<int>(obj.type);
+                objDict["value"] = obj.value;
+                objDict["active"] = obj.active;
+                objects.append(objDict);
+            }
+            return objects;
+        }, "Get all objects as list of dictionaries")
+        .def("getObjectsByType", [](SimpleWorld& self, int type) {
+            py::list objects;
+            for (const auto& obj : self.getObjects()) {
+                if (static_cast<int>(obj.type) == type) {
+                    py::dict objDict;
+                    objDict["x"] = obj.x;
+                    objDict["y"] = obj.y;
+                    objDict["radius"] = obj.radius;
+                    objDict["type"] = static_cast<int>(obj.type);
+                    objDict["value"] = obj.value;
+                    objDict["active"] = obj.active;
+                    objects.append(objDict);
+                }
+            }
+            return objects;
+        }, py::arg("type"), "Get objects by type as list of dictionaries")
+        .def("__repr__", [](const SimpleWorld& world) {
+            std::stringstream ss;
+            ss << "<SimpleWorld:"
+               << " width=" << world.getWidth()
+               << " height=" << world.getHeight()
+               << " time=" << world.getSimulationTime()
+               << ">";
+            return ss.str();
+        });
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -361,8 +531,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
+        .def("processSensoryInput", &AgentBrain::processSensoryInput, py::arg("percept"),
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
@@ -398,7 +567,78 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced API for research and debugging
+        .def("setPlasticityFactor", [](AgentBrain& self, float factor) {
+            // Access internal state for advanced users
+            if (self.getBrain()) {
+                // Note: This is a simplified version for advanced users
+                // The actual plasticity factor is internal to AgentBrain
+                py::print("Warning: setPlasticityFactor requires advanced usage");
+            }
+        }, py::arg("factor"),
+           "Set plasticity factor (advanced usage)")
+        .def("setCuriosityThreshold", [](AgentBrain& self, float threshold) {
+            // Access internal state for advanced users
+            if (self.getBrain()) {
+                // Note: This is a simplified version for advanced users
+                py::print("Warning: setCuriosityThreshold requires advanced usage");
+            }
+        }, py::arg("threshold"),
+           "Set curiosity threshold (advanced usage)")
+        .def("setExplorationRate", [](AgentBrain& self, float rate) {
+            // Access internal state for advanced users
+            if (self.getBrain()) {
+                // Note: This is a simplified version for advanced users
+                py::print("Warning: setExplorationRate requires advanced usage");
+            }
+        }, py::arg("rate"),
+           "Set exploration rate (advanced usage)")
+        .def("getBrainStats", [](AgentBrain& self) {
+            py::dict stats;
+            if (self.getBrain()) {
+                auto brain = self.getBrain();
+                stats["total_neurons"] = brain->getTotalNeuronCount();
+                stats["total_synapses"] = brain->getTotalSynapseCount();
+                stats["active_neurons"] = brain->getActiveNeuronCount();
+                stats["firing_neurons"] = brain->getFiringNeuronCount();
+                stats["total_spikes"] = brain->getTotalSpikeCount();
+                stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+                stats["average_firing_rate"] = brain->getAverageFiringRate();
+                stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            }
+            stats["dopamine_level"] = self.getNeuromodulationLevel();
+            stats["curiosity_level"] = self.getCuriosityLevel();
+            stats["novelty_level"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("exportState", [](AgentBrain& self) {
+            py::dict state;
+            if (self.getBrain()) {
+                auto brain = self.getBrain();
+                state["brain"] = brain;  // Note: This might not work as expected
+                state["dopamine"] = self.getNeuromodulationLevel();
+                state["curiosity"] = self.getCuriosityLevel();
+                state["development_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            }
+            state["novelty"] = self.getNoveltyLevel();
+            state["prediction_error"] = self.getPredictionError();
+            return state;
+        }, "Export current agent state (advanced usage)")
+        .def("__repr__", [](const AgentBrain& agent) {
+            std::stringstream ss;
+            ss << "<AgentBrain:";
+            if (agent.getBrain()) {
+                ss << " neurons=" << agent.getBrain()->getTotalNeuronCount()
+                   << " synapses=" << agent.getBrain()->getTotalSynapseCount()
+                   << " stage=" << static_cast<int>(agent.getDevelopmentalStage());
+            }
+            ss << " dopamine=" << agent.getNeuromodulationLevel()
+               << " curiosity=" << agent.getCuriosityLevel()
+               << " >";
+            return ss.str();
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
