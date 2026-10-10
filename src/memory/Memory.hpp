@@ -1,10 +1,7 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include <vector>
-#include <functional>
-
-namespace nlm {
+// Forward declarations
+class Brain;
 
 // Working memory: temporary active storage of information
 // PLACEHOLDER - Phase 2 will implement real working memory
@@ -87,6 +84,12 @@ public:
     SemanticMemory();
     ~SemanticMemory();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Get brain reference
+    Brain* getBrain() const { return brain_; }
+    
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
     
@@ -105,9 +108,12 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Brain reference for neural integration
+    Brain* brain_;
 };
 
-// Procedural memory: learned skills and habits
+    // Procedural memory: learned skills and habits
 // PLACEHOLDER - Phase 2 will implement real procedural memory
 
 struct Skill {
@@ -122,6 +128,12 @@ class ProceduralMemory {
 public:
     ProceduralMemory();
     ~ProceduralMemory();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Get brain reference
+    Brain* getBrain() const { return brain_; }
     
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
@@ -141,6 +153,9 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Brain reference for neural integration
+    Brain* brain_;
 };
 
 // Associative memory: relationships between representations

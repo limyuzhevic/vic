@@ -116,7 +116,7 @@ struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
 };
 
-SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
+SemanticMemory::SemanticMemory() : pImpl(new Impl), brain_(nullptr) {}
 
 SemanticMemory::~SemanticMemory() = default;
 
@@ -137,6 +137,10 @@ std::string SemanticMemory::retrieveFact(const std::string& key) const {
         }
     }
     return "";
+}
+
+void SemanticMemory::initialize(Brain* brain) {
+    brain_ = brain;
 }
 
 bool SemanticMemory::hasFact(const std::string& key) const {
@@ -161,7 +165,7 @@ struct ProceduralMemory::Impl {
     std::vector<Skill> skills;
 };
 
-ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
+ProceduralMemory::ProceduralMemory() : pImpl(new Impl), brain_(nullptr) {}
 
 ProceduralMemory::~ProceduralMemory() = default;
 
@@ -193,6 +197,10 @@ std::vector<Skill*> ProceduralMemory::getAllSkills() {
         result.push_back(&skill);
     }
     return result;
+}
+
+void ProceduralMemory::initialize(Brain* brain) {
+    brain_ = brain;
 }
 
 void ProceduralMemory::updateProficiency(const std::string& name, float delta) {

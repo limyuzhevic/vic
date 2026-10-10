@@ -6,6 +6,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
@@ -13,6 +16,12 @@ class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Get brain reference
+    Brain* getBrain() const { return brain_; }
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
@@ -37,6 +46,10 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Brain reference for neural integration
+    Brain* brain_;
 };
+
 
 } // namespace nlm

@@ -10,9 +10,13 @@ struct PredictionSystem::Impl {
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem() : pImpl(new Impl), brain_(nullptr) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    brain_ = brain;
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
