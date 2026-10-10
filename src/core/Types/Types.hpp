@@ -7,61 +7,26 @@ namespace nlm {
 
 // Strongly-typed identifiers for safety
 
-// Neuron identifier
-struct NeuronId {
+// Generic identifier template
+template<typename T>
+struct Id {
     uint64_t value;
     
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
+    constexpr Id() : value(0) {}
+    explicit constexpr Id(uint64_t v) : value(v) {}
     
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
+    constexpr bool operator==(const Id& other) const = default;
+    constexpr bool operator!=(const Id& other) const = default;
+    constexpr bool operator<(const Id& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
 };
 
-// Synapse identifier
-struct SynapseId {
-    uint64_t value;
-    
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Region identifier
-struct RegionId {
-    uint64_t value;
-    
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
-
-// Population identifier
-struct PopulationId {
-    uint64_t value;
-    
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
-};
+// Backward compatibility typedefs using the new generic template
+using NeuronId = Id<struct NeuronTag>;
+using SynapseId = Id<struct SynapseTag>;
+using RegionId = Id<struct RegionTag>;
+using PopulationId = Id<struct PopulationTag>;
 
 // Simulation step counter
 using SimulationStep = uint64_t;

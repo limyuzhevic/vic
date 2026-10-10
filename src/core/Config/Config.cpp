@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -22,13 +23,23 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Check if file exists before attempting to open
+    if (!std::filesystem::exists(filepath)) {
+        Logger::getGlobal().error("Config file not found: " + filepath);
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        Logger::getGlobal().error("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +52,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                Logger::getGlobal().warning("Empty key found at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,6 +66,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            Logger::getGlobal().warning("Malformed config line (missing '='): " + line + " at line " + std::to_string(lineNumber));
         }
     }
     
@@ -56,8 +75,18 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true;  // No arguments to process
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Validate argument
+        if (arg.empty()) {
+            Logger::getGlobal().warning("Empty command line argument");
+            continue;
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -65,14 +94,32 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key and value
+                if (key.empty()) {
+                    Logger::getGlobal().warning("Empty key in command line argument: " + arg);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                Logger::getGlobal().warning("Malformed command line argument (missing '='): " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty()) {
+                Logger::getGlobal().warning("Empty key in command line argument: " + arg);
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            Logger::getGlobal().warning("Unhandled command line argument format: " + arg);
         }
     }
     return true;
@@ -81,8 +128,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        Logger::getGlobal().error("Failed to save config to file: " + filepath);
         return false;
     }
+    
+    file << "# NLM Configuration File\n";
+    file << "# Generated at " << "PLACEHOLDER_TIMESTAMP\n\n";
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
@@ -94,6 +145,12 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Validate input key
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to get()");
+        return std::nullopt;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -104,17 +161,36 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        Logger::getGlobal().warning("Type mismatch when retrieving key: " + key);
         return std::nullopt;
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
+    // Validate input key
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to getOr()");
+        return defaultValue;
+    }
+    
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input key
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to set()");
+        return;
+    }
+    
+    // Validate input source
+    if (source < ConfigSource::Default || source > ConfigSource::Runtime) {
+        Logger::getGlobal().warning("Invalid config source: " + std::to_string(static_cast<int>(source)));
+        source = ConfigSource::Runtime;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,27 +203,57 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to set(std::string)");
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to set(int)");
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to set(double)");
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to set(bool)");
+        return;
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to has()");
+        return false;
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    if (key.empty()) {
+        Logger::getGlobal().error("Empty key provided to remove()");
+        return;
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -159,20 +265,36 @@ std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+        if (!entry.key.empty()) {
+            keys.push_back(entry.key);
+        } else {
+            Logger::getGlobal().warning("Empty key found in config entries");
+        }
     }
     return keys;
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    if (pImpl->entries.empty()) {
+        Logger::getGlobal().debug("Config already empty");
+    } else {
+        Logger::getGlobal().info("Clearing " + std::to_string(pImpl->entries.size()) + " config entries");
+        pImpl->entries.clear();
+    }
 }
 
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
+    int emptyKeyCount = 0;
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        if (entry.key.empty()) {
+            ++emptyKeyCount;
+            continue;  // Skip empty keys in summary
+        }
+        
+        oss << "  " << entry.key << " = ";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
@@ -181,8 +303,13 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << " (" << static_cast<int>(entry.source) << ")\n";
     }
+    
+    if (emptyKeyCount > 0) {
+        oss << "  [" << emptyKeyCount << " entries have empty keys]\n";
+    }
+    
     return oss.str();
 }
 
