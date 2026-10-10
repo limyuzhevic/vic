@@ -33,9 +33,26 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    // Real reward computation based on observation
+    // Simple heuristic: reward based on internal signals and actions
+    
+    if (!observation) {
+        return 0.0f;
+    }
+    
+    // Get internal signals as reward indicator
+    auto internal = observation->getInternalSignals();
+    if (!internal.empty()) {
+        // Reward based on average internal signal value
+        float sum = 0.0f;
+        for (float val : internal) {
+            sum += val;
+        }
+        return sum / static_cast<float>(internal.size()) * 0.5f;  // Scale reward
+    }
+    
+    // Default minimal reward
+    return 0.01f;
 }
 
 const std::vector<float>& Reward::getHistory() const {

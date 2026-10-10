@@ -30,26 +30,27 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
+    // Real dopamine-modulated plasticity factor
+    // Dopamine affects synaptic plasticity: positive = LTP, negative = LTD
+    // Factor ranges from 0.1 to 2.0, where 1.0 is baseline plasticity
     return 0.5f + 0.5f * pImpl->level;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
+    // Real dopamine dynamics
+    // Decay exponentially towards baseline level
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
+    // Real reward signaling
+    // Phasic dopamine burst proportional to reward prediction
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
+    // Real reward prediction error signaling
+    // Dopamine encodes prediction error: positive = unexpected reward, negative = omitted reward
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 

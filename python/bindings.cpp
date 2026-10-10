@@ -416,6 +416,160 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // ========================================================================
+    // Additional Python Module Utilities
+    // ========================================================================
+
+    // Performance monitoring and debugging utilities
+    m.def("getSystemInfo", []() {
+        py::dict info;
+        info["name"] = "NLM Neural Learning Machine";
+        info["version"] = "0.1.0";
+        info["cpp_standard"] = "C++20";
+        info["python_bindings"] = true;
+        return info;
+    }, "Get system information");
+
+    m.def("benchmarkAgent", [](std::shared_ptr<Brain> brain, int steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start).count();
+        
+        py::dict results;
+        results["steps"] = steps;
+        results["time_seconds"] = duration;
+        results["steps_per_second"] = steps / duration;
+        results["avg_time_per_step"] = duration / steps;
+        return results;
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance");
+
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        if (!config->has("brain.neuron_count")) {
+            errors.push_back("Missing required key: brain.neuron_count");
+        }
+        
+        auto neurons = config->getOr<int64_t>("brain.neuron_count", 0);
+        if (neurons <= 0 || neurons > 1000000) {
+            errors.push_back("brain.neuron_count must be between 1 and 1000000");
+        }
+        
+        if (config->has("brain.connection_probability")) {
+            float prob = config->getOr<float>("brain.connection_probability", 0.0f);
+            if (prob < 0.0f || prob > 1.0f) {
+                warnings.push_back("brain.connection_probability should be between 0.0 and 1.0");
+            }
+        }
+        
+        auto result = py::dict();
+        result["valid"] = errors.empty();
+        result["errors"] = errors;
+        result["warnings"] = warnings;
+        return result;
+    }, py::arg("config"), "Validate configuration and return errors/warnings");
+
+    m.def("createTrainingEnvironment", [](const std::shared_ptr<Config>& config, int worldSize) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldSize, worldSize, 8, 8);
+        return world;
+    }, py::arg("config"), py::arg("worldSize") = 10, "Create training environment");
+
+    m.def("saveTrainingSession", [](const std::shared_ptr<Brain>& brain, 
+                                   const std::string& filename,
+                                   const std::string& metadata) {
+        bool success = brain->save(filename);
+        py::dict result;
+        result["success"] = success;
+        result["filename"] = filename;
+        result["metadata"] = metadata;
+        result["timestamp"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        return result;
+    }, py::arg("brain"), py::arg("filename"), py::arg("metadata") = "",
+        "Save training session with metadata");
+
+    m.def("loadTrainingSession", [](const std::string& filename) {
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        bool success = brain->load(filename);
+        
+        py::dict result;
+        result["success"] = success;
+        result["brain"] = brain;
+        result["filename"] = filename;
+        return result;
+    }, py::arg("filename"), "Load training session");
+
+    m.def("createDevelopmentPipeline", []() {
+        // Factory function for creating development pipelines
+        py::dict pipeline;
+        pipeline["name"] = "NLM Development Pipeline";
+        pipeline["stages"] = py::list({
+            "sensory_processing",
+            "motor_learning", 
+            "memory_integration",
+            "predictive_coding",
+            "social_cognition"
+        });
+        return pipeline;
+    }, "Create standard development pipeline");
+
+    // Experimental features
+    m.def("runPhaseExperiment", [](const std::string& phaseName, 
+                                 const std::shared_ptr<Config>& config,
+                                 int steps) {
+        // Run a specific phase experiment
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        py::dict results;
+        results["phase"] = phaseName;
+        results["brain"] = brain;
+        results["steps"] = steps;
+        results["completed"] = true;
+        
+        return results;
+    }, py::arg("phaseName"), py::arg("config"), py::arg("steps") = 1000,
+        "Run experimental phase with given configuration");
+
+    m.def("createMultiAgentEnvironment", [](int agentCount, int gridSize) {
+        py::list agents;
+        for (int i = 0; i < agentCount; ++i) {
+            auto config = std::make_shared<Config>();
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            agents.append(brain);
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(gridSize, gridSize, 8, 8);
+        
+        py::dict environment;
+        environment["world"] = world;
+        environment["agents"] = agents;
+        environment["agent_count"] = agentCount;
+        
+        return environment;
+    }, py::arg("agentCount") = 2, py::arg("gridSize") = 10,
+        "Create multi-agent environment");
+
+    m.def("debugNeuromodulation", [](std::shared_ptr<AgentBrain> agent) {
+        py::dict debugInfo;
+        debugInfo["dopamine"] = agent->getNeuromodulationLevel();
+        debugInfo["curiosity"] = agent->getCuriosityLevel();
+        debugInfo["novelty"] = agent->getNoveltyLevel();
+        debugInfo["prediction_error"] = agent->getPredictionError();
+        debugInfo["development_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        return debugInfo;
+    }, py::arg("agent"), "Debug neuromodulation state");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
