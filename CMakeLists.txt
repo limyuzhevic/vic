@@ -18,8 +18,38 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Find and include JSON/YAML parsing libraries
+include(FetchContent)
+
+# Try to find nlohmann/json
+option(NLM_USE_NLOHMANN_JSON "Use nlohmann/json for JSON parsing" ON)
+if(NLM_USE_NLOHMANN_JSON)
+    # Use FetchContent to get nlohmann/json if not found
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+    include_directories(${nlohmann_json_SOURCE_DIR}/include)
+endif()
+
+# Try to find yaml-cpp
+option(NLM_USE_YAML_CPP "Use yaml-cpp for YAML parsing" ON)
+if(NLM_USE_YAML_CPP)
+    # Try to find yaml-cpp system package
+    find_package(yaml-cpp QUIET)
+    if (NOT yaml-cpp_FOUND)
+        # Use FetchContent for yaml-cpp if not found
+        FetchContent_Declare(
+            yaml_cpp
+            GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+            GIT_TAG yaml-cpp-0.7.0
+        )
+        FetchContent_MakeAvailable(yaml_cpp)
+        include_directories(${yaml_cpp_SOURCE_DIR}/include)
+    endif()
+endif()
 
 # Core library
 add_library(nlm_core STATIC
