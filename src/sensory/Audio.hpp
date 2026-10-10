@@ -4,22 +4,30 @@
 
 namespace nlm {
 
-// Audio processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real audio processing using NLM's own neurons
-
-class AudioProcessor {
+// Audio input class
+class Audio : public SensoryInput {
 public:
-    AudioProcessor();
-    ~AudioProcessor();
+    Audio();
+    explicit Audio(size_t sampleRate, size_t numSamples);
+    ~Audio() override;
     
-    // Process audio input
-    void process(const Audio& input);
+    // Disable copying, enable moving
+    Audio(const Audio&) = delete;
+    Audio& operator=(const Audio&) = delete;
+    Audio(Audio&& other) noexcept;
+    Audio& operator=(Audio&& other) noexcept;
     
-    // Get feature representation
-    const std::vector<float>& getFeatures() const;
+    const char* getType() const override;
+    const std::vector<float>& getData() const override;
+    size_t getDimensions() const override;
+    std::unique_ptr<SensoryInput> clone() const override;
     
-    // Get feature dimensionality
-    size_t getFeatureDimensions() const;
+    // Set audio data
+    void setData(const std::vector<float>& data);
+    void setSampleRate(size_t rate);
+    
+    size_t getSampleRate() const;
+    size_t getNumSamples() const;
     
 private:
     struct Impl;

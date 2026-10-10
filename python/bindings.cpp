@@ -422,4 +422,270 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
+// ============================================================================
+// UTILITY FUNCTIONS FOR PYTHON USERS
+// ============================================================================
+
+// Configuration preset functions
+namespace {
+    // Create a learning-ready configuration optimized for cognitive development
+    std::shared_ptr<Config> createLearningConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.15);
+        config->set("brain.connection_probability", 0.08);
+        config->set("brain.initial_weight_mean", 0.5);
+        config->set("brain.initial_weight_std", 0.1);
+        config->set("brain.v_thresh", -55.0);
+        config->set("brain.v_rest", -70.0);
+        config->set("brain.v_reset", -75.0);
+        config->set("brain.tau_mem", 20.0);
+        config->set("brain.tau_ref", 2.0);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        config->set("plasticity.stdp.tau_plus", 20.0);
+        config->set("plasticity.stdp.tau_minus", 20.0);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.learning_rate", 0.002);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", static_cast<int64_t>(42));
+        return config;
+    }
+    
+    // Create a high-performance configuration for real-time simulation
+    std::shared_ptr<Config> createHighPerformanceConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 5000);
+        config->set("brain.synapse_density", 0.20);
+        config->set("brain.connection_probability", 0.12);
+        config->set("brain.initial_weight_mean", 0.6);
+        config->set("brain.initial_weight_std", 0.15);
+        config->set("brain.v_thresh", -52.0);
+        config->set("brain.v_rest", -70.0);
+        config->set("brain.v_reset", -75.0);
+        config->set("brain.tau_mem", 18.0);
+        config->set("brain.tau_ref", 1.5);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.0015);
+        config->set("plasticity.stdp.tau_plus", 15.0);
+        config->set("plasticity.stdp.tau_minus", 15.0);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.learning_rate", 0.003);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.5);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("simulation_timestep", 0.0005);
+        config->set("random_seed", static_cast<int64_t>(12345));
+        return config;
+    }
+    
+    // Create a developmental configuration optimized for growth
+    std::shared_ptr<Config> createDevelopmentalConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.10);
+        config->set("brain.connection_probability", 0.05);
+        config->set("brain.initial_weight_mean", 0.4);
+        config->set("brain.initial_weight_std", 0.08);
+        config->set("brain.v_thresh", -50.0);
+        config->set("brain.v_rest", -70.0);
+        config->set("brain.v_reset", -75.0);
+        config->set("brain.tau_mem", 25.0);
+        config->set("brain.tau_ref", 3.0);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.0008);
+        config->set("plasticity.stdp.tau_plus", 25.0);
+        config->set("plasticity.stdp.tau_minus", 25.0);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.learning_rate", 0.001);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 0.8);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("simulation_timestep", 0.002);
+        config->set("random_seed", static_cast<int64_t>(99));
+        return config;
+    }
+}
+
+// Batch operations for efficiency
+namespace {
+    // Batch step multiple brains for parallel processing
+    void batchBrainSteps(const std::vector<std::shared_ptr<Brain>>& brains, SimulationStep step) {
+        for (auto& brain : brains) {
+            brain->step(step);
+        }
+    }
+    
+    // Batch reset multiple brains
+    void batchBrainResets(std::vector<std::shared_ptr<Brain>>& brains) {
+        for (auto& brain : brains) {
+            brain->reset();
+            brain->initialize();
+        }
+    }
+    
+    // Batch save multiple brains
+    bool batchSaveBrains(const std::vector<std::shared_ptr<Brain>>& brains, const std::string& basePath) {
+        for (size_t i = 0; i < brains.size(); ++i) {
+            std::string filepath = basePath + "_brain_" + std::to_string(i) + ".bin";
+            if (!brains[i]->save(filepath)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    // Batch load multiple brains
+    bool batchLoadBrains(std::vector<std::shared_ptr<Brain>>& brains, const std::vector<std::string>& filepaths, std::shared_ptr<Config> config) {
+        if (brains.size() != filepaths.size()) {
+            return false;
+        }
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            brains[i] = std::make_shared<Brain>(config);
+            if (!brains[i]->load(filepaths[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+// Utility functions for common operations
+namespace {
+    // Get statistics from multiple brains
+    std::string batchGetBrainStats(const std::vector<std::shared_ptr<Brain>>& brains) {
+        std::ostringstream oss;
+        oss << "Batch Brain Statistics (" << brains.size() << " brains):\n";
+        
+        size_t totalNeurons = 0;
+        size_t totalSynapses = 0;
+        size_t totalSpikes = 0;
+        float totalFiringRate = 0.0f;
+        
+        for (size_t i = 0; i < brains.size(); ++i) {
+            oss << "Brain " << i << ":\n";
+            oss << "  Neurons: " << brains[i]->getTotalNeuronCount() << "\n";
+            oss << "  Synapses: " << brains[i]->getTotalSynapseCount() << "\n";
+            oss << "  Spikes: " << brains[i]->getTotalSpikeCount() << "\n";
+            oss << "  Firing rate: " << brains[i]->getAverageFiringRate() << "\n";
+            
+            totalNeurons += brains[i]->getTotalNeuronCount();
+            totalSynapses += brains[i]->getTotalSynapseCount();
+            totalSpikes += brains[i]->getTotalSpikeCount();
+            totalFiringRate += brains[i]->getAverageFiringRate();
+        }
+        
+        oss << "\nAGGREGATES:\n";
+        oss << "  Total neurons: " << totalNeurons << "\n";
+        oss << "  Total synapses: " << totalSynapses << "\n";
+        oss << "  Total spikes: " << totalSpikes << "\n";
+        if (!brains.empty()) {
+            oss << "  Average firing rate: " << (totalFiringRate / brains.size()) << "\n";
+        }
+        
+        return oss.str();
+    }
+    
+    // Create multiple agents with the same brain
+    std::vector<std::shared_ptr<AgentBrain>> createAgentPool(std::shared_ptr<Brain> brain, size_t count) {
+        std::vector<std::shared_ptr<AgentBrain>> agents;
+        agents.reserve(count);
+        
+        for (size_t i = 0; i < count; ++i) {
+            agents.push_back(std::make_shared<AgentBrain>(brain));
+        }
+        
+        return agents;
+    }
+    
+    // Initialize multiple worlds with the same configuration
+    std::vector<std::shared_ptr<SimpleWorld>> createWorldPool(size_t count, size_t width, size_t height, 
+                                                            size_t visionWidth, size_t visionHeight) {
+        std::vector<std::shared_ptr<SimpleWorld>> worlds;
+        worlds.reserve(count);
+        
+        for (size_t i = 0; i < count; ++i) {
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(width, height, visionWidth, visionHeight);
+            worlds.push_back(world);
+        }
+        
+        return worlds;
+    }
+    
+    // Run parallel simulation episode
+    void runParallelEpisode(std::vector<std::shared_ptr<Brain>>& brains, 
+                          std::vector<std::shared_ptr<AgentBrain>>& agents,
+                          std::vector<std::shared_ptr<SimpleWorld>>& worlds,
+                          SimulationStep steps) {
+        if (brains.size() != agents.size() || agents.size() != worlds.size()) {
+            throw std::runtime_error("Size mismatch in parallel simulation components");
+        }
+        
+        for (SimulationStep step = 0; step < steps; ++step) {
+            for (size_t i = 0; i < brains.size(); ++i) {
+                // Update world
+                worlds[i]->update(0.1);
+                
+                // Get sensory input
+                auto percept = worlds[i]->getSensoryPercept();
+                
+                // Process sensory input
+                agents[i]->processSensoryInput(percept);
+                
+                // Run brain step
+                brains[i]->step(step);
+                
+                // Decode motor command
+                auto action = agents[i]->decodeMotorCommand();
+                
+                // Apply action to world
+                worlds[i]->applyMotorCommand(action, worlds[i]->getSimulationTime());
+                
+                // Optional: Apply reward modulation
+                auto internalSignals = percept.getInternal();
+                if (!internalSignals.empty()) {
+                    agents[i]->applyRewardModulation(internalSignals[0], 0.0);
+                }
+            }
+        }
+    }
+}
+
+// Configuration convenience functions
+m.def("createLearningConfig", &createLearningConfig, "Create a learning-ready configuration optimized for cognitive development",
+      py::return_value_policy::reference_internal);
+m.def("createHighPerformanceConfig", &createHighPerformanceConfig, "Create a high-performance configuration for real-time simulation",
+      py::return_value_policy::reference_internal);
+m.def("createDevelopmentalConfig", &createDevelopmentalConfig, "Create a developmental configuration optimized for growth",
+      py::return_value_policy::reference_internal);
+
+// Batch operation functions
+m.def("batchBrainSteps", &batchBrainSteps, "Batch step multiple brains for parallel processing",
+      py::arg("brains"), py::arg("step"));
+m.def("batchBrainResets", &batchBrainResets, "Batch reset multiple brains",
+      py::arg("brains"));
+m.def("batchSaveBrains", &batchSaveBrains, "Batch save multiple brains",
+      py::arg("brains"), py::arg("basePath"));
+m.def("batchLoadBrains", &batchLoadBrains, "Batch load multiple brains",
+      py::arg("brains"), py::arg("filepaths"), py::arg("config"));
+
+// Utility functions
+m.def("batchGetBrainStats", &batchGetBrainStats, "Get statistics from multiple brains",
+      py::arg("brains"));
+m.def("createAgentPool", &createAgentPool, "Create multiple agents with the same brain",
+      py::arg("brain"), py::arg("count"));
+m.def("createWorldPool", &createWorldPool, "Initialize multiple worlds with the same configuration",
+      py::arg("count"), py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"));
+m.def("runParallelEpisode", &runParallelEpisode, "Run parallel simulation episode",
+      py::arg("brains"), py::arg("agents"), py::arg("worlds"), py::arg("steps"));
+}
+
 } // namespace nlm

@@ -1,35 +1,65 @@
 #include "InternalSignals.hpp"
+#include <algorithm>
 
 namespace nlm {
 
-struct InternalSignalsProcessor::Impl {
-    std::vector<float> processedSignals;
-    std::vector<float> homeostaticSignals;
+struct InternalSignals::Impl {
+    std::vector<float> signals;
+    std::vector<float> homeostatic;
     
     Impl() = default;
 };
 
-InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
+InternalSignals::InternalSignals() : pImpl(new Impl) {}
 
-InternalSignalsProcessor::~InternalSignalsProcessor() = default;
+InternalSignals::~InternalSignals() = default;
 
-void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
-    pImpl->processedSignals = signals.getData();
+InternalSignals::InternalSignals(InternalSignals&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+InternalSignals& InternalSignals::operator=(InternalSignals&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
+
+const char* InternalSignals::getType() const {
+    return "InternalSignals";
+}
+
+const std::vector<float>& InternalSignals::getData() const {
+    return pImpl->signals;
+}
+
+size_t InternalSignals::getDimensions() const {
+    return pImpl->signals.size();
+}
+
+std::unique_ptr<SensoryInput> InternalSignals::clone() const {
+    auto clone = std::make_unique<InternalSignals>(*this);
+    clone->setTimestamp(getTimestamp());
+    return clone;
+}
+
+void InternalSignals::addSignal(float value) {
+    pImpl->signals.push_back(value);
     
-    // Generate some homeostatic signals
-    pImpl->homeostaticSignals.clear();
-    pImpl->homeostaticSignals.push_back(1.0f);  // Allostatic load
-    pImpl->homeostaticSignals.push_back(0.5f);  // Metabolic state
+    // Generate homeostatic signals based on current signals
+    float sum = 0.0f;
+    for (float signal : pImpl->signals) {
+        sum += signal;
+    }
+    float mean = pImpl->signals.empty() ? 0.0f : sum / pImpl->signals.size();
+    
+    // Generate simple homeostatic signals
+    pImpl->homeostatic.clear();
+    pImpl->homeostatic.push_back(1.0f / (1.0f + std::abs(mean)));  // Allostatic load (inversely related to mean)
+    pImpl->homeostatic.push_back(0.5f * (1.0f + std::tanh(mean)));  // Metabolic state
 }
 
-const std::vector<float>& InternalSignalsProcessor::getProcessedSignals() const {
-    return pImpl->processedSignals;
-}
-
-const std::vector<float>& InternalSignalsProcessor::getHomeostaticSignals() const {
-    return pImpl->homeostaticSignals;
+void InternalSignals::clearSignals() {
+    pImpl->signals.clear();
+    pImpl->homeostatic.clear();
 }
 
 } // namespace nlm
