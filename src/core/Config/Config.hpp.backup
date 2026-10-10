@@ -1,0 +1,178 @@
+#pragma once
+
+#include <string>
+#include <memory>
+#include <vector>
+#include <variant>
+#include <optional>
+
+namespace nlm {
+
+/**
+ * @file Config.hpp
+ * 
+ * Configuration management system for NLM
+ * 
+ * This file provides a type-safe configuration management system that supports
+ * multiple configuration sources (default, file, command line, runtime) and
+ * various data types. It is used throughout the NLM system to configure
+ * parameters, settings, and runtime behavior.
+ * 
+ * The configuration system supports:
+ * - JSON file loading with schema validation
+ * - Command line argument parsing
+ * - Runtime configuration updates
+ * - Configuration source tracking and conflict resolution
+ * - Type-safe value retrieval with automatic conversion
+ * 
+ * @note Configuration values are stored in a variant type supporting
+ *       basic C++ types, vectors of those types, and strings.
+ * @note Configuration sources are prioritized: CommandLine > File > Default
+ * @note Runtime settings can override file and command line settings
+ * 
+ * @author NLM Development Team
+ * @date 2026
+ * @version 1.0
+ */
+
+/**
+ * @brief Configuration source enumeration
+ * 
+ * Indicates the origin of a configuration value, used to resolve conflicts
+ * when the same key is set from multiple sources.
+ */
+enum class ConfigSource {
+    /** Default configuration values built into the system */
+    Default,
+    /** Configuration loaded from file (typically JSON) */
+    File,
+    /** Configuration set via command line arguments */
+    CommandLine,
+    /** Configuration set at runtime via API calls */
+    Runtime
+};
+
+/**
+ * @struct ConfigEntry
+ * 
+ * Represents a single configuration value with metadata.
+ * 
+ * @note Used internally by the Config class to track configuration
+ *       values along with their source and description for debugging
+ *       and conflict resolution.
+ */
+struct ConfigEntry {
+    /** The configuration key/parameter name */
+    std::string key;
+    
+    /** The configuration value (type determined by key) */
+    ConfigValue value;
+    
+    /** Source of this configuration value */
+    ConfigSource source;
+    
+    /** Human-readable description of the configuration parameter */
+    std::string description;
+    
+    /**
+     * Default constructor creates an empty entry with default source
+     * 
+     * @post key is empty, value is uninitialized, source is Default
+     */
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    /**
+     * @brief Construct a configuration entry with value
+     * 
+     * @param k Configuration key name
+     * @param v Configuration value
+     * @param s Source of the configuration value
+     * @param desc Description of the configuration parameter
+     */
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
+        : key(k), value(v), source(s), description(desc) {}
+};
+
+/**
+ * @class Config
+ * 
+ * Central configuration manager for the NLM system.
+ * 
+ * This class provides a unified interface for managing configuration
+ * values across multiple sources with type-safe access methods. It is
+ * used extensively throughout the NLM system to configure neural
+ * parameters, simulation settings, and runtime behavior.
+ * 
+ * The configuration system supports:
+ * - Multiple value types with automatic conversion
+ * - Configuration source priority and conflict resolution
+ * - File I/O for persistent configuration
+ * - Command line argument integration
+ * - Real-time configuration updates
+ * 
+ * @note This class uses the PImpl idiom for efficient header-only
+ *       interface with implementation details in the .cpp file.
+ * @note Configuration access is thread-safe for read operations.
+ * @note Configuration modification requires external synchronization.
+ * 
+ * @see ConfigSource - Enumeration of configuration sources
+ * @see ConfigEntry - Structure for configuration values
+ */
+// Main configuration class
+    Config();
+    ~Config();
+    
+    // Disable copying, enable moving
+    Config(const Config&) = delete;
+    Config& operator=(const Config&) = delete;
+    Config(Config&&) noexcept;
+    Config& operator=(Config&&) noexcept;
+    
+    // Load from file (JSON format)
+    bool loadFromFile(const std::string& filepath);
+    
+    // Load from command line arguments
+    bool loadFromArgs(int argc, char** argv);
+    
+    // Save to file
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Set values
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Check existence
+    bool has(const std::string& key) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Clear all
+    void clear();
+    
+    // Get configuration summary
+    std::string summary() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+};
+
+} // namespace nlm

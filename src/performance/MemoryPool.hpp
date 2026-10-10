@@ -28,108 +28,289 @@
 namespace nlm {
 
 /**
- * Lock-free stack node for memory pool free list
+ * @file MemoryPool.hpp
+ * 
+ * Memory pool allocator system for NLM
+ * 
+ * This file provides the memory pool allocator system for NLM, implementing:
+ * - Generic memory pool
+ * - Neuron pool
+ * - Synapse pool
+ * - Lock-free allocation/deallocation
+ * - Memory statistics
+ * - Thread-safe operations
+ * 
+ * The memory pool allocator system in NLM:
+ * - **MemoryPool**: Generic memory pool for fixed-size objects
+ * - **NeuronPool**: Specialized pool for neurons with cache-aligned states
+ * - **SynapsePool**: Specialized pool for synapses
+ * - **Lock-free allocation**: Lock-free allocation and deallocation
+ * - **Memory statistics**: Memory statistics
+ * - **Thread safety**: Thread-safe operations
+ * 
+ * Key features:
+ * - **Generic memory pool**: Generic memory pool for fixed-size objects
+ * - **Neuron pool**: Specialized pool for neurons with cache-aligned states
+ * - **Synapse pool**: Specialized pool for synapses
+ * - **Lock-free allocation**: Lock-free allocation and deallocation
+ * - **Memory statistics**: Memory statistics
+ * - **Thread safety**: Thread-safe operations
+ * 
+ * Memory pool characteristics in NLM:
+ * - **Generic memory pool**: Generic memory pool for fixed-size objects
+ * - **Neuron pool**: Specialized pool for neurons with cache-aligned states
+ * - **Synapse pool**: Specialized pool for synapses
+ * - **Lock-free allocation**: Lock-free allocation and deallocation
+ * - **Memory statistics**: Memory statistics
+ * - **Thread safety**: Thread-safe operations
+ * 
+ * @note Critical for performance optimization
+ * @note Used extensively in performance systems
+ * @note Essential for scaling to large networks
+ * @see MemoryPool.cpp - For implementation details
+ * 
+ * @author NLM Development Team
+ * @date 2026
+ * @version 1.0
+ */
+
+/**
+ * @struct MemPoolNode
+ * 
+ * Neural implementation of lock-free stack node for memory pool free list.
+ * 
+ * This structure implements the lock-free stack node, providing
+ * lock-free stack node for memory pool free list. It is essential for:
+ * - **Free list management**: Free list management
+ * - **Lock-free operations**: Lock-free operations
+ * - **Memory allocation**: Memory allocation
+ * - **Memory deallocation**: Memory deallocation
+ * 
+ * Free list characteristics in NLM:
+ * - **Free list management**: Free list management
+ * - **Lock-free operations**: Lock-free operations
+ * - **Memory allocation**: Memory allocation
+ * - **Memory deallocation**: Memory deallocation
+ * 
+ * @note Lock-free stack node for memory pool free list
+ * 
+ * @author NLM Development Team
  */
 struct MemPoolNode {
+    /** Next node in free list (lock-free) */
     std::atomic<MemPoolNode*> next;
     
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default memory pool node with default parameters.
+     * The memory pool node is initialized with default values for
+     * all node fields.
+     */
     MemPoolNode() : next(nullptr) {}
 };
 
 /**
- * MemoryPool - Slab allocator for fixed-size objects
+ * @class MemoryPool
  * 
- * Template parameter T specifies the object type to allocate.
- * All objects have the same fixed size determined at construction.
+ * Neural implementation of memory pool for fixed-size objects.
+ * 
+ * This class implements the memory pool, providing
+ * memory pool for fixed-size objects. It is essential for:
+ * - **Memory allocation**: Memory allocation
+ * - **Memory deallocation**: Memory deallocation
+ * - **Free list management**: Free list management
+ * - **Lock-free operations**: Lock-free operations
+ * - **Memory statistics**: Memory statistics
+ * 
+ * Memory pool characteristics in NLM:
+ * - **Memory allocation**: Memory allocation
+ * - **Memory deallocation**: Memory deallocation
+ * - **Free list management**: Free list management
+ * - **Lock-free operations**: Lock-free operations
+ * - **Memory statistics**: Memory statistics
+ * 
+ * Key components:
+ * - **Slab size**: Slab size for each object
+ * - **Block size**: Number of objects per block
+ * - **Free list**: Head of free list (lock-free)
+ * - **Memory blocks**: List of memory blocks
+ * - **Statistics**: Allocation and deallocation statistics
+ * 
+ * @note Lock-free memory pool for fixed-size objects
+ * @see MemoryPool.cpp - For implementation details
+ * 
+ * @author NLM Development Team
  */
 template<typename T>
 class MemoryPool {
 public:
     /**
-     * Create a memory pool
-     * @param blockSize Number of objects per memory block
-     * @param initialBlocks Number of blocks to pre-allocate
+     * @brief Default constructor
+     * 
+     * Creates a default memory pool with default parameters.
+     * The memory pool is initialized with default values for
+     * all pool fields.
      */
     explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4);
     
+    /**
+     * @brief Destructor
+     * 
+     * Cleans up memory pool resources and performs any necessary
+     * cleanup operations. The memory pool is left in a valid but
+     * non-operational state after destruction.
+     */
     ~MemoryPool();
     
-    // Disable copying
-    MemoryPool(const MemoryPool&) = delete;
-    MemoryPool& operator=(const MemoryPool&) = delete;
-    
     /**
-     * Allocate an object from the pool
-     * Lock-free operation
+     * @brief Allocate an object from the pool
+     * 
+     * Allocates an object from the pool. This is used for:
+     * - Memory allocation
+     * - Object allocation
+     * - Pool management
+     * - Allocation statistics
      */
     T* allocate();
     
     /**
-     * Return an object to the pool
-     * Lock-free operation
+     * @brief Return an object to the pool
+     * 
+     * Returns an object to the pool. This is used for:
+     * - Memory deallocation
+     * - Object deallocation
+     * - Pool management
+     * - Deallocation statistics
      */
     void deallocate(T* obj);
     
     /**
-     * Check if pool is empty
+     * @brief Check if pool is empty
+     * 
+     * Checks if the pool is empty. This is used for:
+     * - Empty checking
+     * - Pool status checking
+     * - Allocation/deallocation management
      */
     bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
     
     /**
-     * Get number of allocated objects
+     * @brief Get number of allocated objects
+     * 
+     * Returns the number of allocated objects. This is used for:
+     * - Allocation count access
+     * - Allocation statistics
+     * - Pool management
      */
     size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
     
     /**
-     * Get number of available objects
+     * @brief Get number of available objects
+     * 
+     * Returns the number of available objects. This is used for:
+     * - Availability count access
+     * - Allocation statistics
+     * - Pool management
      */
     size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
     
     /**
-     * Total memory used by pool (bytes)
+     * @brief Get total memory used by pool (bytes)
+     * 
+     * Returns the total memory used by the pool. This is used for:
+     * - Memory usage access
+     * - Memory statistics
+     * - Pool management
      */
     size_t memoryUsage() const;
     
     /**
-     * Pre-allocate objects
+     * @brief Pre-allocate objects
+     * 
+     * Pre-allocates objects. This is used for:
+     * - Object pre-allocation
+     * - Pool management
+     * - Memory statistics
      */
     void reserve(size_t count);
     
 private:
-    // Memory block containing objects
+    /**
+     * @struct Block
+     * 
+     * Neural implementation of memory block containing objects.
+     * 
+     * This structure implements the memory block, providing
+     * memory block for object storage.
+     */
     struct Block {
+        /** Block data storage */
         std::vector<uint8_t> data;
+        
+        /** Next block in pool */
         Block* nextBlock;
         
+        /**
+         * @brief Constructor
+         * 
+         * Creates a memory block with specified object size and count.
+         */
         explicit Block(size_t objectSize, size_t count);
         
+        /**
+         * @brief Get object
+         * 
+         * Returns the object at specified index.
+         */
         T* getObject(size_t index, size_t objectSize) {
             return reinterpret_cast<T*>(data.data() + index * objectSize);
         }
     };
     
-    // Add a new block to the pool
+    /**
+     * @brief Add a new block to the pool
+     * 
+     * Adds a new block to the pool. This is used for:
+     * - Block management
+     * - Object allocation
+     * - Pool expansion
+     */
     void addBlock();
     
-    // Slab size for each object (rounded up to alignment)
+    /**
+     * Slab size for each object (rounded up to alignment)
+     */
     size_t slabSize_;
     
-    // Number of objects per block
+    /**
+     * Number of objects per block
+     */
     size_t blockSize_;
     
-    // Head of free list (lock-free)
+    /**
+     * Head of free list (lock-free)
+     */
     std::atomic<MemPoolNode*> freeList_;
     
-    // List of memory blocks
+    /**
+     * List of memory blocks
+     */
     std::vector<std::unique_ptr<Block>> blocks_;
     
-    // Block we're currently allocating from
+    /**
+     * Current block we're allocating from
+     */
     std::atomic<Block*> currentBlock_;
     
-    // Index of next available object in current block
+    /**
+     * Index of next available object in current block
+     */
     std::atomic<size_t> currentIndex_;
     
-    // Statistics
+    /**
+     * Statistics
+     */
     std::atomic<size_t> allocatedCount_;
     std::atomic<size_t> availableCount_;
 };
@@ -205,8 +386,8 @@ T* MemoryPool<T>::allocate() {
     while (node != nullptr) {
         MemPoolNode* next = node->next.load(std::memory_order_relaxed);
         if (freeList_.compare_exchange_weak(node, next, 
-                                             std::memory_order_release, 
-                                             std::memory_order_relaxed)) {
+                                              std::memory_order_release, 
+                                              std::memory_order_relaxed)) {
             allocatedCount_.fetch_add(1, std::memory_order_relaxed);
             availableCount_.fetch_sub(1, std::memory_order_relaxed);
             return reinterpret_cast<T*>(node);
@@ -255,33 +436,113 @@ void MemoryPool<T>::reserve(size_t count) {
     }
 }
 
-// NeuronPool - Specialized pool for neurons with cache-aligned states
+/**
+ * @class NeuronPool
+ * 
+ * Neural implementation of specialized pool for neurons with cache-aligned states.
+ * 
+ * This class implements the neuron pool, providing
+ * specialized pool for neurons with cache-aligned states. It is essential for:
+ * - **Neuron allocation**: Neuron allocation
+ * - **Neuron deallocation**: Neuron deallocation
+ * - **State access**: State access
+ * - **Memory usage**: Memory usage
+ * - **Pool management**: Pool management
+ * 
+ * Neuron pool characteristics in NLM:
+ * - **Neuron allocation**: Neuron allocation
+ * - **Neuron deallocation**: Neuron deallocation
+ * - **State access**: State access
+ * - **Memory usage**: Memory usage
+ * - **Pool management**: Pool management
+ * 
+ * @note Specialized pool for neurons with cache-aligned states
+ * @see NeuronPool.cpp - For implementation details
+ * 
+ * @author NLM Development Team
+ */
 class NeuronPool {
 public:
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default neuron pool with default parameters.
+     * The neuron pool is initialized with default values for
+     * all pool fields.
+     */
     NeuronPool();
+    
+    /**
+     * @brief Destructor
+     * 
+     * Cleans up neuron pool resources and performs any necessary
+     * cleanup operations. The neuron pool is left in a valid but
+     * non-operational state after destruction.
+     */
     ~NeuronPool();
     
-    // Allocate a neuron with its state
+    /**
+     * @brief Allocate a neuron with its state
+     * 
+     * Allocates a neuron with its state. This is used for:
+     * - Neuron allocation
+     * - Pool management
+     * - State initialization
+     */
     NeuronId allocate();
     
-    // Deallocate a neuron
+    /**
+     * @brief Deallocate a neuron
+     * 
+     * Deallocates a neuron. This is used for:
+     * - Neuron deallocation
+     * - Pool management
+     * - Memory cleanup
+     */
     void deallocate(NeuronId id);
     
-    // Access neuron state directly (for SoA access)
+    /**
+     * @brief Access neuron state directly (for SoA access)
+     * 
+     * Accesses neuron state directly for SoA access. This is used for:
+     * - State access
+     * - SoA management
+     * - Memory optimization
+     */
     template<typename Member>
     Member* getState(NeuronIndex index);
     
-    // Get total count
+    /**
+     * @brief Get total count
+     * 
+     * Returns the total count. This is used for:
+     * - Count access
+     * - Pool management
+     */
     size_t size() const { return size_; }
     
-    // Memory usage
+    /**
+     * @brief Get memory usage
+     * 
+     * Returns the memory usage. This is used for:
+     * - Memory usage access
+     * - Memory statistics
+     */
     size_t memoryUsage() const;
     
 private:
     static constexpr size_t CACHE_LINE = 64;
     
+    /**
+     * @struct NeuronBlock
+     * 
+     * Neural implementation of neuron block with cache-aligned states.
+     * 
+     * This structure implements the neuron block, providing
+     * cache-aligned states for neuron storage.
+     */
     struct alignas(CACHE_LINE) alignas(sizeof(void*)) NeuronBlock {
-        // SoA storage for neuron states
+        /** SoA storage for neuron states */
         std::vector<float> membranePotential;
         std::vector<float> restingPotential;
         std::vector<float> threshold;
@@ -298,52 +559,164 @@ private:
         std::vector<uint64_t> regionId;
         std::vector<uint64_t> populationId;
         
-        // Per-neuron current injection (not in NeuronState, but needed for hot path)
+        /** Per-neuron current injection (not in NeuronState, but needed for hot path) */
         std::vector<float> synapticInput;
         
+        /**
+         * @brief Default constructor
+         * 
+         * Creates a default neuron block with default parameters.
+         */
         NeuronBlock() {}
     };
     
+    /**
+     * Total neuron count
+     */
     size_t size_;
+    
+    /**
+     * Block capacity
+     */
     size_t capacity_;
+    
+    /**
+     * Blocks of neurons
+     */
     std::vector<std::unique_ptr<NeuronBlock>> blocks_;
     
-    // Free list for deallocated neurons
+    /**
+     * Free list for deallocated neurons
+     */
     std::vector<NeuronIndex> freeList_;
     std::atomic<size_t> freeListTop_;
 };
 
-// SynapsePool - Specialized pool for synapses
+/**
+ * @class SynapsePool
+ * 
+ * Neural implementation of specialized pool for synapses.
+ * 
+ * This class implements the synapse pool, providing
+ * specialized pool for synapses. It is essential for:
+ * - **Synapse allocation**: Synapse allocation
+ * - **Synapse deallocation**: Synapse deallocation
+ * - **Synapse access**: Synapse access
+ * - **Synapse management**: Synapse management
+ * - **Memory usage**: Memory usage
+ * 
+ * Synapse pool characteristics in NLM:
+ * - **Synapse allocation**: Synapse allocation
+ * - **Synapse deallocation**: Synapse deallocation
+ * - **Synapse access**: Synapse access
+ * - **Synapse management**: Synapse management
+ * - **Memory usage**: Memory usage
+ * 
+ * @note Specialized pool for synapses
+ * @see SynapsePool.cpp - For implementation details
+ * 
+ * @author NLM Development Team
+ */
 class SynapsePool {
 public:
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default synapse pool with default parameters.
+     * The synapse pool is initialized with default values for
+     * all pool fields.
+     */
     SynapsePool();
+    
+    /**
+     * @brief Destructor
+     * 
+     * Cleans up synapse pool resources and performs any necessary
+     * cleanup operations. The synapse pool is left in a valid but
+     * non-operational state after destruction.
+     */
     ~SynapsePool();
     
-    // Allocate a synapse
+    /**
+     * @brief Allocate a synapse
+     * 
+     * Allocates a synapse. This is used for:
+     * - Synapse allocation
+     * - Pool management
+     * - Connection management
+     */
     SynapseId allocate(NeuronId source, NeuronId destination);
     
-    // Deallocate a synapse
+    /**
+     * @brief Deallocate a synapse
+     * 
+     * Deallocates a synapse. This is used for:
+     * - Synapse deallocation
+     * - Pool management
+     * - Memory cleanup
+     */
     void deallocate(SynapseId id);
     
-    // Get synapse data (for SoA access)
+    /**
+     * @brief Get synapse data (for SoA access)
+     * 
+     * Returns synapse data for SoA access. This is used for:
+     * - Synapse data access
+     * - SoA management
+     * - Memory optimization
+     */
     template<typename Member>
     Member* getState(SynapseIndex index);
     
-    // Get source/destination neurons
+    /**
+     * @brief Get source neurons
+     * 
+     * Returns the source neurons. This is used for:
+     * - Source access
+     * - Synapse management
+     */
     NeuronId getSource(SynapseIndex index) const;
+    
+    /**
+     * @brief Get destination neurons
+     * 
+     * Returns the destination neurons. This is used for:
+     * - Destination access
+     * - Synapse management
+     */
     NeuronId getDestination(SynapseIndex index) const;
     
-    // Total count
+    /**
+     * @brief Get total count
+     * 
+     * Returns the total count. This is used for:
+     * - Count access
+     * - Pool management
+     */
     size_t size() const { return size_; }
     
-    // Memory usage
+    /**
+     * @brief Get memory usage
+     * 
+     * Returns the memory usage. This is used for:
+     * - Memory usage access
+     * - Memory statistics
+     */
     size_t memoryUsage() const;
     
 private:
     static constexpr size_t CACHE_LINE = 64;
     
+    /**
+     * @struct SynapseBlock
+     * 
+     * Neural implementation of synapse block with SoA storage.
+     * 
+     * This structure implements the synapse block, providing
+     * SoA storage for synapse states.
+     */
     struct alignas(CACHE_LINE) SynapseBlock {
-        // SoA storage for synapse states
+        /** SoA storage for synapse states */
         std::vector<uint64_t> sourceNeuron;  // Source neuron ID
         std::vector<uint64_t> destinationNeuron;  // Dest neuron ID
         std::vector<float> weight;
@@ -351,23 +724,39 @@ private:
         std::vector<uint8_t> synapseType;  // SynapseType enum
         std::vector<uint8_t> plasticityFlags;  // Packed flags
         
-        // Short-term plasticity
+        /** Short-term plasticity */
         std::vector<float> shortTermDepression;
         std::vector<float> shortTermFacilitation;
         std::vector<float> lastPreSpikeTime;
         std::vector<float> lastPostSpikeTime;
         
-        // Eligibility trace
+        /** Eligibility trace */
         std::vector<float> eligibilityTrace;
         
-        // Synaptic efficacy
+        /** Synaptic efficacy */
         std::vector<float> efficacy;
         
+        /**
+         * @brief Default constructor
+         * 
+         * Creates a default synapse block with default parameters.
+         */
         SynapseBlock() {}
     };
     
+    /**
+     * Total synapse count
+     */
     size_t size_;
+    
+    /**
+     * Block capacity
+     */
     size_t capacity_;
+    
+    /**
+     * Blocks of synapses
+     */
     std::vector<std::unique_ptr<SynapseBlock>> blocks_;
     std::vector<SynapseIndex> freeList_;
     std::atomic<size_t> freeListTop_;

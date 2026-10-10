@@ -1,7 +1,50 @@
 #pragma once
 
 /**
- * Performance Infrastructure
+ * @file Performance.hpp
+ * 
+ * Performance infrastructure configuration for NLM
+ * 
+ * This file provides the performance infrastructure configuration for NLM, implementing:
+ * - Performance feature configuration
+ * - Memory pool configuration
+ * - SIMD configuration
+ * - Multithreading configuration
+ * - Build-time performance optimization
+ * 
+ * The performance infrastructure in NLM:
+ * - **Performance features**: Performance optimization features
+ * - **Memory pools**: Memory pool allocators
+ * - **SIMD**: Single instruction multiple data
+ * - **Multithreading**: Multithreading support
+ * - **Configuration**: Build-time performance configuration
+ * 
+ * Key features:
+ * - **Performance features**: Performance optimization features
+ * - **Memory pools**: Memory pool allocators
+ * - **SIMD**: Single instruction multiple data
+ * - **Multithreading**: Multithreading support
+ * - **Configuration**: Build-time performance configuration
+ * 
+ * Performance characteristics in NLM:
+ * - **Performance features**: Performance optimization features
+ * - **Memory pools**: Memory pool allocators
+ * - **SIMD**: Single instruction multiple data
+ * - **Multithreading**: Multithreading support
+ * - **Configuration**: Build-time performance configuration
+ * 
+ * @note Critical for performance optimization
+ * @note Used extensively in performance systems
+ * @note Essential for scaling to large networks
+ * @see Performance.cpp - For implementation details
+ * 
+ * @author NLM Development Team
+ * @date 2026
+ * @version 1.0
+ */
+
+/**
+ * @brief Performance Infrastructure
  * 
  * Phase 5 introduces comprehensive performance optimization for large-scale neural simulation:
  * 

@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_json_yaml_config {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -59,6 +63,15 @@ int main() {
     std::cout << "Running Config tests..." << std::endl;
     try {
         test_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running JSON/YAML Config tests..." << std::endl;
+    try {
+        test_json_yaml_config::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
@@ -112,8 +125,7 @@ int main() {
     
     std::cout << "Running Brain tests..." << std::endl;
     try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
+        test_brain::runAll();\n        std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;

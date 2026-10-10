@@ -29,158 +29,424 @@
 
 namespace nlm {
 
+/**
+ * @file EventQueue.hpp
+ * 
+ * Event queue system for NLM
+ * 
+ * This file provides the event queue system for NLM, implementing:
+ * - Spike event management
+ * - Lock-free ring buffer
+ * - Delayed spike queue
+ * - Priority event queue
+ * - Event processing pipeline
+ * 
+ * The event queue system in NLM:
+ * - **SpikeEvent**: Spike event with minimal data for queue processing
+ * - **SpikeRingBuffer**: SPSC ring buffer for immediate spike events
+ * - **DelayedSpikeQueue**: Time-bucketed delayed spike queue
+ * - **PriorityEventQueue**: Priority event queue for time-sensitive events
+ * - **Event processing**: Event processing pipeline
+ * 
+ * Key features:
+ * - **Spike event management**: Spike event management
+ * - **Lock-free ring buffer**: Lock-free ring buffer
+ * - **Delayed spike queue**: Delayed spike queue
+ * - **Priority event queue**: Priority event queue
+ * - **Event processing**: Event processing pipeline
+ * 
+ * Event characteristics in NLM:
+ * - **Spike event management**: Spike event management
+ * - **Lock-free ring buffer**: Lock-free ring buffer
+ * - **Delayed spike queue**: Delayed spike queue
+ * - **Priority event queue**: Priority event queue
+ * - **Event processing**: Event processing pipeline
+ * 
+ * @note Critical for performance optimization
+ * @note Used extensively in event systems
+ * @note Essential for spike processing
+ * @see EventQueue.cpp - For implementation details
+ * 
+ * @author NLM Development Team
+ * @date 2026
+ * @version 1.0
+ */
+
 // Constants for event queue sizing
 constexpr size_t SPIKE_QUEUE_CAPACITY = 16384;  // Must be power of 2
 constexpr size_t DELAYED_SPIKE_BUCKETS = 1024;  // Number of time buckets
 constexpr size_t MAX_DELAY_STEPS = 100;  // Maximum synaptic delay in steps
 
 /**
- * SpikeEvent with minimal data for queue processing
+ * @struct QueuedSpikeEvent
+ * 
+ * Neural implementation of spike event with minimal data for queue processing.
+ * 
+ * This structure implements the spike event, providing
+ * spike event with minimal data for queue processing. It is essential for:
+ * - **Spike event**: Spike event with minimal data
+ * - **Event storage**: Event storage
+ * - **Event transmission**: Event transmission
+ * - **Spike processing**: Spike processing
+ * - **Event queuing**: Event queuing
+ * 
+ * Spike event characteristics in NLM:
+ * - **Spike event**: Spike event with minimal data
+ * - **Event storage**: Event storage
+ * - **Event transmission**: Event transmission
+ * - **Spike processing**: Spike processing
+ * - **Event queuing**: Event queuing
+ * 
+ * Key components:
+ * - **Source neuron**: Source neuron
+ * - **Destination neuron**: Destination neuron
+ * - **Synapse ID**: Synapse ID
+ * - **Weight**: Weight
+ * - **Excitatory**: Excitatory
+ * 
+ * @note Spike event with minimal data for queue processing
+ * 
+ * @author NLM Development Team
  */
 struct alignas(16) QueuedSpikeEvent {
+    /** Source neuron */
     uint64_t sourceNeuron;
+    
+    /** Destination neuron */
     uint64_t destNeuron;
+    
+    /** Synapse ID */
     uint64_t synapseId;
+    
+    /** Weight */
     float weight;
+    
+    /** Is excitatory */
     uint8_t isExcitatory;
+    
+    /** Padding for cache alignment */
     uint8_t padding[7];  // Pad to 16 bytes for cache alignment
     
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default queued spike event with default parameters.
+     * The queued spike event is initialized with default values for
+     * all event fields.
+     */
     QueuedSpikeEvent() : sourceNeuron(0), destNeuron(0), synapseId(0), 
                          weight(0.0f), isExcitatory(1), padding{} {}
     
+    /**
+     * @brief Parameterized constructor
+     * 
+     * Creates a queued spike event with specified parameters.
+     * The queued spike event is initialized with specified source,
+     * destination, synapse, weight, and excitatory flags.
+     */
     QueuedSpikeEvent(uint64_t src, uint64_t dst, uint64_t syn, float w, bool exc)
         : sourceNeuron(src), destNeuron(dst), synapseId(syn), weight(w), 
           isExcitatory(exc ? 1 : 0), padding{} {}
 };
 
 /**
- * SPSC Ring Buffer for immediate spike events
+ * @class SpikeRingBuffer
  * 
- * Lock-free single-producer single-consumer queue.
- * Uses atomic head/tail indices with modulo arithmetic.
+ * Neural implementation of SPSC ring buffer for immediate spike events.
+ * 
+ * This class implements the SPSC ring buffer, providing
+ * SPSC ring buffer for immediate spike events. It is essential for:
+ * - **Spike event storage**: Spike event storage
+ * - **Lock-free processing**: Lock-free processing
+ * - **Ring buffer**: Ring buffer
+ * - **Event queuing**: Event queuing
+ * - **Event dequeuing**: Event dequeuing
+ * 
+ * Ring buffer characteristics in NLM:
+ * - **Spike event storage**: Spike event storage
+ * - **Lock-free processing**: Lock-free processing
+ * - **Ring buffer**: Ring buffer
+ * - **Event queuing**: Event queuing
+ * - **Event dequeuing**: Event dequeuing
+ * 
+ * Key components:
+ * - **Buffer capacity**: Buffer capacity
+ * - **Buffer mask**: Buffer mask
+ * - **Buffer storage**: Buffer storage
+ * - **Head index**: Head index
+ * - **Tail index**: Tail index
+ * 
+ * @note Lock-free single-producer single-consumer (SPSC) ring buffer
+ * @see EventQueue.cpp - For implementation details
+ * 
+ * @author NLM Development Team
  */
 class SpikeRingBuffer {
 public:
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default spike ring buffer with default parameters.
+     * The spike ring buffer is initialized with default values for
+     * all buffer fields.
+     */
     explicit SpikeRingBuffer(size_t capacity = SPIKE_QUEUE_CAPACITY);
-    ~SpikeRingBuffer();
-    
-    // Disable copying
-    SpikeRingBuffer(const SpikeRingBuffer&) = delete;
-    SpikeRingBuffer& operator=(const SpikeRingBuffer&) = delete;
     
     /**
-     * Push a spike event to the queue
-     * @return true if event was enqueued, false if queue is full
+     * @brief Destructor
+     * 
+     * Cleans up spike ring buffer resources and performs any necessary
+     * cleanup operations. The spike ring buffer is left in a valid but
+     * non-operational state after destruction.
+     */
+    ~SpikeRingBuffer();
+    
+    /**
+     * @brief Push a spike event to the queue
+     * 
+     * Pushes a spike event to the queue. This is used for:
+     * - Event queuing
+     * - Event storage
+     * - Event processing
+     * - Event control
      */
     bool push(const QueuedSpikeEvent& event);
     
     /**
-     * Pop a spike event from the queue
-     * @return event if available, empty optional if queue is empty
+     * @brief Pop a spike event from the queue
+     * 
+     * Pops a spike event from the queue. This is used for:
+     * - Event dequeuing
+     * - Event retrieval
+     * - Event processing
+     * - Event control
      */
     std::optional<QueuedSpikeEvent> pop();
     
     /**
-     * Check if queue is empty
+     * @brief Check if queue is empty
+     * 
+     * Checks if the queue is empty. This is used for:
+     * - Empty checking
+     * - Queue status checking
+     * - Event processing
+     * - Event control
      */
     bool empty() const;
     
     /**
-     * Check if queue is full
+     * @brief Check if queue is full
+     * 
+     * Checks if the queue is full. This is used for:
+     * - Full checking
+     * - Queue status checking
+     * - Event processing
+     * - Event control
      */
     bool full() const;
     
     /**
-     * Get number of events in queue
+     * @brief Get number of events in queue
+     * 
+     * Returns the number of events in queue. This is used for:
+     * - Event count access
+     * - Event count management
+     * - Event processing
+     * - Event control
      */
     size_t size() const;
     
     /**
-     * Get queue capacity
+     * @brief Get queue capacity
+     * 
+     * Returns the queue capacity. This is used for:
+     * - Capacity access
+     * - Capacity management
+     * - Event processing
+     * - Event control
      */
     size_t capacity() const { return capacity_; }
     
     /**
-     * Clear all events
+     * @brief Clear all events
+     * 
+     * Clears all events. This is used for:
+     * - Event clearing
+     * - Queue clearing
+     * - Event processing
+     * - Event control
      */
     void clear();
     
 private:
+    /** Buffer capacity */
     const size_t capacity_;
+    
+    /** Bit mask for fast modulo (capacity must be power of 2) */
     const size_t mask_;  // Bit mask for fast modulo (capacity must be power of 2)
     
-    // Storage
+    /** Storage */
     std::vector<QueuedSpikeEvent> buffer_;
     
-    // Atomic indices
-    std::atomic<size_t> head_;   // Written by consumer
-    std::atomic<size_t> tail_;   // Written by producer
+    /** Atomic head index (written by consumer) */
+    std::atomic<size_t> head_;
+    
+    /** Atomic tail index (written by producer) */
+    std::atomic<size_t> tail_;
 };
 
 /**
- * Time-bucketed delayed spike queue
+ * @class DelayedSpikeQueue
  * 
- * Organizes delayed spikes into time buckets for efficient processing.
- * Each bucket contains spikes scheduled for delivery at that simulation step.
+ * Neural implementation of time-bucketed delayed spike queue.
  * 
- * Biological motivation:
- * - Synaptic delays vary (1-20ms typically)
- * - Spikes are delivered after their delay period
- * - Grouping by delivery time enables efficient batch processing
+ * This class implements the delayed spike queue, providing
+ * time-bucketed delayed spike queue. It is essential for:
+ * - **Delayed spike processing**: Delayed spike processing
+ * - **Time bucketing**: Time bucketing
+ * - **Bucket processing**: Bucket processing
+ * - **Event scheduling**: Event scheduling
+ * - **Event delivery**: Event delivery
+ * 
+ * Delayed spike characteristics in NLM:
+ * - **Delayed spike processing**: Delayed spike processing
+ * - **Time bucketing**: Time bucketing
+ * - **Bucket processing**: Bucket processing
+ * - **Event scheduling**: Event scheduling
+ * - **Event delivery**: Event delivery
+ * 
+ * Key components:
+ * - **Number of buckets**: Number of buckets
+ * - **Max delay steps**: Max delay steps
+ * - **Current step**: Current step
+ * - **Oldest step**: Oldest step
+ * - **Bucket storage**: Bucket storage
+ * 
+ * @note Time-bucketed delayed spike queue
+ * @see EventQueue.cpp - For implementation details
+ * 
+ * @author NLM Development Team
  */
 class DelayedSpikeQueue {
 public:
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default delayed spike queue with default parameters.
+     * The delayed spike queue is initialized with default values for
+     * all queue fields.
+     */
     DelayedSpikeQueue(size_t numBuckets = DELAYED_SPIKE_BUCKETS, 
                       size_t maxDelaySteps = MAX_DELAY_STEPS);
+    
+    /**
+     * @brief Destructor
+     * 
+     * Cleans up delayed spike queue resources and performs any necessary
+     * cleanup operations. The delayed spike queue is left in a valid but
+     * non-operational state after destruction.
+     */
     ~DelayedSpikeQueue();
     
-    // Disable copying
-    DelayedSpikeQueue(const DelayedSpikeQueue&) = delete;
-    DelayedSpikeQueue& operator=(const DelayedSpikeQueue&) = delete;
-    
     /**
-     * Schedule a spike for delivery at a future step
+     * @brief Schedule a spike for delivery at a future step
+     * 
+     * Schedules a spike for delivery at a future step. This is used for:
+     * - Event scheduling
+     * - Delayed spike processing
+     * - Event queuing
+     * - Event delivery
      */
     void schedule(uint64_t sourceNeuron, uint64_t destNeuron, uint64_t synapseId,
-                  float weight, bool isExcitatory, uint64_t deliveryStep);
+                   float weight, bool isExcitatory, uint64_t deliveryStep);
     
     /**
-     * Get all spikes scheduled for delivery at current step
-     * @return Vector of spikes (ownership transferred)
+     * @brief Get all spikes scheduled for delivery at current step
+     * 
+     * Returns all spikes scheduled for delivery at current step. This is used for:
+     * - Spike retrieval
+     * - Event processing
+     * - Spike delivery
+     * - Event control
      */
     std::vector<QueuedSpikeEvent> getDueSpikes(uint64_t currentStep);
     
     /**
-     * Get count of pending delayed spikes
+     * @brief Get count of pending delayed spikes
+     * 
+     * Returns the count of pending delayed spikes. This is used for:
+     * - Pending count access
+     * - Pending count management
+     * - Event processing
+     * - Event control
      */
     size_t pendingCount() const;
     
     /**
-     * Get count of spikes in a specific bucket
+     * @brief Get count of spikes in a specific bucket
+     * 
+     * Returns the count of spikes in a specific bucket. This is used for:
+     * - Bucket size access
+     * - Bucket management
+     * - Event processing
+     * - Event control
      */
     size_t bucketSize(uint64_t step) const;
     
     /**
-     * Clear all pending spikes
+     * @brief Clear all pending spikes
+     * 
+     * Clears all pending spikes. This is used for:
+     * - Spike clearing
+     * - Queue clearing
+     * - Event processing
+     * - Event control
      */
     void clear();
     
     /**
-     * Advance time bucket (call at end of simulation step)
-     * Removes old buckets and rotates window
+     * @brief Advance time bucket
+     * 
+     * Advances time bucket (call at end of simulation step). This is used for:
+     * - Time advancement
+     * - Bucket management
+     * - Event processing
+     * - Event control
      */
     void advanceTime(uint64_t currentStep);
     
 private:
+    /**
+     * @struct SpikeBucket
+     * 
+     * Neural implementation of spike bucket.
+     * 
+     * This structure implements the spike bucket, providing
+     * spike bucket for event queuing.
+     */
     struct alignas(64) SpikeBucket {
-        // Each bucket is a small ring buffer for spikes due at that step
+        /**
+         * Bucket capacity
+         */
         static constexpr size_t BUCKET_CAPACITY = 256;
         
+        /** Event storage */
         QueuedSpikeEvent events[BUCKET_CAPACITY];
+        
+        /** Atomic event count */
         std::atomic<size_t> count;
+        
+        /** Atomic read index */
         std::atomic<size_t> readIndex;
+        
+        /** Atomic write index */
         std::atomic<size_t> writeIndex;
         
+        /**
+         * @brief Default constructor
+         * 
+         * Creates a default spike bucket with default parameters.
+         */
         SpikeBucket() : count(0), readIndex(0), writeIndex(0) {
             // Zero the events array
             for (auto& e : events) {
@@ -188,6 +454,13 @@ private:
             }
         }
         
+        /**
+         * @brief Push a spike event to bucket
+         * 
+         * Pushes a spike event to bucket. This is used for:
+         * - Event queuing
+         * - Bucket processing
+         */
         bool push(const QueuedSpikeEvent& event) {
             if (count.load(std::memory_order_relaxed) >= BUCKET_CAPACITY) {
                 return false;
@@ -198,6 +471,13 @@ private:
             return true;
         }
         
+        /**
+         * @brief Drain all spikes from bucket
+         * 
+         * Drains all spikes from bucket. This is used for:
+         * - Spike draining
+         * - Event retrieval
+         */
         std::vector<QueuedSpikeEvent> drain() {
             std::vector<QueuedSpikeEvent> result;
             size_t cnt = count.load(std::memory_order_acquire);
@@ -210,35 +490,97 @@ private:
             return result;
         }
         
+        /**
+         * @brief Get bucket size
+         * 
+         * Returns the bucket size. This is used for:
+         * - Bucket size access
+         * - Bucket management
+         */
         size_t size() const { return count.load(std::memory_order_acquire); }
     };
     
+    /** Number of buckets */
     size_t numBuckets_;
+    
+    /** Maximum delay steps */
     size_t maxDelaySteps_;
+    
+    /** Current step */
     uint64_t currentStep_;
+    
+    /** Oldest step */
     uint64_t oldestStep_;
     
-    // Circular buffer of buckets
+    /** Circular buffer of buckets */
     std::vector<SpikeBucket> buckets_;
+    
+    /** Pending bucket counts */
     std::vector<size_t> pendingCounts_;
 };
 
 /**
- * Priority Event Queue for time-sensitive events
+ * @class PriorityEventQueue
  * 
- * Uses a small priority queue for events that need strict ordering.
- * Used for neuromodulatory events, plasticity updates, etc.
+ * Neural implementation of priority event queue for time-sensitive events.
+ * 
+ * This class implements the priority event queue, providing
+ * priority event queue for time-sensitive events. It is essential for:
+ * - **Priority event processing**: Priority event processing
+ * - **Event ordering**: Event ordering
+ * - **Priority management**: Priority management
+ * - **Time-sensitive processing**: Time-sensitive processing
+ * - **Event prioritization**: Event prioritization
+ * 
+ * Priority event characteristics in NLM:
+ * - **Priority event processing**: Priority event processing
+ * - **Event ordering**: Event ordering
+ * - **Priority management**: Priority management
+ * - **Time-sensitive processing**: Time-sensitive processing
+ * - **Event prioritization**: Event prioritization
+ * 
+ * Key components:
+ * - **Max priority events**: Max priority events
+ * - **Priority event**: Priority event
+ * - **Event storage**: Event storage
+ * - **Event pushing**: Event pushing
+ * - **Event popping**: Event popping
+ * 
+ * @note Priority event queue for time-sensitive events
+ * @see EventQueue.cpp - For implementation details
+ * 
+ * @author NLM Development Team
  */
 class PriorityEventQueue {
 public:
+    /**
+     * Maximum priority events
+     */
     static constexpr size_t MAX_PRIORITY_EVENTS = 4096;
     
+    /**
+     * @brief Priority event
+     * 
+     * Priority event for queue processing.
+     */
     struct PriorityEvent {
+        /** Timestamp */
         uint64_t timestamp;
-        uint8_t priority;  // 0 = highest priority
-        uint16_t eventType;  // Event type ID
-        uint64_t data[4];  // Event-specific data
         
+        /** Priority (0 = highest priority) */
+        uint8_t priority;
+        
+        /** Event type ID */
+        uint16_t eventType;
+        
+        /** Event-specific data */
+        uint64_t data[4];
+        
+        /**
+         * @brief Comparison operator
+         * 
+         * Comparison operator for priority queue.
+         */
         bool operator<(const PriorityEvent& other) const {
             // Lower priority value = higher priority in min-heap
             if (priority != other.priority) return priority > other.priority;
@@ -246,39 +588,83 @@ public:
         }
     };
     
+    /**
+     * @brief Default constructor
+     * 
+     * Creates a default priority event queue with default parameters.
+     * The priority event queue is initialized with default values for
+     * all queue fields.
+     */
     PriorityEventQueue();
     
     /**
-     * Push a priority event
+     * @brief Push a priority event
+     * 
+     * Pushes a priority event. This is used for:
+     * - Event pushing
+     * - Event storage
+     * - Event processing
+     * - Event control
      */
     void push(uint64_t timestamp, uint8_t priority, uint16_t type, const uint64_t* data = nullptr);
     
     /**
-     * Pop the highest priority event
+     * @brief Pop the highest priority event
+     * 
+     * Pops the highest priority event. This is used for:
+     * - Event popping
+     * - Event retrieval
+     * - Event processing
+     * - Event control
      */
     std::optional<PriorityEvent> pop();
     
     /**
-     * Get all events due before a timestamp
+     * @brief Get all events due before a timestamp
+     * 
+     * Returns all events due before a timestamp. This is used for:
+     * - Event retrieval
+     * - Event processing
+     * - Event scheduling
+     * - Event control
      */
     std::vector<PriorityEvent> getDueEvents(uint64_t currentTime);
     
     /**
-     * Check if empty
+     * @brief Check if empty
+     * 
+     * Checks if the queue is empty. This is used for:
+     * - Empty checking
+     * - Queue status checking
+     * - Event processing
+     * - Event control
      */
     bool empty() const { return events_.empty(); }
     
     /**
-     * Clear all events
+     * @brief Clear all events
+     * 
+     * Clears all events. This is used for:
+     * - Event clearing
+     * - Queue clearing
+     * - Event processing
+     * - Event control
      */
     void clear() { events_.clear(); }
     
     /**
-     * Get count
+     * @brief Get count
+     * 
+     * Returns the count. This is used for:
+     * - Count access
+     * - Count management
+     * - Event processing
+     * - Event control
      */
     size_t size() const { return events_.size(); }
-
+    
 private:
+    /** Event storage */
     std::vector<PriorityEvent> events_;
 };
 

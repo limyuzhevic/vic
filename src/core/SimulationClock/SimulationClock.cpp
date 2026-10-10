@@ -1,4 +1,5 @@
 #include "SimulationClock.hpp"
+#include "../ErrorHandling.hpp"
 #include <chrono>
 
 namespace nlm {
@@ -14,97 +15,205 @@ struct SimulationClock::Impl {
         : step(0), time(0.0), timestep(dt), realStartSet(false) {}
 };
 
-SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
+SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(std::make_unique<Impl>(timestep)) {}
 
 SimulationClock::~SimulationClock() = default;
 
-SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
 
 void SimulationClock::reset() {
-    pImpl->step = 0;
-    pImpl->time = 0.0;
-    pImpl->realStartSet = false;
+    try {
+        pImpl->step = 0;
+        pImpl->time = 0.0;
+        pImpl->realStartSet = false;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to reset simulation clock");
+    }
 }
 
 void SimulationClock::advance() {
-    ++pImpl->step;
-    pImpl->time += pImpl->timestep;
+    try {
+        ++pImpl->step;
+        pImpl->time += pImpl->timestep;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to advance simulation clock");
+    }
 }
 
 SimulationStep SimulationClock::getStep() const {
-    return pImpl->step;
+    try {
+        return pImpl->step;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to get simulation step");
+    }
 }
 
 void SimulationClock::setStep(SimulationStep step) {
-    pImpl->step = step;
-    pImpl->time = step * pImpl->timestep;
+    try {
+        pImpl->step = step;
+        pImpl->time = step * pImpl->timestep;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to set simulation step");
+    }
 }
 
 Timestamp SimulationClock::getTime() const {
-    return pImpl->time;
+    try {
+        return pImpl->time;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to get simulation time");
+    }
 }
 
 void SimulationClock::setTime(Timestamp time) {
-    pImpl->time = time;
-    pImpl->step = static_cast<SimulationStep>(time / pImpl->timestep);
+    try {
+        pImpl->time = time;
+        pImpl->step = static_cast<SimulationStep>(time / pImpl->timestep);
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to set simulation time");
+    }
 }
 
 TimestepDuration SimulationClock::getTimestep() const {
-    return pImpl->timestep;
+    try {
+        return pImpl->timestep;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to get simulation timestep");
+    }
 }
 
 void SimulationClock::setTimestep(TimestepDuration dt) {
-    pImpl->timestep = dt;
+    try {
+        pImpl->timestep = dt;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to set simulation timestep");
+    }
 }
 
 bool SimulationClock::isFirstStep() const {
-    return pImpl->step == 0;
+    try {
+        return pImpl->step == 0;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to check if simulation is at first step");
+    }
 }
 
 bool SimulationClock::isLastStep(SimulationStep totalSteps) const {
-    return pImpl->step >= totalSteps;
+    try {
+        return pImpl->step >= totalSteps;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to check if simulation is at last step");
+    }
 }
 
 Timestamp SimulationClock::stepToTime(SimulationStep step) const {
-    return step * pImpl->timestep;
+    try {
+        return step * pImpl->timestep;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to convert step to time");
+    }
 }
 
 SimulationStep SimulationClock::timeToStep(Timestamp time) const {
-    return static_cast<SimulationStep>(time / pImpl->timestep);
+    try {
+        return static_cast<SimulationStep>(time / pImpl->timestep);
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to convert time to step");
+    }
 }
 
 void SimulationClock::advanceBy(SimulationStep steps) {
-    pImpl->step += steps;
-    pImpl->time += steps * pImpl->timestep;
+    try {
+        pImpl->step += steps;
+        pImpl->time += steps * pImpl->timestep;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to advance simulation by steps");
+    }
 }
 
 Timestamp SimulationClock::timeAtFutureStep(SimulationStep stepsAhead) const {
-    return pImpl->time + (stepsAhead * pImpl->timestep);
+    try {
+        return pImpl->time + (stepsAhead * pImpl->timestep);
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to get time at future step");
+    }
 }
 
 double SimulationClock::getRealTimeElapsed() const {
-    if (!pImpl->realStartSet) {
-        return 0.0;
+    try {
+        if (!pImpl->realStartSet) {
+            return 0.0;
+        }
+        auto now = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(now - pImpl->realStart);
+        return duration.count();
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to get real time elapsed");
     }
-    auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(now - pImpl->realStart);
-    return duration.count();
 }
 
 void SimulationClock::setRealTimeStart() {
-    pImpl->realStart = std::chrono::steady_clock::now();
-    pImpl->realStartSet = true;
+    try {
+        pImpl->realStart = std::chrono::steady_clock::now();
+        pImpl->realStartSet = true;
+    } catch (const NLMError&) {
+        throw;
+    } catch (const std::exception& e) {
+        NLM_THROW_ERROR(ErrorCode::Component_OperationFailed,
+                       "Failed to set real time start");
+    }
 }
 
 } // namespace nlm

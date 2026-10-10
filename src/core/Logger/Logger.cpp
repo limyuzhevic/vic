@@ -1,4 +1,5 @@
 #include "Logger.hpp"
+#include "../ErrorHandling.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -176,14 +177,46 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
-Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+void Logger::logError(const NLMError& error) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    LogEntry entry;
+    entry.level = LogLevel::Error;
+    entry.message = error.what();
+    entry.file = error.file();
+    entry.line = error.line();
+    entry.function = error.function();
+    entry.timestamp = std::chrono::system_clock::now();
+    
+    for (auto& logger : pImpl->loggers) {
+        logger->log(entry);
+    }
 }
 
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+void Logger::logError(ErrorCode code, const std::string& message,
+                     const std::string& file, int line,
+                     const std::string& function) {
+    NLMError error(code, message, file, line, function);
+    logError(error);
+}
+
+ErrorHandler& Logger::getErrorHandler() {
+    static ErrorHandler errorHandler;
+    return errorHandler;
+}
+
+void Logger::setErrorCallback(ErrorHandler::ErrorCallback callback) {
+    ErrorHandler::setErrorCallback(std::move(callback));
+}
+
+void Logger::handleError(const NLMError& error) {
+    getGlobal().logError(error);
+}
+
+void Logger::handleError(ErrorCode code, const std::string& message,
+                        const std::string& file, int line,
+                        const std::string& function) {
+    getGlobal().logError(code, message, file, line, function);
 }
 
 // LogStream implementation
