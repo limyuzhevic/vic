@@ -71,14 +71,54 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+        try {
+            // First close any existing file
+            if (pImpl->fileOut.is_open()) {
+                pImpl->fileOut.close();
+            }
+            
+            // Attempt to open the new file
+            pImpl->fileOut.open(filepath, std::ios::app);
+            
+            // Check if the file was successfully opened
+            if (!pImpl->fileOut.is_open()) {
+                // Log error using current console since file logging failed
+                std::cerr << "[ERROR] Failed to open log file: " << filepath << std::endl;
+                return;
+            }
+            
+            // Check if file is actually writable
+            pImpl->fileOut.flush();
+            if (pImpl->fileOut.bad()) {
+                std::cerr << "[ERROR] Log file is not writable: " << filepath << std::endl;
+                pImpl->fileOut.close();
+                return;
+            }
+            
+            // Log successful file opening
+            std::cout << "[INFO] Log file opened: " << filepath << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "[ERROR] Exception opening log file " << filepath 
+                      << ": " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[ERROR] Unknown exception opening log file: " << filepath << std::endl;
+        }
     }
-}
+
+    void ConsoleLogger::closeOutputFile() {
+        try {
+            if (pImpl->fileOut.is_open()) {
+                pImpl->fileOut.flush();
+                pImpl->fileOut.close();
+                std::cout << "[INFO] Log file closed successfully" << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[ERROR] Exception closing log file: " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[ERROR] Unknown exception closing log file" << std::endl;
+        }
+    }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
@@ -110,7 +150,16 @@ struct Logger::Impl {
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    try {
+        clearLoggers();
+    } catch (const std::exception& e) {
+        // Log the exception if possible during destruction
+        std::cerr << "[ERROR] Exception during Logger destruction: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[ERROR] Unknown exception during Logger destruction" << std::endl;
+    }
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);

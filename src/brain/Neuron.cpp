@@ -27,12 +27,20 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->type = NeuronType::Internal;
-    pImpl->regionId = INVALID_REGION_ID;
-    pImpl->populationId = INVALID_POPULATION_ID;
-    pImpl->totalCurrent = 0.0f;
+Neuron::Neuron(NeuronId id) {
+    try {
+        pImpl.reset(new Impl);
+        if (!pImpl) {
+            throw std::runtime_error("Failed to allocate Neuron memory");
+        }
+        pImpl->id = id;
+        pImpl->type = NeuronType::Internal;
+        pImpl->regionId = INVALID_REGION_ID;
+        pImpl->populationId = INVALID_POPULATION_ID;
+        pImpl->totalCurrent = 0.0f;
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception in Neuron constructor: " + std::string(e.what()));
+    }
 }
 
 Neuron::~Neuron() = default;
@@ -181,11 +189,25 @@ void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
 }
 
 void Neuron::setRegionId(RegionId region) {
+    if (!pImpl) {
+        return;
+    }
     pImpl->regionId = region;
 }
 
+RegionId Neuron::getRegionId() const {
+    return pImpl ? pImpl->regionId : INVALID_REGION_ID;
+}
+
 void Neuron::setPopulationId(PopulationId population) {
+    if (!pImpl) {
+        return;
+    }
     pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl ? pImpl->populationId : INVALID_POPULATION_ID;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {

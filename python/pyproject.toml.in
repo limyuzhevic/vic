@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pynlm"
+version = "0.1.0"
+description = "Python bindings for NLM neural simulation framework"
+authors = [
+    {name = "NLM Developers", email = "contact@nlm.org"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=2.12.0",
+    "black>=22.0.0",
+    "flake8>=3.9.0",
+    "mypy>=0.991.0",
+]
+
+[project.urls]
+homepage = "https://github.com/nlm-project/nlm"
+repository = "https://github.com/nlm-project/nlm"
+"documentation" = "https://nlm.readthedocs.io"
+bug-tracker = "https://github.com/nlm-project/nlm/issues"
+
+[tool.setuptools]
+packages = [
+    "pynlm",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+skip-string-normalization = false
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

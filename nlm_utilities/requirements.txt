@@ -1,0 +1,33 @@
+# NLM Advanced Utilities
+# Package dependencies for advanced NLM neural simulation framework utilities
+
+# Core dependencies
+numpy>=1.20,<2.0
+pandas>=1.3,<3.0
+matplotlib>=3.3,<4.0
+scipy>=1.6,<2.0
+networkx>=2.6,<3.0
+h5py>=3.1,<4.0
+pyyaml>=5.4,<7.0
+
+# Optional dependencies for enhanced functionality
+# These can be installed separately if needed
+# jupyter>=1.0.0  # For notebook integration
+# plotly>=5.0.0   # For interactive visualizations
+# seaborn>=0.11.0 # For statistical plotting
+
+# Development dependencies (for package development)
+pytest>=7.0.0
+pytest-cov>=2.12.0
+black>=22.0.0
+flake8>=3.9.0
+mypy>=0.991.0
+
+# Performance monitoring additions
+psutil>=5.8.0
+
+# Data processing
+numba>=0.54.0
+
+# Configuration validation
+jsonschema>=4.0.0

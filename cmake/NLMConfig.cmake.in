@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# Add any additional configuration here
+# find_dependency for required packages if needed
+
+# Include per-configuration compiler/linker flags
+include(CMakeFindDependencyMacro)

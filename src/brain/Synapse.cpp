@@ -46,20 +46,27 @@ struct Synapse::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
 
-Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
-    pImpl->id = id;
-    pImpl->sourceNeuron = source;
-    pImpl->destinationNeuron = destination;
-    pImpl->weight = 0.0f;
-    pImpl->delay = 1;  // Default: 1 step delay
-    pImpl->type = SynapseType::Excitatory;
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
+Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination) {
+    try {
+        pImpl.reset(new Impl);
+        if (!pImpl) {
+            throw std::runtime_error("Failed to allocate Synapse memory");
+        }
+        pImpl->id = id;
+        pImpl->sourceNeuron = source;
+        pImpl->destinationNeuron = destination;
+        pImpl->weight = 0.0f;
+        pImpl->delay = 1;  // Default: 1 step delay
+        pImpl->type = SynapseType::Excitatory;
+        pImpl->eligibilityTrace = 0.0f;
+        pImpl->efficacy = 1.0f;
+        pImpl->shortTermDepression = 1.0f;
+        pImpl->shortTermFacilitation = 0.0f;
+        pImpl->lastPreSpikeTime = -1.0f;
+        pImpl->lastPostSpikeTime = -1.0f;
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception in Synapse constructor: " + std::string(e.what()));
+    }
 }
 
 Synapse::~Synapse() = default;
