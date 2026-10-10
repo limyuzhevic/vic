@@ -144,7 +144,7 @@ void Neuron::injectCurrent(MembranePotential current) {
 }
 
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
@@ -195,7 +195,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
+        pImpl->totalCurrent = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }

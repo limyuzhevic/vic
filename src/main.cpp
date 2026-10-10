@@ -327,9 +327,7 @@ int main(int argc, char** argv) {
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
+    auto logger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
@@ -343,7 +341,7 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Load config from file (ignore if not found)
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -353,6 +351,8 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+            // Use the provided config file, don't fall back to default
+            break;
         }
     }
     

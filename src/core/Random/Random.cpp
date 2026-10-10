@@ -1,134 +1,105 @@
+// Random number generation system implementation for NLM
 #include "Random.hpp"
-#include <stdexcept>
+#include <random>
+#include <algorithm>
 
 namespace nlm {
 
-struct RandomGenerator::Impl {
-    std::mt19937_64 gen;
-    uint64_t currentSeed;
+RandomGenerator::RandomGenerator(uint64_t seed) : rng_(seed) {
+    // Initialize distributions with the seed
+    std::uniform_real_distribution<float> uniformFloatDist(0.0f, 1.0f);
+    std::uniform_int_distribution<int64_t> uniformIntDist(0, std::numeric_limits<int64_t>::max());
+    std::normal_distribution<float> normalDist(0.0f, 1.0f);
+    std::exponential_distribution<float> exponentialDist(1.0f);
     
-    Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
-};
-
-RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
-
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
-
-RandomGenerator::~RandomGenerator() = default;
-
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    uniformFloatDist_ = uniformFloatDist;
+    uniformIntDist_ = uniformIntDist;
+    normalDist_ = normalDist;
+    exponentialDist_ = exponentialDist;
 }
 
-RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
+define constexpr int64_t get_max_int64() {
+    return std::numeric_limits<int64_t>::max();
 }
 
-void RandomGenerator::seed(uint64_t seed) {
-    pImpl->gen.seed(seed);
-    pImpl->currentSeed = seed;
+void RandomGenerator::setSeed(uint64_t seed) {
+    rng_.seed(seed);
+    
+    // Reinitialize distributions
+    std::uniform_real_distribution<float> uniformFloatDist(0.0f, 1.0f);
+    std::uniform_int_distribution<int64_t> uniformIntDist(0, get_max_int64());
+    std::normal_distribution<float> normalDist(0.0f, 1.0f);
+    std::exponential_distribution<float> exponentialDist(1.0f);
+    
+    uniformFloatDist_ = uniformFloatDist;
+    uniformIntDist_ = uniformIntDist;
+    normalDist_ = normalDist;
+    exponentialDist_ = exponentialDist;
 }
 
 uint64_t RandomGenerator::getSeed() const {
-    return pImpl->currentSeed;
-}
-
-uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
-    if (min == max) {
-        return min;
-    }
-    std::uniform_int_distribution<uint32_t> dist(min, max);
-    return dist(pImpl->gen);
-}
-
-uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
-    if (min == max) {
-        return min;
-    }
-    std::uniform_int_distribution<uint64_t> dist(min, max);
-    return dist(pImpl->gen);
-}
-
-double RandomGenerator::uniformReal(double min, double max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
-    std::uniform_real_distribution<double> dist(min, max);
-    return dist(pImpl->gen);
+    return rng_.seed();
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
     std::uniform_real_distribution<float> dist(min, max);
-    return dist(pImpl->gen);
+    return dist(rng_);
 }
 
-double RandomGenerator::normal(double mean, double stddev) {
-    std::normal_distribution<double> dist(mean, stddev);
-    return dist(pImpl->gen);
+double RandomGenerator::uniformReal(double min, double max) {
+    std::uniform_real_distribution<double> dist(min, max);
+    return dist(rng_);
 }
 
-float RandomGenerator::normal(float mean, float stddev) {
+int64_t RandomGenerator::uniformInt(int64_t min, int64_t max) {
+    std::uniform_int_distribution<int64_t> dist(min, max);
+    return dist(rng_);
+}
+
+uint64_t RandomGenerator::uniformUint(uint64_t min, uint64_t max) {
+    std::uniform_int_distribution<uint64_t> dist(min, max);
+    return dist(rng_);
+}
+
+float RandomGenerator::gaussian(float mean, float stddev) {
     std::normal_distribution<float> dist(mean, stddev);
-    return dist(pImpl->gen);
+    return dist(rng_);
 }
 
-bool RandomGenerator::bernoulli(double p) {
-    std::bernoulli_distribution dist(p);
-    return dist(pImpl->gen);
+double RandomGenerator::gaussian(double mean, double stddev) {
+    std::normal_distribution<double> dist(mean, stddev);
+    return dist(rng_);
 }
 
-uint32_t RandomGenerator::poisson(double lambda) {
-    std::poisson_distribution<uint32_t> dist(lambda);
-    return dist(pImpl->gen);
-}
-
-double RandomGenerator::exponential(double lambda) {
-    std::exponential_distribution<double> dist(lambda);
-    return dist(pImpl->gen);
-}
-
-bool RandomGenerator::randomBool() {
-    return bernoulli(0.5);
-}
-
-uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
-}
-
-uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
-    if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
+template<typename T>
+T RandomGenerator::randomChoice(const std::vector<T>& choices) {
+    if (choices.empty()) {
+        throw std::runtime_error("Cannot choose from empty vector");
     }
-    return uniformInt(0, n - 1);
+    std::uniform_int_distribution<size_t> dist(0, choices.size() - 1);
+    return choices[dist(rng_)];
 }
 
-void RandomGenerator::fillBytes(void* data, size_t size) {
-    uint8_t* bytes = static_cast<uint8_t*>(data);
-    for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
-    }
+std::vector<size_t> RandomGenerator::shuffle(size_t count) {
+    std::vector<size_t> indices(count);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::shuffle(indices.begin(), indices.end(), rng_);
+    return indices;
 }
 
-std::mt19937_64& RandomGenerator::engine() {
-    return pImpl->gen;
+bool RandomGenerator::bernoulli(float probability) {
+    std::bernoulli_distribution dist(probability);
+    return dist(rng_);
 }
 
-const std::mt19937_64& RandomGenerator::engine() const {
-    return pImpl->gen;
+float RandomGenerator::exponential(float lambda) {
+    std::exponential_distribution<float> dist(lambda);
+    return dist(rng_);
+}
+
+std::pair<float, float> RandomGenerator::normalPair(float mean, float stddev) {
+    std::normal_distribution<float> dist(mean, stddev);
+    return {dist(rng_), dist(rng_)};
 }
 
 } // namespace nlm

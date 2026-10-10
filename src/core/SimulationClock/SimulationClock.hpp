@@ -1,62 +1,70 @@
+// Simulation clock system for NLM
 #pragma once
 
-#include "Types.hpp"
+#include <cstdint>
+#include <string>
+#include <chrono>
 
 namespace nlm {
 
-// Simulation clock for managing time in the neural simulation
-// Provides deterministic time tracking separate from wall-clock time
+using SimulationStep = uint64_t;
+using TimePoint = std::chrono::high_resolution_clock::time_point;
+using Duration = std::chrono::duration<double>;
 
 class SimulationClock {
 public:
-    // Create with specific timestep
-    explicit SimulationClock(TimestepDuration timestep = 0.001); // 1ms default
+    SimulationClock(double timestep = 0.001);
+    ~SimulationClock() = default;
     
-    ~SimulationClock();
-    
-    // Disable copying, enable moving
-    SimulationClock(const SimulationClock&) = delete;
-    SimulationClock& operator=(const SimulationClock&) = delete;
-    SimulationClock(SimulationClock&&) noexcept;
-    SimulationClock& operator=(SimulationClock&&) noexcept;
-    
-    // Time operations
-    void reset();
+    // Advance simulation by one timestep
     void advance();
     
-    // Step counter
-    SimulationStep getStep() const;
-    void setStep(SimulationStep step);
-    
-    // Current simulation time
+    // Get current simulation time
     Timestamp getTime() const;
-    void setTime(Timestamp time);
     
-    // Timestep
-    TimestepDuration getTimestep() const;
-    void setTimestep(TimestepDuration dt);
+    // Get current simulation step
+    SimulationStep getStep() const;
     
-    // Convenience queries
-    bool isFirstStep() const;
-    bool isLastStep(SimulationStep totalSteps) const;
+    // Get timestep
+    double getTimestep() const;
     
-    // Step to time conversion
-    Timestamp stepToTime(SimulationStep step) const;
-    SimulationStep timeToStep(Timestamp time) const;
+    // Set timestep
+    void setTimestep(double timestep);
     
-    // Advance by multiple steps
-    void advanceBy(SimulationStep steps);
+    // Reset simulation
+    void reset();
     
-    // Get time at a future step from now
-    Timestamp timeAtFutureStep(SimulationStep stepsAhead) const;
+    // Check if simulation has started
+    bool isRunning() const;
     
-    // Real-time wall clock comparison (for real-time mode)
+    // Get real time elapsed
     double getRealTimeElapsed() const;
-    void setRealTimeStart();
+    
+    // Get simulation time elapsed
+    double getSimulationTimeElapsed() const;
+    
+    // Get formatted time string
+    std::string getFormattedTime() const;
+    
+    // Get formatted simulation time
+    std::string getFormattedSimulationTime() const;
+    
+    // Create a copy of the current clock state
+    SimulationClock copy() const;
+    
+    // Restore clock state from another clock
+    void restore(const SimulationClock& other);
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    Timestamp currentTime_;
+    SimulationStep currentStep_;
+    double timestep_;
+    bool running_;
+    TimePoint startTime_;
+    Duration realTimeElapsed_;
+    
+    void updateRealTime();
+    void updateSimulationTime();
 };
 
 } // namespace nlm

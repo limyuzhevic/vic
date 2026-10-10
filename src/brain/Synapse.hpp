@@ -1,88 +1,100 @@
+// Synapse class for NLM - Enhanced with modern C++ patterns
 #pragma once
 
-#include "../core/Types/Types.hpp"
+#include <memory>
+#include <string>
+#include <vector>
+#include <cmath>
+#include "Types.hpp"
+#include "Random/Random.hpp"
 
 namespace nlm {
 
-// Forward declaration
-class Neuron;
-
-// Synapse representing a connection between neurons
-// Implements real synaptic transmission with delays and short-term plasticity
-
 class Synapse {
 public:
-    // Create synapse with IDs
+    // Constructor and destructor
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
+    ~Synapse() = default;
     
-    ~Synapse();
-    
-    // Disable copying, enable moving
+    // Copy and move operations
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    Synapse(Synapse&& other) noexcept;
+    Synapse& operator=(Synapse&& other) noexcept;
     
-    // Identity
+    // Basic synapse properties
     SynapseId getId() const;
-    
-    // Connection
     NeuronId getSourceNeuron() const;
     NeuronId getDestinationNeuron() const;
     
-    // Weight
+    // Weight management
     SynapticWeight getWeight() const;
     void setWeight(SynapticWeight weight);
     void addToWeight(SynapticWeight delta);
+    SynapticWeight getEffectiveWeight() const; // Weight with efficacy applied
     
-    // Delay (in simulation steps)
+    // Delay
     Delay getDelay() const;
     void setDelay(Delay delay);
     
     // Type
     SynapseType getType() const;
     void setType(SynapseType type);
-    
-    // Excitatory/Inhibitory
     bool isExcitatory() const;
     bool isInhibitory() const;
     
-    // Activity history for plasticity
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    float getShortTermFacilitation() const;
+    float getEfficacy() const;
+    void setEfficacy(float efficacy);
+    
+    // Spike history for STDP
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
+    void clearHistory();
     const std::vector<Timestamp>& getPreSpikeHistory() const;
     const std::vector<Timestamp>& getPostSpikeHistory() const;
-    void clearHistory();
+    size_t getPreSpikeCount() const;
+    size_t getPostSpikeCount() const;
     
-    // Plasticity flags
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    
-    // Enable/disable plasticity rules
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
-    
-    // Eligibility trace (for reward-modulated learning)
+    // Eligibility trace for reward-modulated learning
     float getEligibilityTrace() const;
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
-    // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    // Plasticity flags
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    const PlasticityFlags& getPlasticityFlags() const;
+    PlasticityFlags& getPlasticityFlags();
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // State management
     void step(Timestamp currentTime);
-    
-    // Reset to initial state
     void reset();
+    void initializeRandom(RandomGenerator& rng);
     
-    // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    // Utility methods
+    std::string getSynapseDescription() const;
+    bool isValid() const;
+    double getLastPreSpikeTime() const; // For short-term plasticity calculations
+    double getLastPostSpikeTime() const;
+    
+    // Observer pattern for weight changes
+    class WeightChangeObserver {
+    public:
+        virtual ~WeightChangeObserver() = default;
+        virtual void onWeightChange(Synapse* synapse, float oldWeight, float newWeight) = 0;
+    };
+    
+    void addWeightChangeObserver(std::shared_ptr<WeightChangeObserver> observer);
+    void removeWeightChangeObserver(std::shared_ptr<WeightChangeObserver> observer);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    Synapse() = default; // Internal only
+    friend class Brain;
 };
 
 } // namespace nlm

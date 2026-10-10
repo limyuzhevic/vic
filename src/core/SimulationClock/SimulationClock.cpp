@@ -1,110 +1,118 @@
+// Simulation clock system implementation for NLM
 #include "SimulationClock.hpp"
-#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
 
 namespace nlm {
 
-struct SimulationClock::Impl {
-    SimulationStep step;
-    Timestamp time;
-    TimestepDuration timestep;
-    std::chrono::steady_clock::time_point realStart;
-    bool realStartSet;
-    
-    Impl(TimestepDuration dt) 
-        : step(0), time(0.0), timestep(dt), realStartSet(false) {}
-};
-
-SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
-
-SimulationClock::~SimulationClock() = default;
-
-SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+SimulationClock::SimulationClock(double timestep) 
+    : currentTime_(0.0), currentStep_(0), timestep_(timestep), 
+      running_(false), startTime_(), realTimeElapsed_(0.0) {
+    if (timestep_ <= 0.0) {
+        timestep_ = 0.001;
     }
-    return *this;
-}
-
-void SimulationClock::reset() {
-    pImpl->step = 0;
-    pImpl->time = 0.0;
-    pImpl->realStartSet = false;
 }
 
 void SimulationClock::advance() {
-    ++pImpl->step;
-    pImpl->time += pImpl->timestep;
-}
-
-SimulationStep SimulationClock::getStep() const {
-    return pImpl->step;
-}
-
-void SimulationClock::setStep(SimulationStep step) {
-    pImpl->step = step;
-    pImpl->time = step * pImpl->timestep;
+    if (!running_) {
+        running_ = true;
+        startTime_ = std::chrono::high_resolution_clock::now();
+    }
+    
+    currentStep_++;
+    currentTime_ = currentStep_ * timestep_;
+    updateRealTime();
 }
 
 Timestamp SimulationClock::getTime() const {
-    return pImpl->time;
+    return currentTime_;
 }
 
-void SimulationClock::setTime(Timestamp time) {
-    pImpl->time = time;
-    pImpl->step = static_cast<SimulationStep>(time / pImpl->timestep);
+SimulationStep SimulationClock::getStep() const {
+    return currentStep_;
 }
 
-TimestepDuration SimulationClock::getTimestep() const {
-    return pImpl->timestep;
+double SimulationClock::getTimestep() const {
+    return timestep_;
 }
 
-void SimulationClock::setTimestep(TimestepDuration dt) {
-    pImpl->timestep = dt;
+void SimulationClock::setTimestep(double timestep) {
+    if (timestep > 0.0) {
+        timestep_ = timestep;
+    }
 }
 
-bool SimulationClock::isFirstStep() const {
-    return pImpl->step == 0;
+void SimulationClock::reset() {
+    currentTime_ = 0.0;
+    currentStep_ = 0;
+    running_ = false;
+    realTimeElapsed_ = std::chrono::duration<double>(0.0);
 }
 
-bool SimulationClock::isLastStep(SimulationStep totalSteps) const {
-    return pImpl->step >= totalSteps;
-}
-
-Timestamp SimulationClock::stepToTime(SimulationStep step) const {
-    return step * pImpl->timestep;
-}
-
-SimulationStep SimulationClock::timeToStep(Timestamp time) const {
-    return static_cast<SimulationStep>(time / pImpl->timestep);
-}
-
-void SimulationClock::advanceBy(SimulationStep steps) {
-    pImpl->step += steps;
-    pImpl->time += steps * pImpl->timestep;
-}
-
-Timestamp SimulationClock::timeAtFutureStep(SimulationStep stepsAhead) const {
-    return pImpl->time + (stepsAhead * pImpl->timestep);
+bool SimulationClock::isRunning() const {
+    return running_;
 }
 
 double SimulationClock::getRealTimeElapsed() const {
-    if (!pImpl->realStartSet) {
-        return 0.0;
-    }
-    auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(now - pImpl->realStart);
-    return duration.count();
+    return realTimeElapsed_.count();
 }
 
-void SimulationClock::setRealTimeStart() {
-    pImpl->realStart = std::chrono::steady_clock::now();
-    pImpl->realStartSet = true;
+double SimulationClock::getSimulationTimeElapsed() const {
+    return currentTime_;
+}
+
+std::string SimulationClock::getFormattedTime() const {
+    auto hours = static_cast<int>(currentTime_ / 3600.0);
+    auto minutes = static_cast<int>((currentTime_ - hours * 3600.0) / 60.0);
+    auto seconds = static_cast<int>(currentTime_ - hours * 3600.0 - minutes * 60.0);
+    auto milliseconds = static_cast<int>((currentTime_ - hours * 3600.0 - minutes * 60.0 - seconds) * 1000.0);
+    
+    std::stringstream ss;
+    ss << std::setfill('0') << std::setw(2) << hours << ":"
+       << std::setw(2) << minutes << ":"
+       << std::setw(2) << seconds << "."
+       << std::setw(3) << milliseconds;
+    
+    return ss.str();
+}
+
+std::string SimulationClock::getFormattedSimulationTime() const {
+    auto hours = static_cast<int>(currentTime_ / 3600.0);
+    auto minutes = static_cast<int>((currentTime_ - hours * 3600.0) / 60.0);
+    auto seconds = static_cast<int>(currentTime_ - hours * 3600.0 - minutes * 60.0);
+    auto milliseconds = static_cast<int>((currentTime_ - hours * 3600.0 - minutes * 60.0 - seconds) * 1000.0);
+    
+    std::stringstream ss;
+    ss << hours << "h " << minutes << "m " << seconds << "s " << milliseconds << "ms";
+    
+    return ss.str();
+}
+
+SimulationClock SimulationClock::copy() const {
+    SimulationClock copy(timestep_);
+    copy.currentTime_ = currentTime_;
+    copy.currentStep_ = currentStep_;
+    copy.running_ = running_;
+    copy.realTimeElapsed_ = realTimeElapsed_;
+    copy.startTime_ = startTime_;
+    return copy;
+}
+
+void SimulationClock::restore(const SimulationClock& other) {
+    currentTime_ = other.currentTime_;
+    currentStep_ = other.currentStep_;
+    timestep_ = other.timestep_;
+    running_ = other.running_;
+    realTimeElapsed_ = other.realTimeElapsed_;
+    startTime_ = other.startTime_;
+}
+
+void SimulationClock::updateRealTime() {
+    if (running_) {
+        auto now = std::chrono::high_resolution_clock::now();
+        realTimeElapsed_ = std::chrono::duration<double>(now - startTime_);
+    }
 }
 
 } // namespace nlm
