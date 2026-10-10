@@ -15,6 +15,17 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -289,7 +300,133 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    // ========== MEMORY SYSTEMS ==========
+
+    py::class_<NeuralWorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system for transient information storage)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize working memory with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store a neural activity pattern in working memory")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store activation directly to a specific neuron")
+        .def("retrieve", &NeuralWorkingMemory::retrieve,
+             "Retrieve current working memory content as activity levels")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if a neuron is part of working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation level of a specific neuron in working memory")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory (maintenance and decay)")
+        .def("clear", &NeuralWorkingMemory::clear, "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity, "Get working memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"),
+             "Set working memory capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate, "Get decay rate for memory traces")
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"),
+             "Set decay rate for memory traces")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"),
+             "Strengthen working memory representation (for rehearsal)")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition,
+             "Run competition between memory traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"),
+             "Check if neuron is part of the winning population")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity,
+             "Get overall memory activity level")
+        .def("__repr__", [](const NeuralWorkingMemory& wm) {
+            return "<WorkingMemory: " + std::to_string(wm.getActiveTraces()) + 
+                   " traces, capacity: " + std::to_string(wm.getCapacity()) + ">";
+        });
+
+    py::class_<NeuralEpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system for experience storage and replay)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralEpisodicMemory::initialize, py::arg("brain"),
+             "Initialize episodic memory with brain reference")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store a new experience episode")
+        .def("retrieveSimilar", &NeuralEpisodicMemory::retrieveSimilar,
+             py::arg("sensoryPattern"), py::arg("maxResults") = 5,
+             "Retrieve episodes similar to a query pattern")
+        .def("retrieveTemporal", &NeuralEpisodicMemory::retrieveTemporal,
+             py::arg("startTime"), py::arg("endTime"), py::arg("maxResults") = 10,
+             "Retrieve episodes from a specific time window")
+        .def("retrieveByLocation", &NeuralEpisodicMemory::retrieveByLocation,
+             py::arg("x"), py::arg("y"), py::arg("radius"), py::arg("maxResults") = 5,
+             "Retrieve episodes by location")
+        .def("retrieveAfterAction", &NeuralEpisodicMemory::retrieveAfterAction,
+             py::arg("action"), py::arg("maxResults") = 5,
+             "Retrieve episodes following a specific action")
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"),
+             "Replay an episode to reactivate neural patterns")
+        .def("updateRelevance", &NeuralEpisodicMemory::updateRelevance,
+             py::arg("episodeId"), py::arg("relevanceDelta"),
+             "Update episode relevance based on recent use")
+        .def("getEpisode", &NeuralEpisodicMemory::getEpisode, py::arg("index"),
+             "Get episode by index")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount,
+             "Get total number of episodes")
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get recent episodes")
+        .def("getAverageReward", &NeuralEpisodicMemory::getAverageReward,
+             "Get average reward from episodes")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Clear old episodes based on relevance threshold")
+        .def("clear", &NeuralEpisodicMemory::clear, "Clear all episodes")
+        .def("enableReplay", &NeuralEpisodicMemory::enableReplay, py::arg("enable"),
+             "Enable or disable replay")
+        .def("isReplayEnabled", &NeuralEpisodicMemory::isReplayEnabled,
+             "Check if replay is enabled")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("count"),
+             "Get episodes selected for replay")
+        .def("replaySequence", &NeuralEpisodicMemory::replaySequence, py::arg("episodeIds"),
+             "Replay multiple episodes in sequence")
+        .def("__repr__", [](const NeuralEpisodicMemory& em) {
+            return "<EpisodicMemory: " + std::to_string(em.getEpisodeCount()) + 
+                   " episodes, replay enabled: " + std::string(em.isReplayEnabled() ? "true" : "false") + ">";
+        });
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attentional selection system for neural competition and focus)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize attentional selection with brain reference")
+        .def("processCompetition", &AttentionalSelection::processCompetition,
+             py::arg("competitors"), py::arg("globalInhibition") = 0.5f,
+             "Process competing sensory inputs and select winners")
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"),
+             "Apply attention to a specific region")
+        .def("releaseAttention", &AttentionalSelection::releaseAttention,
+             "Release attention (allow all regions equal processing)")
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions,
+             "Get current attention focus")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"),
+             "Set inhibition strength")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"),
+             "Set excitation strength")
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"),
+             "Set competition threshold")
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"),
+             "Get inhibition level for a neuron")
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"),
+             "Get excitation level for a neuron")
+        .def("update", &AttentionalSelection::update, py::arg("dt"),
+             "Update attention dynamics")
+        .def("isAttended", &AttentionalSelection::isAttended, py::arg("neuron"),
+             "Check if neuron is currently attended")
+        .def("getWinners", &AttentionalSelection::getWinners,
+             "Get attention winners")
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias, py::arg("neuron"), py::arg("biasStrength"),
+             "Apply top-down attention bias")
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience, py::arg("neuron"), py::arg("salienceStrength"),
+             "Apply bottom-up attention salience")
+        .def("reset", &AttentionalSelection::reset, "Reset attention")
+        .def("__repr__", [](const AttentionalSelection& as) {
+            return "<AttentionalSelection: " + std::to_string(as.getWinners().size()) + 
+                   " winners, " + std::to_string(as.getAttendedRegions().size()) + " attended regions>";
+        });
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
