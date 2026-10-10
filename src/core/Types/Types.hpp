@@ -126,8 +126,10 @@ struct PlasticityFlags {
 enum class DevelopmentalStage : uint8_t {
     Initial,
     CriticalPeriod,
+    Social,
     Maturation,
     Adult,
+    Cognitive,
     Aging
 };
 

@@ -74,6 +74,8 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Consider a concept for action planning
+    void considerConcept(size_t conceptId, SimulationStep step, Timestamp time);
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);

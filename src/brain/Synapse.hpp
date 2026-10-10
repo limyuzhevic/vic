@@ -66,6 +66,13 @@ public:
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    void setShortTermDepression(float depression);
+    
+    float getShortTermFacilitation() const;
+    void setShortTermFacilitation(float facilitation);
+    
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
     void setEfficacy(float efficacy);

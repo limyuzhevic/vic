@@ -258,6 +258,32 @@ struct SelfModel::Impl {
     
     Impl() : brain(nullptr) {}
 };
+void NeuralPlanner::considerConcept(size_t conceptId, SimulationStep step, Timestamp time) {
+    // Integrate learned concept into action planning
+    // Consider the concept as a goal or constraint for planning
+    std::vector<float> conceptGoal;
+    
+    // Convert concept to planning goal based on concept ID
+    // In a real implementation, concepts would have associated goals/behaviors
+    conceptGoal.resize(10, 0.0f);
+    if (conceptId < 10) conceptGoal[conceptId] = 1.0f;
+    
+    // Set as current goal for planning
+    currentGoal_ = conceptGoal;
+    
+    // Update planning confidence based on concept integration
+    planningConfidence_ = std::min(1.0f, planningConfidence_ * 1.1f);
+    
+    // Log concept integration
+    if (brain_ && brain_->getConfig()) {
+        bool logLevel = brain_->getConfig()->getOr<bool>("log_level", false);
+        if (logLevel) {
+            NLM_LOG_INFO(std::string("NeuralPlanner: Considering concept " ) + std::to_string(conceptId) + 
+                       " for action planning at step " + std::to_string(step));
+        }
+    }
+}
+
 
 SelfModel::SelfModel()
     : pImpl(new Impl)

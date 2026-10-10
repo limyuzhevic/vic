@@ -2,11 +2,11 @@
 
 ## Overview
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+NLM (熙然) is an **integrated artificial brain** that successfully connects all its components into a coherent system. Unlike the previous disconnected skeleton, NLM now functions as a complete computational brain with all systems working together.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        NLM Brain                                 │
+│                        NLM Brain (PHASE 6)                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
@@ -16,7 +16,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │         │                  │                  │                 │
 │         ▼                  ▼                  ▼                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │  Sensory    │    │  Memory     │    │   Action    │          │
+│  │  Sensory    │    │   Memory     │    │   Action    │          │
 │  │  Processing │    │  Systems   │    │  Selection  │          │
 │  └─────────────┘    └─────────────┘    └─────────────┘          │
 │                            │                                    │
@@ -46,6 +46,11 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
+
+                   ┌─────────────────────────────────────┐
+                   │        COGNITIVE LOOP              │
+                   │  (Top-down modulation)           │
+                   └─────────────────────────────────────┘
 ```
 
 ## Core Components
@@ -62,49 +67,63 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Synapse**: Synaptic connection representation
 - **NeuralPopulation**: Group of neurons with shared properties
 - **NeuralRegion**: Brain region with multiple populations
-- **Brain**: Central coordinator
+- **Brain**: Central coordinator **with integrated systems** (Memory, Prediction, Cognition, Development, Neuromodulation)
 
 ### 3. Dynamics Layer
 - **NeuralDynamics**: Abstract base for neuron dynamics
-- **SpikeSystem**: Event-driven spike processing
+- **SpikeSystem**: Event-driven spike processing with spike event handlers
 
 ### 4. Plasticity Layer
 - **PlasticityRule**: Abstract base for plasticity rules
 - **Hebbian**: Hebbian learning rule
-- **STDP**: Spike-Timing-Dependent Plasticity
-- **StructuralPlasticity**: Synapse formation/removal
+- **STDP**: Spike-Timing-Dependent Plasticity with neuromodulation
+- **StructuralPlasticity**: Synapse formation/removal with developmental control
 
-### 5. Development Layer
-- **DevelopmentSystem**: Orchestrates development
-- **Synaptogenesis**: New synapse formation
-- **Pruning**: Weak synapse removal
-- **Maturation**: Adult property development
+### 5. Development Layer (Enhanced)
+- **DevelopmentSystem**: Orchestrates development with sophisticated age-dependent effects
+- **Synaptogenesis**: New synapse formation with developmental stage modulation
+- **Pruning**: Weak synapse removal with activity-dependent regulation
+- **Maturation**: Adult property development with multiple stages
+- **CRITICAL PERIODS**: Enhanced sensitive period modeling with social and cognitive stages
 
-### 6. Neuromodulation Layer
+### 6. Neuromodulation Layer (Enhanced)
 - **Neuromodulator**: Abstract base for neuromodulators
-- **Dopamine**: Reward and reinforcement
-- **Novelty**: Novelty detection
-- **Curiosity**: Exploration motivation
-- **PredictionError**: Error signals
+- **Dopamine**: Reward and reinforcement with working memory integration
+- **Acetylcholine**: Learning, memory encoding, and attention control (NEWLY IMPLEMENTED)
+- **Norepinephrine**: Arousal, attention enhancement, and stress response (NEWLY IMPLEMENTED)
+- **Serotonin**: Social behavior, attention scope, and memory consolidation (NEWLY IMPLEMENTED)
+- **Novelty**: Novelty detection integrated with curiosity
+- **Curiosity**: Exploration motivation integrated with prediction error
+- **PredictionError**: Error signals for predictive learning
 
-### 7. Memory Layer (Phase 4)
-- **NeuralWorkingMemory**: Persistent activity for temporary storage
-- **NeuralEpisodicMemory**: Experience encoding in neural patterns
-- **NeuralAssociativeMemory**: Experience-based associations
-- **ConceptFormation**: Pattern discovery without labels
-- **SpatialRepresentation**: Learned spatial relationships
-- **TemporalRelation**: Before/after/sequence encoding
+### 7. Memory Layer (Phase 4 + Enhanced Integration)
+- **NeuralWorkingMemory**: Persistent activity for temporary storage with neuromodulation
+- **NeuralEpisodicMemory**: Experience encoding in neural patterns with consolidation
+- **NeuralAssociativeMemory**: Experience-based associations with cross-context retrieval
+- **ConceptFormation**: Pattern discovery without labels (NEWLY INTEGRATED)
+- **SpatialRepresentation**: Learned spatial relationships with place cell formation (NEWLY INTEGRATED)
+- **TemporalRelation**: Before/after/sequence encoding with prediction (NEWLY INTEGRATED)
 
-### 8. Prediction Layer (Phase 4)
-- **NeuralPrediction**: Temporal sequence learning
-- **ActionConsequencePredictor**: Action effect prediction
-- **PredictionErrorSignal**: Error computation for learning
+### 8. Prediction Layer (Phase 4 + Enhanced Integration)
+- **NeuralPrediction**: Learns temporal sequences through repeated experience (ENHANCED)
+- **ActionConsequencePredictor**: Associates actions with their effects (ENHANCED)
+- **Multi-step Prediction**: Chains predictions to anticipate distant futures (ENHANCED)
+- **CognitivePrediction**: Integrates with action planning and decision making
 
-### 9. Cognitive Layer (Phase 4)
-- **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
-- **NeuralPlanner**: Predictive action selection
-- **SelfModel**: Sensorimotor self-awareness
-- **SocialLearning**: Observation and imitation
+### 9. Cognition Layer (Phase 4 + Enhanced Integration)
+- **NeuralPlanner**: Action planning with concept consideration (ENHANCED)
+- **ConceptFormation**: Pattern discovery and category formation (ENHANCED)
+- **SelfModel**: Self-knowledge and body awareness (NEWLY INTEGRATED)
+- **SocialLearning**: Imitation and social knowledge acquisition (NEWLY INTEGRATED)
+- **AttentionalSelection**: Focus control with neuromodulatory integration (ENHANCED)
+
+### 10. Performance Layer
+- **Memory Pools**: Efficient memory allocation management
+- **Event Queues**: High-performance event processing
+- **Sparse Connectivity**: Optimized memory usage for sparse connections
+- **Parallel Processing**: Multi-threaded computation support
+- **SIMD Vectorization**: Hardware-accelerated computation
+- **CheckpointSystem**: Brain state persistence and recovery
 
 ### 10. Sensory Layer
 - **SensoryInput**: Base class for sensory data

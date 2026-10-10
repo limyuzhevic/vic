@@ -22,12 +22,14 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SpatialRepresentation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Acetylcholine;
+    class Norepinephrine;
+    class Serotonin;
+class TemporalRelation;
+class SelfModel;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -43,6 +45,9 @@ struct InterRegionConnection {
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
+
+// SocialLearning for social cognition and collaborative learning
+class SocialLearning;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
@@ -164,6 +169,17 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+// SocialLearning for social cognition and collaborative learning
+    SocialLearning* getSocialLearning();
+    
+    // Get spatial context for current state
+    std::pair<float, float> getSpatialContext() const;
+
+    // ========== TEMPORAL COGNITION ==========
+
+    // Temporal relation for sequence learning and prediction
+    TemporalRelation* getTemporalRelation();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -181,8 +197,14 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Serotonin - social behavior and impulse control
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and stress
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention and learning
+    Acetylcholine* getAcetylcholine();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
