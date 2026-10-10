@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -93,6 +95,30 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced configuration methods
+    void enableValidation(bool enable);
+    void setAutoSave(const std::string& path);
+    void setCompressionLevel(int level);
+    void setMaxMemoryUsage(size_t bytes);
+    
+    // Configuration export/import
+    std::string exportToJSON() const;
+    bool importFromJSON(const std::string& jsonStr);
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    ConfigSource getEntrySource(const std::string& key) const;
+    std::vector<std::pair<std::string, ConfigSource>> getAllEntriesWithSources() const;
+    
+    // Validation methods
+    bool validateAll() const;
+    bool validateKey(const std::string& key) const;
+    
+    // Additional set methods for vectors
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +126,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    static std::string getCurrentTimestamp();
+    static std::string getTimestampString(std::chrono::system_clock::time_point timePoint);
+    static std::string formatConfigValue(const ConfigValue& value);
 };
 
 } // namespace nlm
