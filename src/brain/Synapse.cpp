@@ -1,4 +1,5 @@
 #include "Synapse.hpp"
+#include "../core/utilities/Util.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -98,9 +99,7 @@ void Synapse::setWeight(SynapticWeight weight) {
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    pImpl->weight = WeightClampUtil::safeWeightUpdate(pImpl->weight, delta, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 Delay Synapse::getDelay() const {
@@ -128,17 +127,11 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
-    }
+    SpikeHistoryManager::recordSpike(pImpl->preSpikeHistory, timestamp);
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
-    }
+    SpikeHistoryManager::recordSpike(pImpl->postSpikeHistory, timestamp);
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
@@ -218,8 +211,8 @@ void Synapse::step(Timestamp currentTime) {
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Clamp weight bounds using utility
+    pImpl->weight = WeightClampUtil::clampWeight(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {

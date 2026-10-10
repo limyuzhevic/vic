@@ -1,5 +1,6 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/utilities/Util.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -78,8 +79,9 @@ void Hebbian::update(Synapse* synapse,
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    // Use utility function for weight clamping to eliminate code duplication
+    float newWeight = WeightClampUtil::safeWeightUpdate(synapse->getWeight(), delta, 
+                                                         pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
 }
 

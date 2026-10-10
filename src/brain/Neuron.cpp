@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/utilities/Util.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -148,14 +149,11 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    SpikeHistoryManager::recordSpike(pImpl->spikeHistory, timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    SpikeHistoryManager::clearSpikeHistory(pImpl->spikeHistory);
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {

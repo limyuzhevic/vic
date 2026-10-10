@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/utilities/Util.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -81,7 +82,7 @@ void STDP::update(Synapse* synapse,
     // Apply weight change with bounds
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
+        float efficacy = EfficacySafetyUtil::safeGetEfficacy(synapse);
         totalDelta *= efficacy;
         
         // Apply weight change
@@ -96,9 +97,9 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    // Use utility function for weight clamping to eliminate code duplication
+    float newWeight = WeightClampUtil::safeWeightUpdate(synapse->getWeight(), delta, 
+                                                         pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
 }
 
