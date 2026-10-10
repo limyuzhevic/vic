@@ -1,0 +1,849 @@
+# Neuromodulation Guide
+
+## Overview
+
+Neuromodulation in NLM refers to the system of neuromodulators that regulate neural activity and plasticity throughout the brain. These signals modulate neural excitability, plasticity rules, and learning processes, enabling adaptive behavior and efficient learning.
+
+## Neuromodulator Types
+
+### Dopamine
+**Function**: Reward prediction error signaling and reinforcement learning
+**Properties**:
+- **Phasic Activity**: Burst firing in response to unexpected rewards
+- **Tonic Activity**: Baseline level that sets global learning rate
+- **Bidirectional Effects**: Can enhance or suppress neural activity
+- **Plasticity Modulation**: Modulates STDP and Hebbian learning
+
+**Computational Model**:
+```cpp
+dopamine = learningRate * (reward - prediction)
+```
+
+### Curiosity
+**Function**: Novelty detection and exploration motivation
+**Properties**:
+- **Activity-Dependent**: Increases with unexpected events
+- **State-Sensitive**: Modulates based on current neural state
+- **Exploration Drive**: Promotes seeking novel experiences
+- **Attention Modulation**: Influences attentional focus
+
+**Computational Model**:
+```cpp
+curiosity = novelty * uncertainty * explorationCoefficient
+```
+
+### Novelty
+**Function**: Detection of unexpected events
+**Properties**:
+- **Prediction Error Based**: Measures deviation from predictions
+- **Rapid Adaptation**: Quickly adjusts to new patterns
+- **Memory Updating**: Drives memory consolidation
+- **Learning Enhancement**: Boosts learning for novel stimuli
+
+**Computational Model**:
+```cpp
+novelty = |actual - predicted| * noveltySensitivity
+```
+
+### PredictionError
+**Function**: Error signal for prediction systems
+**Properties**:
+- **Multi-source**: Integrates temporal, action, and multi-step errors
+- **Adaptive**: Adjusts based on prediction accuracy
+- **Learning Signal**: Guides learning toward better predictions
+- **Memory Updating**: Drives memory system updates
+
+**Computational Model**:
+```cpp
+predictionError = expected - actual
+```
+
+## Neuromodulation Architecture
+
+### Core Neuromodulation System
+```cpp
+struct NeuromodulationSystem {
+    // Neuromodulator instances
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<PredictionError> predictionError;
+    
+    // Integration with other systems
+    std::unique_ptr<NeuralNetwork> neuralNetwork;
+    std::unique_ptr<PlasticitySystem> plasticity;
+    std::unique_ptr<MemorySystem> workingMemory;
+    
+    // Global modulation state
+    float globalModulationLevel;
+    float learningRate;
+    Timestamp lastUpdateTime;
+    
+    // Neuromodulator interactions
+    std::vector<NeuromodulatorInteraction> interactions;
+};
+```
+
+### Neuromodulator Interactions
+
+#### Dopamine-Curiosity Interaction
+```cpp
+void NeuromodulationSystem::applyDopamineCuriosityInteraction() {
+    
+    // Curiosity amplifies dopamine response to unexpected rewards
+    float curiosityAmplification = curiosity->getActivation() * 0.5f;
+    
+    // Scale dopamine by curiosity level
+    float effectiveDopamine = dopamine->getSignal() * (1.0f + curiosityAmplification);
+    
+    // Apply to neural activity
+    neuralNetwork->applyNeuromodulation(effectiveDopamine, MODULATION_TYPE_DOPAMINE);
+}
+```
+
+#### Novelty-PredictionError Interaction
+```cpp
+void NeuromodulationSystem::applyNoveltyPredictionErrorInteraction() {
+    
+    // Novelty provides input to prediction error
+    float noveltyInput = novelty->getActivation() * predictionError->getSensitivity();
+    
+    // Prediction error modulates novelty response
+    float predictionErrorAmplification = predictionError->getMagnitude() * NOVELTY_GAIN;
+    
+    // Apply combined effect
+    float combinedEffect = noveltyInput + predictionErrorAmplification;
+    neuralNetwork->applyNeuromodulation(combinedEffect, MODULATION_TYPE_NOVELTY);
+}
+```
+
+## Dopamine
+
+### Implementation Overview
+**Dopamine** implements reward prediction error signaling and reinforcement learning.
+
+#### Core Components
+```cpp
+struct Dopamine {
+    // Signal properties
+    float signal;                    // Current dopamine signal
+    float baseline;                  // Baseline level
+    float predictionError;           // Reward prediction error
+    
+    // Learning modulation
+    float learningRate;              // Learning rate modulation
+    float eligibilityTrace;          // Eligibility for plasticity
+    float adaptationTimeConstant;    // Time constant for adaptation
+    
+    // State tracking
+    Timestamp lastRewardTime;        // Time of last reward
+    float accumulatedReward;         // Total accumulated reward
+    bool isPhasic;                   // Whether in phasic burst
+};
+```
+
+### Dopamine Dynamics
+
+#### Phasic and Tonic Activity
+```cpp
+void Dopamine::update(float dt, float rewardPredictionError) {
+    
+    // Calculate phasic response
+    if (fabs(rewardPredictionError) > PHASIC_THRESHOLD) {
+        isPhasic = true;
+        signal += rewardPredictionError * PHASIC_GAIN;
+    } else {
+        isPhasic = false;
+    }
+    
+    // Update tonic activity
+    signal += baseline * TONIC_COEFFICIENT;
+    
+    // Apply decay
+    signal *= exp(-dt / adaptationTimeConstant);
+}
+```
+
+#### Plasticity Modulation
+```cpp
+void Dopamine::modulatePlasticity(float learningRate) {
+    
+    // Scale learning rate by dopamine signal
+    float effectiveLearningRate = learningRate * (1.0f + signal * DOPAMINE_EFFECT_GAIN);
+    
+    // Apply to plasticity system
+    plasticity->setGlobalLearningRate(effectiveLearningRate);
+    
+    // Update eligibility traces
+    updateEligibilityTrace(dt, effectiveLearningRate);
+}
+```
+
+### Applications
+
+#### Reward-Based Learning
+```cpp
+void Dopamine::applyRewardBasedLearning(float reward, float predictionError) {
+    
+    // Update prediction error
+    predictionError = reward - lastPrediction;
+    
+    // Apply phasic dopamine response
+    signal = predictionError * PHASIC_GAIN;
+    
+    // Update learning rate
+    float effectiveLearningRate = BASE_LEARNING_RATE * (1.0f + signal * REINFORCEMENT_GAIN);
+    
+    // Apply to neural network
+    neuralNetwork->applyRewardModulation(effectiveLearningRate, predictionError);
+}
+```
+
+#### Action Selection Bias
+```cpp
+action_probability(action) {
+    // Calculate action value
+    value(action) = lastOutcome + 
+                   explorationBonus(action) + 
+                   dopamineSignal * actionValueWeight;
+    
+    // Normalize probabilities
+    normalize(action_probabilities);
+    
+    return action_probabilities;
+}
+```
+
+## Curiosity
+
+### Implementation Overview
+**Curiosity** implements novelty-driven exploration and information-seeking behavior.
+
+#### Core Components
+```cpp
+struct Curiosity {
+    // Novelty detection
+    float noveltyScore;               // Current novelty level
+    float uncertainty;               // Current uncertainty
+    float explorationDrive;          // Current exploration motivation
+    
+    // State tracking
+    Timestamp lastExploration;       // Time of last exploration
+    float explorationHistory;         // Recent exploration activity
+    float informationGain;            // Information gain from exploration
+    
+    // Adaptation mechanisms
+    float learningRate;              // Learning rate modulation
+    float adaptationTime;            // Adaptation time constant
+    float habituationThreshold;      // Threshold for habituation
+};
+```
+
+### Novelty Detection
+
+#### Context-Based Novelty
+```cpp
+void Curiosity::updateNovelty(const std::vector<float>& sensoryInput,
+                            const PatternVector& context) {
+    
+    // Calculate prediction error
+    float predictionError = calculatePredictionError(sensoryInput, context);
+    
+    // Apply sensitivity
+    noveltyScore = predictionError * NOVELTY_SENSITIVITY;
+    
+    // Adapt based on context
+    adaptNoveltyToContext(context);
+}
+```
+
+#### Uncertainty Estimation
+```cpp
+float Curiosity::estimateUncertainty(const std::vector<float>& sensoryInput) {
+    
+    // Calculate input variance
+    float variance = calculateInputVariance(sensoryInput);
+    
+    // Apply to uncertainty estimate
+    uncertainty = variance * UNCERTAINTY_SENSITIVITY;
+    
+    // Adapt based on recent experience
+    adaptUncertaintyToExperience(sensoryInput);
+    
+    return uncertainty;
+}
+```
+
+### Exploration Behavior
+
+#### Exploration-Exploitation Balance
+```cpp
+float Curiosity::calculateExplorationMotivaton() {
+    
+    // Combine novelty and uncertainty
+    float noveltyMotivation = noveltyScore * NOVELTY_WEIGHT;
+    float uncertaintyMotivation = uncertainty * UNCERTAINTY_WEIGHT;
+    
+    // Apply to exploration drive
+    explorationDrive = noveltyMotivation + uncertaintyMotivation;
+    
+    // Apply habituation
+    if (explorationHistory > habituationThreshold) {
+        explorationDrive *= HABITUATION_FACTOR;
+    }
+    
+    return explorationDrive;
+}
+```
+
+#### Action Selection Bias
+```cpp
+void Curiosity::applyExplorationBias(
+    std::vector<float>& actionProbabilities,
+    const std::vector<float>& actionValues) {
+    
+    // Calculate exploration bonus
+    float explorationBonus = calculateExplorationMotivaton() * EXPLORATION_BONUS;
+    
+    // Apply to action probabilities
+    for (size_t i = 0; i < actionProbabilities.size(); ++i) {
+        actionProbabilities[i] *= (1.0f + explorationBonus);
+    }
+    
+    // Normalize probabilities
+    normalize(actionProbabilities);
+}
+```
+
+## Novelty
+
+### Implementation Overview
+**Novelty** implements detection of unexpected events and change.
+
+#### Core Components
+```cpp
+struct Novelty {
+    // Detection properties
+    float noveltyThreshold;           // Threshold for novelty detection
+    float noveltySensitivity;         // Sensitivity to novel events
+    float adaptationRate;             // Rate of novelty adaptation
+    
+    // State tracking
+    std::vector<float> noveltyHistory; // Recent novelty levels
+    Timestamp lastNoveltyEvent;        // Time of last novelty event
+    float accumulatedNovelty;         // Total novelty experienced
+    
+    // Learning integration
+    float learningRate;              // Learning rate modulation
+    float memoryUpdateRate;          // Memory update rate
+};
+```
+
+### Novelty Detection
+
+#### Prediction Error-Based Detection
+```cpp
+void Novelty::updateNovelty(const PatternVector& expectedPattern,
+                           const PatternVector& actualPattern) {
+    
+    // Calculate prediction error
+    PatternVector error = expectedPattern - actualPattern;
+    float errorMagnitude = calculatePatternMagnitude(error);
+    
+    // Apply novelty detection
+    if (errorMagnitude > noveltyThreshold) {
+        // Record novelty event
+        recordNoveltyEvent(errorMagnitude);
+        
+        // Update novelty score
+        noveltyScore = errorMagnitude * noveltySensitivity;
+        
+        // Apply to neural network
+        neuralNetwork->applyNoveltyModulation(noveltyScore);
+    }
+}
+```
+
+#### Contextual Novelty
+```cpp
+float Novelty::calculateContextualNovelty(
+    const PatternVector& pattern,
+    const ContextVector& context) {
+    
+    // Calculate context novelty
+    float contextNovelty = calculatePatternNovelty(pattern, context);
+    
+    // Apply adaptation
+    contextNovelty *= adaptationRate;
+    
+    return contextNovelty;
+}
+```
+
+### Novelty-Driven Learning
+
+#### Memory Updating
+```cpp
+void Novelty::triggerMemoryUpdate(const PatternVector& pattern) {
+    
+    // Calculate novelty score
+    float noveltyScore = calculatePatternNovelty(pattern);
+    
+    // Apply to memory system
+    memorySystem->updateMemory(pattern, noveltyScore * memoryUpdateRate);
+    
+    // Record novelty event
+    recordNoveltyEvent(noveltyScore);
+}
+```
+
+#### Learning Enhancement
+```cpp
+void Novelty::enhanceLearning(const PatternVector& pattern) {
+    
+    // Calculate novelty score
+    float noveltyScore = calculatePatternNovelty(pattern);
+    
+    // Apply to learning system
+    learningSystem->enhanceLearning(pattern, noveltyScore * learningRate);
+    
+    // Update model
+    model->update(pattern, noveltyScore);
+}
+```
+
+## PredictionError
+
+### Implementation Overview
+**PredictionError** implements error signal computation for prediction systems.
+
+#### Core Components
+```cpp
+struct PredictionError {
+    // Error computation
+    float errorSensitivity;           // Sensitivity to prediction errors
+    float errorDecay;                 // Error decay rate
+    float errorIntegration;           // Error integration rate
+    
+    // State tracking
+    float currentError;               // Current prediction error
+    Timestamp lastErrorTime;           // Time of last error
+    float accumulatedError;            // Total accumulated error
+    
+    // Error sources
+    std::vector<PredictionErrorSource> errorSources;
+    float errorWeights[3];            // Weights for different error types
+};
+```
+
+### Error Computation
+
+#### Multi-Source Error Integration
+```cpp
+temporal_errors = calculateTemporalPredictionError()
+action_errors = calculateActionConsequenceError()
+multiStep_errors = calculateMultiStepPredictionError()
+
+predictionError = temporal_errors * errorWeights[0] +
+                 action_errors * errorWeights[1] +
+                 multiStep_errors * errorWeights[2]
+```
+
+#### Error Integration
+```cpp
+void PredictionError::integrateErrors(float dt) {
+    
+    // Update each error source
+    for (auto& source : errorSources) {
+        source.update(dt);
+    }
+    
+    // Calculate combined error
+    currentError = calculateCombinedError();
+    
+    // Apply decay
+    currentError *= errorDecay;
+    
+    // Update accumulated error
+    accumulatedError += currentError * dt;
+}
+```
+
+### Error Signaling and Integration
+
+#### Error Propagation
+```cpp
+void PredictionError::propagateError(
+    NeuromodulationSystem& neuromodulation,
+    PlasticitySystem& plasticity) {
+    
+    // Signal to neuromodulation
+    neuromodulation.applyPredictionError(currentError, errorIntegration);
+    
+    // Update plasticity
+    plasticity.updateBasedOnPredictionError(currentError);
+    
+    // Apply to neural network
+    neuralNetwork->applyPredictionError(currentError);
+}
+```
+
+#### Learning Modulation
+```cpp
+void PredictionError::modulateLearning(
+    PlasticitySystem& plasticity,
+    float learningRate) {
+    
+    // Scale learning by error magnitude
+    float scaledLearningRate = learningRate * currentError;
+    
+    // Apply to plasticity system
+    plasticity.setGlobalLearningRate(scaledLearningRate);
+    
+    // Update eligibility traces
+    updateEligibilityTraces(scaledLearningRate);
+}
+```
+
+## Neuromodulation Integration
+
+### Integration with Neural Network
+```cpp
+void NeuromodulationSystem::integrateWithNeuralNetwork(
+    NeuralNetwork& network) {
+    
+    // Apply dopamine modulation
+    float dopamineSignal = dopamine->getSignal();
+    network.applyDopamineModulation(dopamineSignal);
+    
+    // Apply curiosity modulation
+    float curiositySignal = curiosity->getExplorationMotivaton();
+    network.applyCuriosityModulation(curiositySignal);
+    
+    // Apply novelty modulation
+    float noveltySignal = novelty->getNoveltyScore();
+    network.applyNoveltyModulation(noveltySignal);
+    
+    // Apply prediction error modulation
+    float errorSignal = predictionError->getCurrentError();
+    network.applyPredictionErrorModulation(errorSignal);
+}
+```
+
+### Integration with Plasticity System
+```cpp
+void NeuromodulationSystem::integrateWithPlasticity(
+    PlasticitySystem& plasticity) {
+    
+    // Apply combined neuromodulation
+    float combinedModulation = calculateCombinedModulation();
+    
+    // Apply to plasticity system
+    plasticity.applyGlobalModulation(combinedModulation);
+    
+    // Update plasticity rules
+    updatePlasticityRules(combinedModulation);
+}
+```
+
+### Integration with Working Memory
+```cpp
+void NeuromodulationSystem::integrateWithWorkingMemory(
+    NeuralWorkingMemory& workingMemory) {
+    
+    // Apply exploration bias to working memory
+    float explorationBonus = curiosity->getExplorationMotivaton();
+    workingMemory.applyExplorationBonus(explorationBonus);
+    
+    // Apply novelty filtering to working memory
+    float noveltyScore = novelty->getNoveltyScore();
+    workingMemory.applyNoveltyFilter(noveltyScore);
+}
+```
+
+## Neuromodulation Performance Metrics
+
+### Signal Quality Metrics
+```cpp
+struct NeuromodulationSignalMetrics {
+    float signalToNoiseRatio;          // Signal quality
+    float responseLatency;             // Response time
+    float adaptationSpeed;              // Speed of adaptation
+    float stabilityIndex;               // Stability of signals
+    float modulationDepth;              // Depth of modulation
+};
+```
+
+### Behavioral Metrics
+```cpp
+struct NeuromodulationBehavioralMetrics {
+    float explorationRate;             // Rate of exploration
+    float learningSpeed;                // Speed of learning
+    float predictionAccuracy;           // Accuracy of predictions
+    float errorRecoveryRate;            // Rate of error recovery
+    float behavioralFlexibility;        // Flexibility in behavior
+};
+```
+
+## Neuromodulation Testing and Validation
+
+### Unit Tests
+- **Neuromodulator Tests**: Test individual neuromodulators
+- **Interaction Tests**: Test interactions between neuromodulators
+- **Integration Tests**: Test integration with other systems
+- **Behavioral Tests**: Test behavioral effects of neuromodulation
+
+### Performance Tests
+- **Signal Accuracy**: Test accuracy of neuromodulator signals
+- **Adaptation Speed**: Test speed of adaptation to new situations
+- **Exploration Rate**: Test exploration behavior
+- **Learning Efficiency**: Test efficiency of learning with neuromodulation
+
+### Behavioral Tests
+- **Exploration-Exploitation Balance**: Test balance between exploration and exploitation
+- **Novelty Seeking**: Test behavior in novel environments
+- **Reward Learning**: Test learning from rewards
+- **Error Recovery**: Test ability to recover from errors
+
+## Neuromodulation Common Issues and Solutions
+
+### Issue 1: Over-Activation
+**Problem**: Neuromodulators are too active or produce excessive responses.
+**Solution**:
+- Add stronger decay mechanisms
+- Implement better bounds checking
+- Add feedback inhibition
+- Adjust sensitivity parameters
+
+### Issue 2: Under-Activation
+**Problem**: Neuromodulators are too weak or produce insufficient responses.
+**Solution**:
+- Increase baseline levels
+- Reduce decay rates
+- Adjust sensitivity parameters
+- Add amplification mechanisms
+
+### Issue 3: Poor Integration
+**Problem**: Neuromodulators don't integrate well with other systems.
+**Solution**:
+- Improve integration mechanisms
+- Add better cross-system communication
+- Implement more sophisticated interaction rules
+- Add feedback loops
+
+### Issue 4: Slow Adaptation
+**Problem**: Neuromodulators adapt too slowly to changing environments.
+**Solution**:
+- Increase adaptation rates
+- Add faster adaptation mechanisms
+- Implement online learning
+- Add prediction error-based adaptation
+
+## API Reference
+
+### NeuromodulationSystem Class Methods
+```cpp
+// Construction and Destruction
+NeuromodulationSystem()
+~NeuromodulationSystem()
+
+// Neuromodulator Access
+dopamine::Dopamine* getDopamine() const
+curiosity::Curiosity* getCuriosity() const
+novelty::Novelty* getNovelty() const
+predictionError::PredictionError* getPredictionError() const
+
+// Integration Operations
+void integrateWithNeuralNetwork(NeuralNetwork& network)
+void integrateWithPlasticity(PlasticitySystem& plasticity)
+void integrateWithWorkingMemory(NeuralWorkingMemory& workingMemory)
+
+// State Queries
+float getGlobalModulationLevel() const
+float getLearningRate() const
+Timestamp getLastUpdateTime() const
+```
+
+### Dopamine Class Methods
+```cpp
+// Construction and Destruction
+dopamine::Dopamine()
+~dopamine::Dopamine()
+
+// Signal Operations
+dopamine::DopamineSignal update(float dt, float rewardPredictionError)
+void setBaseline(float baseline)
+void setLearningRate(float rate)
+
+// State Queries
+dopamine::DopamineSignal getSignal() const
+float getPredictionError() const
+bool isPhasic() const
+```
+
+### Curiosity Class Methods
+```cpp
+// Construction and Destruction
+curiosity::Curiosity()
+~curiosity::Curiosity()
+
+// Novelty Operations
+float updateNovelty(const std::vector<float>& sensoryInput, const PatternVector& context)
+void applyExplorationBias(std::vector<float>& actionProbabilities, const std::vector<float>& actionValues)
+
+// State Queries
+float getNoveltyScore() const
+float getUncertainty() const
+float getExplorationMotivaton() const
+```
+
+### Novelty Class Methods
+```cpp
+// Construction and Destruction
+novelty::Novelty()
+~novelty::Novelty()
+
+// Detection Operations
+void updateNovelty(const PatternVector& expectedPattern, const PatternVector& actualPattern)
+float calculateContextualNovelty(const PatternVector& pattern, const ContextVector& context)
+void triggerMemoryUpdate(const PatternVector& pattern)
+
+// State Queries
+float getNoveltyScore() const
+float getNoveltyHistory() const
+Timestamp getLastNoveltyEvent() const
+```
+
+### PredictionError Class Methods
+```cpp
+// Construction and Destruction
+predictionError::PredictionError()
+~predictionError::PredictionError()
+
+// Error Operations
+float computeError(const PatternVector& expectedState, const PatternVector& actualState)
+void propagateError(NeuromodulationSystem& neuromodulation, PlasticitySystem& plasticity)
+void modulateLearning(PlasticitySystem& plasticity, float learningRate)
+
+// Configuration
+void setErrorSensitivity(float sensitivity)
+void setErrorDecay(float decay)
+void setErrorModulatesLearning(bool modulates)
+
+// State Queries
+float getCurrentError() const
+bool isErrorSignaled() const
+Timestamp getLastErrorTime() const
+```
+
+## Integration Guide
+
+### Phase 6 Neuromodulation Integration
+The Phase 6 integration brings together all neuromodulators into a coherent system:
+
+```cpp
+// Neuromodulation systems in Brain::Impl
+dopamine.reset(new Dopamine());
+curiosity.reset(new Curiosity());
+novelty.reset(new Novelty());
+predictionError.reset(new PredictionError());
+
+// Integration relationships
+neuromodulation->setNeuralNetwork(neuralNetwork.get());
+neuromodulation->setPlasticity(stdp.get());
+neuromodulation->setWorkingMemory(workingMemory.get());
+```
+
+### Neuromodulation Flow in Phase 6
+```
+WORLD (Environment)
+  ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  ↓
+ATTENTION (competitive selection)
+  ↓
+NEURAL PROCESSING (LIF dynamics)
+  ↓
+PREDICTION (temporal sequence learning)
+  ↓
+WORKING MEMORY (persistent activity)
+  ↓
+EPISODIC MEMORY (experience storage)
+  ↓
+CONCEPT FORMATION (pattern discovery)
+  ↓
+PLANNING (multi-step prediction)
+  ↓
+SELF-MODEL (sensorimotor learning)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD.applyMotorCommand()
+  ↓
+ACTION RESULT
+  ↓
+REWARD / ERROR
+  ↓
+NEUROMODULATION
+  ├─ Dopamine → Reward prediction error
+  ├─ Curiosity → Exploration motivation
+  ├─ Novelty → Change detection
+  └─ PredictionError → Learning signals
+  ↓
+PLASTICITY (STDP, Hebbian)
+  ↓
+DEVELOPMENT (stage progression)
+  ↓
+BEHAVIORAL CHANGE
+  ↓
+NEW EXPERIENCES
+  ↓
+CONTINUOUS LEARNING
+```
+
+## Future Directions
+
+### Advanced Neuromodulation
+- **Multi-Integrator Neuromodulation**: Integration of multiple neuromodulators
+- **State-Dependent Neuromodulation**: Neuromodulation that depends on neural state
+- **Temporal Neuromodulation**: Time-varying neuromodulation
+- **Social Neuromodulation**: Neuromodulation for social learning
+
+### Neuromodulation Optimization
+- **Efficient Neuromodulation**: More efficient neuromodulation algorithms
+- **Adaptive Neuromodulation**: Neuromodulation that adapts to environment
+- **Predictive Neuromodulation**: Predictive neuromodulation based on expectations
+- **Hierarchical Neuromodulation**: Multi-level neuromodulation
+
+### Neuromodulation Neuroscience Integration
+- **Detailed Neuromodulator Dynamics**: Realistic neuromodulator dynamics
+- **Neuromodulator Receptor Modeling**: Neuromodulator receptor-level modeling
+- **Neuromodulator Circuit Modeling**: Neural circuit models for neuromodulators
+- **Systems-Level Neuromodulation**: Large-scale neuromodulation understanding
+
+## Conclusion
+
+Neuromodulation is a core system in NLM that regulates neural activity, plasticity, and learning. The dopamine, curiosity, novelty, and prediction error neuromodulators work together to enable adaptive behavior, efficient learning, and exploration of novel experiences.
+
+Understanding neuromodulation is essential for:
+- **Designing Adaptive Systems**: Creating systems that can adapt to changing environments
+- **Implementing Efficient Learning**: Building systems that learn efficiently
+- **Debugging Systems**: Identifying and fixing neuromodulation-related issues
+- **Extending Functionality**: Adding new neuromodulation capabilities
+
+The neuromodulation guide provides the foundation for exploring NLM's neuromodulation capabilities, from basic signal generation to advanced learning mechanisms.
+
+## See Also
+- [Dopamine Guide](dopamine.html): Dopamine neuromodulator documentation
+- [Curiosity Guide](curiosity.html): Curiosity neuromodulator documentation
+- [Novelty Guide](novelty.html): Novelty neuromodulator documentation
+- [PredictionError Guide](prediction-error.html): Prediction error neuromodulator documentation
+- [Plasticity Guide](plasticity.html): Plasticity system documentation
+- [Working Memory Guide](memory.html): Working memory documentation
+
+## References
+- Montague, P. R., Dayan, P., & Sejnowski, T. J. (1996). A framework for mesencephalic dopamine systems. Journal of Neuroscience.
+- Berridge, K. C., & Robinson, T. E. (1998). What is the role of dopamine in reward: enjoyment or motivation? Philosophical Transactions of the Royal Society B.
+- Kording, K. P., & Wolpert, D. (2004). The effect of uncertainty on the brain. Neural Systems, Computation, and Behavior.

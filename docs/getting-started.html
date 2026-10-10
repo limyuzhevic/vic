@@ -1,0 +1,672 @@
+# NLM Getting Started Guide
+
+## Overview
+
+This guide provides step-by-step instructions for setting up and using NLM for the first time. It covers installation, basic configuration, and running your first simulations.
+
+## Prerequisites
+
+### System Requirements
+- **Operating System**: Linux (Ubuntu/Debian recommended), macOS, or Windows with WSL
+- **Compiler**: C++17 compatible compiler (GCC 9+, Clang 12+, or MSVC 2019+)
+- **Build Tools**: CMake 3.16 or higher
+- **Memory**: Minimum 4GB RAM, 8GB+ recommended
+- **Disk Space**: Minimum 1GB free space, 10GB+ recommended for full installation
+
+### Optional Dependencies
+- **Performance Optimizations**: SIMD support (AVX-2/AVX-512)
+- **Parallel Processing**: OpenMP or similar threading libraries
+- **GPU Acceleration**: CUDA/NVIDIA drivers for GPU computing
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+# Clone the NLM repository
+git clone https://github.com/your-org/nlm.git
+cd nlm
+
+# Verify the repository structure
+ls -la
+```
+
+### 2. Check Current Directory Structure
+
+The repository should contain:
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/                    # Documentation directory
+├── src/                    # Source code
+│   ├── core/               # Core utilities
+│   ├── brain/              # Neural components
+│   ├── dynamics/           # Neural dynamics
+│   ├── plasticity/         # Plasticity rules
+│   ├── development/        # Developmental system
+│   ├── neuromodulation/     # Neuromodulators
+│   ├── memory/             # Memory systems
+│   ├── prediction/         # Prediction systems
+│   ├── cognition/          # Cognitive mechanisms
+│   ├── sensory/            # Sensory processing
+│   ├── motor/              # Motor system
+│   ├── environment/        # Environment interface
+│   ├── experiments/        # Experiment framework
+│   └── visualization/       # Visualization
+├── tests/                  # Test suite
+└── configs/                # Configuration files
+```
+
+### 3. Build from Source
+
+#### Basic Build
+```bash
+# Create build directory
+mkdir build
+cd build
+
+# Configure CMake
+ cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build with available cores
+make -j$(nproc)
+```
+
+#### Build with Performance Optimizations
+```bash
+# Build with optimizations enabled
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON
+
+# Build with specific optimization level
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_OPT_LEVEL=2
+
+# Build with GPU support (if available)
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_GPU_ENABLED=ON
+```
+
+#### Build with Tests
+```bash
+# Configure with test support
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DNLM_ENABLE_TESTS=ON
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests
+ctest --output-on-failure
+```
+
+### 4. Verify Installation
+
+#### Check Build Output
+```bash
+# Verify that binaries were created
+ls -la bin/
+
+# Check for main executables
+./bin/nlm_phase6_demo      # Phase 6 integration test
+./bin/nlm_phase4_demo      # Phase 4 cognitive demo
+./bin/nlm_phase3_demo      # Phase 3 environment interaction demo
+```
+
+#### Run a Simple Test
+```bash
+# Run Phase 6 integration test
+./bin/nlm_phase6_demo
+
+# Run a simple neuron test
+./bin/nlm_neuron_test
+
+# Check system information
+./bin/nlm_info
+```
+
+## Basic Configuration
+
+### Configuration Files
+
+NLM uses configuration files to control simulation behavior. Configuration files are in JSON format and located in the `configs/` directory.
+
+#### Example Configuration Files
+
+**Basic Configuration** (`configs/basic_config.json`)
+```json
+{
+    "simulation": {
+        "timestep": 0.001,
+        "max_neurons": 1000,
+        "max_synapses": 10000,
+        "random_seed": 42
+    },
+    "development": {
+        "enabled": true,
+        "plasticity_curve": "exponential"
+    },
+    "memory": {
+        "capacity": 500,
+        "replay_enabled": true
+    }
+}
+```
+
+**Performance Configuration** (`configs/performance_config.json`)
+```json
+{
+    "simulation": {
+        "timestep": 0.001,
+        "max_neurons": 10000,
+        "max_synapses": 100000
+    },
+    "performance": {
+        "optimization_level": "advanced",
+        "use_memory_pools": true,
+        "enable_vectorization": true,
+        "parallel_processing": true
+    },
+    "development": {
+        "enabled": true,
+        "critical_period_duration": 1000
+    }
+}
+```
+
+### Modifying Configuration
+
+#### Edit Configuration Files
+```bash
+# Edit configuration using text editor
+nano configs/basic_config.json
+
+# Or use JSON formatter
+cat configs/basic_config.json | python -m json.tool
+```
+
+#### Common Configuration Changes
+
+**Adjust Number of Neurons**
+```json
+{
+    "simulation": {
+        "max_neurons": 5000,  // Increase for larger networks
+        "timestep": 0.001
+    }
+}
+```
+
+**Enable/Disable Development**
+```json
+{
+    "development": {
+        "enabled": true,  // Set to false to disable development
+        "plasticity_curve": "exponential"
+    }
+}
+```
+
+**Configure Memory Systems**
+```json
+{
+    "memory": {
+        "capacity": 2000,
+        "replay_enabled": true,
+        "consolidation_interval": 1000
+    }
+}
+```
+
+## Running Your First Simulation
+
+### Phase 2: Neural Computation (Basic Test)
+
+#### Create a Simple Test File
+```bash
+# Create a simple test configuration
+cat > test_config.json << EOF
+{
+    "simulation": {
+        "timestep": 0.001,
+        "max_neurons": 100,
+        "max_synapses": 1000,
+        "random_seed": 123
+    },
+    "development": {
+        "enabled": false
+    }
+}
+EOF
+```
+
+#### Run Neural Computation Test
+```bash
+# Run with basic configuration
+./bin/nlm_phase2_test --config=test_config.json
+
+# Run with verbose output
+./bin/nlm_phase2_test --config=test_config.json --verbose
+```
+
+### Phase 3: Environment Interaction
+
+#### Understanding Phase 3
+Phase 3 demonstrates NLM interacting with a simple environment through sensory input and motor output.
+
+#### Run Phase 3 Demo
+```bash
+# Run Phase 3 demo with default settings
+./bin/nlm_phase3_demo
+
+# Run Phase 3 with custom configuration
+./bin/nlm_phase3_demo --config=experiments/phase3_config.json
+
+# Run Phase 3 with visualization
+./bin/nlm_phase3_demo --config=experiments/phase3_config.json --visualize
+```
+
+#### Phase 3 Configuration Options
+```json
+{
+    "environment": {
+        "type": "simple",
+        "width": 100,
+        "height": 100,
+        "object_density": 0.1
+    },
+    "sensory": {
+        "vision_enabled": true,
+        "proprioception_enabled": true,
+        "internal_signals_enabled": true
+    },
+    "motor": {
+        "output_enabled": true,
+        "action_space": "continuous"
+    }
+}
+```
+
+### Phase 4: Emerging Cognition
+
+#### Overview
+Phase 4 demonstrates the emergence of cognitive abilities through prediction, memory, attention, and planning systems.
+
+#### Run Phase 4 Demo
+```bash
+# Run Phase 4 demo with default settings
+./bin/nlm_phase4_demo
+
+# Run Phase 4 with custom configuration
+./bin/nlm_phase4_demo --config=experiments/phase4_config.json
+
+# Run Phase 4 with extended duration
+./bin/nlm_phase4_demo --config=experiments/phase4_config.json --duration=60000
+
+# Run Phase 4 with detailed logging
+./bin/nlm_phase4_demo --config=experiments/phase4_config.json --log-level=DEBUG
+```
+
+#### Phase 4 Configuration Options
+```json
+{
+    "cognition": {
+        "attention_enabled": true,
+        "planning_enabled": true,
+        "concept_formation_enabled": true,
+        "self_model_enabled": true,
+        "social_learning_enabled": true
+    },
+    "memory": {
+        "working_memory_enabled": true,
+        "episodic_memory_enabled": true,
+        "associative_memory_enabled": true,
+        "concept_memory_enabled": true
+    },
+    "prediction": {
+        "temporal_prediction_enabled": true,
+        "action_consequence_prediction_enabled": true,
+        "multi_step_prediction_enabled": true
+    }
+}
+```
+
+### Phase 6: Final Integration
+
+#### Overview
+Phase 6 represents the complete integration of all systems into a coherent artificial brain.
+
+#### Run Phase 6 Demo
+```bash
+# Run Phase 2 demo (basic neural computation)
+./bin/nlm_phase2_demo
+
+# Run Phase 6 demo with default settings
+./bin/nlm_phase6_demo
+
+# Run Phase 6 with custom configuration
+./bin/nlm_phase6_demo --config=experiments/phase6_config.json
+
+# Run Phase 6 with checkpointing
+./bin/nlm_phase6_demo --config=experiments/phase6_config.json --checkpoint-interval=10000
+
+# Run Phase 6 with replay and consolidation
+./bin/nlm_phase6_demo --config=experiments/phase6_config.json --enable-replay --enable-consolidation
+```
+
+#### Phase 6 Configuration Options
+```json
+{
+    "integration": {
+        "enable_all_systems": true,
+        "checkpoint_enabled": true,
+        "replay_enabled": true,
+        "consolidation_enabled": true
+    },
+    "systems": {
+        "neural_computation": {"enabled": true},
+        "memory_systems": {"enabled": true},
+        "neuromodulation": {"enabled": true},
+        "prediction_system": {"enabled": true},
+        "cognition_systems": {"enabled": true},
+        "development_system": {"enabled": true}
+    }
+}
+```
+
+## Advanced Configuration
+
+### Command Line Options
+
+#### Common Options
+```bash
+./bin/executable [options] [config_file]
+
+Options:
+    --help                    Show help message
+    --version                 Show version information
+    --config=FILE             Specify configuration file
+    --verbose                 Enable verbose output
+    --log-level=LEVEL         Set log level (DEBUG, INFO, WARNING, ERROR)
+    --duration=MS             Run for specified duration in milliseconds
+    --checkpoint-interval=MS  Save checkpoint every N milliseconds
+    --visualize               Enable visualization
+    --measure-performance     Collect performance metrics
+```
+
+#### Example Usage
+```bash
+# Run with custom config and verbose output
+./bin/nlm_phase6_demo --config=my_config.json --verbose --duration=30000
+
+# Run with performance measurement
+./bin/nlm_phase6_demo --config=performance_config.json --measure-performance
+
+# Run with visualization
+./bin/nlm_phase6_demo --config=experiments/phase6_config.json --visualize
+```
+
+### Runtime Configuration
+
+#### Interactive Configuration
+```bash
+# Start interactive configuration tool
+./bin/nlm_config_tool
+
+# Modify runtime parameters
+./bin/nlm_config_tool --set timestep=0.0005
+./bin/nlm_config_tool --set max_neurons=2000
+```
+
+#### Configuration Files
+```bash
+# List available configuration files
+ls -la configs/
+
+# View configuration file contents
+cat configs/basic_config.json | python -m json.tool
+```
+
+## Monitoring and Debugging
+
+### Real-time Monitoring
+```bash
+# Start monitoring tool
+./bin/nlm_monitor --demo
+
+# Monitor specific system
+./bin/nlm_monitor --system=memory
+./bin/nlm_monitor --system=plasticity
+```
+
+### Logging Levels
+```bash
+# Set logging level
+./bin/nlm_phase6_demo --log-level=DEBUG
+
+# Enable detailed neural logging
+./bin/nlm_phase6_demo --log-level=TRACE --log-system=neural
+
+# Enable plasticity logging
+./bin/nlm_phase6_demo --log-level=INFO --log-system=plasticity
+```
+
+### Performance Monitoring
+```bash
+# Collect performance metrics
+./bin/nlm_phase6_demo --measure-performance
+
+# Monitor memory usage
+./bin/nlm_monitor --system=memory --monitor=usage
+
+# Track simulation speed
+./bin/nlm_monitor --system=performance --monitor=speed
+```
+
+## Example Scripts
+
+### Running Examples
+
+#### Example 1: Simple Neural Network
+```bash
+# Create example configuration
+cat > examples/simple_neural.json << EOF
+{
+    "simulation": {
+        "timestep": 0.001,
+        "max_neurons": 50,
+        "max_synapses": 200,
+        "random_seed": 42
+    },
+    "development": {
+        "enabled": false
+    }
+}
+EOF
+
+# Run the example
+./bin/nlm_phase2_test --config=examples/simple_neural.json
+```
+
+#### Example 2: Learning Environment
+```bash
+# Create environment learning configuration
+cat > examples/environment_learning.json << EOF
+{
+    "environment": {
+        "type": "simple",
+        "width": 200,
+        "height": 200,
+        "object_density": 0.05
+    },
+    "sensory": {
+        "vision_enabled": true,
+        "proprioception_enabled": true
+    },
+    "motor": {
+        "output_enabled": true
+    }
+}
+EOF
+
+# Run environment learning example
+./bin/nlm_phase3_demo --config=examples/environment_learning.json
+```
+
+#### Example 3: Cognitive Development
+```bash
+# Create cognitive development configuration
+cat > examples/cognitive_development.json << EOF
+{
+    "cognition": {
+        "attention_enabled": true,
+        "planning_enabled": true,
+        "concept_formation_enabled": true,
+        "self_model_enabled": true
+    },
+    "memory": {
+        "working_memory_enabled": true,
+        "episodic_memory_enabled": true,
+        "associative_memory_enabled": true
+    },
+    "prediction": {
+        "temporal_prediction_enabled": true,
+        "action_consequence_prediction_enabled": true
+    }
+}
+EOF
+
+# Run cognitive development example
+./bin/nlm_phase4_demo --config=examples/cognitive_development.json
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Issue 1: Build Errors
+**Problem**: CMake configuration errors or compilation failures.
+
+**Solution**:
+```bash
+# Clean build and rebuild
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON
+make clean
+make -j$(nproc)
+```
+
+#### Issue 2: Runtime Errors
+**Problem**: Segmentation faults or runtime exceptions.
+
+**Solution**:
+```bash
+# Run with debugging symbols
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+
+# Run with valgrind for memory errors
+valgrind --leak-check=full ./bin/nlm_phase6_demo
+```
+
+#### Issue 3: Configuration Errors
+**Problem**: Invalid configuration file or missing options.
+
+**Solution**:
+```bash
+# Validate configuration file
+cat my_config.json | python -m json.tool
+
+# Use example configuration
+./bin/nlm_phase6_demo --config=configs/basic_config.json
+```
+
+#### Issue 4: Performance Issues
+**Problem**: Slow simulation performance.
+
+**Solution**:
+```bash
+# Build with optimizations
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_OPT_LEVEL=2
+
+# Reduce simulation complexity
+./bin/nlm_phase6_demo --config=small_config.json
+```
+
+### Getting Help
+
+#### Documentation
+- **Main Documentation**: `docs/index.html`
+- **API Reference**: `docs/api-reference.html`
+- **Architecture Guide**: `docs/architecture.html`
+- **Configuration Guide**: `docs/configuration.html`
+
+#### Community Support
+- **GitHub Issues**: Report issues at https://github.com/your-org/nlm/issues
+- **Discussions**: Ask questions at https://github.com/your-org/nlm/discussions
+- **Documentation**: Contribute to documentation at https://github.com/your-org/nlm-docs
+
+#### Technical Support
+- **Bug Reports**: Include system information, configuration, and error messages
+- **Feature Requests**: Describe use case and proposed functionality
+- **Performance Issues**: Include timing information and system specifications
+
+## Next Steps
+
+### Learning Path
+1. **Complete Phase 2 Tutorial**: Basic neural computation
+2. **Explore Phase 3 Examples**: Environment interaction
+3. **Study Phase 4 Demos**: Cognitive emergence
+4. **Run Phase 6 Integration**: Complete system integration
+5. **Experiment with Custom Configurations**: Modify parameters and observe effects
+
+### Further Exploration
+- **Advanced Configuration**: Explore advanced configuration options
+- **Performance Optimization**: Learn about performance tuning
+- **Custom Experiments**: Design and run your own experiments
+- **Extension Development**: Extend NLM functionality
+- **Community Contribution**: Contribute to NLM development
+
+## Quick Reference
+
+### Basic Commands
+```bash
+# Build
+mkdir build && cd build && cmake .. && make -j$(nproc)
+
+# Run Phase 6 demo
+./bin/nlm_phase6_demo
+
+# Run with custom config
+./bin/nlm_phase6_demo --config=my_config.json
+
+# Run with performance monitoring
+./bin/nlm_phase6_demo --measure-performance
+
+# Run with visualization
+./bin/nlm_phase6_demo --visualize
+```
+
+### Configuration File Locations
+```
+configs/
+├── basic_config.json          # Basic simulation configuration
+├── performance_config.json     # Optimized configuration
+├── experiments/               # Experiment configurations
+└── examples/                  # Example configurations
+```
+
+### Output Files
+```
+results/
+├── simulation_output/         # Neural simulation results
+├── performance_metrics/       # Performance measurement data
+├── visualization/             # Generated visualizations
+└── checkpoints/               # Saved brain states
+```
+
+## Conclusion
+
+You now have a working NLM installation and have run your first simulations. This guide covers the basic setup and usage, but NLM offers much more functionality for advanced users and researchers.
+
+Continue exploring the documentation, running experiments, and discovering how NLM can help you understand neural computation, artificial development, and emergent cognition.
+
+**Happy simulating! Neurally yours,**
+The NLM Team

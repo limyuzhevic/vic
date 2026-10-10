@@ -24,57 +24,52 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
+    float ltpWeight = pImpl->ltpWeight;
+    float ltdWeight = pImpl->ltdWeight;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
+    // OPTIMIZATION: Sort spike times for efficient processing
+    // Create sorted copies to enable sliding window optimization
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Use sliding window to find spike pairs within effective range
+    // STDP time constant typically 10-100ms, so only recent spikes matter
+    float effectiveWindow = 5.0f * tau;  // Consider spikes within 5*tau
+    
+    // Two-pointer approach to find spike pairs efficiently
+    size_t preIdx = 0, postIdx = 0;
+    while (preIdx < sortedPreSpikes.size() && postIdx < sortedPostSpikes.size()) {
+        float dt = static_cast<float>(sortedPostSpikes[postIdx] - sortedPreSpikes[preIdx]);
+        
+        if (dt >= -effectiveWindow && dt <= effectiveWindow) {
+            // Within effective STDP window
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                float delta = ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            
+            // Move both pointers to next spike
+            ++preIdx;
+            ++postIdx;
+        } else if (dt < -effectiveWindow) {
+            // Post spike too old, move post pointer
+            ++postIdx;
+        } else {
+            // Pre spike too old, move pre pointer
+            ++preIdx;
         }
     }
     

@@ -1,0 +1,1763 @@
+# Advanced Memory
+
+## Overview
+
+Advanced Memory extends basic memory systems to capture more complex memory phenomena, including multi-level memory organization, dynamic memory allocation, and advanced consolidation mechanisms. This guide covers advanced memory mechanisms including hierarchical memory, dynamic memory allocation, advanced consolidation, and memory optimization.
+
+## Hierarchical Memory Systems
+
+### Overview
+Hierarchical memory organizes memories into multiple levels, from immediate working memory to long-term storage. This approach enables efficient memory management and supports different types of memory operations.
+
+### Hierarchical Memory Architecture
+```cpp
+struct HierarchicalMemorySystem {
+    // Memory levels
+    std::unique_ptr<WorkingMemory> workingMemory;           // Level 1: Immediate memory
+    std::unique_ptr<ShortTermMemory> shortTermMemory;       // Level 2: Short-term memory
+    std::unique_ptr<EpisodicMemory> episodicMemory;       // Level 3: Episodic memory
+    std::unique_ptr<SemanticMemory> semanticMemory;       // Level 4: Semantic memory
+    std::unique_ptr<ConceptualMemory> conceptualMemory;   // Level 5: Conceptual memory
+    
+    // Memory hierarchy controller
+    std::unique_ptr<MemoryHierarchyController> hierarchyController;
+    
+    // Memory management
+    std::unique_ptr<MemoryAllocator> memoryAllocator;
+    std::unique_ptr<MemoryCompressor> memoryCompressor;
+    std::unique_ptr<MemoryConsolidator> memoryConsolidator;
+    
+    // Memory integration
+    std::unique_ptr<MemoryIntegrator> memoryIntegrator;
+};
+```
+
+### Memory Hierarchy Levels
+
+#### Working Memory (Level 1)
+**Characteristics**:
+- **Immediate Storage**: Stores information for immediate use
+- **Limited Capacity**: Typically 4-7 items
+- **High Speed**: Fast access and manipulation
+- **Volatile**: Information fades quickly without rehearsal
+
+**Operations**:
+- **Storage**: Store information in working memory slots
+- **Retrieval**: Retrieve information from working memory
+- **Manipulation**: Manipulate information in working memory
+- **Rehearsal**: Maintain information through rehearsal
+
+**Advanced Features**:
+```cpp
+class AdvancedWorkingMemory : public WorkingMemory {
+public:
+    AdvancedWorkingMemory(size_t capacity) : WorkingMemory(capacity) {}
+    
+    void store(const std::vector<float>& information, int slot) override {
+        // Store information with priority
+        storeInformationWithPriority(information, slot);
+        
+        // Update working memory statistics
+        updateWorkingMemoryStatistics();
+    }
+    
+    void retrieve(int slot, std::vector<float>& information) override {
+        // Retrieve information with context
+        retrieveInformationWithContext(slot, information);
+        
+        // Update retrieval statistics
+        updateRetrievalStatistics();
+    }
+    
+    void maintain(float dt) override {
+        // Maintain information through rehearsal
+        maintainInformationThroughRehearsal(dt);
+        
+        // Apply decay
+        applyDecay(dt);
+    }
+    
+    void consolidate(float dt, MemoryConsolidationSystem& consolidation) override {
+        // Consolidate information to short-term memory
+        consolidateToShortTermMemory(dt, consolidation);
+    }
+    
+private:
+    void storeInformationWithPriority(
+        const std::vector<float>& information, int slot) {
+        // Store information with priority based on importance
+        float priority = calculatePriority(information);
+        informationWithPriority[slot] = {information, priority};
+        
+        // Update working memory state
+        workingMemoryState = updateWorkingMemoryState();
+    }
+    
+    void retrieveInformationWithContext(
+        int slot, std::vector<float>& information) {
+        // Retrieve information with context from related memories
+        information = informationWithPriority[slot].information;
+        
+        // Get contextual information
+        std::vector<float> context = getContextualInformation(slot);
+        
+        // Integrate context into retrieved information
+        information = integrateContext(information, context);
+    }
+    
+    void maintainInformationThroughRehearsal(float dt) {
+        // Maintain information through rehearsal
+        for (auto& [slot, data] : informationWithPriority) {
+            if (data.priority > REHEARSAL_THRESHOLD) {
+                // Perform rehearsal
+                performRehearsal(slot, data.information, dt);
+            }
+        }
+    }
+    
+    void consolidateToShortTermMemory(
+        float dt, MemoryConsolidationSystem& consolidation) {
+        // Consolidate information to short-term memory
+        for (auto& [slot, data] : informationWithPriority) {
+            if (shouldConsolidate(slot, data)) {
+                consolidateInformation(slot, data, dt, consolidation);
+            }
+        }
+    }
+    
+    bool shouldConsolidate(int slot, const InformationWithPriority& data) {
+        // Determine if information should be consolidated
+        return data.priority > CONSOLIDATION_THRESHOLD &&
+               getSlotUsageCount(slot) > MIN_USAGE_COUNT;
+    }
+    
+    void consolidateInformation(
+        int slot, const InformationWithPriority& data,
+        float dt, MemoryConsolidationSystem& consolidation) {
+        
+        // Create consolidated representation
+        std::vector<float> consolidatedRepresentation = 
+            createConsolidatedRepresentation(data.information);
+        
+        // Store in short-term memory
+        shortTermMemory->store(consolidatedRepresentation);
+        
+        // Update working memory statistics
+        workingMemory->removeSlot(slot);
+        
+        // Record consolidation
+        recordConsolidation(slot, data.information, consolidatedRepresentation);
+    }
+    
+    float calculatePriority(const std::vector<float>& information) {
+        // Calculate information priority based on multiple factors
+        float novelty = calculateNovelty(information);
+        float relevance = calculateRelevance(information);
+        float urgency = calculateUrgency(information);
+        
+        return (novelty + relevance + urgency) / 3.0f;
+    }
+    
+    std::vector<float> getContextualInformation(int slot) {
+        // Get contextual information from related memories
+        std::vector<float> context;
+        
+        // Get related episodic memories
+        std::vector<size_t> relatedMemories = getRelatedEpisodicMemories(slot);
+        
+        // Extract context from related memories
+        for (size_t memoryId : relatedMemories) {
+            std::vector<float> memoryContext = 
+                episodicMemory->extractContext(memoryId);
+            context.insert(context.end(), memoryContext.begin(), memoryContext.end());
+        }
+        
+        return context;
+    }
+    
+    std::vector<float> integrateContext(
+        const std::vector<float>& information,
+        const std::vector<float>& context) {
+        
+        // Integrate context into information
+        std::vector<float> integratedInformation = information;
+        
+        // Apply contextual modulation
+        for (size_t i = 0; i < integratedInformation.size() && i < context.size(); ++i) {
+            integratedInformation[i] *= (1.0f + context[i] * CONTEXT_MODULATION_STRENGTH);
+        }
+        
+        return integratedInformation;
+    }
+    
+    void performRehearsal(int slot, const std::vector<float>& information, float dt) {
+        // Perform rehearsal to maintain information
+        for (size_t i = 0; i < information.size(); ++i) {
+            // Enhance information through rehearsal
+            information[i] *= (1.0f + REHEARSAL_ENHANCEMENT * dt);
+            
+            // Add noise to simulate biological variation
+            information[i] += randomGaussian(0, REHEARSAL_NOISE);
+        }
+        
+        // Update stored information
+        informationWithPriority[slot].information = information;
+    }
+    
+    void updateWorkingMemoryStatistics() {
+        // Update working memory statistics
+        activeSlots = getActiveSlots();
+        memoryLoad = calculateMemoryLoad();
+        rehearsalCount = calculateRehearsalCount();
+    }
+    
+    WorkingMemoryState updateWorkingMemoryState() {
+        // Update working memory state
+        WorkingMemoryState state;
+        
+        state.memoryLoad = memoryLoad;
+        state.rehearsalCount = rehearsalCount;
+        state.activeSlots = activeSlots.size();
+        state.efficiency = calculateEfficiency();
+        
+        return state;
+    }
+    
+    float calculateEfficiency() {
+        // Calculate working memory efficiency
+        if (activeSlots.empty()) return 0.0f;
+        
+        float totalPriority = 0.0f;
+        for (const auto& [slot, data] : informationWithPriority) {
+            if (std::find(activeSlots.begin(), activeSlots.end(), slot) != activeSlots.end()) {
+                totalPriority += data.priority;
+            }
+        }
+        
+        return totalPriority / activeSlots.size();
+    }
+    
+    float calculateRehearsalCount() {
+        // Calculate total rehearsal count
+        float totalRehearsals = 0.0f;
+        for (const auto& [slot, data] : informationWithPriority) {
+            if (data.priority > REHEARSAL_THRESHOLD) {
+                totalRehearsals += data.rehearsalCount;
+            }
+        }
+        
+        return totalRehearsals;
+    }
+    
+    std::vector<size_t> getActiveSlots() {
+        // Get list of active slots
+        std::vector<size_t> activeSlots;
+        
+        for (const auto& [slot, data] : informationWithPriority) {
+            if (data.priority > 0.0f) {
+                activeSlots.push_back(slot);
+            }
+        }
+        
+        return activeSlots;
+    }
+    
+    float getSlotUsageCount(int slot) {
+        // Get usage count for slot
+        // Implementation depends on tracking system
+        return slotUsageCount[slot];
+    }
+    
+    void recordConsolidation(
+        int slot,
+        const std::vector<float>& original,
+        const std::vector<float>& consolidated) {
+        
+        // Record consolidation event
+        ConsolidationEvent event;
+        event.slot = slot;
+        event.original = original;
+        event.consolidated = consolidated;
+        event.time = currentTime;
+        
+        consolidationEvents.push_back(event);
+    }
+    
+    // Data structures
+    struct InformationWithPriority {
+        std::vector<float> information;
+        float priority;
+        float rehearsalCount;
+        float lastRehearsalTime;
+    };
+    
+    std::map<int, InformationWithPriority> informationWithPriority;
+    std::map<int, float> slotUsageCount;
+    std::vector<ConsolidationEvent> consolidationEvents;
+    float REHEARSAL_THRESHOLD;
+    float REHEARSAL_ENHANCEMENT;
+    float REHEARSAL_NOISE;
+    float CONSOLIDATION_THRESHOLD;
+    float MIN_USAGE_COUNT;
+    float CONTEXT_MODULATION_STRENGTH;
+    float currentTime;
+};
+```
+
+#### Short-Term Memory (Level 2)
+**Characteristics**:
+- **Temporary Storage**: Stores information for temporary use
+- **Moderate Capacity**: Typically 7-9 items
+- **Medium Speed**: Fast access with some decay
+- **Semi-Permanent**: Information can persist with rehearsal
+
+**Advanced Features**:
+```cpp
+class AdvancedShortTermMemory : public ShortTermMemory {
+public:
+    AdvancedShortTermMemory(size_t capacity) : ShortTermMemory(capacity) {}
+    
+    void store(const std::vector<float>& pattern) override {
+        // Store pattern with similarity assessment
+        storePatternWithSimilarity(pattern);
+        
+        // Update short-term memory statistics
+        updateShortTermMemoryStatistics();
+    }
+    
+    void retrieve(float similarityThreshold, std::vector<float>& pattern) override {
+        // Retrieve pattern based on similarity
+        retrievePatternBySimilarity(similarityThreshold, pattern);
+        
+        // Update retrieval statistics
+        updateRetrievalStatistics();
+    }
+    
+    void decay(float dt) override {
+        // Apply decay to patterns
+        applyPatternDecay(dt);
+        
+        // Consolidate stable patterns
+        consolidateStablePatterns(dt);
+    }
+    
+    void consolidate(float dt, MemoryConsolidationSystem& consolidation) override {
+        // Consolidate patterns to episodic memory
+        consolidateToEpisodicMemory(dt, consolidation);
+    }
+    
+private:
+    void storePatternWithSimilarity(const std::vector<float>& pattern) {
+        // Calculate pattern similarity with existing patterns
+        float bestSimilarity = 1.0f;
+        size_t bestIndex = 0;
+        
+        for (size_t i = 0; i < patterns.size(); ++i) {
+            float similarity = calculatePatternSimilarity(pattern, patterns[i]);
+            if (similarity > bestSimilarity) {
+                bestSimilarity = similarity;
+                bestIndex = i;
+            }
+        }
+        
+        // Store pattern if similarity is acceptable
+        if (bestSimilarity < PATTERN_STOARGE_THRESHOLD) {
+            patterns.push_back(pattern);
+            similarities.push_back(bestSimilarity);
+            
+            // Update pattern statistics
+            updatePatternStatistics();
+        }
+    }
+    
+    void retrievePatternBySimilarity(
+        float similarityThreshold, std::vector<float>& pattern) {
+        
+        // Find patterns that meet similarity threshold
+        std::vector<size_t> matchingIndices;
+        for (size_t i = 0; i < similarities.size(); ++i) {
+            if (similarities[i] >= similarityThreshold) {
+                matchingIndices.push_back(i);
+            }
+        }
+        
+        if (!matchingIndices.empty()) {
+            // Select pattern based on importance
+            size_t selectedIndex = selectImportantPattern(matchingIndices);
+            pattern = patterns[selectedIndex];
+            
+            // Update access statistics
+            updateAccessStatistics(selectedIndex);
+        }
+    }
+    
+    void applyPatternDecay(float dt) {
+        // Apply decay to all patterns
+        for (size_t i = 0; i < patterns.size(); ++i) {
+            // Calculate decay based on pattern age
+            float decayRate = calculateDecayRate(i);
+            patterns[i] *= (1.0f - decayRate * dt);
+            
+            // Update pattern strength
+            updatePatternStrength(i, decayRate);
+        }
+        
+        // Remove weak patterns
+        removeWeakPatterns();
+    }
+    
+    void consolidateStablePatterns(float dt) {
+        // Consolidate patterns that are stable and frequently accessed
+        for (size_t i = 0; i < patterns.size(); ++i) {
+            if (shouldConsolidatePattern(i, dt)) {
+                consolidatePattern(i, dt);
+            }
+        }
+    }
+    
+    void consolidateToEpisodicMemory(
+        float dt, MemoryConsolidationSystem& consolidation) {
+        
+        // Consolidate patterns to episodic memory
+        for (size_t i = 0; i < patterns.size(); ++i) {
+            if (canConsolidateToEpisodicMemory(i, dt)) {
+                consolidateToEpisodicMemory(i, dt, consolidation);
+            }
+        }
+    }
+    
+    bool shouldConsolidatePattern(size_t patternIndex, float dt) {
+        // Determine if pattern should be consolidated
+        float patternStability = getPatternStability(patternIndex);
+        float accessFrequency = getAccessFrequency(patternIndex);
+        
+        return patternStability > STABILITY_THRESHOLD &&
+               accessFrequency > FREQUENCY_THRESHOLD &&
+               dt > CONSOLIDATION_INTERVAL;
+    }
+    
+    bool canConsolidateToEpisodicMemory(
+        size_t patternIndex, float dt, MemoryConsolidationSystem& consolidation) {
+        
+        // Check if pattern can be consolidated to episodic memory
+        float consolidationCapacity = consolidation.getAvailableCapacity();
+        
+        if (consolidationCapacity <= 0) {
+            return false;
+        }
+        
+        // Check pattern similarity with existing episodic memories
+        std::vector<size_t> similarMemories = 
+            findSimilarEpisodicMemories(patterns[patternIndex]);
+        
+        if (similarMemories.empty()) {
+            return true;  // No conflicts, can consolidate
+        }
+        
+        // Check if consolidation will cause conflicts
+        return !willCauseConflicts(patterns[patternIndex], similarMemories);
+    }
+    
+    void consolidateToEpisodicMemory(
+        size_t patternIndex, float dt,
+        MemoryConsolidationSystem& consolidation) {
+        
+        // Create episodic memory representation
+        EpisodicMemoryRecord record;
+        record.pattern = patterns[patternIndex];
+        record.time = currentTime;
+        record.context = getPatternContext(patternIndex);
+        record.importance = calculatePatternImportance(patternIndex);
+        
+        // Store in episodic memory
+        size_t memoryId = episodicMemory->store(record);
+        
+        // Remove pattern from short-term memory
+        removePattern(patternIndex);
+        
+        // Record consolidation
+        consolidation.recordConsolidation(memoryId, patterns[patternIndex]);
+    }
+    
+    float calculatePatternSimilarity(
+        const std::vector<float>& pattern1,
+        const std::vector<float>& pattern2) {
+        
+        // Calculate pattern similarity using correlation
+        if (pattern1.size() != pattern2.size()) {
+            return 0.0f;
+        }
+        
+        float dotProduct = 0.0f;
+        float norm1 = 0.0f;
+        float norm2 = 0.0f;
+        
+        for (size_t i = 0; i < pattern1.size(); ++i) {
+            dotProduct += pattern1[i] * pattern2[i];
+            norm1 += pattern1[i] * pattern1[i];
+            norm2 += pattern2[i] * pattern2[i];
+        }
+        
+        float similarity = dotProduct / (sqrt(norm1) * sqrt(norm2) + 1e-6f);
+        return std::max(0.0f, similarity);
+    }
+    
+    size_t selectImportantPattern(const std::vector<size_t>& matchingIndices) {
+        // Select most important pattern
+        size_t selectedIndex = matchingIndices[0];
+        float maxImportance = getPatternImportance(selectedIndex);
+        
+        for (size_t index : matchingIndices) {
+            float importance = getPatternImportance(index);
+            if (importance > maxImportance) {
+                selectedIndex = index;
+                maxImportance = importance;
+            }
+        }
+        
+        return selectedIndex;
+    }
+    
+    float calculateDecayRate(size_t patternIndex) {
+        // Calculate decay rate based on pattern age and strength
+        float age = getPatternAge(patternIndex);
+        float strength = getPatternStrength(patternIndex);
+        
+        return BASE_DECAY_RATE + ageDecayCoefficient * age - strengthDecayCoefficient * strength;
+    }
+    
+    void updatePatternStrength(size_t patternIndex, float decayRate) {
+        // Update pattern strength based on decay
+        patternStrengths[patternIndex] *= (1.0f - decayRate);
+    }
+    
+    void removeWeakPatterns() {
+        // Remove patterns that have become too weak
+        std::vector<size_t> patternsToKeep;
+        
+        for (size_t i = 0; i < patterns.size(); ++i) {
+            if (patternStrengths[i] > WEAK_PATTERN_THRESHOLD) {
+                patternsToKeep.push_back(i);
+            }
+        }
+        
+        // Remove weak patterns
+        removePatterns(patternsToKeep);
+    }
+    
+    bool willCauseConflicts(
+        const std::vector<float>& pattern,
+        const std::vector<size_t>& similarMemories) {
+        
+        // Check if pattern consolidation will cause conflicts
+        for (size_t memoryId : similarMemories) {
+            EpisodicMemoryRecord& memory = episodicMemory->getMemoryRecord(memoryId);
+            
+            if (calculatePatternSimilarity(pattern, memory.pattern) > CONFLICT_THRESHOLD) {
+                return true;  // Conflict detected
+            }
+        }
+        
+        return false;  // No conflicts
+    }
+    
+    void removePatterns(const std::vector<size_t>& patternsToKeep) {
+        // Remove patterns that are not in keep list
+        std::vector<std::vector<float>> newPatterns;
+        std::vector<float> newSimilarities;
+        std::vector<float> newPatternStrengths;
+        
+        for (size_t i = 0; i < patterns.size(); ++i) {
+            if (std::find(patternsToKeep.begin(), patternsToKeep.end(), i) != patternsToKeep.end()) {
+                newPatterns.push_back(patterns[i]);
+                newSimilarities.push_back(similarities[i]);
+                newPatternStrengths.push_back(patternStrengths[i]);
+            }
+        }
+        
+        patterns = newPatterns;
+        similarities = newSimilarities;
+        patternStrengths = newPatternStrengths;
+    }
+    
+    // Data structures
+    std::vector<std::vector<float>> patterns;
+    std::vector<float> similarities;
+    std::vector<float> patternStrengths;
+    std::map<size_t, float> accessCounts;
+    float PATTERN_STOARGE_THRESHOLD;
+    float BASE_DECAY_RATE;
+    float ageDecayCoefficient;
+    float strengthDecayCoefficient;
+    float STABILITY_THRESHOLD;
+    float FREQUENCY_THRESHOLD;
+    float CONSOLIDATION_INTERVAL;
+    float CONFLICT_THRESHOLD;
+    float WEAK_PATTERN_THRESHOLD;
+    float currentTime;
+};
+```
+
+#### Episodic Memory (Level 3)
+**Characteristics**:
+- **Event Storage**: Stores specific events and experiences
+- **Temporal Context**: Linked to specific times and contexts
+- **Pattern Completion**: Retrieves memories from partial cues
+- **Replay Mechanisms**: Reactivates past patterns
+
+**Advanced Features**:
+```cpp
+class AdvancedEpisodicMemory : public EpisodicMemory {
+public:
+    AdvancedEpisodicMemory(size_t capacity) : EpisodicMemory(capacity) {}
+    
+    size_t store(const ExperienceRecord& record) override {
+        // Store experience with temporal and spatial context
+        size_t memoryId = storeWithContext(record);
+        
+        // Index for efficient retrieval
+        indexMemory(memoryId, record);
+        
+        // Consolidate if important
+        if (record.importance > CONSOLIDATION_THRESHOLD) {
+            consolidateMemory(memoryId, record);
+        }
+        
+        return memoryId;
+    }
+    
+    std::vector<size_t> retrieve(const ExperienceQuery& query) override {
+        // Retrieve memories based on query
+        std::vector<size_t> matchingMemories = queryMemories(query);
+        
+        // Complete patterns
+        completePatterns(matchingMemories);
+        
+        return matchingMemories;
+    }
+    
+    void replay(float dt) override {
+        // Replay important memories
+        replayImportantMemories(dt);
+        
+        // Consolidate replayed memories
+        consolidateReplayMemories(dt);
+    }
+    
+private:
+    size_t storeWithContext(const ExperienceRecord& record) {
+        // Store memory with temporal and spatial context
+        EpisodicMemoryRecord episodicRecord;
+        episodicRecord.id = generateMemoryId();
+        episodicRecord.time = record.time;
+        episodicRecord.position = record.position;
+        episodicRecord.sensoryPattern = record.sensoryPattern;
+        episodicRecord.motorPattern = record.motorPattern;
+        episodicRecord.predictionError = record.predictionError;
+        episodicRecord.rewardPrediction = record.rewardPrediction;
+        episodicRecord.importance = record.importance;
+        episodicRecord.relatedMemories = record.relatedMemories;
+        episodicRecord.isReplayCandidate = record.isReplayCandidate;
+        episodicRecord.replayPriority = record.replayPriority;
+        episodicRecord.lastReplayTime = record.lastReplayTime;
+        
+        // Store in memory database
+        memories[episodicRecord.id] = episodicRecord;
+        
+        return episodicRecord.id;
+    }
+    
+    void indexMemory(size_t memoryId, const ExperienceRecord& record) {
+        // Index memory for efficient retrieval
+        
+        // Temporal index
+        temporalIndex[record.time].push_back(memoryId);
+        
+        // Spatial index
+        spatialIndex[record.position].push_back(memoryId);
+        
+        // Pattern index
+        patternIndex[hashPattern(record.sensoryPattern)].push_back(memoryId);
+        
+        // Importance index
+        importanceIndex[record.importance].push_back(memoryId);
+    }
+    
+    std::vector<size_t> queryMemories(const ExperienceQuery& query) {
+        // Query memories based on criteria
+        std::vector<size_t> matchingMemories;
+        
+        // Temporal query
+        if (query.timeRange.has_value()) {
+            std::vector<size_t> temporalMatches = getTemporalMatches(query.timeRange.value());
+            matchingMemories.insert(matchingMemories.end(), temporalMatches.begin(), temporalMatches.end());
+        }
+        
+        // Spatial query
+        if (query.positionRange.has_value()) {
+            std::vector<size_t> spatialMatches = getSpatialMatches(query.positionRange.value());
+            matchingMemories.insert(matchingMemories.end(), spatialMatches.begin(), spatialMatches.end());
+        }
+        
+        // Pattern query
+        if (!query.pattern.empty()) {
+            std::vector<size_t> patternMatches = getPatternMatches(query.pattern);
+            matchingMemories.insert(matchingMemories.end(), patternMatches.begin(), patternMatches.end());
+        }
+        
+        // Importance query
+        if (query.minImportance > 0) {
+            std::vector<size_t> importanceMatches = getImportanceMatches(query.minImportance);
+            matchingMemories.insert(matchingMemories.end(), importanceMatches.begin(), importanceMatches.end());
+        }
+        
+        // Remove duplicates
+        std::sort(matchingMemories.begin(), matchingMemories.end());
+        matchingMemories.erase(std::unique(matchingMemories.begin(), matchingMemories.end()), matchingMemories.end());
+        
+        return matchingMemories;
+    }
+    
+    void completePatterns(std::vector<size_t>& matchingMemories) {
+        // Complete patterns for retrieved memories
+        for (size_t memoryId : matchingMemories) {
+            completePattern(memoryId);
+        }
+    }
+    
+    void completePattern(size_t memoryId) {
+        // Complete pattern for memory
+        if (memories.find(memoryId) == memories.end()) {
+            return;
+        }
+        
+        EpisodicMemoryRecord& memory = memories[memoryId];
+        
+        // Check if pattern is incomplete
+        if (memory.patternIsComplete) {
+            return;
+        }
+        
+        // Get partial cue
+        std::vector<float> partialCue = getPartialCue(memory);
+        
+        // Find similar patterns
+        std::vector<size_t> similarMemories = findSimilarPatterns(partialCue);
+        
+        // Combine information from similar memories
+        std::vector<float> completedPattern = combinePatterns(similarMemories);
+        
+        // Update memory with completed pattern
+        memory.pattern = completedPattern;
+        memory.patternIsComplete = true;
+    }
+    
+    void replayImportantMemories(float dt) {
+        // Replay important memories
+        std::vector<size_t> replayCandidates;
+        
+        for (auto& [memoryId, memory] : memories) {
+            if (memory.isReplayCandidate &&
+                canReplayMemory(memoryId, dt)) {
+                replayCandidates.push_back(memoryId);
+            }
+        }
+        
+        // Reimplement replay
+        for (size_t memoryId : replayCandidates) {
+            replayMemory(memoryId, dt);
+        }
+    }
+    
+    bool canReplayMemory(size_t memoryId, float dt) {
+        // Check if memory can be replayed
+        if (memories.find(memoryId) == memories.end()) {
+            return false;
+        }
+        
+        EpisodicMemoryRecord& memory = memories[memoryId];
+        
+        // Check if enough time has passed since last replay
+        if (memory.lastReplayTime + REPLAY_INTERVAL > currentTime) {
+            return false;
+        }
+        
+        // Check if memory is marked as replay candidate
+        if (!memory.isReplayCandidate) {
+            return false;
+        }
+        
+        // Check if memory is important enough
+        if (memory.importance < REPLAY_IMPORTANCE_THRESHOLD) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    void replayMemory(size_t memoryId, float dt) {
+        // Replay memory
+        if (memories.find(memoryId) == memories.end()) {
+            return;
+        }
+        
+        EpisodicMemoryRecord& memory = memories[memoryId];
+        
+        // Update memory state
+        memory.lastReplayTime = currentTime;
+        memory.replayCount++;
+        
+        // Reactivate neural patterns
+        reactivateNeuralPatterns(memory);
+        
+        // Consolidate replayed memory
+        consolidateReplayMemory(memoryId, dt);
+    }
+    
+    void consolidateReplayMemory(size_t memoryId, float dt) {
+        // Consolidate replayed memory
+        if (memories.find(memoryId) == memories.end()) {
+            return;
+        }
+        
+        EpisodicMemoryRecord& memory = memories[memoryId];
+        
+        // Check if consolidation is needed
+        if (memory.replayCount < CONSOLIDATION_REPLAY_COUNT) {
+            return;
+        }
+        
+        // Consolidate memory
+        consolidateMemory(memoryId, memory);
+    }
+    
+    void consolidateMemory(size_t memoryId, const EpisodicMemoryRecord& memory) {
+        // Consolidate memory to semantic memory
+        std::vector<float> semanticPattern = extractSemanticPattern(memory);
+        
+        // Store in semantic memory
+        semanticMemory->store(semanticPattern, memory.importance);
+        
+        // Mark memory as consolidated
+        memories[memoryId].isConsolidated = true;
+    }
+    
+    std::vector<size_t> getTemporalMatches(const TimeRange& timeRange) {
+        std::vector<size_t> matches;
+        
+        for (auto& [time, memoryIds] : temporalIndex) {
+            if (time >= timeRange.start && time <= timeRange.end) {
+                matches.insert(matches.end(), memoryIds.begin(), memoryIds.end());
+            }
+        }
+        
+        return matches;
+    }
+    
+    std::vector<size_t> getSpatialMatches(const PositionRange& positionRange) {
+        std::vector<size_t> matches;
+        
+        for (auto& [position, memoryIds] : spatialIndex) {
+            if (position.x >= positionRange.minX && position.x <= positionRange.maxX &&
+                position.y >= positionRange.minY && position.y <= positionRange.maxY) {
+                matches.insert(matches.end(), memoryIds.begin(), memoryIds.end());
+            }
+        }
+        
+        return matches;
+    }
+    
+    std::vector<size_t> getPatternMatches(const std::vector<float>& pattern) {
+        std::vector<size_t> matches;
+        
+        size_t patternHash = hashPattern(pattern);
+        if (patternIndex.find(patternHash) != patternIndex.end()) {
+            matches = patternIndex[patternHash];
+        }
+        
+        return matches;
+    }
+    
+    std::vector<size_t> getImportanceMatches(float minImportance) {
+        std::vector<size_t> matches;
+        
+        for (auto& [importance, memoryIds] : importanceIndex) {
+            if (importance >= minImportance) {
+                matches.insert(matches.end(), memoryIds.begin(), memoryIds.end());
+            }
+        }
+        
+        return matches;
+    }
+    
+    void reactivateNeuralPatterns(const EpisodicMemoryRecord& memory) {
+        // Reactivate neural patterns associated with memory
+        // This would involve updating neural connections
+        // and reactivating relevant neurons
+    }
+    
+    std::vector<size_t> findSimilarPatterns(const std::vector<float>& pattern) {
+        std::vector<size_t> similarMemories;
+        
+        for (auto& [memoryId, memory] : memories) {
+            float similarity = calculatePatternSimilarity(pattern, memory.sensoryPattern);
+            if (similarity > SIMILARITY_THRESHOLD) {
+                similarMemories.push_back(memoryId);
+            }
+        }
+        
+        return similarMemories;
+    }
+    
+    std::vector<float> combinePatterns(const std::vector<size_t>& memoryIds) {
+        // Combine patterns from multiple memories
+        std::vector<float> combinedPattern;
+        
+        if (memoryIds.empty()) {
+            return combinedPattern;
+        }
+        
+        // Get first memory as base
+        size_t firstMemoryId = memoryIds[0];
+        combinedPattern = memories[firstMemoryId].sensoryPattern;
+        
+        // Combine with other memories
+        for (size_t i = 1; i < memoryIds.size(); ++i) {
+            size_t memoryId = memoryIds[i];
+            
+            // Blend patterns
+            for (size_t j = 0; j < combinedPattern.size() && j < memories[memoryId].sensoryPattern.size(); ++j) {
+                combinedPattern[j] = (combinedPattern[j] + memories[memoryId].sensoryPattern[j]) / 2.0f;
+            }
+        }
+        
+        return combinedPattern;
+    }
+    
+    std::vector<float> getPatternContext(size_t memoryId) {
+        // Get contextual information for memory
+        if (memories.find(memoryId) == memories.end()) {
+            return std::vector<float>();
+        }
+        
+        EpisodicMemoryRecord& memory = memories[memoryId];
+        
+        // Combine position and temporal context
+        std::vector<float> context;
+        context.push_back(memory.position.x);
+        context.push_back(memory.position.y);
+        context.push_back(memory.time);
+        
+        return context;
+    }
+    
+    float calculatePatternImportance(size_t memoryId) {
+        // Calculate importance of pattern
+        if (memories.find(memoryId) == memories.end()) {
+            return 0.0f;
+        }
+        
+        EpisodicMemoryRecord& memory = memories[memoryId];
+        
+        // Calculate importance based on multiple factors
+        float noveltyImportance = calculateNoveltyImportance(memory);
+        float relevanceImportance = calculateRelevanceImportance(memory);
+        float recencyImportance = calculateRecencyImportance(memory);
+        
+        return (noveltyImportance + relevanceImportance + recencyImportance) / 3.0f;
+    }
+    
+    float calculateNoveltyImportance(const EpisodicMemoryRecord& memory) {
+        // Calculate novelty importance
+        // Implementation depends on novelty detection system
+        return 1.0f - memory.time / MAX_NOVELTY_TIME;
+    }
+    
+    float calculateRelevanceImportance(const EpisodicMemoryRecord& memory) {
+        // Calculate relevance importance
+        // Implementation depends on relevance detection system
+        return memory.importance;
+    }
+    
+    float calculateRecencyImportance(const EpisodicMemoryRecord& memory) {
+        // Calculate recency importance
+        float timeSinceEvent = currentTime - memory.time;
+        return std::max(0.0f, 1.0f - timeSinceEvent / RECIENCY_DECAY_TIME);
+    }
+    
+    size_t generateMemoryId() {
+        // Generate unique memory ID
+        return nextMemoryId++;
+    }
+    
+    float calculatePatternSimilarity(
+        const std::vector<float>& pattern1,
+        const std::vector<float>& pattern2) {
+        
+        // Calculate pattern similarity using correlation
+        if (pattern1.size() != pattern2.size()) {
+            return 0.0f;
+        }
+        
+        float dotProduct = 0.0f;
+        float norm1 = 0.0f;
+        float norm2 = 0.0f;
+        
+        for (size_t i = 0; i < pattern1.size(); ++i) {
+            dotProduct += pattern1[i] * pattern2[i];
+            norm1 += pattern1[i] * pattern1[i];
+            norm2 += pattern2[i] * pattern2[i];
+        }
+        
+        float similarity = dotProduct / (sqrt(norm1) * sqrt(norm2) + 1e-6f);
+        return std::max(0.0f, similarity);
+    }
+    
+    size_t hashPattern(const std::vector<float>& pattern) {
+        // Hash pattern for efficient lookup
+        std::hash<float> hasher;
+        size_t hashValue = 0;
+        
+        for (float value : pattern) {
+            hashValue ^= hasher(value);
+        }
+        
+        return hashValue;
+    }
+    
+    // Data structures
+    std::map<size_t, EpisodicMemoryRecord> memories;
+    std::map<float, std::vector<size_t>> temporalIndex;
+    std::map<Position, std::vector<size_t>> spatialIndex;
+    std::map<size_t, std::vector<size_t>> patternIndex;
+    std::map<float, std::vector<size_t>> importanceIndex;
+    
+    float SIMILARITY_THRESHOLD;
+    float REPLAY_INTERVAL;
+    float REPLAY_IMPORTANCE_THRESHOLD;
+    float CONSOLIDATION_REPLAY_COUNT;
+    float MAX_NOVELTY_TIME;
+    float RECIENCY_DECAY_TIME;
+    size_t nextMemoryId;
+    float currentTime;
+};
+```
+
+#### Semantic Memory (Level 4)
+**Characteristics**:
+- **Abstract Representation**: Stores abstract concepts and categories
+- **Property-based**: Organized by properties and relationships
+- **Generalization**: Extrapolates from examples
+- **Stability**: Stable representations of recurring patterns
+
+**Advanced Features**:
+```cpp
+class AdvancedSemanticMemory : public SemanticMemory {
+public:
+    AdvancedSemanticMemory(size_t capacity) : SemanticMemory(capacity) {}
+    
+    size_t store(const Concept& concept) override {
+        // Store concept with property-based organization
+        size_t conceptId = storeWithProperties(concept);
+        
+        // Index for efficient retrieval
+        indexConcept(conceptId, concept);
+        
+        // Integrate with existing concepts
+        integrateWithExistingConcepts(conceptId, concept);
+        
+        return conceptId;
+    }
+    
+    std::vector<size_t> retrieve(const ConceptQuery& query) override {
+        // Retrieve concepts based on query
+        std::vector<size_t> matchingConcepts = queryConcepts(query);
+        
+        // Generalize retrieved concepts
+        generalizeConcepts(matchingConcepts);
+        
+        return matchingConcepts;
+    }
+    
+    void update(float dt) override {
+        // Update concept representations
+        updateConceptRepresentations(dt);
+        
+        // Consolidate similar concepts
+        consolidateSimilarConcepts(dt);
+    }
+    
+private:
+    size_t storeWithProperties(const Concept& concept) {
+        // Store concept with property-based organization
+        SemanticConcept semanticConcept;
+        semanticConcept.id = generateConceptId();
+        semanticConcept.name = concept.name;
+        semanticConcept.properties = concept.properties;
+        semanticConcept.propertyWeights = calculatePropertyWeights(concept);
+        semanticConcept.category = concept.category;
+        semanticConcept.importance = calculateConceptImportance(concept);
+        
+        // Store in concept database
+        concepts[semanticConcept.id] = semanticConcept;
+        
+        return semanticConcept.id;
+    }
+    
+    void indexConcept(size_t conceptId, const Concept& concept) {
+        // Index concept for efficient retrieval
+        
+        // Name index
+        nameIndex[concept.name].push_back(conceptId);
+        
+        // Property index
+        for (const auto& [property, value] : concept.properties) {
+            propertyIndex[property][value].push_back(conceptId);
+        }
+        
+        // Category index
+        categoryIndex[concept.category].push_back(conceptId);
+        
+        // Importance index
+        importanceIndex[concept.importance].push_back(conceptId);
+    }
+    
+    std::vector<size_t> queryConcepts(const ConceptQuery& query) {
+        // Query concepts based on criteria
+        std::vector<size_t> matchingConcepts;
+        
+        // Name query
+        if (!query.name.empty()) {
+            std::vector<size_t> nameMatches = getNameMatches(query.name);
+            matchingConcepts.insert(matchingConcepts.end(), nameMatches.begin(), nameMatches.end());
+        }
+        
+        // Property query
+        if (!query.properties.empty()) {
+            std::vector<size_t> propertyMatches = getPropertyMatches(query.properties);
+            matchingConcepts.insert(matchingConcepts.end(), propertyMatches.begin(), propertyMatches.end());
+        }
+        
+        // Category query
+        if (!query.category.empty()) {
+            std::vector<size_t> categoryMatches = getCategoryMatches(query.category);
+            matchingConcepts.insert(matchingConcepts.end(), categoryMatches.begin(), categoryMatches.end());
+        }
+        
+        // Importance query
+        if (query.minImportance > 0) {
+            std::vector<size_t> importanceMatches = getImportanceMatches(query.minImportance);
+            matchingConcepts.insert(matchingConcepts.end(), importanceMatches.begin(), importanceMatches.end());
+        }
+        
+        // Remove duplicates
+        std::sort(matchingConcepts.begin(), matchingConcepts.end());
+        matchingConcepts.erase(std::unique(matchingConcepts.begin(), matchingConcepts.end()), matchingConcepts.end());
+        
+        return matchingConcepts;
+    }
+    
+    void generalizeConcepts(std::vector<size_t>& conceptIds) {
+        // Generalize concepts based on similarity
+        for (size_t conceptId : conceptIds) {
+            generalizeConcept(conceptId);
+        }
+    }
+    
+    void generalizeConcept(size_t conceptId) {
+        // Generalize concept based on usage
+        if (concepts.find(conceptId) == concepts.end()) {
+            return;
+        }
+        
+        SemanticConcept& concept = concepts[conceptId];
+        
+        // Generalize based on frequency of use
+        concept.generalizationLevel = calculateGeneralizationLevel(conceptId);
+        
+        // Update prototype representation
+        updateConceptPrototype(conceptId);
+        
+        // Update property weights
+        updatePropertyWeights(conceptId);
+    }
+    
+    void updateConceptRepresentations(float dt) {
+        // Update concept representations
+        for (auto& [conceptId, concept] : concepts) {
+            updateConceptRepresentation(conceptId, dt);
+        }
+    }
+    
+    void consolidateSimilarConcepts(float dt) {
+        // Consolidate similar concepts
+        for (auto& [conceptId, concept] : concepts) {
+            consolidateSimilarConcept(conceptId, dt);
+        }
+    }
+    
+    std::vector<size_t> getNameMatches(const std::string& name) {
+        std::vector<size_t> matches;
+        
+        if (nameIndex.find(name) != nameIndex.end()) {
+            matches = nameIndex[name];
+        }
+        
+        return matches;
+    }
+    
+    std::vector<size_t> getPropertyMatches(const std::map<std::string, float>& properties) {
+        std::vector<size_t> matches;
+        
+        // Find concepts that match all properties
+        for (auto& [conceptId, concept] : concepts) {
+            bool allPropertiesMatch = true;
+            
+            for (const auto& [property, value] : properties) {
+                if (concept.properties.find(property) == concept.properties.end() ||
+                    concept.properties[property] != value) {
+                    allPropertiesMatch = false;
+                    break;
+                }
+            }
+            
+            if (allPropertiesMatch) {
+                matches.push_back(conceptId);
+            }
+        }
+        
+        return matches;
+    }
+    
+    std::vector<size_t> getCategoryMatches(const std::string& category) {
+        std::vector<size_t> matches;
+        
+        if (categoryIndex.find(category) != categoryIndex.end()) {
+            matches = categoryIndex[category];
+        }
+        
+        return matches;
+    }
+    
+    std::vector<size_t> getImportanceMatches(float minImportance) {
+        std::vector<size_t> matches;
+        
+        for (auto& [importance, conceptIds] : importanceIndex) {
+            if (importance >= minImportance) {
+                matches.insert(matches.end(), conceptIds.begin(), conceptIds.end());
+            }
+        }
+        
+        return matches;
+    }
+    
+    void updateConceptRepresentation(size_t conceptId, float dt) {
+        // Update concept representation
+        if (concepts.find(conceptId) == concepts.end()) {
+            return;
+        }
+        
+        SemanticConcept& concept = concepts[conceptId];
+        
+        // Update prototype based on usage
+        updateConceptPrototype(conceptId);
+        
+        // Apply concept decay
+        applyConceptDecay(conceptId, dt);
+    }
+    
+    void updateConceptPrototype(size_t conceptId) {
+        // Update concept prototype based on frequent usage
+        if (concepts.find(conceptId) == concepts.end()) {
+            return;
+        }
+        
+        SemanticConcept& concept = concepts[conceptId];
+        
+        // Update prototype based on recent interactions
+        std::vector<size_t> relatedConcepts = getRelatedConcepts(conceptId);
+        
+        if (!relatedConcepts.empty()) {
+            // Blend with related concepts
+            std::vector<float> blendedPrototype = blendPrototypes(conceptId, relatedConcepts);
+            
+            // Update prototype
+            concept.prototype = blendedPrototype;
+        }
+    }
+    
+    void applyConceptDecay(float dt) {
+        // Apply decay to concept representations
+        for (auto& [conceptId, concept] : concepts) {
+            concept.prototype *= (1.0f - conceptDecayRate * dt);
+            concept.importance *= (1.0f - conceptDecayRate * dt);
+        }
+    }
+    
+    void consolidateSimilarConcept(size_t conceptId, float dt) {
+        // Consolidate similar concept
+        if (concepts.find(conceptId) == concepts.end()) {
+            return;
+        }
+        
+        SemanticConcept& concept = concepts[conceptId];
+        
+        // Find similar concepts
+        std::vector<size_t> similarConcepts = findSimilarConcepts(conceptId);
+        
+        if (similarConcepts.size() < MIN_SIMILAR_CONCEPTS) {
+            return;  // Not enough similar concepts to consolidate
+        }
+        
+        // Consolidate similar concepts
+        consolidateConcepts(conceptId, similarConcepts);
+    }
+    
+    std::vector<size_t> findSimilarConcepts(size_t conceptId) {
+        // Find concepts that are similar to the given concept
+        std::vector<size_t> similarConcepts;
+        
+        if (concepts.find(conceptId) == concepts.end()) {
+            return similarConcepts;
+        }
+        
+        SemanticConcept& concept = concepts[conceptId];
+        
+        for (auto& [otherId, otherConcept] : concepts) {
+            if (otherId == conceptId) {
+                continue;
+            }
+            
+            float similarity = calculateConceptSimilarity(concept, otherConcept);
+            if (similarity > SIMILARITY_THRESHOLD) {
+                similarConcepts.push_back(otherId);
+            }
+        }
+        
+        return similarConcepts;
+    }
+    
+    void consolidateConcepts(size_t conceptId, const std::vector<size_t>& similarConcepts) {
+        // Consolidate similar concepts
+        SemanticConcept& concept = concepts[conceptId];
+        
+        // Create consolidated representation
+        std::vector<float> consolidatedPrototype = concept.prototype;
+        std::map<std::string, float> consolidatedProperties = concept.properties;
+        
+        // Combine with similar concepts
+        for (size_t similarId : similarConcepts) {
+            if (concepts.find(similarId) == concepts.end()) {
+                continue;
+            }
+            
+            SemanticConcept& similarConcept = concepts[similarId];
+            
+            // Combine prototypes
+            for (size_t i = 0; i < consolidatedPrototype.size() && i < similarConcept.prototype.size(); ++i) {
+                consolidatedPrototype[i] = (consolidatedPrototype[i] + similarConcept.prototype[i]) / 2.0f;
+            }
+            
+            // Combine properties
+            for (const auto& [property, value] : similarConcept.properties) {
+                if (consolidatedProperties.find(property) == consolidatedProperties.end()) {
+                    consolidatedProperties[property] = value;
+                } else {
+                    consolidatedProperties[property] = (consolidatedProperties[property] + value) / 2.0f;
+                }
+            }
+        }
+        
+        // Update concept with consolidated representation
+        concept.prototype = consolidatedPrototype;
+        concept.properties = consolidatedProperties;
+        
+        // Mark concept for removal
+        conceptsToRemove.insert(similarConcepts.begin(), similarConcepts.end());
+    }
+    
+    float calculatePropertyWeights(const Concept& concept) {
+        // Calculate property weights based on property importance
+        float totalWeight = 0.0f;
+        std::map<std::string, float> weights;
+        
+        for (const auto& [property, value] : concept.properties) {
+            float weight = calculatePropertyWeight(property, value);
+            weights[property] = weight;
+            totalWeight += weight;
+        }
+        
+        // Normalize weights
+        for (auto& [property, weight] : weights) {
+            weights[property] /= totalWeight;
+        }
+        
+        return weights;
+    }
+    
+    float calculatePropertyWeight(const std::string& property, float value) {
+        // Calculate property weight based on typical values
+        // This is a simplified implementation
+        return std::abs(value);
+    }
+    
+    float calculateConceptImportance(const Concept& concept) {
+        // Calculate concept importance based on multiple factors
+        float noveltyImportance = calculateNoveltyImportance(concept);
+        float relevanceImportance = calculateRelevanceImportance(concept);
+        float stabilityImportance = calculateStabilityImportance(concept);
+        
+        return (noveltyImportance + relevanceImportance + stabilityImportance) / 3.0f;
+    }
+    
+    std::vector<size_t> getRelatedConcepts(size_t conceptId) {
+        // Get concepts that are related to the given concept
+        std::vector<size_t> relatedConcepts;
+        
+        if (concepts.find(conceptId) == concepts.end()) {
+            return relatedConcepts;
+        }
+        
+        SemanticConcept& concept = concepts[conceptId];
+        
+        // Get concepts in the same category
+        if (categoryIndex.find(concept.category) != categoryIndex.end()) {
+            relatedConcepts = categoryIndex[concept.category];
+            
+            // Remove the concept itself
+            relatedConcepts.erase(std::remove(relatedConcepts.begin(), relatedConcepts.end(), conceptId), relatedConcepts.end());
+        }
+        
+        return relatedConcepts;
+    }
+    
+    std::vector<float> blendPrototypes(
+        size_t conceptId, const std::vector<size_t>& relatedConcepts) {
+        
+        // Blend prototypes from related concepts
+        std::vector<float> blendedPrototype;
+        
+        if (relatedConcepts.empty()) {
+            return blendedPrototype;
+        }
+        
+        // Get first concept as base
+        size_t firstConceptId = relatedConcepts[0];
+        blendedPrototype = concepts[firstConceptId].prototype;
+        
+        // Blend with other concepts
+        for (size_t i = 1; i < relatedConcepts.size(); ++i) {
+            size_t relatedId = relatedConcepts[i];
+            
+            // Blend prototypes
+            for (size_t j = 0; j < blendedPrototype.size() && j < concepts[relatedId].prototype.size(); ++j) {
+                blendedPrototype[j] = (blendedPrototype[j] + concepts[relatedId].prototype[j]) / 2.0f;
+            }
+        }
+        
+        return blendedPrototype;
+    }
+    
+    float calculateConceptSimilarity(
+        const SemanticConcept& concept1,
+        const SemanticConcept& concept2) {
+        
+        // Calculate similarity between concepts
+        float nameSimilarity = calculateStringSimilarity(concept1.name, concept2.name);
+        float categorySimilarity = calculateStringSimilarity(concept1.category, concept2.category);
+        float propertySimilarity = calculatePropertySimilarity(concept1.properties, concept2.properties);
+        
+        return (nameSimilarity + categorySimilarity + propertySimilarity) / 3.0f;
+    }
+    
+    float calculatePropertySimilarity(
+        const std::map<std::string, float>& properties1,
+        const std::map<std::string, float>& properties2) {
+        
+        // Calculate property similarity
+        float totalSimilarity = 0.0f;
+        float totalProperties = 0.0f;
+        
+        for (const auto& [property, value1] : properties1) {
+            if (properties2.find(property) != properties2.end()) {
+                float value2 = properties2[property];
+                float similarity = 1.0f - std::abs(value1 - value2);
+                totalSimilarity += similarity;
+            }
+            totalProperties++;
+        }
+        
+        for (const auto& [property, value] : properties2) {
+            if (properties1.find(property) == properties1.end()) {
+                totalProperties++;
+            }
+        }
+        
+        return totalSimilarity / (totalProperties + 1e-6f);
+    }
+    
+    float calculateStringSimilarity(const std::string& str1, const std::string& str2) {
+        // Calculate string similarity using Levenshtein distance
+        int distance = levenshteinDistance(str1, str2);
+        int maxLength = std::max(str1.length(), str2.length());
+        
+        return 1.0f - static_cast<float>(distance) / static_cast<float>(maxLength + 1);
+    }
+    
+    int levenshteinDistance(const std::string& str1, const std::string& str2) {
+        // Calculate Levenshtein distance between two strings
+        int m = str1.length();
+        int n = str2.length();
+        
+        // Create matrix for dynamic programming
+        std::vector<std::vector<int>> dp(m + 1, std::vector<int>(n + 1, 0));
+        
+        // Initialize first row and column
+        for (int i = 0; i <= m; ++i) {
+            dp[i][0] = i;
+        }
+        for (int j = 0; j <= n; ++j) {
+            dp[0][j] = j;
+        }
+        
+        // Fill matrix
+        for (int i = 1; i <= m; ++i) {
+            for (int j = 1; j <= n; ++j) {
+                int cost = (str1[i-1] == str2[j-1]) ? 0 : 1;
+                dp[i][j] = std::min({
+                    dp[i-1][j] + 1,           // deletion
+                    dp[i][j-1] + 1,           // insertion
+                    dp[i-1][j-1] + cost      // substitution
+                });
+            }
+        }
+        
+        return dp[m][n];
+    }
+    
+    // Data structures
+    std::map<size_t, SemanticConcept> concepts;
+    std::map<std::string, std::vector<size_t>> nameIndex;
+    std::map<std::string, std::map<float, std::vector<size_t>>> propertyIndex;
+    std::map<std::string, std::vector<size_t>> categoryIndex;
+    std::map<float, std::vector<size_t>> importanceIndex;
+    
+    float conceptDecayRate;
+    float SIMILARITY_THRESHOLD;
+    size_t MIN_SIMILAR_CONCEPTS;
+    size_t nextConceptId;
+};
+```
+
+## Advanced Memory Integration
+
+### Integration with Neural Dynamics
+```cpp
+void AdvancedMemorySystem::integrateWithNeuralDynamics(
+    NeuralNetwork& neuralNetwork,
+    const MemoryIntegrationContext& context) {
+    
+    // Integrate working memory with neural dynamics
+    integrateWorkingMemoryWithNeuralDynamics(neuralNetwork, context);
+    
+    // Integrate short-term memory with neural dynamics
+    integrateShortTermMemoryWithNeuralDynamics(neuralNetwork, context);
+    
+    // Integrate episodic memory with neural dynamics
+    integrateEpisodicMemoryWithNeuralDynamics(neuralNetwork, context);
+    
+    // Integrate semantic memory with neural dynamics
+    integrateSemanticMemoryWithNeuralDynamics(neuralNetwork, context);
+    
+    // Integrate conceptual memory with neural dynamics
+    integrateConceptualMemoryWithNeuralDynamics(neuralNetwork, context);
+}
+```
+
+### Integration with Plasticity
+```cpp
+void AdvancedMemorySystem::integrateWithPlasticity(
+    PlasticitySystem& plasticity,
+    const MemoryIntegrationContext& context) {
+    
+    // Integrate memory systems with plasticity
+    integrateWithPlasticity(plasticity, context);
+    
+    // Support memory-dependent plasticity
+    supportMemoryDependentPlasticity(plasticity, context);
+    
+    // Support plasticity-dependent memory
+    supportPlasticityDependentMemory(plasticity, context);
+}
+```
+
+### Integration with Prediction System
+```cpp
+void AdvancedMemorySystem::integrateWithPredictionSystem(
+    PredictionSystem& predictionSystem,
+    const MemoryIntegrationContext& context) {
+    
+    // Integrate memory systems with prediction
+    integrateWithPrediction(predictionSystem, context);
+    
+    // Support memory-dependent prediction
+    supportMemoryDependentPrediction(predictionSystem, context);
+    
+    // Support prediction-dependent memory
+    supportPredictionDependentMemory(predictionSystem, context);
+}
+```
+
+### Integration with Cognition
+```cpp
+void AdvancedMemorySystem::integrateWithCognition(
+    CognitionSystem& cognitionSystem,
+    const MemoryIntegrationContext& context) {
+    
+    // Integrate memory systems with cognition
+    integrateWithCognition(cognitionSystem, context);
+    
+    // Support memory-dependent cognition
+    supportMemoryDependentCognition(cognitionSystem, context);
+    
+    // Support cognition-dependent memory
+    supportCognitionDependentMemory(cognitionSystem, context);
+}
+```
+
+## Advanced Memory Performance Metrics
+
+### Memory Performance Metrics
+```cpp
+struct AdvancedMemoryMetrics {
+    // Memory capacity metrics
+    float workingMemoryCapacity;      // Working memory capacity
+    float shortTermMemoryCapacity;    // Short-term memory capacity
+    float episodicMemoryCapacity;    // Episodic memory capacity
+    float semanticMemoryCapacity;    // Semantic memory capacity
+    float conceptualMemoryCapacity;  // Conceptual memory capacity
+    
+    // Memory efficiency metrics
+    float memoryEfficiency;           // Overall memory efficiency
+    float memoryUtilization;          // Memory utilization efficiency
+    float memorySpeed;                // Memory access speed
+    float memoryAccuracy;             // Memory retrieval accuracy
+    
+    // Memory quality metrics
+    float memoryStability;            // Memory stability over time
+    float memoryIntegrity;            // Memory integrity
+    float memoryCoherence;            // Memory coherence
+};
+```
+
+### Integration Performance Metrics
+```cpp
+struct MemoryIntegrationMetrics {
+    // Integration quality metrics
+    float integrationCompleteness;    // Completeness of integration
+    float integrationCohesion;        // Cohesion of integration
+    float integrationCoupling;        // Coupling of integration
+    float integrationEfficiency;      // Efficiency of integration
+    
+    // Functional metrics
+    float systemFunctionality;         // Overall system functionality
+    float performanceQuality;          // Quality of performance
+    float behavioralQuality;           // Quality of behavior
+    float learningQuality;             // Quality of learning
+};
+```
+
+## Advanced Memory Testing and Validation
+
+### Unit Tests
+- **Hierarchical Memory Tests**: Test hierarchical memory organization
+- **Short-Term Memory Tests**: Test short-term memory mechanisms
+- **Episodic Memory Tests**: Test episodic memory encoding and retrieval
+- **Semantic Memory Tests**: Test semantic memory organization and generalization
+- **Concept Memory Tests**: Test conceptual memory formation and abstraction
+- **Integration Tests**: Test integration of advanced memory systems
+
+### Performance Tests
+- **Memory Capacity Tests**: Test memory capacity under various conditions
+- **Memory Efficiency Tests**: Test memory efficiency and utilization
+- **Memory Speed Tests**: Test memory access speed
+- **Memory Accuracy Tests**: Test memory retrieval accuracy
+- **Memory Stability Tests**: Test memory stability over time
+
+### Behavioral Tests
+- **Memory Learning Tests**: Test memory learning and retention
+- **Memory Forgetting Tests**: Test memory forgetting patterns
+- **Memory Interference Tests**: Test memory interference and completion
+- **Memory Transfer Tests**: Test memory transfer across domains
+
+## Advanced Memory Common Issues and Solutions
+
+### Issue 1: Memory Overload
+**Problem**: Memory systems become overloaded with too much information.
+**Solution**:
+- Implement stronger capacity limits
+- Add prioritization mechanisms
+- Use aging to remove old memories
+- Implement memory compression
+
+### Issue 2: Memory Interference
+**Problem**: Memories interfere with each other's retrieval.
+**Solution**:
+- Implement pattern separation
+- Use contextual gating
+- Apply similarity-based filtering
+- Use temporal indexing
+
+### Issue 3: Memory Decay
+**Problem**: Memories degrade over time without reinforcement.
+**Solution**:
+- Implement replay mechanisms
+- Add consolidation processes
+- Use rehearsal schedules
+- Apply boosting mechanisms
+
+### Issue 4: Poor Generalization
+**Problem**: Memory systems fail to generalize to new situations.
+**Solution**:
+- Enhance abstraction mechanisms
+- Improve pattern completion
+- Implement transfer learning
+- Use concept formation
+
+## Conclusion
+
+Advanced Memory extends basic memory systems to capture more complex memory phenomena, including hierarchical memory organization, dynamic memory allocation, and advanced consolidation mechanisms. This guide covers:
+
+- **Hierarchical Memory Systems**: Multi-level memory organization from working memory to conceptual memory
+- **Advanced Memory Features**: Enhanced capabilities for each memory level
+- **Memory Integration**: Integration of advanced memory systems with other systems
+- **Performance**: Performance metrics and benchmarks for advanced memory
+- **Testing**: Testing and validation of advanced memory systems
+
+Understanding advanced memory is essential for:
+- **Designing Intelligent Systems**: Creating systems that can store and retrieve complex information
+- **Implementing Advanced Learning**: Building systems with sophisticated memory capabilities
+- **Modeling Biological Memory**: Creating models that accurately represent biological memory systems
+- **Optimizing Memory Performance**: Building systems with optimal memory performance
+- **Extending Memory Capabilities**: Adding new memory capabilities
+
+The advanced memory guide provides the foundation for exploring NLM's advanced memory capabilities, from hierarchical organization to sophisticated consolidation mechanisms.
+
+## See Also
+- [Working Memory Guide](memory.html#working-memory): Working memory documentation
+- [Short-Term Memory Guide](memory.html#short-term-memory): Short-term memory documentation
+- [Episodic Memory Guide](memory.html#episodic-memory): Episodic memory documentation
+- [Semantic Memory Guide](memory://semantic-memory): Semantic memory documentation
+- [Concept Memory Guide](memory://concept-memory): Concept memory documentation
+- [Memory Integration Guide](memory-integration.html): Memory system integration documentation
+- [Prediction Guide](prediction.html): Prediction system documentation
+- [Cognition Guide](cognition.html): Cognition system documentation
+
+## References
+- Baddeley, A. D. (2000). The episodic buffer: A slot-and address architecture for complex working memory tasks. Quarterly Journal of Experimental Psychology.
+- Anderson, J. R. (1995). Learning and Memory: An Integrated Approach. Wiley.
+- Cowan, N. (2001). The magical number 4 in short-term memory: A link to the counting mechanism. Science.
+- Tulving, E. (2002). Episodic memory and the self. Philosophical Transactions of the Royal Society B.
+- Marr, D. (1982). Vision. W. H. Freeman.
+- Rogers, T. T., & McClelland, D. E. (2008). Semantic cognition: A parallel architecture approach. Psychology of Learning and Motivation.
+- Smolensky, P. (1990). Tensor product of basis sets forms an associative memory. In Connectionist Models of Thought Processes.

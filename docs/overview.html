@@ -1,0 +1,199 @@
+# NLM Overview
+
+## What is NLM?
+
+NLM (熙然, meaning "serene flow") is an experimental artificial developmental brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+
+## Key Features
+
+### Brain-Inspired Architecture
+- **Neural Components**: LIF (Leaky Integrate-and-Fire) neurons and synapses
+- **Developmental Learning**: Systems that mature and adapt over time
+- **Emergent Cognition**: Complex abilities that arise from neural dynamics
+- **Closed-Loop Operation**: Continuous interaction with the environment
+
+### Integrated Systems
+
+#### Neural Computation
+- **Real Neural Dynamics**: LIF neuron models with biologically plausible properties
+- **Event-Driven Processing**: Spike-based neural computation
+- **Spike Timing-Dependent Plasticity (STDP)**: Learning based on precise spike timing
+- **Hebbian Learning**: "Neurons that fire together, wire together"
+
+#### Memory Systems
+- **Working Memory**: Persistent activity circuits for temporary storage
+- **Episodic Memory**: Experience encoding in neural patterns
+- **Associative Memory**: Experience-based pattern associations
+- **Concept Formation**: Pattern discovery and category formation
+
+#### Neuromodulation
+- **Dopamine**: Reward prediction error and reinforcement
+- **Curiosity**: Exploration motivation based on novelty and uncertainty
+- **Novelty Detection**: Identification of unexpected events
+- **Prediction Error**: Discrepancy between expected and actual outcomes
+
+#### Prediction Systems
+- **Temporal Prediction**: Learning sequential relationships
+- **Action Consequences**: Predicting effects of actions
+- **Multi-step Planning**: Chain of predictions for future states
+
+#### Cognitive Systems
+- **Attention**: Competitive selection of neural representations
+- **Planning**: Predictive action selection
+- **Self-Model**: Sensorimotor self-awareness
+- **Social Learning**: Observation and imitation of others
+
+#### Development System
+- **Developmental Stages**: Progression from initial to mature states
+- **Plasticity Modulation**: Age-dependent learning rates
+- **Critical Periods**: Sensitive learning windows
+- **Maturation**: Adult-level property development
+
+## Design Philosophy
+
+### Biological Inspiration
+- Neural dynamics inspired by real neurons (but not physiological)
+- Plasticity mechanisms based on synaptic learning rules
+- Developmental stages mimicking brain maturation
+- Neuromodulation similar to biological systems
+
+### Computational Approach
+- **No Machine Learning Frameworks**: Implements neural computation directly
+- **No Transformer Architecture**: Uses spiking dynamics and competitive attention
+- **Deterministic Simulation**: Reproducible experiments via explicit random seeds
+- **Data-Oriented Design**: Optimized for large-scale simulation performance
+
+## Architectural Principles
+
+### Modularity
+- **Clear Interfaces**: Well-defined boundaries between components
+- **Independent Evolution**: Components can be developed and tested separately
+- **Extensible Design**: Easy to add new components and mechanisms
+
+### Integration
+- **Unified Brain Loop**: All systems connected into a coherent architecture
+- **Bidirectional Flow**: Information flows between all levels of processing
+- **Cross-System Influences**: Each system affects and is affected by others
+
+### Performance
+- **Memory Efficiency**: Memory pool systems for allocation efficiency
+- **SIMD Compatibility**: Structure-of-Arrays layouts for vectorization
+- **Parallel Processing**: Batch processing and optimization for scale
+
+## Project Phases
+
+### Phase 1 (Complete): Project Skeleton
+- Core types and configuration system
+- Neural interfaces and basic structures
+- Simulation clock and random number generation
+
+### Phase 2 (Complete): Neural Computation
+- Real LIF neuron dynamics implementation
+- Event-driven spike propagation
+- STDP and Hebbian plasticity rules
+- Structural plasticity for synapse formation/removal
+
+### Phase 3 (Complete): World Interaction
+- World interaction loop implementation
+- Sensory input and motor output systems
+- Reward prediction error computation
+- Developmental stage progression
+- Novelty and curiosity mechanisms
+
+### Phase 4 (Complete): Emerging Cognition
+- Neural prediction systems
+- Working memory with persistent activity
+- Episodic-like memory storage
+- Concept formation without labels
+- Neural attention (competitive selection, NOT Transformer QKV)
+- Predictive planning capabilities
+- Self-model development
+- Social learning mechanisms
+- Continual learning capabilities
+
+### Phase 5 (Complete): Performance Optimizations
+- Memory pool implementations
+- Event queue systems
+- SIMD vectorization
+- Parallel processing capabilities
+- Checkpoint systems for persistence
+
+### Phase 6 (Complete): Final Integration
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load functionality
+- Replay and consolidation mechanisms
+- Phase 6 integration experiment created
+
+## Scientific Background
+
+### Biological Inspiration
+NLM draws inspiration from biological brains but makes no claims of being an accurate simulation. Key areas of inspiration include:
+
+- **Neural Plasticity**: Synaptic strengthening based on activity patterns
+- **Neural Dynamics**: Integrate-and-fire neuron models with refractory periods
+- **Developmental Learning**: Critical periods and activity-dependent refinement
+- **Neuromodulation**: Dopamine signaling for reward and prediction error
+- **Predictive Processing**: Hierarchical prediction and error minimization
+
+### Known Limitations
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No realistic cortical architecture
+- Limited to computational resources
+
+## Current Status
+
+**Phase 6: Final Integration**
+
+All major systems are integrated and functional:
+- Memory systems with working, episodic, and associative components
+- Neuromodulation affecting plasticity and learning
+- Prediction systems for temporal and action-based forecasting
+- Cognitive systems for attention, planning, and social learning
+- Development system with stage progression and plasticity modulation
+- Full world interaction loop with sensory input and motor output
+
+## Applications
+
+### Research Applications
+- **Computational Neuroscience**: Testing neural computation hypotheses
+- **Artificial Intelligence**: Developing brain-inspired learning systems
+- **Cognitive Modeling**: Investigating how complex behaviors emerge
+- **Developmental Psychology**: Studying critical periods and maturation
+
+### Educational Applications
+- **Neural Computation**: Teaching principles of spiking neural networks
+- **Brain-inspired AI**: Demonstrating alternative approaches to machine learning
+- **Systems Integration**: Showing how complex systems co-evolve
+- **Developmental Learning**: Illustrating learning across multiple stages
+
+## Future Directions
+
+### Phase 7: Advanced Optimizations
+- Full SIMD implementation with AVX-512 and AVX2
+- Multi-threading support for parallel processing
+- GPU acceleration for large-scale simulations
+- Adaptive optimization with runtime tuning
+
+### Phase 8: Research Features
+- Approximate computing with precision-speed tradeoffs
+- Dynamic optimization based on task requirements
+- Distributed computing for massive scale
+- Hardware acceleration with custom accelerators
+
+## License
+
+MIT License
+
+## Authors
+
+Research project — See docs for scientific background.
+
+## Contact
+
+For questions about NLM documentation, please refer to the technical documentation or contact the research team through the project's GitHub repository.

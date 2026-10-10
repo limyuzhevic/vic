@@ -1,0 +1,1060 @@
+# Cognition Guide
+
+## Overview
+
+The Cognition System in NLM implements higher-level cognitive functions that emerge from the interaction of neural dynamics, memory, and prediction systems. It enables the agent to perform complex tasks, reason about actions, and develop abstract representations of the world.
+
+## Cognition System Architecture
+
+### Core Cognitive Components
+```cpp
+struct CognitionSystem {
+    // Cognitive mechanisms
+    std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    
+    // Integration with other systems
+    std::unique_ptr<WorkingMemory> workingMemory;
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<MemorySystem> episodicMemory;
+    
+    // Cognitive state
+    float cognitiveLoad;              // Current cognitive load
+    float attentionFocus;             // Current attentional focus
+    float planningHorizon;            // Current planning horizon
+    bool isProcessing;                // Whether system is processing
+};
+```
+
+## AttentionalSelection
+
+### Implementation Overview
+**AttentionalSelection** implements competitive attention mechanisms that select relevant neural representations for processing.
+
+#### Core Components
+```cpp
+struct AttentionalSelection {
+    // Attention mechanisms
+    std::vector<AttentionMechanism> attentionMechanisms;
+    float attentionStrength;          // Current attention strength
+    float inhibitionStrength;         // Current inhibition strength
+    
+    // Selection dynamics
+    std::function<float(float)> gainFunction; // Gain function
+    std::function<float(float)> inhibitionFunction; // Inhibition function
+    
+    // Top-down and bottom-up integration
+    bool topDownEnabled;              // Whether top-down attention is enabled
+    bool bottomUpEnabled;             // Whether bottom-up attention is enabled
+};
+```
+
+### Attention Mechanisms
+
+#### Winner-Take-More
+**Core Principle**: Strongest neural representation wins and suppresses others.
+
+**Implementation**:
+```cpp
+void AttentionalSelection::applyWinnerTakeMore(
+    std::vector<NeuralPattern>& patterns,
+    float threshold) {
+    
+    // Calculate pattern activations
+    std::vector<float> activations;
+    for (const auto& pattern : patterns) {
+        float activation = pattern.getActivation();
+        activations.push_back(activation);
+    }
+    
+    // Find strongest pattern
+    float maxActivation = *std::max_element(activations.begin(), activations.end());
+    size_t winnerIndex = std::distance(activations.begin(),
+                                      std::max_element(activations.begin(), activations.end()));
+    
+    // Apply winner-take-more dynamics
+    for (size_t i = 0; i < patterns.size(); ++i) {
+        if (i == winnerIndex) {
+            // Winner receives excitation
+            patterns[i].addActivation(attentionStrength);
+        } else {
+            // Losers receive inhibition
+            patterns[i].addActivation(-inhibitionStrength);
+        }
+    }
+}
+```
+
+#### Top-Down Attention
+```cpp
+void AttentionalSelection::applyTopDownAttention(
+    std::vector<NeuralPattern>& patterns,
+    const GoalVector& goals) {
+    
+    // Calculate goal relevance for each pattern
+    std::vector<float> goalRelevance;
+    for (const auto& pattern : patterns) {
+        float relevance = calculateGoalRelevance(pattern, goals);
+        goalRelevance.push_back(relevance);
+    }
+    
+    // Apply goal-based weighting
+    for (size_t i = 0; i < patterns.size(); ++i) {
+        patterns[i].addActivation(goalRelevance[i] * TOP_DOWN_GAIN);
+    }
+}
+```
+
+#### Bottom-Up Attention
+```cpp
+void AttentionalSelection::applyBottomUpAttention(
+    std::vector<NeuralPattern>& patterns,
+    const std::vector<float>& sensoryInput) {
+    
+    // Calculate sensory salience
+    std::vector<float> salience;
+    for (size_t i = 0; i < patterns.size(); ++i) {
+        float s = calculatePatternSalience(patterns[i], sensoryInput);
+        salience.push_back(s);
+    }
+    
+    // Apply salience-based weighting
+    for (size_t i = 0; i < patterns.size(); ++i) {
+        patterns[i].addActivation(salience[i] * BOTTOM_UP_GAIN);
+    }
+}
+```
+
+### Attention Applications
+
+#### Working Memory Selection
+```cpp
+void AttentionalSelection::selectWorkingMemoryItems(
+    NeuralWorkingMemory& workingMemory,
+    const GoalVector& goals) {
+    
+    // Get working memory items
+    std::vector<float> items = workingMemory.getItems();
+    
+    // Apply attention to items
+    applyAttentionToPatterns(items, goals);
+    
+    // Select attended items
+    std::vector<int> attendedIndices = getAttendedIndices(items);
+    
+    // Update working memory
+    workingMemory.selectItems(attendedIndices);
+}
+```
+
+#### Prediction System Gating
+```cpp
+void AttentionalSelection::gatePredictionSystem(
+    PredictionSystem& predictionSystem,
+    const GoalVector& goals) {
+    
+    // Select relevant predictions
+    std::vector<PredictionPattern> predictions = 
+        predictionSystem.getRelevantPredictions(goals);
+    
+    // Apply attention to predictions
+    applyAttentionToPredictions(predictions, goals);
+    
+    // Update prediction system
+    predictionSystem.setAttendedPredictions(predictions);
+}
+```
+
+## NeuralPlanner
+
+### Implementation Overview
+**NeuralPlanner** implements predictive action selection and multi-step planning using neural representations.
+
+#### Core Components
+```cpp
+struct NeuralPlanner {
+    // Planning mechanisms
+    std::vector<PlanningStep> planningSteps;
+    float planningHorizon;            // Planning horizon in steps
+    float planningConfidence;         // Confidence in planning
+    
+    // Action evaluation
+    std::function<float(const ActionVector&)> actionEvaluator;
+    std::unique_ptr<ActionValueEstimator> actionValueEstimator;
+    
+    // Planning search
+    bool useMonteCarloSearch;         // Whether to use Monte Carlo search
+    int searchDepth;                   // Search depth
+    float explorationBonus;           // Exploration bonus
+};
+```
+
+### Planning Steps
+
+#### Step 1: Goal Identification
+```cpp
+void NeuralPlanner::identifyGoals(
+    const ContextVector& context,
+    GoalVector& goals) {
+    
+    // Extract relevant goals from context
+    goals = extractGoalsFromContext(context);
+    
+    // Prioritize goals based on current state
+    prioritizeGoals(goals, context);
+}
+```
+
+#### Step 2: Action Sequence Generation
+```cpp
+std::vector<ActionVector> NeuralPlanner::generateActionSequences(
+    const GoalVector& goal,
+    int sequenceLength) {
+    
+    // Generate possible actions
+    std::vector<ActionVector> possibleActions = getAvailableActions();
+    
+    // Generate action sequences
+    std::vector<ActionVector> sequences;
+    generateSequences(possibleActions, sequenceLength, sequences);
+    
+    return sequences;
+}
+```
+
+#### Step 3: Action Evaluation
+```cpp
+float NeuralPlanner::evaluateActionSequence(
+    const ActionVector& sequence,
+    const GoalVector& goal,
+    const ContextVector& context) {
+    
+    // Predict action consequences
+    EffectVector predictedEffects = predictActionEffects(sequence, context);
+    
+    // Calculate expected value
+    float expectedValue = calculateExpectedValue(predictedEffects);
+    
+    // Compare with goal
+    float goalAlignment = calculateGoalAlignment(expectedValue, goal);
+    
+    return expectedValue * goalAlignment;
+}
+```
+
+#### Step 4: Action Selection
+```cpp
+ActionVector NeuralPlanner::selectAction(
+    const std::vector<ActionVector>& sequences,
+    const GoalVector& goal,
+    const ContextVector& context) {
+    
+    // Evaluate all sequences
+    std::vector<float> sequenceScores;
+    for (const auto& sequence : sequences) {
+        float score = evaluateActionSequence(sequence, goal, context);
+        sequenceScores.push_back(score);
+    }
+    
+    // Select best sequence
+    size_t bestIndex = std::distance(sequenceScores.begin(),
+                                     std::max_element(sequenceScores.begin(), sequenceScores.end()));
+    
+    return sequences[bestIndex];
+}
+```
+
+### Planning Search Algorithms
+
+#### Monte Carlo Tree Search
+```cpp
+void NeuralPlanner::applyMonteCarloTreeSearch(
+    const GoalVector& goal,
+    const ContextVector& context) {
+    
+    // Initialize search tree
+    MCTree tree;
+    
+    // Expand search tree
+    expandSearchTree(tree, goal, context);
+    
+    // Evaluate leaf nodes
+    evaluateLeafNodes(tree);
+    
+    // Backpropagate results
+    backpropagateResults(tree);
+    
+    // Select best action
+    ActionVector bestAction = selectBestAction(tree);
+}
+```
+
+#### Beam Search
+```cpp
+std::vector<ActionVector> NeuralPlanner::applyBeamSearch(
+    const GoalVector& goal,
+    const ContextVector& context,
+    int beamWidth) {
+    
+    // Initialize beam
+    std::vector<ActionVector> beam = getInitialActions();
+    
+    // Generate sequences
+    for (int step = 0; step < beamWidth; ++step) {
+        // Expand each sequence in beam
+        std::vector<ActionVector> expandedSequences;
+        for (const auto& sequence : beam) {
+            std::vector<ActionVector> expanded = expandSequence(sequence, goal);
+            expandedSequences.insert(expandedSequences.end(),
+                                     expanded.begin(), expanded.end());
+        }
+        
+        // Prune to beam width
+        beam = pruneToBeamWidth(expandedSequences, beamWidth);
+    }
+    
+    return beam;
+}
+```
+
+### Planning Applications
+
+#### Action Selection
+```cpp
+ActionVector NeuralPlanner::selectAction(
+    const ContextVector& context,
+    const GoalVector& goal,
+    const std::vector<ActionVector>& availableActions) {
+    
+    // Generate action sequences
+    std::vector<ActionVector> sequences = generateActionSequences(goal);
+    
+    // Evaluate sequences
+    std::vector<float> sequenceScores;
+    for (const auto& sequence : sequences) {
+        float score = evaluateActionSequence(sequence, goal, context);
+        sequenceScores.push_back(score);
+    }
+    
+    // Select best action
+    ActionVector bestAction = sequences[0]; // Use first action from best sequence
+    return bestAction;
+}
+```
+
+#### Multi-Objective Planning
+```cpp
+std::vector<ActionVector> NeuralPlanner::generateMultiObjectivePlans(
+    const std::vector<GoalVector>& goals,
+    const ContextVector& context) {
+    
+    // Generate plans for each goal
+    std::vector<ActionVector> goalPlans;
+    for (const auto& goal : goals) {
+        ActionVector plan = generatePlan(goal, context);
+        goalPlans.push_back(plan);
+    }
+    
+    // Combine plans
+    std::vector<ActionVector> combinedPlans = combinePlans(goalPlans);
+    
+    return combinedPlans;
+}
+```
+
+## SelfModel
+
+### Implementation Overview
+**SelfModel** implements sensorimotor self-awareness and agency detection.
+
+#### Core Components
+```cpp
+struct SelfModel {
+    // Self-representation
+    std::vector<float> bodySchema;          // Body schema representation
+    std::vector<float> actionCapabilities;  // Action capability representation
+    std::vector<float> sensoryPredictions;  // Sensory predictions
+    
+    // Self-monitoring
+    float predictionError;                // Prediction error
+    float agencyDetection;                // Agency detection confidence
+    bool isSelfGenerated;                 // Whether event is self-generated
+    
+    // Adaptation
+    float adaptationRate;                 // Adaptation rate
+    float learningRate;                   // Learning rate
+};
+```
+
+### Body Schema
+
+#### Body Schema Formation
+```cpp
+void SelfModel::formBodySchema(
+    const std::vector<float>& proprioceptiveInput,
+    const std::vector<float>& motorOutput) {
+    
+    // Extract body properties
+    std::vector<float> bodyProperties = extractBodyProperties(proprioceptiveInput);
+    
+    // Learn body relationships
+    learnBodyRelationships(bodyProperties, motorOutput);
+    
+    // Update body schema
+    bodySchema = bodyProperties;
+}
+```
+
+#### Body Schema Usage
+```cpp
+float SelfModel::predictSensoryConsequences(
+    const ActionVector& action) {
+    
+    // Predict sensory consequences
+    std::vector<float> predictedSensory = predictSensoryOutcomes(action);
+    
+    // Compare with actual sensory input
+    float predictionError = calculatePredictionError(predictedSensory);
+    
+    return predictionError;
+}
+```
+
+### Agency Detection
+
+#### Self-Generated vs External Events
+```cpp
+code
+void SelfModel::detectAgency(
+    const std::vector<float>& sensoryInput,
+    const ActionVector& action) {
+    
+    // Predict sensory consequences of action
+    std::vector<float> predictedConsequences = predictConsequences(action);
+    
+    // Compare with actual sensory input
+    float predictionError = calculatePredictionError(predictedConsequences, sensoryInput);
+    
+    // Determine agency
+    if (predictionError < AGENCY_THRESHOLD) {
+        isSelfGenerated = true;
+        agencyDetection = 1.0f - predictionError / AGENCY_THRESHOLD;
+    } else {
+        isSelfGenerated = false;
+        agencyDetection = 0.0f;
+    }
+}
+```
+
+#### Action Quality Assessment
+```cpp
+float SelfModel::assessActionQuality(
+    const ActionVector& action,
+    const std::vector<float>& sensoryInput) {
+    
+    // Predict action consequences
+    std::vector<float> predictedConsequences = predictConsequences(action);
+    
+    // Calculate actual consequences
+    std::vector<float> actualConsequences = getSensoryInput(sensoryInput);
+    
+    // Calculate prediction error
+    float predictionError = calculatePredictionError(predictedConsequences, actualConsequences);
+    
+    // Assess action quality
+    float actionQuality = 1.0f - predictionError;
+    
+    // Apply agency weighting
+    if (isSelfGenerated) {
+        actionQuality *= AGENCY_WEIGHT;
+    }
+    
+    return actionQuality;
+}
+```
+
+### Self-Model Applications
+
+#### Action Selection
+```cpp
+ActionVector SelfModel::selectActionWithSelfModel(
+    const ContextVector& context,
+    const GoalVector& goal) {
+    
+    // Identify self-relevant goals
+    GoalVector selfGoals = filterSelfRelevantGoals(goal, bodySchema);
+    
+    // Generate self-consistent actions
+    ActionVector action = generateSelfConsistentAction(selfGoals, context);
+    
+    return action;
+}
+```
+
+#### Learning Enhancement
+```cpp
+self
+void SelfModel::enhanceLearningWithSelfModel(
+    const PatternVector& pattern,
+    const ActionVector& action) {
+    
+    // Detect agency
+    detectAgency(pattern, action);
+    
+    // Enhance learning based on agency
+    if (isSelfGenerated) {
+        learningRate *= AGENCY_LEARNING_BOOST;
+    }
+    
+    // Update self-model
+    updateSelfModel(pattern, action);
+}
+```
+
+## SocialLearning
+
+### Implementation Overview
+**SocialLearning** implements observation and imitation of other agents.
+
+#### Core Components
+```cpp
+struct SocialLearning {
+    // Observation mechanisms
+    std::vector<ObservedAgent> observedAgents;  // Observed agents
+    float observationConfidence;               // Confidence in observations
+    float imitationConfidence;                 // Confidence in imitation
+    
+    // Imitation mechanisms
+    std::vector<ActionPattern> actionPatterns;  // Observed action patterns
+    std::unique_ptr<ActionMatcher> actionMatcher; // Action matching
+    
+    // Communication
+    std::vector<CommunicationSignal> communicationSignals; // Communication signals
+    float communicationConfidence;               // Confidence in communication
+};
+```
+
+### Observation
+
+#### Agent Observation
+```cpp
+void SocialLearning::observeAgent(
+    const AgentId& agentId,
+    const AgentState& agentState) {
+    
+    // Store agent state
+    ObservedAgent agent;
+    agent.id = agentId;
+    agent.state = agentState;
+    agent.observedTime = currentTime;
+    
+    // Extract action patterns
+    extractActionPatterns(agent);
+    
+    // Store observation
+    observedAgents.push_back(agent);
+}
+```
+
+#### Action Pattern Extraction
+```cpp
+void SocialLearning::extractActionPatterns(ObservedAgent& agent) {
+    
+    // Extract action sequences
+    std::vector<ActionVector> actionSequences = extractActionSequences(agent.state);
+    
+    // Extract action contexts
+    std::vector<ContextVector> actionContexts = extractActionContexts(agent.state);
+    
+    // Extract action outcomes
+    std::vector<EffectVector> actionOutcomes = extractActionOutcomes(agent.state);
+    
+    // Store patterns
+    for (size_t i = 0; i < actionSequences.size(); ++i) {
+        ActionPattern pattern;
+        pattern.sequence = actionSequences[i];
+        pattern.context = actionContexts[i];
+        pattern.outcome = actionOutcomes[i];
+        pattern.confidence = calculatePatternConfidence(actionSequences[i], actionContexts[i]);
+        
+        actionPatterns.push_back(pattern);
+    }
+}
+```
+
+### Imitation
+
+#### Action Matching
+```cpp
+ActionVector SocialLearning::matchAndImitate(
+    const ContextVector& context,
+    const GoalVector& goal) {
+    
+    // Find similar actions
+    std::vector<ActionPattern> similarPatterns = findSimilarPatterns(context);
+    
+    // Select most similar action
+    ActionPattern bestPattern = selectBestPattern(similarPatterns);
+    
+    // Imitate action
+    ActionVector action = bestPattern.sequence;
+    
+    return action;
+}
+```
+
+#### Imitation Learning
+```cpp
+void SocialLearning::learnFromObservation(
+    const ObservedAgent& agent,
+    const ContextVector& context) {
+    
+    // Extract action patterns
+    std::vector<ActionPattern> patterns = extractActionPatternsFromAgent(agent);
+    
+    // Learn action patterns
+    for (const auto& pattern : patterns) {
+        learnActionPattern(pattern, context);
+    }
+    
+    // Update action matcher
+    updateActionMatcher(patterns, context);
+}
+```
+
+### Communication
+
+#### Communication Signal Processing
+```cpp
+void SocialLearning::processCommunicationSignal(
+    const CommunicationSignal& signal,
+    const AgentId& senderId) {
+    
+    // Validate signal
+    if (!validateSignal(signal, senderId)) {
+        return;
+    }
+    
+    // Extract message content
+    std::vector<float> messageContent = extractMessageContent(signal);
+    
+    // Process communication
+    processCommunication(messageContent, senderId);
+    
+    // Store signal
+    communicationSignals.push_back(signal);
+}
+```
+
+#### Communication Integration
+```cpp
+void SocialLearning::integrateCommunication(
+    const ContextVector& context,
+    const GoalVector& goal) {
+    
+    // Extract relevant communication
+    std::vector<CommunicationSignal> relevantSignals = 
+        extractRelevantCommunication(context, goal);
+    
+    // Process communication
+    for (const auto& signal : relevantSignals) {
+        processCommunicationSignal(signal);
+    }
+    
+    // Update action selection
+    updateActionSelectionWithCommunication(context, goal);
+}
+```
+
+## Cognition Integration
+
+### Integration with Working Memory
+```cpp
+void CognitionSystem::integrateWithWorkingMemory(
+    WorkingMemory& workingMemory) {
+    
+    // Use attention for working memory selection
+    attention->selectWorkingMemoryItems(workingMemory, getCurrentGoals());
+    
+    // Use planning for working memory organization
+    planner->organizeWorkingMemory(workingMemory);
+    
+    // Use self-model for working memory representation
+    selfModel->representWorkingMemory(workingMemory);
+}
+```
+
+### Integration with Prediction System
+```cpp
+void CognitionSystem::integrateWithPredictionSystem(
+    PredictionSystem& predictionSystem) {
+    
+    // Use attention for prediction selection
+    attention->gatePredictionSystem(predictionSystem, getCurrentGoals());
+    
+    // Use planning for prediction evaluation
+    planner->evaluatePredictions(predictionSystem);
+    
+    // Use self-model for prediction validation
+    selfModel->validatePredictions(predictionSystem);
+}
+```
+
+### Integration with Neuromodulation
+```cpp
+void CognitionSystem::integrateWithNeuromodulation(
+    NeuromodulationSystem& neuromodulation) {
+    
+    // Use curiosity for cognitive exploration
+    curiosity->applyCognitiveExploration(cognitionSystem);
+    
+    // Use novelty for cognitive updating
+    novelty->applyCognitiveUpdating(cognitionSystem);
+    
+    // Use prediction error for cognitive learning
+    predictionError->applyCognitiveLearning(cognitionSystem);
+}
+```
+
+## Cognition Performance Metrics
+
+### Cognitive Metrics
+```cpp
+struct CognitiveMetrics {
+    float attentionQuality;              // Quality of attentional selection
+    float planningEfficiency;            // Efficiency of planning
+    float selfModelAccuracy;             // Accuracy of self-representation
+    float socialLearningRate;             // Rate of social learning
+    float cognitiveFlexibility;           // Flexibility in cognition
+};
+```
+
+### Behavioral Metrics
+```cpp
+struct CognitiveBehavioralMetrics {
+    float goalAchievementRate;            // Rate of goal achievement
+    float actionSelectionAccuracy;       // Accuracy of action selection
+    float predictionAccuracy;            // Accuracy of predictions
+    float learningSpeed;                  // Speed of learning
+    float behavioralAdaptation;           // Adaptation to new situations
+};
+```
+
+## Cognition Testing and Validation
+
+### Unit Tests
+- **Attention Tests**: Test attentional selection mechanisms
+- **Planning Tests**: Test planning and action selection
+- **Self-Model Tests**: Test self-representation and agency detection
+- **Social Learning Tests**: Test observation and imitation
+- **Integration Tests**: Test integration with other systems
+
+### Performance Tests
+- **Attention Quality**: Test quality of attentional selection
+- **Planning Efficiency**: Test efficiency of planning
+- **Self-Model Accuracy**: Test accuracy of self-representation
+- **Social Learning Rate**: Test rate of social learning
+- **Cognitive Flexibility**: Test flexibility in cognition
+
+### Behavioral Tests
+- **Goal Achievement**: Test goal achievement rate
+- **Action Selection**: Test action selection accuracy
+- **Prediction Accuracy**: Test prediction accuracy
+- **Learning Speed**: Test learning speed
+- **Behavioral Adaptation**: Test behavioral adaptation
+
+## Cognition Common Issues and Solutions
+
+### Issue 1: Poor Attention Quality
+**Problem**: Attention selection is ineffective or inefficient.
+**Solution**:
+- Improve attention mechanisms
+- Adjust gain and inhibition functions
+- Optimize top-down and bottom-up integration
+- Add attention training mechanisms
+
+### Issue 2: Ineffective Planning
+**Problem**: Planning is slow or produces poor action sequences.
+**Solution**:
+- Improve planning algorithms
+- Optimize action evaluation
+- Add heuristic search
+- Implement better planning heuristics
+
+### Issue 3: Inaccurate Self-Representation
+**Problem**: Self-model is inaccurate or incomplete.
+**Solution**:
+- Improve body schema formation
+- Enhance agency detection
+- Add self-monitoring mechanisms
+- Implement better feedback loops
+
+### Issue 4: Limited Social Learning
+**Problem**: Social learning is slow or ineffective.
+**Solution**:
+- Improve observation mechanisms
+- Enhance action matching
+- Add communication processing
+- Implement better imitation learning
+
+## API Reference
+
+### CognitionSystem Class Methods
+```cpp
+// Construction and Destruction
+CognitionSystem()
+~CognitionSystem()
+
+// Attention Operations
+void applyAttention(std::vector<NeuralPattern>& patterns, const GoalVector& goals)
+void applyWinnerTakeMore(std::vector<NeuralPattern>& patterns, float threshold)
+void applyTopDownAttention(std::vector<NeuralPattern>& patterns, const GoalVector& goals)
+void applyBottomUpAttention(std::vector<NeuralPattern>& patterns, const std::vector<float>& sensoryInput)
+
+// Planning Operations
+void identifyGoals(const ContextVector& context, GoalVector& goals)
+void generateActionSequences(const GoalVector& goal, int sequenceLength)
+void evaluateActionSequence(const ActionVector& sequence, const GoalVector& goal, const ContextVector& context)
+void selectAction(const std::vector<ActionVector>& sequences, const GoalVector& goal, const ContextVector& context)
+
+// Self-Model Operations
+void formBodySchema(const std::vector<float>& proprioceptiveInput, const std::vector<float>& motorOutput)
+void detectAgency(const std::vector<float>& sensoryInput, const ActionVector& action)
+void assessActionQuality(const ActionVector& action, const std::vector<float>& sensoryInput)
+
+// Social Learning Operations
+void observeAgent(const AgentId& agentId, const AgentState& agentState)
+void extractActionPatterns(ObservedAgent& agent)
+void matchAndImitate(const ContextVector& context, const GoalVector& goal)
+
+// Integration Operations
+void integrateWithWorkingMemory(WorkingMemory& workingMemory)
+void integrateWithPredictionSystem(PredictionSystem& predictionSystem)
+void integrateWithNeuromodulation(NeuromodulationSystem& neuromodulation)
+
+// State Queries
+float getAttentionStrength() const
+float getPlanningHorizon() const
+float getCognitiveLoad() const
+bool isProcessing() const
+```
+
+### AttentionalSelection Class Methods
+```cpp
+// Construction and Destruction
+AttentionalSelection()
+~AttentionalSelection()
+
+// Attention Operations
+void applyWinnerTakeMore(std::vector<NeuralPattern>& patterns, float threshold)
+void applyTopDownAttention(std::vector<NeuralPattern>& patterns, const GoalVector& goals)
+void applyBottomUpAttention(std::vector<NeuralPattern>& patterns, const std::vector<float>& sensoryInput)
+
+// Configuration
+void setGainFunction(std::function<float(float)> function)
+void setInhibitionFunction(std::function<float(float)> function)
+void setTopDownEnabled(bool enabled)
+void setBottomUpEnabled(bool enabled)
+
+// State Queries
+float getAttentionStrength() const
+float getInhibitionStrength() const
+```
+
+### NeuralPlanner Class Methods
+```cpp
+// Construction and Destruction
+NeuralPlanner()
+~NeuralPlanner()
+
+// Planning Operations
+void identifyGoals(const ContextVector& context, GoalVector& goals)
+void generateActionSequences(const GoalVector& goal, int sequenceLength)
+void evaluateActionSequence(const ActionVector& sequence, const GoalVector& goal, const ContextVector& context)
+void selectAction(const std::vector<ActionVector>& sequences, const GoalVector& goal, const ContextVector& context)
+
+// Search Operations
+void applyMonteCarloTreeSearch(const GoalVector& goal, const ContextVector& context)
+std::vector<ActionVector> applyBeamSearch(const GoalVector& goal, const ContextVector& context, int beamWidth)
+
+// Configuration
+void setActionEvaluator(std::function<float(const ActionVector&)> evaluator)
+void setMonteCarloSearch(bool enabled)
+void setSearchDepth(int depth)
+
+// State Queries
+float getPlanningConfidence() const
+float getExplorationBonus() const
+```
+
+### SelfModel Class Methods
+```cpp
+// Construction and Destruction
+SelfModel()
+~SelfModel()
+
+// Body Schema Operations
+void formBodySchema(const std::vector<float>& proprioceptiveInput, const std::vector<float>& motorOutput)
+float predictSensoryConsequences(const ActionVector& action)
+
+// Agency Detection Operations
+detectAgency(const std::vector<float>& sensoryInput, const ActionVector& action)
+float assessActionQuality(const ActionVector& action, const std::vector<float>& sensoryInput)
+
+// Adaptation Operations
+void adaptToNewExperience(const PatternVector& pattern)
+void updateSelfModel(const PatternVector& pattern, const ActionVector& action)
+
+// Configuration
+void setAdaptationRate(float rate)
+void setLearningRate(float rate)
+
+// State Queries
+float getPredictionError() const
+float getAgencyDetection() const
+bool isSelfGenerated() const
+```
+
+### SocialLearning Class Methods
+```cpp
+// Construction and Destruction
+SocialLearning()
+~SocialLearning()
+
+// Observation Operations
+void observeAgent(const AgentId& agentId, const AgentState& agentState)
+void extractActionPatterns(ObservedAgent& agent)
+
+// Imitation Operations
+ActionVector matchAndImitate(const ContextVector& context, const GoalVector& goal)
+void learnFromObservation(const ObservedAgent& agent, const ContextVector& context)
+
+// Communication Operations
+void processCommunicationSignal(const CommunicationSignal& signal, const AgentId& senderId)
+void integrateCommunication(const ContextVector& context, const GoalVector& goal)
+
+// Configuration
+void setActionMatcher(std::unique_ptr<ActionMatcher> matcher)
+void setObservationConfidence(float confidence)
+void setImitationConfidence(float confidence)
+
+// State Queries
+float getObservationConfidence() const
+float getImitationConfidence() const
+```
+
+## Integration Guide
+
+### Phase 6 Cognition Integration
+The Phase 6 integration brings together cognitive capabilities with all other brain systems:
+
+```cpp
+// Cognition systems in Brain::Impl
+attention.reset(new AttentionalSelection());
+planner.reset(new NeuralPlanner());
+selfModel.reset(new SelfModel());
+socialLearning.reset(new SocialLearning());
+
+// Integration relationships
+cognition->setWorkingMemory(workingMemory.get());
+cognition->setPredictionSystem(predictionSystem.get());
+cognition->setNeuromodulation(neuromodulation.get());
+```
+
+### Cognition Flow in Phase 6
+```
+WORLD (Environment)
+  ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  ↓
+ATTENTION (competitive selection)
+  ↓
+NEURAL PROCESSING (LIF dynamics)
+  ↓
+PREDICTION (temporal sequence learning)
+  ↓
+WORKING MEMORY (persistent activity)
+  ↓
+EPISODIC MEMORY (experience storage)
+  ↓
+CONCEPT FORMATION (pattern discovery)
+  ↓
+PLANNING (multi-step prediction)
+  ↓
+SELF-MODEL (sensorimotor learning)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD.applyMotorCommand()
+  ↓
+ACTION RESULT
+  ↓
+REWARD / ERROR
+  ↓
+NEUROMODULATION (dopamine, curiosity)
+  ↓
+PLASTICITY (STDP, Hebbian)
+  ↓
+COGNITION
+  ├─ Attention → Selective processing
+  ├─ Planning → Action selection
+  ├─ Self-Model → Self-awareness
+  └─ Social Learning → Imitation
+  ↓
+BEHAVIORAL CHANGE
+  ↓
+NEW EXPERIENCES
+  ↓
+CONTINUOUS LEARNING
+```
+
+## Future Directions
+
+### Advanced Cognition
+- **Hierarchical Cognition**: Multi-level cognitive architectures
+- **Meta-Cognition**: Thinking about thinking
+- **Emotional Cognition**: Integration of emotions with cognition
+- **Consciousness**: Investigating consciousness emergence
+
+### Cognitive Optimization
+- **Efficient Cognition**: More efficient cognitive algorithms
+- **Adaptive Cognition**: Cognition that adapts to task requirements
+- **Predictive Cognition**: Cognitive prediction capabilities
+- **Hierarchical Cognition**: Multi-level cognitive processing
+
+### Cognitive Neuroscience Integration
+- **Detailed Cognitive Dynamics**: Realistic cognitive dynamics
+- **Cognitive Circuit Modeling**: Neural circuit models for cognition
+- **Systems-Level Cognition**: Large-scale cognitive understanding
+- **Cognitive Architecture**: Cognitive architecture models
+
+## Conclusion
+
+The Cognition System is a core cognitive component that enables NLM to perform complex tasks, reason about actions, and develop abstract representations. It implements attention, planning, self-model, and social learning through neural mechanisms.
+
+Understanding cognitive systems is essential for:
+- **Designing Intelligent Systems**: Creating systems that can think and reason
+- **Implementing Complex Behavior**: Building systems with sophisticated behaviors
+- **Debugging Cognitive Issues**: Identifying and fixing cognitive problems
+- **Extending Cognitive Functionality**: Adding new cognitive capabilities
+
+The cognition guide provides the foundation for exploring NLM's cognitive capabilities, from basic attentional selection to advanced cognitive functions.
+
+## See Also
+- [Attention Guide](attention.html): Attention system documentation
+- [Planning Guide](planning.html): Planning system documentation
+- [Self-Model Guide](self-model.html): Self-model documentation
+- [Social Learning Guide](social-learning.html): Social learning documentation
+- [Working Memory Guide](memory.html): Working memory documentation
+- [Prediction Guide](prediction.html): Prediction system documentation
+
+## References
+- Bundesen, C. (1990). A theory of visual attention. Psychological Review.
+- Newell, A., & Simon, H. A. (1972). Human problem solving. Prentice-Hall.
+- Miller, G. A. (1956). The magical number seven, plus or minus two. Psychological Review.
+- Baddeley, A. D. (2000). The episodic buffer: A slot-and address architecture for complex working memory tasks. Quarterly Journal of Experimental Psychology.
+- Minsky, M. (1975). A framework for representing knowledge. In Piaget and Vygotsky (Eds.), Knowledge and Development.

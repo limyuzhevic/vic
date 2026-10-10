@@ -1,0 +1,1083 @@
+# Memory Systems Guide
+
+## Overview
+
+Memory systems in NLM are fundamental for maintaining information over time, enabling learning, and supporting cognitive functions. Unlike traditional AI systems that use vector-based storage, NLM implements memory as persistent neural activity patterns within the brain's neural architecture.
+
+## Memory System Types
+
+### Working Memory
+**Characteristics**:
+- **Persistent Activity**: Neural circuits that maintain activity without input
+- **Short-Term**: Limited duration (seconds to minutes)
+- **Capacity Limited**: Typically 4-7 items (neural basis)
+- **Active Maintenance**: Requires ongoing neural activity
+
+**Biological Analogy**:
+- **Prefrontal Cortex Working Memory**
+- **Persistent Neural Activity**
+- **Active Maintenance Mechanisms**
+
+### Episodic Memory
+**Characteristics**:
+- **Experience Storage**: Encodes specific events and experiences
+- **Temporal Context**: Linked to specific times and contexts
+- **Pattern Completion**: Retrieves memories from partial cues
+- **Replay Mechanisms**: Reactivation of past patterns
+
+**Biological Analogy**:
+- **Hippocampal Memory Encoding**
+- **Spatial and Temporal Context**
+- **Pattern Completion**
+
+### Associative Memory
+**Characteristics**:
+- **Pattern Association**: Links similar patterns together
+- **Hebbian Learning**: Strengthens co-activated connections
+- **Generalization**: Extrapolates from examples
+- **Category Formation**: Groups similar experiences
+
+**Biological Analogy**:
+- **Cortical Pattern Separation/Completion**
+- **Hebbian Memory**
+- **Category Learning**
+
+### Concept Memory
+**Characteristics**:
+- **Abstract Representation**: Learns patterns without labels
+- **Prototype Formation**: Creates representative patterns
+- **Stability Measurement**: Tracks concept consistency
+- **Property-based Categorization**: Organizes by features
+
+**Biological Analogy**:
+- **Cortical Concept Formation**
+- **Pattern Abstraction**
+- **Prototype Learning**
+
+## Neural Working Memory
+
+### Implementation Overview
+**Neural Working Memory (NWM)** implements temporary information storage through persistent neural activity in recurrent circuits.
+
+#### Core Components
+```cpp
+struct NeuralWorkingMemory {
+    // Persistent activity circuits
+    std::vector<NeuralPopulation*> maintainCircuits;
+    
+    // Information storage
+    std::vector<float> storedInformation;
+    std::vector<Neuron*> activeNeurons;
+    
+    // Competitive dynamics
+    float activationThreshold;
+    float inhibitionStrength;
+    
+    // Maintenance mechanisms
+    float decayRate;
+    float refreshThreshold;
+    bool isResting;
+};
+```
+
+### Working Memory Operations
+
+#### Storage
+```cpp
+void NeuralWorkingMemory::store(float information, int slot)
+// Store information in working memory slot
+
+void NeuralWorkingMemory::storePattern(const std::vector<float>& pattern)
+// Store complex pattern as distributed representation
+
+void NeuralWorkingMemory::replace(int oldSlot, int newSlot, 
+                                float newInformation)
+// Replace information in slot
+```
+
+#### Retrieval
+```cpp
+float NeuralWorkingMemory::retrieve(int slot) const
+// Retrieve information from slot
+
+std::vector<float> NeuralWorkingMemory::retrievePattern(int slot) const
+// Retrieve full pattern
+
+int NeuralWorkingMemory::matchPattern(const std::vector<float>& pattern) const
+// Find matching pattern using similarity
+
+std::vector<int> NeuralWorkingMemory::getActiveSlots() const
+// Get slots with active maintenance
+```
+
+#### Maintenance
+```cpp
+void NeuralWorkingMemory::update(float dt)
+// Maintain persistent activity
+
+void NeuralWorkingMemory::decay(float dt)
+// Apply decay to inactive slots
+
+void NeuralWorkingMemory::refresh(int slot, float refreshAmount)
+// Boost activity to prevent decay
+
+void NeuralWorkingMemory::compete()
+// Select dominant representations through competition
+```
+
+### Working Memory Dynamics
+
+#### Persistent Activity Circuit
+```cpp
+// Recurrent connectivity enables persistent activity
+void maintainPersistentActivity(NeuralPopulation& population) {
+    // Establish recurrent connections
+    // Balance excitation and inhibition
+    // Maintain activity without external input
+}
+```
+
+#### Winner-Take-More Dynamics
+```cpp
+void applyWinnerTakeMore(std::vector<Neuron*>& neurons) {
+    // Calculate neural activity levels
+    // Identify winner neurons
+    // Apply inhibition to losers
+    // Amplify winner activity
+}
+```
+
+#### Memory Capacity and Stability
+```cpp
+// Capacity control through inhibition
+float calculateInhibitionLevel(std::vector<float> activities) {
+    // Compute total activity
+    // Determine inhibition strength
+    // Maintain optimal capacity (4-7 items)
+}
+```
+
+### Working Memory Applications
+
+#### Attention Selection
+```cpp
+void selectAttention(float priorityVector, float threshold) {
+    // Apply priority-based attention
+    // Select most relevant working memory items
+    // Gate information flow
+}
+```
+
+#### Planning Support
+```cpp
+void supportPlanning(float actionPlan) {
+    // Maintain action sequences
+    // Evaluate multiple options
+    // Select optimal sequences
+}
+```
+
+#### Prediction Error Integration
+```cpp
+void integratePredictionError(float error, int slot) {
+    // Update working memory with prediction error
+    // Adjust future expectations
+    // Guide learning
+}
+```
+
+## Neural Episodic Memory
+
+### Implementation Overview
+**Neural Episodic Memory (NEM)** stores experiences as neural patterns with temporal and spatial context.
+
+#### Core Components
+```cpp
+struct NeuralEpisodicMemory {
+    // Memory storage
+    std::vector<MemoryTrace> memoryTraces;
+    std::vector<PatternVector> storedPatterns;
+    
+    // Temporal indexing
+    std::map<Timestamp, std::vector<size_t>> temporalIndex;
+    std::map<int, std::vector<size_t>> spatialIndex;
+    
+    // Retrieval mechanisms
+    float patternCompletionThreshold;
+    float temporalWindowSize;
+    
+    // Consolidation
+    bool isConsolidating;
+    std::vector<size_t> consolidationQueue;
+};
+```
+
+### Memory Encoding
+
+#### Experience Encoding
+```cpp
+void NeuralEpisodicMemory::encodeExperience(const Experience& experience) {
+    // Extract features from experience
+    // Create neural pattern representation
+    // Store with temporal and spatial context
+    // Index for future retrieval
+}
+
+void createMemoryTrace(const Experience& experience, 
+                      Timestamp time, Position position) {
+    // Create comprehensive memory trace
+    // Include sensory, motor, and contextual information
+    // Establish temporal and spatial associations
+}
+```
+
+#### Pattern Formation
+```cpp
+void NeuralEpisodicMemory::formPattern(const std::vector<float>& features,
+                                       float stability) {
+    // Create pattern from features
+    // Measure pattern stability
+    // Store in pattern database
+    // Establish pattern relationships
+}
+```
+
+### Memory Storage
+
+#### Memory Traces
+```cpp
+struct MemoryTrace {
+    size_t id;
+    Timestamp time;
+    Position position;
+    std::vector<float> sensoryPattern;
+    std::vector<float> motorPattern;
+    float predictionError;
+    float rewardPrediction;
+    std::vector<size_t> relatedMemories;
+    
+    // Replay metadata
+    bool isReplayCandidate;
+    float replayPriority;
+    Timestamp lastReplayTime;
+};
+```
+
+#### Pattern Storage
+```cpp
+void NeuralEpisodicMemory::storePattern(const std::vector<float>& pattern,
+                                        Timestamp time,
+                                        Position position) {
+    // Create pattern vector
+    // Store in pattern database
+    // Establish temporal index
+    // Establish spatial index
+}
+```
+
+### Memory Retrieval
+
+#### Pattern Completion
+```cpp
+std::vector<float> NeuralEpisodicMemory::completePattern(
+    const std::vector<float>& partialPattern,
+    float similarityThreshold) {
+    
+    // Find similar stored patterns
+    // Combine partial information
+    // Fill in missing details
+    // Return completed pattern
+}
+```
+
+#### Temporal Retrieval
+```cpp
+size_t NeuralEpisodicMemory::retrieveByTime(Timestamp time,
+                                           float temporalWindow) {
+    // Search temporal index
+    // Find memories within time window
+    // Return most recent matching memory
+}
+```
+
+#### Spatial Retrieval
+```cpp
+std::vector<size_t> NeuralEpisodicMemory::retrieveByPosition(
+    Position position,
+    float spatialRadius) {
+    // Search spatial index
+    // Find memories within spatial radius
+    // Return matching memories
+}
+```
+
+#### Association-based Retrieval
+```cpp
+size_t NeuralEpisodicMemory::retrieveByAssociation(
+    size_t relatedMemoryId,
+    float similarityThreshold) {
+    // Search associated memories
+    // Find related patterns
+    // Return associated memory
+}
+```
+
+### Memory Replay and Consolidation
+
+#### Replay Mechanisms
+```cpp
+void NeuralEpisodicMemory::replayMemory(size_t memoryId, 
+                                         float consolidationStrength) {
+    // Reactivate neural pattern
+    // Integrate with current knowledge
+    // Strengthen related connections
+    // Update memory trace
+}
+
+void consolidateMemories(const std::vector<size_t>& memoryIds,
+                        float consolidationStrength) {
+    // Combine similar memories
+    // Extract common features
+    // Create abstract representation
+    // Store consolidated memory
+}
+```
+
+#### Consolidation Process
+```cpp
+void NeuralEpisodicMemory::consolidateSleep() {
+    // Process memories during rest
+    // Strengthen important memories
+    // Weaken irrelevant memories
+    // Update temporal indices
+}
+```
+
+### Episodic Memory Applications
+
+#### Prediction System Integration
+```cpp
+void integrateWithPredictionSystem(
+    NeuralEpisodicMemory& episodicMemory,
+    PredictionSystem& predictionSystem) {
+    // Use stored memories for prediction
+    // Update predictions based on retrieved memories
+    // Learn from prediction errors
+    // Store new predictions
+}
+```
+
+#### Planning Support
+```cpp
+void supportPlanningWithEpisodicMemory(
+    NeuralEpisodicMemory& episodicMemory,
+    NeuralPlanner& planner) {
+    // Retrieve relevant past experiences
+    // Extract successful strategies
+    // Guide action selection
+    // Update planning heuristics
+}
+```
+
+## Neural Associative Memory
+
+### Implementation Overview
+**Neural Associative Memory (NAM)** creates associations between related patterns through Hebbian learning and pattern completion.
+
+#### Core Components
+```cpp
+struct NeuralAssociativeMemory {
+    // Pattern database
+    std::vector<PatternVector> patternDatabase;
+    std::vector<float> patternWeights;
+    
+    // Association strength
+    std::vector<AssociationMatrix> associations;
+    std::map<size_t, std::vector<size_t>> patternGroups;
+    
+    // Learning mechanisms
+    float learningRate;
+    float stabilityThreshold;
+    float generalizationStrength;
+};
+```
+
+### Pattern Association
+
+#### Hebbian Association
+```cpp
+void NeuralAssociativeMemory::applyHebbianAssociation(
+    const PatternVector& pattern1,
+    const PatternVector& pattern2) {
+    
+    // Calculate correlation
+    float correlation = calculateCorrelation(pattern1, pattern2);
+    
+    // Strengthen association
+    size_t index1 = findPattern(pattern1);
+    size_t index2 = findPattern(pattern2);
+    
+    associations[index1][index2] += correlation * learningRate;
+    associations[index2][index1] += correlation * learningRate;
+}
+```
+
+#### Pattern Separation
+```cpp
+size_t NeuralAssociativeMemory::separatePattern(
+    const PatternVector& pattern) {
+    
+    // Find similar existing patterns
+    std::vector<size_t> similarPatterns = findSimilarPatterns(pattern);
+    
+    // Create new distinct pattern
+    PatternVector distinctPattern = modifyPattern(pattern, similarPatterns);
+    
+    // Store new pattern
+    size_t newIndex = storePattern(distinctPattern);
+    
+    return newIndex;
+}
+```
+
+#### Pattern Completion
+```cpp
+PatternVector NeuralAssociativeMemory::completePattern(
+    const PatternVector& partialPattern,
+    float completionThreshold) {
+    
+    // Find strongly associated patterns
+    std::vector<size_t> associatedPatterns = findAssociatedPatterns(partialPattern);
+    
+    // Combine information from associated patterns
+    PatternVector completedPattern = combinePatterns(associatedPatterns);
+    
+    return completedPattern;
+}
+```
+
+### Concept Formation
+
+#### Clustering Algorithm
+```cpp
+void NeuralAssociativeMemory::clusterPatterns(
+    float similarityThreshold,
+    float stabilityThreshold) {
+    
+    // Iteratively group similar patterns
+    while (patternsNeedClustering()) {
+        // Find clusters
+        // Merge similar clusters
+        // Update cluster centers
+    }
+}
+```
+
+#### Prototype Formation
+```cpp
+PatternVector NeuralAssociativeMemory::createPrototype(
+    const std::vector<size_t>& patternGroup) {
+    
+    // Average pattern vectors
+    PatternVector prototype = averagePatternVectors(patternGroup);
+    
+    // Measure stability
+    float stability = calculatePatternStability(prototype, patternGroup);
+    
+    return prototype;
+}
+```
+
+#### Concept Stability
+```cpp
+bool NeuralAssociativeMemory::isConceptStable(
+    const PatternVector& concept,
+    const std::vector<size_t>& supportingPatterns,
+    float stabilityThreshold) {
+    
+    // Calculate pattern consistency
+    float consistency = calculatePatternConsistency(concept, supportingPatterns);
+    
+    // Check stability threshold
+    return consistency >= stabilityThreshold;
+}
+```
+
+### Associative Memory Applications
+
+#### Category Learning
+```cpp
+void NeuralAssociativeMemory::learnCategory(
+    const std::vector<PatternVector>& examples,
+    float stabilityThreshold) {
+    
+    // Create category prototype
+    PatternVector prototype = createPrototype(examples);
+    
+    // Measure category stability
+    if (isConceptStable(prototype, examples, stabilityThreshold)) {
+        // Store category
+        storeConcept(prototype, examples);
+    }
+}
+```
+
+#### Prediction Support
+```cpp
+PatternVector NeuralAssociativeMemory::supportPrediction(
+    const PatternVector& currentState,
+    const PatternVector& goalState) {
+    
+    // Find similar past experiences
+    std::vector<size_t> similarExperiences = findSimilarPatterns(currentState);
+    
+    // Extract action-effect associations
+    PatternVector prediction = extractActionEffects(similarExperiences);
+    
+    return prediction;
+}
+```
+
+## Concept Formation
+
+### Implementation Overview
+**Concept Formation** enables learning abstract representations from concrete experiences without explicit labels.
+
+#### Core Components
+```cpp
+struct ConceptFormation {
+    // Concept database
+    std::vector<ConceptVector> concepts;
+    std::vector<PatternVector> conceptPrototypes;
+    
+    // Learning mechanisms
+    float learningRate;
+    float stabilityMeasurement;
+    float generalizationStrength;
+    
+    // Category hints
+    std::vector<PropertyHint> propertyHints;
+    std::map<PropertyType, float> propertyWeights;
+};
+```
+
+### Pattern Discovery
+
+#### Feature Extraction
+```cpp
+void ConceptFormation::extractFeatures(
+    const PatternVector& pattern,
+    std::vector<PropertyHint>& features) {
+    
+    // Extract relevant properties
+    // Normalize feature values
+    // Identify stable features
+    // Store feature hints
+}
+```
+
+#### Clustering
+```cpp
+size_t ConceptFormation::clusterPattern(
+    const PatternVector& pattern,
+    float similarityThreshold) {
+    
+    // Find similar existing concepts
+    std::vector<size_t> similarConcepts = findSimilarConcepts(pattern);
+    
+    if (!similarConcepts.empty()) {
+        // Add to existing concept
+        return mergeIntoConcept(pattern, similarConcepts);
+    } else {
+        // Create new concept
+        return createNewConcept(pattern);
+    }
+}
+```
+
+### Prototype Formation
+
+#### Averaging Algorithm
+```cpp
+ConceptVector ConceptFormation::createPrototype(
+    const std::vector<size_t>& patternIndices) {
+    
+    // Average pattern vectors
+    ConceptVector prototype;
+    for (size_t index : patternIndices) {
+        prototype += patternDatabase[index];
+    }
+    prototype /= patternIndices.size();
+    
+    // Normalize prototype
+    normalizeConcept(prototype);
+    
+    return prototype;
+}
+```
+
+#### Stability Measurement
+```cpp
+float ConceptFormation::calculateConceptStability(
+    const ConceptVector& concept,
+    const std::vector<size_t>& supportingIndices) {
+    
+    // Calculate within-concept variance
+    float variance = calculatePatternVariance(concept, supportingIndices);
+    
+    // Calculate cross-pattern similarity
+    float similarity = calculateCrossPatternSimilarity(concept, supportingIndices);
+    
+    // Combine metrics
+    return (1.0f - variance) * similarity;
+}
+```
+
+### Property-based Categorization
+
+#### Property Hints
+```cpp
+void ConceptFormation::extractPropertyHints(
+    const PatternVector& pattern,
+    std::vector<PropertyHint>& hints) {
+    
+    // Extract numerical properties
+    extractNumericalProperties(pattern, hints);
+    
+    // Extract categorical properties
+    extractCategoricalProperties(pattern, hints);
+    
+    // Extract relational properties
+    extractRelationalProperties(pattern, hints);
+}
+```
+
+#### Property Weighting
+```cpp
+void ConceptFormation::weightProperties(
+    const std::vector<PropertyHint>& hints) {
+    
+    // Calculate property importance
+    for (auto& hint : hints) {
+        hint.importance = calculatePropertyImportance(hint);
+    }
+    
+    // Normalize weights
+    normalizePropertyWeights(hints);
+}
+```
+
+### Concept Applications
+
+#### Planning
+```cpp
+ConceptVector ConceptFormation::supportPlanning(
+    const PatternVector& currentState,
+    const ConceptVector& goalConcept) {
+    
+    // Find relevant concepts
+    std::vector<size_t> relevantConcepts = findRelevantConcepts(currentState);
+    
+    // Generate action sequences
+    ConceptVector plan = generateActionSequences(relevantConcepts, goalConcept);
+    
+    return plan;
+}
+```
+
+#### Prediction
+```cpp
+ConceptVector ConceptFormation::supportPrediction(
+    const PatternVector& currentState,
+    float predictionHorizon) {
+    
+    // Retrieve relevant concepts
+    std::vector<size_t> relevantConcepts = findRelevantConcepts(currentState);
+    
+    // Project forward in time
+    ConceptVector prediction = projectConceptForward(relevantConcepts, predictionHorizon);
+    
+    return prediction;
+}
+```
+
+## Memory Integration
+
+### Working Memory and Episodic Memory Integration
+```cpp
+void integrateWorkingMemoryWithEpisodicMemory(
+    NeuralWorkingMemory& workingMemory,
+    NeuralEpisodicMemory& episodicMemory) {
+    
+    // Transfer completed working memory items to episodic memory
+    transferCompletedWorkingMemoryItems(workingMemory, episodicMemory);
+    
+    // Update working memory with episodic memory insights
+    updateWorkingMemoryFromEpisodicMemory(workingMemory, episodicMemory);
+}
+```
+
+### Working Memory and Associative Memory Integration
+```cpp
+void integrateWorkingMemoryWithAssociativeMemory(
+    NeuralWorkingMemory& workingMemory,
+    NeuralAssociativeMemory& associativeMemory) {
+    
+    // Apply associative memory to working memory items
+    applyAssociativeMemoryToWorkingMemory(workingMemory, associativeMemory);
+    
+    // Update associative memory with working memory content
+    updateAssociativeMemoryFromWorkingMemory(workingMemory, associativeMemory);
+}
+```
+
+### Working Memory and Concept Memory Integration
+```cpp
+void integrateWorkingMemoryWithConceptMemory(
+    NeuralWorkingMemory& workingMemory,
+    ConceptFormation& conceptMemory) {
+    
+    // Abstract working memory content into concepts
+    abstractWorkingMemoryIntoConcepts(workingMemory, conceptMemory);
+    
+    // Apply concept knowledge to working memory
+    applyConceptKnowledgeToWorkingMemory(workingMemory, conceptMemory);
+}
+```
+
+### Episodic Memory and Prediction System Integration
+```cpp
+void integrateEpisodicMemoryWithPredictionSystem(
+    NeuralEpisodicMemory& episodicMemory,
+    PredictionSystem& predictionSystem) {
+    
+    // Use stored experiences for prediction
+    useEpisodicMemoryForPrediction(episodicMemory, predictionSystem);
+    
+    // Update episodic memory with prediction errors
+    updateEpisodicMemoryFromPredictionErrors(episodicMemory, predictionSystem);
+}
+```
+
+### Episodic Memory and Planning Integration
+```cpp
+void integrateEpisodicMemoryWithPlanning(
+    NeuralEpisodicMemory& episodicMemory,
+    NeuralPlanner& planner) {
+    
+    // Use past experiences to guide planning
+    usePastExperiencesForPlanning(episodicMemory, planner);
+    
+    // Update episodic memory with planning outcomes
+    updateEpisodicMemoryFromPlanning(episodicMemory, planner);
+}
+```
+
+### Associative Memory and Prediction System Integration
+```cpp
+void integrateAssociativeMemoryWithPredictionSystem(
+    NeuralAssociativeMemory& associativeMemory,
+    PredictionSystem& predictionSystem) {
+    
+    // Use pattern associations for prediction
+    useAssociativeMemoryForPrediction(associativeMemory, predictionSystem);
+    
+    // Update associative memory with prediction feedback
+    updateAssociativeMemoryFromPredictionFeedback(associativeMemory, predictionSystem);
+}
+```
+
+### Memory System Performance Metrics
+```cpp
+struct MemorySystemMetrics {
+    // Working memory metrics
+    float workingMemoryCapacity;      // Number of items
+    float workingMemoryStability;     // Retention rate
+    float workingMemoryRecency;       // Recent item priority
+    
+    // Episodic memory metrics
+    float episodicMemoryCapacity;     // Number of memories
+    float episodicMemoryAccuracy;    // Retrieval accuracy
+    float episodicMemoryCompleteness;// Memory reconstruction quality
+    
+    // Associative memory metrics
+    float associativeMemoryStrength;  // Association intensity
+    float associativeMemoryGeneralization; // Generalization ability
+    float associativeMemoryStability; // Association stability
+    
+    // Concept memory metrics
+    float conceptMemoryAbstraction;   // Abstraction level
+    float conceptMemoryStability;    // Concept stability
+    float conceptMemoryTransfer;     // Concept transfer ability
+};
+```
+
+## Memory System Testing and Validation
+
+### Unit Tests
+- **Working Memory Tests**: Store/retrieve items, capacity testing, decay testing
+- **Episodic Memory Tests**: Encoding/retrieval, pattern completion, temporal indexing
+- **Associative Memory Tests**: Pattern association, separation, completion
+- **Concept Memory Tests**: Clustering, prototype formation, property extraction
+- **Integration Tests**: Cross-memory system interactions, system coordination
+
+### Performance Tests
+- **Memory Capacity**: Test with increasing numbers of items/patterns
+- **Retrieval Speed**: Measure time to retrieve from memory systems
+- **Memory Stability**: Test retention over time
+- **Generalization**: Test ability to apply learned patterns
+
+### Behavioral Tests
+- **Learning Curves**: Track improvement over time
+- **Pattern Completion**: Test memory reconstruction quality
+- **Error Recovery**: Test ability to recover from errors
+- **Adaptation**: Test flexibility to new patterns
+
+## Memory System Common Issues and Solutions
+
+### Issue 1: Memory Overload
+**Problem**: Memory systems become saturated with too many items.
+**Solution**:
+- Implement stronger capacity limits
+- Add prioritization mechanisms
+- Use aging to remove old memories
+- Implement memory compression
+
+### Issue 2: Memory Interference
+**Problem**: Memories interfere with each other's retrieval.
+**Solution**:
+- Implement pattern separation
+- Use temporal indexing
+- Apply similarity-based filtering
+- Use contextual gating
+
+### Issue 3: Memory Decay
+**Problem**: Memories degrade over time without reinforcement.
+**Solution**:
+- Implement replay mechanisms
+- Add consolidation processes
+- Use rehearsal schedules
+- Apply boosting mechanisms
+
+### Issue 4: Poor Generalization
+**Problem**: Memory systems fail to generalize to new situations.
+**Solution**:
+- Enhance abstraction mechanisms
+- Improve pattern completion
+- Implement transfer learning
+- Use concept formation
+
+## API Reference
+
+### NeuralWorkingMemory Class Methods
+```cpp
+// Construction and Destruction
+NeuralWorkingMemory()
+~NeuralWorkingMemory()
+
+// Storage Operations
+void store(float information, int slot)
+void storePattern(const std::vector<float>& pattern)
+void replace(int oldSlot, int newSlot, float newInformation)
+
+// Retrieval Operations
+float retrieve(int slot) const
+std::vector<float> retrievePattern(int slot) const
+int matchPattern(const std::vector<float>& pattern) const
+std::vector<int> getActiveSlots() const
+
+// Maintenance Operations
+void update(float dt)
+void decay(float dt)
+void refresh(int slot, float refreshAmount)
+void compete()
+
+// State Queries
+int getCapacity() const
+float getDecayRate() const
+float getStability() const
+```
+
+### NeuralEpisodicMemory Class Methods
+```cpp
+// Construction and Destruction
+NeuralEpisodicMemory()
+~NeuralEpisodicMemory()
+
+// Encoding Operations
+void encodeExperience(const Experience& experience)
+void createMemoryTrace(const Experience& experience, Timestamp time, Position position)
+
+// Storage Operations
+void storePattern(const std::vector<float>& pattern, Timestamp time, Position position)
+
+// Retrieval Operations
+std::vector<float> completePattern(const std::vector<float>& partialPattern, float similarityThreshold)
+size_t retrieveByTime(Timestamp time, float temporalWindow)
+std::vector<size_t> retrieveByPosition(Position position, float spatialRadius)
+size_t retrieveByAssociation(size_t relatedMemoryId, float similarityThreshold)
+
+// Replay Operations
+void replayMemory(size_t memoryId, float consolidationStrength)
+void consolidateMemories(const std::vector<size_t>& memoryIds, float consolidationStrength)
+void consolidateSleep()
+
+// State Queries
+size_t getMemoryCapacity() const
+float getPatternCompletionThreshold() const
+```
+
+### NeuralAssociativeMemory Class Methods
+```cpp
+// Construction and Destruction
+NeuralAssociativeMemory()
+~NeuralAssociativeMemory()
+
+// Association Operations
+void applyHebbianAssociation(const PatternVector& pattern1, const PatternVector& pattern2)
+size_t separatePattern(const PatternVector& pattern)
+PatternVector completePattern(const PatternVector& partialPattern, float completionThreshold)
+
+// Concept Operations
+void clusterPatterns(float similarityThreshold, float stabilityThreshold)
+PatternVector createPrototype(const std::vector<size_t>& patternGroup)
+
+// Learning Operations
+void learnCategory(const std::vector<PatternVector>& examples, float stabilityThreshold)
+PatternVector supportPrediction(const PatternVector& currentState, const PatternVector& goalState)
+
+// State Queries
+size_t getPatternDatabaseSize() const
+float getAssociationStrength(size_t index1, size_t index2) const
+```
+
+### ConceptFormation Class Methods
+```cpp
+// Construction and Destruction
+ConceptFormation()
+~ConceptFormation()
+
+// Pattern Processing Operations
+void extractFeatures(const PatternVector& pattern, std::vector<PropertyHint>& features)
+size_t clusterPattern(const PatternVector& pattern, float similarityThreshold)
+
+// Concept Operations
+ConceptVector createPrototype(const std::vector<size_t>& patternIndices)
+float calculateConceptStability(const ConceptVector& concept, const std::vector<size_t>& supportingIndices)
+
+// Property Processing Operations
+void extractPropertyHints(const PatternVector& pattern, std::vector<PropertyHint>& hints)
+void weightProperties(const std::vector<PropertyHint>& hints)
+
+// Application Operations
+ConceptVector supportPlanning(const PatternVector& currentState, const ConceptVector& goalConcept)
+ConceptVector supportPrediction(const PatternVector& currentState, float predictionHorizon)
+
+// State Queries
+size_t getConceptDatabaseSize() const
+ConceptVector getConcept(size_t index) const
+```
+
+## Integration Guide
+
+### Phase 6 Memory System Integration
+The Phase 6 integration brings together all memory systems into a coherent architecture:
+
+```cpp
+// Memory systems in Brain::Impl
+workingMemory.reset(new NeuralWorkingMemory());
+episodicMemory.reset(new NeuralEpisodicMemory());
+associativeMemory.reset(new NeuralAssociativeMemory());
+conceptFormation.reset(new ConceptFormation());
+
+// Integration relationships
+workingMemory->setConsolidationSystem(episodicMemory.get());
+episodicMemory->setAssociationSystem(associativeMemory.get());
+associativeMemory->setConceptSystem(conceptFormation.get());
+conceptFormation->setWorkingMemorySystem(workingMemory.get());
+```
+
+### Memory Flow in Phase 6
+```
+WORLD (Environment)
+  ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  ↓
+ATTENTION (competitive selection)
+  ↓
+NEURAL PROCESSING (LIF dynamics)
+  ↓
+PREDICTION (temporal sequence learning)
+  ↓
+WORKING MEMORY (persistent activity)
+  ↓
+EPISODIC MEMORY (experience storage)
+  ↓
+CONCEPT FORMATION (pattern discovery)
+  ↓
+ASSOCIATIVE MEMORY (pattern associations)
+  ↓
+PLANNING (multi-step prediction)
+  ↓
+SELF-MODEL (sensorimotor learning)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD.applyMotorCommand()
+  ↓
+ACTION RESULT
+  ↓
+REWARD / ERROR
+  ↓
+NEUROMODULATION
+  ↓
+PLASTICITY
+  ↓
+SOCIAL LEARNING (observation/imitation)
+```
+
+## Future Directions
+
+### Advanced Memory Systems
+- **Hierarchical Memory**: Multi-level memory systems
+- **Episodic-Conceptual Integration**: Better integration of episodic and conceptual memory
+- **Meta-Memory**: Memory about memories
+- **Emotional Memory**: Integration of emotional valence
+
+### Memory Optimization
+- **Efficient Storage**: Compressed memory representations
+- **Adaptive Capacity**: Dynamic memory allocation
+- **Memory Scheduling**: Optimal memory management
+- **Parallel Memory Processing**: Concurrent memory operations
+
+### Memory Neuroscience Integration
+- **Detailed Temporal Dynamics**: Precise timing of memory processes
+- **Molecular Mechanisms**: Biochemical memory consolidation
+- **Neural Circuit Modeling**: Realistic memory circuit models
+- **Systems-Level Understanding**: Large-scale memory system understanding
+
+## Conclusion
+
+Memory systems form the backbone of NLM's cognitive capabilities. Working memory provides temporary storage, episodic memory records experiences, associative memory creates connections, and concept memory forms abstract representations. Together, they enable NLM to learn, adapt, and solve complex problems.
+
+Understanding memory systems is essential for:
+- **Designing Cognitive Architectures**: Creating systems that can remember and learn
+- **Implementing Intelligence**: Building systems with persistent knowledge
+- **Debugging Systems**: Identifying and fixing memory-related issues
+- **Extending Functionality**: Adding new memory capabilities
+
+The memory systems guide provides the foundation for exploring NLM's memory capabilities, from basic storage to advanced cognitive functions.
+
+## See Also
+- [Working Memory Guide](working-memory.html): Working memory documentation
+- [Episodic Memory Guide](episodic-memory.html): Episodic memory documentation
+- [Concept Formation Guide](concept-formation.html): Concept formation documentation
+- [Attention Guide](attention.html): Attention system documentation
+- [Planning Guide](planning.html): Planning system documentation
+
+## References
+- Baddeley, A. (2012). Working memory: Theories, models, and applications. Oxford University Press.
+- Tulving, E. (2002). Episodic memory: From mind to brain. Annual Review of Psychology.
+- McClelland, J. L., McNaughton, B. L., & O'Reilly, R. C. (1995). Complementary learning systems in the brain. IEEE Transactions on Neural Networks.

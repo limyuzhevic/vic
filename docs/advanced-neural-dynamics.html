@@ -1,0 +1,1421 @@
+# Advanced Neural Dynamics
+
+## Overview
+
+Advanced Neural Dynamics extends the basic LIF model to capture more complex neural behaviors and phenomena. This guide covers advanced neural dynamics including complex LIF extensions, non-linearities, and sophisticated temporal processing.
+
+## Advanced LIF Extensions
+
+### 1. Adaptive LIF (ALIF)
+
+**Purpose**: Neuron with adaptive threshold and firing rate
+
+**Model**:
+```cpp
+class AdaptiveLIF : public Neuron {
+public:
+    AdaptiveLIF(NeuronId id) : Neuron(id) {}
+    
+    void step(float dt, float input) override {
+        // Update adaptive threshold
+        updateAdaptiveThreshold(dt);
+        
+        // Apply LIF dynamics with adaptive threshold
+        applyAdaptiveLIFDynamics(dt, input);
+        
+        // Update firing rate adaptation
+        updateFiringRateAdaptation(dt);
+        
+        // Generate spike if threshold crossed
+        if (getMembranePotential() >= getAdaptiveThreshold()) {
+            generateAdaptiveSpike();
+        }
+    }
+    
+private:
+    float adaptiveThreshold;
+    float adaptationCurrent;
+    float maximumAdaptation;
+    float adaptationTimeConstant;
+};
+```
+
+**Adaptive Threshold Dynamics**:
+```cpp
+define adaptive_threshold_t = adaptive_threshold_0 + adaptation_current * adaptation_strength
+```
+
+**Adaptation Current Dynamics**:
+```cpp
+define d(adaptation_current)/dt = -adaptation_current / tau_adaptation + k * firing_rate
+```
+
+### 2. Stochastic LIF (SLIF)
+
+**Purpose**: Neuron with stochastic input and noise
+
+**Model**:
+```cpp
+class StochasticLIF : public Neuron {
+public:
+    StochasticLIF(NeuronId id, float noiseLevel) 
+        : Neuron(id), noiseLevel(noiseLevel) {}
+    
+    void step(float dt, float input) override {
+        // Add stochastic input
+        float stochasticInput = generateStochasticInput(dt);
+        
+        // Apply LIF dynamics with noise
+        applyStochasticLIFDynamics(dt, input + stochasticInput);
+        
+        // Generate spike probabilistically
+        generateStochasticSpike(dt);
+    }
+    
+private:
+    float noiseLevel;
+    std::normal_distribution<float> noiseDistribution;
+    float refractoryNoise;
+};
+```
+
+**Stochastic Input**:
+```cpp
+define input_t = input_t + noise_t * noise_level
+define noise_t ~ N(0, sigma)
+```
+
+**Probabilistic Spike Generation**:
+```cpp
+prob(spike) = 1 - exp(-(v - threshold) / temperature)
+```
+
+### 3. Resonant LIF (RLIF)
+
+**Purpose**: Neuron with resonant properties and oscillation
+
+**Model**:
+```cpp
+class ResonantLIF : public Neuron {
+public:
+    ResonantLIF(NeuronId id, float resonanceFrequency) 
+        : Neuron(id), resonanceFrequency(resonanceFrequency) {}
+    
+    void step(float dt, float input) override {
+        // Apply resonant dynamics
+        applyResonantDynamics(dt, input);
+        
+        // Update resonant state
+        updateResonantState(dt);
+        
+        // Generate spike from resonance
+        generateResonantSpike(dt);
+    }
+    
+private:
+    float resonanceFrequency;
+    float resonanceDamping;
+    float resonancePhase;
+    float externalInput;
+};
+```
+
+**Resonant Dynamics**:
+```cpp
+define dv/dt = -v/tau + (1 - v) * input + resonance_amplitude * sin(omega * t + phase)
+```
+
+### 4. Bistable LIF (BLIF)
+
+**Purpose**: Neuron with bistable dynamics (two stable states)
+
+**Model**:
+```cpp
+class BistableLIF : public Neuron {
+public:
+    BistableLIF(NeuronId id) : Neuron(id) {}
+    
+    void step(float dt, float input) override {
+        // Apply bistable dynamics
+        applyBistableDynamics(dt, input);
+        
+        // Determine state
+        determineState();
+        
+        // Generate spike from stable state
+        generateBistableSpike(dt);
+    }
+    
+private:
+    float stableState1;
+    float stableState2;
+    float stateBias;
+    float noiseLevel;
+};
+```
+
+**Bistable Dynamics**:
+```cpp
+define dv/dt = -v * (v - stable1) * (v - stable2) + input + noise
+```
+
+## Non-Linear Dynamics
+
+### 1. Hindmarsh-Rose (HR) Model
+
+**Purpose**: Model of bursting behavior
+
+**Model**:
+```cpp
+class HindmarshRose : public Neuron {
+public:
+    HindmarshRose(NeuronId id) : Neuron(id) {}
+    
+    void step(float dt, float input) override {
+        // Apply HR dynamics
+        applyHRDynamics(dt, input);
+        
+        // Update burst state
+        updateBurstState(dt);
+        
+        // Generate spike
+        generateHRSelfSpike();
+    }
+    
+private:
+    float x, y, z;  // HR state variables
+    float a, b, c;  // HR parameters
+};
+```
+
+**HR Dynamics**:
+```cpp
+define dx/dt = y - a*x^3 + b*x
+
+define dy/dt = c - (x^2) - y
+
+define dz/dt = r * (s * (x - xr) - z)
+```
+
+### 2. Morris-Lecar (ML) Model
+
+**Purpose**: Two-dimensional model of neuronal dynamics
+
+**Model**:
+```cpp
+class MorrisLecar : public Neuron {
+public:
+    MorrisLecar(NeuronId id) : Neuron(id) {}
+    
+    void step(float dt, float input) override {
+        // Apply ML dynamics
+        applyMLDynamics(dt, input);
+        
+        // Update membrane potential
+        updateMembranePotential(dt);
+        
+        // Update recovery variable
+        updateRecoveryVariable(dt);
+        
+        // Generate spike
+        generateMLSpike();
+    }
+    
+private:
+    float v;    // Membrane potential
+    float u;    // Recovery variable
+    float I_app; // Applied current
+};
+```
+
+**ML Dynamics**:
+```cpp
+define C * dv/dt = I_app - g_L * v - g_K * u * (v - v_K) + I_syn
+
+define du/dt = phi * (0.5 * (v + v1) - u) / cosh(0.5 * (v + v1 - v3))
+```
+
+### 3. FitzHugh-Nagumo (FHN) Model
+
+**Purpose**: Simplified neuron model with excitable dynamics
+
+**Model**:
+```cpp
+class FitzHughNagumo : public Neuron {
+public:
+    FitzHughNagumo(NeuronId id) : Neuron(id) {}
+    
+    void step(float dt, float input) override {
+        // Apply FHN dynamics
+        applyFHNDynamics(dt, input);
+        
+        // Update fast variable
+        updateFastVariable(dt);
+        
+        // Update slow variable
+        updateSlowVariable(dt);
+        
+        // Generate spike
+        generateFHNSpike();
+    }
+    
+private:
+    float v;  // Fast variable (membrane potential)
+    float w;  // Slow variable (recovery)
+};
+```
+
+**FHN Dynamics**:
+```cpp
+define dv/dt = v - v^3/3 - w + I
+
+define tau * dw/dt = a * (b * v + w - w0)
+```
+
+## Synaptic Dynamics Extensions
+
+### 1. NMDA Receptor Dynamics
+
+**Purpose**: Model NMDA receptor kinetics
+
+**Model**:
+```cpp
+class NMDASynapse : public Synapse {
+public:
+    NMDASynapse(SynapseId id, NeuronId pre, NeuronId post) 
+        : Synapse(id, pre, post) {}
+    
+    void transmit(Neuron& postNeuron, Timestamp time) override {
+        // Activate NMDA receptors
+        activateNMDAReceivers();
+        
+        // Update NMDA conductance
+        updateNMDAConductance(time);
+        
+        // Generate postsynaptic potential
+        generateNMDAEPSP(postNeuron, time);
+    }
+    
+private:
+    float nmdaConductance;
+    float nmdaDecayTime;
+    float nmdaVoltageDependency;
+    float mgBlock;
+};
+```
+
+**NMDA Dynamics**:
+```cpp
+define g_NMDA/dt = -g_NMDA/tau_NMDA + alpha_NMDA * activation * (1 - voltage_dependent_block)
+```
+
+### 2. GABA Receptor Dynamics
+
+**Purpose**: Model GABA receptor kinetics
+
+**Model**:
+```cpp
+class GABASynapse : public Synapse {
+public:
+    GABASynapse(SynapseId id, NeuronId pre, NeuronId post) 
+        : Synapse(id, pre, post) {}
+    
+    void transmit(Neuron& postNeuron, Timestamp time) override {
+        // Activate GABA receptors
+        activateGABAReceivers();
+        
+        // Update GABA conductance
+        updateGABAConductance(time);
+        
+        // Generate postsynaptic inhibition
+        generateGABAIPSP(postNeuron, time);
+    }
+    
+private:
+    float gabaConductance;
+    float gabaDecayTime;
+    float gabaReceptorDensity;
+};
+```
+
+**GABA Dynamics**:
+```cpp
+define g_GABA/dt = -g_GABA/tau_GABA + alpha_GABA * activation
+```
+
+### 3. Acetylcholine Receptor Dynamics
+
+**Purpose**: Model cholinergic receptor kinetics
+
+**Model**:
+```cpp
+class CholinergicSynapse : public Synapse {
+public:
+    CholinergicSynapse(SynapseId id, NeuronId pre, NeuronId post) 
+        : Synapse(id, pre, post) {}
+    
+    void transmit(Neuron& postNeuron, Timestamp time) override {
+        // Activate cholinergic receptors
+        activateCholinergicReceivers();
+        
+        // Update acetylcholine conductance
+        updateAChConductance(time);
+        
+        // Generate postsynaptic cholinergic effect
+        generateAChEffect(postNeuron, time);
+    }
+    
+private:
+    float achConductance;
+    float achDecayTime;
+    float achReceptorType;  // M1, M2, etc.
+};
+```
+
+## Temporal Processing Extensions
+
+### 1. Spike Timing Dependent Plasticity (STDP) Variations
+
+**Purpose**: Enhanced STDP models with additional features
+
+**Extended STDP Models**:
+
+#### Pair-Based STDP with Weight Dependence
+```cpp
+void ExtendedSTDP::applyPairBasedSTDP(
+    Neuron& pre, Neuron& post,
+    Timestamp preTime, Timestamp postTime,
+    float learningRate) {
+    
+    float delta_t = postTime - preTime;
+    
+    if (delta_t > 0) {
+        // LTP: post after pre
+        float weightChange = A_plus * exp(-delta_t / tau_plus) * (1 - post.getWeight() / maxWeight);
+        post.modifyWeight(weightChange);
+    } else {
+        // LTD: post before pre
+        float weightChange = -A_minus * exp(delta_t / tau_minus) * (pre.getWeight() / maxWeight);
+        pre.modifyWeight(weightChange);
+    }
+}
+```
+
+#### Additive STDP
+```cpp
+void AdditiveSTDP::applyAdditiveSTDP(
+    Neuron& pre, Neuron& post,
+    Timestamp preTime, Timestamp postTime,
+    float learningRate) {
+    
+    float delta_t = postTime - preTime;
+    
+    // Add to both pre- and post-synaptic weights
+    if (delta_t > 0) {
+        // LTP
+        post.modifyWeight(learningRate * A_plus * exp(-delta_t / tau_plus));
+        pre.modifyWeight(learningRate * A_plus * exp(-delta_t / tau_plus) * preWeightFactor);
+    } else {
+        // LTD
+        pre.modifyWeight(-learningRate * A_minus * exp(delta_t / tau_minus));
+        post.modifyWeight(-learningRate * A_minus * exp(delta_t / tau_minus) * postWeightFactor);
+    }
+}
+```
+
+### 2. Eligibility Traces with Plasticity
+
+**Purpose**: Track eligibility for plasticity over time
+
+**Model**:
+```cpp
+class EligibilityTraceSystem {
+public:
+    EligibilityTraceSystem() {
+        // Initialize traces
+        preTrace = 0.0f;
+        postTrace = 0.0f;
+        traceDecay = 0.99f;
+        traceIncrement = 0.01f;
+    }
+    
+    void updateTraces(float dt, bool preSpike, bool postSpike) {
+        // Decay traces
+        preTrace *= traceDecay;
+        postTrace *= traceDecay;
+        
+        // Increment traces on spikes
+        if (preSpike) {
+            preTrace += traceIncrement;
+        }
+        if (postSpike) {
+            postTrace += traceIncrement;
+        }
+    }
+    
+    void applyPlasticity(float neuromodulator) {
+        // Apply plasticity based on traces
+        float preToPostChange = postTrace * neuromodulator * A_plus;
+        float postToPreChange = preTrace * neuromodulator * A_minus;
+        
+        // Update weights
+        updateWeights(preToPostChange, postToPreChange);
+        
+        // Reset traces
+        resetTraces();
+    }
+    
+private:
+    float preTrace;
+    float postTrace;
+    float traceDecay;
+    float traceIncrement;
+    float A_plus;
+    float A_minus;
+};
+```
+
+### 3. Reward Prediction Error with STDP
+
+**Purpose**: Integrate reward prediction error with STDP
+
+**Model**:
+```cpp
+class RPE_STDP : public STDP {
+public:
+    RPE_STDP(float predictionErrorSensitivity)
+        : predictionErrorSensitivity(predictionErrorSensitivity) {}
+    
+    void update(Neuron& pre, Neuron& post, float dt) override {
+        // Get prediction error
+        float predictionError = calculatePredictionError(pre, post);
+        
+        // Apply STDP with prediction error modulation
+        applySTDPWithRPE(pre, post, dt, predictionError);
+    }
+    
+private:
+    void applySTDPWithRPE(Neuron& pre, Neuron& post, float dt, float predictionError) {
+        // Get spike history
+        auto preSpikes = pre.getRecentSpikeTimes(dt);
+        auto postSpikes = post.getRecentSpikeTimes(dt);
+        
+        // Apply STDP
+        for (auto preTime : preSpikes) {
+            for (auto postTime : postSpikes) {
+                applySingleSTDP(pre, post, preTime, postTime, predictionError);
+            }
+        }
+    }
+    
+    void applySingleSTDP(Neuron& pre, Neuron& post, 
+                        Timestamp preTime, Timestamp postTime,
+                        float predictionError) {
+        float delta_t = postTime - preTime;
+        
+        if (delta_t > 0) {
+            // LTP
+            float weightChange = A_plus * exp(-delta_t / tau_plus) * (1 + predictionError * predictionErrorSensitivity);
+            post.modifyWeight(weightChange);
+        } else {
+            // LTD
+            float weightChange = -A_minus * exp(delta_t / tau_minus) * (1 - predictionError * predictionErrorSensitivity);
+            pre.modifyWeight(weightChange);
+        }
+    }
+    
+    float predictionErrorSensitivity;
+    float A_plus;
+    float A_minus;
+    float tau_plus;
+    float tau_minus;
+};
+```
+
+## Neural Field Models
+
+### 1. Continuous Neural Fields
+
+**Purpose**: Model neural populations as continuous fields
+
+**Model**:
+```cpp
+class NeuralField {
+public:
+    NeuralField(int size, float connectionRadius) 
+        : size(size), connectionRadius(connectionRadius) {
+        // Initialize field
+        field.resize(size, 0.0f);
+        connectivityMatrix.resize(size, std::vector<float>(size, 0.0f));
+        
+        // Initialize connectivity
+        initializeConnectivity();
+    }
+    
+    void update(float dt, const std::vector<float>& input) {
+        // Calculate current field
+        std::vector<float> currentField = getCurrentField();
+        
+        // Apply connectivity
+        std::vector<float> connectedField = applyConnectivity(currentField);
+        
+        // Add input
+        std::vector<float> newField = connectedField + input * inputStrength;
+        
+        // Apply decay
+        newField = applyDecay(newField, dt);
+        
+        // Update field
+        field = newField;
+    }
+    
+    std::vector<float> getField() const { return field; }
+    
+private:
+    int size;
+    float connectionRadius;
+    std::vector<float> field;
+    std::vector<std::vector<float>> connectivityMatrix;
+    float inputStrength;
+    float decayRate;
+};
+```
+
+**Field Dynamics**:
+```cpp
+define du_i/dt = -u_i + integral(kernel_ij * u_j) + input_i
+```
+
+### 2. Adaptive Neural Fields
+
+**Purpose**: Neural fields with learning capabilities
+
+**Model**:
+```cpp
+class AdaptiveNeuralField : public NeuralField {
+public:
+    AdaptiveNeuralField(int size, float connectionRadius)
+        : NeuralField(size, connectionRadius) {}
+    
+    void learnFromInput(const std::vector<float>& input, float target) {
+        // Calculate error
+        std::vector<float> currentField = getField();
+        std::vector<float> error = target - currentField;
+        
+        // Update connectivity
+        updateConnectivity(input, error);
+        
+        // Update field
+        updateField(input);
+    }
+    
+private:
+    void updateConnectivity(const std::vector<float>& input, const std::vector<float>& error) {
+        // Update connectivity matrix based on input and error
+        for (int i = 0; i < size; ++i) {
+            for (int j = 0; j < size; ++j) {
+                float contribution = input[j] * error[i];
+                connectivityMatrix[i][j] += learningRate * contribution;
+            }
+        }
+    }
+    
+    void updateField(const std::vector<float>& input) {
+        // Update field based on input
+        std::vector<float> currentField = getField();
+        std::vector<float> newField = currentField + input * learningRate;
+        setField(newField);
+    }
+    
+    float learningRate;
+};
+```
+
+## Advanced Plasticity Mechanisms
+
+### 1. Homeostatic Plasticity
+
+**Purpose**: Maintain neural stability through synaptic scaling
+
+**Model**:
+```cpp
+class HomeostaticPlasticity : public PlasticityRule {
+public:
+    HomeostaticPlasticity(float targetActivity, float learningRate)
+        : targetActivity(targetActivity), learningRate(learningRate) {}
+    
+    void update(Neuron& pre, Neuron& post, float dt) override {
+        // Calculate current activity
+        float currentActivity = calculateNetworkActivity();
+        
+        // Calculate scaling factor
+        float scalingFactor = targetActivity / currentActivity;
+        
+        // Apply synaptic scaling
+        applySynapticScaling(pre, post, scalingFactor);
+    }
+    
+private:
+    void applySynapticScaling(Neuron& pre, Neuron& post, float scalingFactor) {
+        // Scale synaptic weights
+        pre.modifyWeight(pre.getWeight() * scalingFactor);
+        post.modifyWeight(post.getWeight() * scalingFactor);
+    }
+    
+    float targetActivity;
+    float learningRate;
+};
+```
+
+### 2. Meta-Plasticity
+
+**Purpose**: Plasticity that changes how plasticity works
+
+**Model**:
+```cpp
+class MetaPlasticity : public PlasticityRule {
+public:
+    MetaPlasticity(float metaLearningRate) : metaLearningRate(metaLearningRate) {}
+    
+    void update(Neuron& pre, Neuron& post, float dt) override {
+        // Update learning rate based on recent activity
+        updateLearningRate(metaLearningRate);
+        
+        // Apply plasticity with updated learning rate
+        applyPlasticityWithUpdatedRate(pre, post, dt);
+    }
+    
+private:
+    void updateLearningRate(float learningRateChange) {
+        // Update learning rate based on recent activity
+        currentLearningRate += learningRateChange;
+        clampLearningRate();
+    }
+    
+    void applyPlasticityWithUpdatedRate(Neuron& pre, Neuron& post, float dt) {
+        // Apply plasticity with updated learning rate
+        float effectiveLearningRate = currentLearningRate;
+        
+        // Apply STDP-like plasticity
+        applySTDPWithLearningRate(pre, post, dt, effectiveLearningRate);
+    }
+    
+    float metaLearningRate;
+    float currentLearningRate;
+};
+```
+
+### 3. Synaptic Tag-and-Locking
+
+**Purpose**: Mark synapses for plasticity and lock them for later modification
+
+**Model**:
+```cpp
+class SynapticTaggingSystem {
+public:
+    SynapticTaggingSystem() {
+        // Initialize tags
+        tagDecay = 0.95f;
+        tagIncrement = 0.1f;
+        lockDuration = 100.0f;  // ms
+    }
+    
+    void tagSynapse(SynapseId synapseId) {
+        // Set tag for synapse
+        tags[synapseId] = tagIncrement;
+        tagTimes[synapseId] = currentTime;
+    }
+    
+    void lockSynapse(SynapseId synapseId, float newWeight) {
+        // Lock synapse with new weight
+        lockedWeights[synapseId] = newWeight;
+        lockTimes[synapseId] = currentTime;
+    }
+    
+    void updateTags(float dt) {
+        // Decay tags
+        for (auto& [synapseId, tag] : tags) {
+            tag *= tagDecay;
+            
+            // Unlock if tag decayed too much
+            if (tag < unlockThreshold && isLocked(synapseId)) {
+                unlockSynapse(synapseId);
+            }
+        }
+        
+        // Release locks
+        releaseExpiredLocks(dt);
+    }
+    
+    void applyTagBasedPlasticity(float neuromodulator) {
+        // Apply plasticity to tagged synapses
+        for (auto& [synapseId, tag] : tags) {
+            if (tag > tagThreshold) {
+                float weightChange = calculateWeightChange(synapseId, neuromodulator);
+                applyWeightChange(synapseId, weightChange);
+            }
+        }
+    }
+    
+private:
+    std::map<SynapseId, float> tags;
+    std::map<SynapseId, float> tagTimes;
+    std::map<SynapseId, float> lockedWeights;
+    std::map<SynapseId, float> lockTimes;
+    float tagDecay;
+    float tagIncrement;
+    float lockDuration;
+    float tagThreshold;
+    float unlockThreshold;
+    float currentTime;
+};
+```
+
+## Dynamic Neural Systems
+
+### 1. Neural Darwinism
+
+**Purpose**: Selection of neural representations based on fitness
+
+**Model**:
+```cpp
+class NeuralDarwinSystem {
+public:
+    NeuralDarwinSystem(float selectionPressure) 
+        : selectionPressure(selectionPressure) {}
+    
+    void evolvePopulation(std::vector<NeuralModule>& population, float fitness) {
+        // Calculate fitness for each module
+        std::vector<float> fitnessValues;
+        for (auto& module : population) {
+            float moduleFitness = calculateModuleFitness(module, fitness);
+            fitnessValues.push_back(moduleFitness);
+        }
+        
+        // Select parents based on fitness
+        std::vector<NeuralModule*> parents = selectParents(population, fitnessValues);
+        
+        // Create offspring through mutation and recombination
+        std::vector<NeuralModule> offspring = createOffspring(parents);
+        
+        // Replace population with offspring
+        population = offspring;
+    }
+    
+private:
+    std::vector<NeuralModule*> selectParents(
+        std::vector<NeuralModule>& population,
+        const std::vector<float>& fitnessValues) {
+        
+        std::vector<NeuralModule*> parents;
+        std::vector<float> probabilities;
+        
+        for (float fitness : fitnessValues) {
+            probabilities.push_back(fitness / totalFitness);
+        }
+        
+        // Select parents using roulette wheel
+        for (int i = 0; i < population.size(); ++i) {
+            int selectedIndex = selectRouletteWheel(probabilities);
+            parents.push_back(&population[selectedIndex]);
+        }
+        
+        return parents;
+    }
+    
+    std::vector<NeuralModule> createOffspring(
+        const std::vector<NeuralModule*>& parents) {
+        
+        std::vector<NeuralModule> offspring;
+        
+        for (int i = 0; i < parents.size(); ++i) {
+            // Create offspring through mutation
+            NeuralModule child = mutate(*parents[i]);
+            
+            // Occasionally perform recombination
+            if (i > 0 && randomFloat() < recombinationRate) {
+                child = recombine(*parents[i-1], *parents[i]);
+            }
+            
+            offspring.push_back(child);
+        }
+        
+        return offspring;
+    }
+    
+    NeuralModule mutate(const NeuralModule& parent) {
+        NeuralModule child = parent;
+        
+        // Mutate random parameters
+        for (int param = 0; param < child.parameters.size(); ++param) {
+            if (randomFloat() < mutationRate) {
+                child.parameters[param] += randomGaussian(0, mutationStdDev);
+            }
+        }
+        
+        return child;
+    }
+    
+    NeuralModule recombine(const NeuralModule& parent1, const NeuralModule& parent2) {
+        NeuralModule child;
+        
+        // Recombine parameters
+        for (int param = 0; param < parent1.parameters.size(); ++param) {
+            if (randomFloat() < crossoverRate) {
+                child.parameters[param] = parent1.parameters[param];
+            } else {
+                child.parameters[param] = parent2.parameters[param];
+            }
+        }
+        
+        return child;
+    }
+    
+    float calculateModuleFitness(const NeuralModule& module, float taskFitness) {
+        // Calculate fitness based on task performance
+        float performance = module.calculatePerformance();
+        
+        // Apply selection pressure
+        float fitness = performance * selectionPressure + taskFitness;
+        
+        return fitness;
+    }
+    
+    float selectionPressure;
+    float totalFitness;
+    float mutationRate;
+    float mutationStdDev;
+    float recombinationRate;
+    float crossoverRate;
+};
+```
+
+### 2. Embodied Neural Development
+
+**Purpose**: Neural development driven by interaction with environment
+
+**Model**:
+```cpp
+class EmbodiedNeuralDevelopment {
+public:
+    EmbodiedNeuralDevelopment(std::shared_ptr<Environment> environment)
+        : environment(environment) {}
+    
+    void developNeuralSystem() {
+        // Initialize neural system
+        initializeNeuralSystem();
+        
+        // Develop through interaction
+        developThroughInteraction();
+        
+        // Optimize performance
+        optimizePerformance();
+    }
+    
+private:
+    void initializeNeuralSystem() {
+        // Create basic neural architecture
+        createBasicArchitecture();
+        
+        // Initialize synaptic connections
+        initializeSynapticConnections();
+        
+        // Set up neuromodulation
+        setupNeuromodulation();
+    }
+    
+    void developThroughInteraction() {
+        // Interact with environment
+        for (int step = 0; step < developmentSteps; ++step) {
+            // Perceive environment
+            Perception perception = perceiveEnvironment();
+            
+            // Act in environment
+            Action action = selectAction(perception);
+            
+            // Learn from experience
+            learnFromExperience(perception, action);
+            
+            // Adapt to environment
+            adaptToEnvironment(perception, action);
+            
+            // Update neural system
+            updateNeuralSystem();
+        }
+    }
+    
+    void optimizePerformance() {
+        // Optimize neural performance
+        optimizeNeuralEfficiency();
+        
+        // Refine connectivity
+        refineConnectivity();
+        
+        // Enhance learning capabilities
+        enhanceLearningCapabilities();
+    }
+    
+    std::shared_ptr<Environment> environment;
+    int developmentSteps;
+    float learningRate;
+    float adaptationRate;
+};
+```
+
+## Complex Network Dynamics
+
+### 1. Scale-Free Networks
+
+**Purpose**: Neural networks with scale-free topology
+
+**Model**:
+```cpp
+class ScaleFreeNeuralNetwork : public NeuralNetwork {
+public:
+    ScaleFreeNeuralNetwork(int numNeurons) : NeuralNetwork(numNeurons) {
+        // Create scale-free network
+        createScaleFreeNetwork();
+    }
+    
+private:
+    void createScaleFreeNetwork() {
+        // Initialize with random neurons
+        for (int i = 0; i < numNeurons; ++i) {
+            neurons.push_back(createNeuron(i));
+        }
+        
+        // Create scale-free connections using Barabási–Albert model
+        createBarabasiAlbertConnections();
+    }
+    
+    void createBarabasiAlbertConnections() {
+        // Start with small initial network
+        int m0 = 5;  // Initial number of nodes
+        int m = 3;   // Number of new connections per node
+        
+        // Create initial network
+        for (int i = 0; i < m0; ++i) {
+            for (int j = i + 1; j < m0; ++j) {
+                addConnection(i, j, initialConnectionStrength);
+            }
+        }
+        
+        // Add remaining nodes
+        for (int i = m0; i < numNeurons; ++i) {
+            addNewNodeConnections(i, m);
+        }
+    }
+    
+    void addNewNodeConnections(int newNode, int m) {
+        // Determine nodes that new node connects to
+        std::vector<int> candidates = getAllExistingNodes();
+        std::vector<float> connectionProbabilities;
+        
+        for (int nodeId : candidates) {
+            float degree = getNodeDegree(nodeId);
+            float probability = degree / (degree + attachmentParameter);
+            connectionProbabilities.push_back(probability);
+        }
+        
+        // Select m nodes to connect to
+        std::vector<int> selectedNodes = selectNodes(connectionProbabilities, m);
+        
+        // Add connections
+        for (int selectedNode : selectedNodes) {
+            addConnection(selectedNode, newNode, initialConnectionStrength);
+        }
+    }
+    
+    std::vector<int> getAllExistingNodes() {
+        std::vector<int> nodes;
+        for (int i = 0; i < numNeurons; ++i) {
+            nodes.push_back(i);
+        }
+        return nodes;
+    }
+    
+    float getNodeDegree(int nodeId) {
+        int degree = 0;
+        for (const auto& connection : connections) {
+            if (connection.preNeuron == nodeId || connection.postNeuron == nodeId) {
+                degree++;
+            }
+        }
+        return degree;
+    }
+    
+    std::vector<int> selectNodes(const std::vector<float>& probabilities, int count) {
+        std::vector<int> selectedNodes;
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::discrete_distribution<> dist(probabilities.begin(), probabilities.end());
+        
+        for (int i = 0; i < count; ++i) {
+            int selectedNode = dist(gen);
+            selectedNodes.push_back(selectedNode);
+        }
+        
+        return selectedNodes;
+    }
+    
+    float attachmentParameter;
+};
+```
+
+### 2. Small-World Networks
+
+**Purpose**: Neural networks with small-world topology
+
+**Model**:
+```cpp
+class SmallWorldNeuralNetwork : public NeuralNetwork {
+public:
+    SmallWorldNeuralNetwork(int numNeurons, float rewiringProbability)
+        : NeuralNetwork(numNeurons), rewiringProbability(rewiringProbability) {
+        // Create small-world network
+        createSmallWorldNetwork();
+    }
+    
+private:
+    void createSmallWorldNetwork() {
+        // Create regular ring lattice
+        createRegularLattice();
+        
+        // Rewire connections with probability
+        rewireConnections();
+    }
+    
+    void createRegularLattice() {
+        // Create regular connections
+        for (int i = 0; i < numNeurons; ++i) {
+            int neighbor1 = (i + 1) % numNeurons;
+            int neighbor2 = (i + 2) % numNeurons;
+            
+            addConnection(i, neighbor1, initialConnectionStrength);
+            addConnection(i, neighbor2, initialConnectionStrength);
+        }
+    }
+    
+    void rewireConnections() {
+        // Rewire connections randomly
+        for (auto& connection : connections) {
+            if (randomFloat() < rewiringProbability) {
+                // Remove existing connection
+                removeConnection(connection.id);
+                
+                // Add new random connection
+                int pre = connection.preNeuron;
+                int newPost = randomNodeExcluding(pre);
+                addConnection(pre, newPost, initialConnectionStrength);
+            }
+        }
+    }
+    
+    int randomNodeExcluding(int excludedNode) {
+        int randomNode = randomInt(0, numNeurons - 1);
+        if (randomNode == excludedNode) {
+            randomNode = (randomNode + 1) % numNeurons;
+        }
+        return randomNode;
+    }
+    
+    float rewiringProbability;
+};
+```
+
+## Computational Complexity Analysis
+
+### 1. Complexity Analysis of Advanced Dynamics
+
+#### Computational Complexity of Adaptive LIF
+```cpp
+// Adaptive LIF complexity analysis
+// State variables: membranePotential, adaptiveThreshold, adaptationCurrent
+// Operations per timestep: O(1)
+// Memory usage: O(1) per neuron
+// Computational complexity: O(N) for N neurons
+```
+
+#### Computational Complexity of Stochastic LIF
+```cpp
+// Stochastic LIF complexity analysis
+// State variables: membranePotential, noiseLevel, refractoryNoise
+// Operations per timestep: O(1) (plus random number generation)
+// Memory usage: O(1) per neuron
+// Computational complexity: O(N) for N neurons
+```
+
+#### Computational Complexity of Resonant LIF
+```cpp
+// Resonant LIF complexity analysis
+// State variables: membranePotential, resonancePhase, externalInput
+// Operations per timestep: O(1)
+// Memory usage: O(1) per neuron
+// Computational complexity: O(N) for N neurons
+```
+
+### 2. Complexity Analysis of Neural Field Models
+
+#### Computational Complexity of Continuous Neural Fields
+```cpp
+// Neural field complexity analysis
+// State variables: field (size x size matrix)
+// Operations per timestep: O(size^2) for convolution
+// Memory usage: O(size^2)
+// Computational complexity: O(size^2) for N = size^2 neurons
+```
+
+#### Computational Complexity of Adaptive Neural Fields
+```cpp
+// Adaptive neural field complexity analysis
+// Additional operations: learning and adaptation
+// Operations per timestep: O(size^2) + O(learning_operations)
+// Memory usage: O(size^2) + O(learning_parameters)
+// Computational complexity: O(size^2) for spatial operations
+```
+
+### 3. Complexity Analysis of Large-Scale Networks
+
+#### Scale-Free Network Complexity
+```cpp
+// Scale-free network complexity analysis
+// Average degree: <k> ~ log(N)
+// Average path length: ~ log(N) / log(<k>)
+// Clustering coefficient: ~ (log(N))^(-1)
+// Computational complexity: O(<k> * N) for network operations
+```
+
+#### Small-World Network Complexity
+```cpp
+// Small-world network complexity analysis
+// Average degree: <k> (same as regular lattice)
+// Average path length: ~ log(N) / log(<k>)
+// Clustering coefficient: ~ high (similar to regular lattice)
+// Computational complexity: O(<k> * N) for network operations
+```
+
+## Implementation Considerations
+
+### 1. Numerical Stability
+
+#### Stability Issues
+- **Oscillations**: High-frequency oscillations in neural dynamics
+- **Explosions**: Unbounded growth of neural activity
+- **Instability**: System fails to settle into stable state
+- **Convergence**: Slow or no convergence to steady state
+
+#### Stability Solutions
+```cpp
+// Numerical stability techniques
+void ensureNumericalStability(NeuralModule& module, float dt) {
+    // Limit maximum membrane potential
+    float maxVoltage = 100.0f;  // mV
+    if (module.getMembranePotential() > maxVoltage) {
+        module.setMembranePotential(maxVoltage);
+    }
+    
+    // Limit maximum weight changes
+    float maxWeightChange = 1.0f;
+    float weightChange = calculateWeightChange();
+    if (fabs(weightChange) > maxWeightChange) {
+        weightChange = sign(weightChange) * maxWeightChange;
+    }
+    
+    // Prevent negative weights (if applicable)
+    if (module.getWeight() + weightChange < 0) {
+        weightChange = -module.getWeight();
+    }
+}
+```
+
+### 2. Performance Optimization
+
+#### Optimization Techniques
+```cpp
+// Performance optimization strategies
+void optimizePerformance(NeuralNetwork& network) {
+    // Use efficient data structures
+    useEfficientDataStructures(network);
+    
+    // Minimize function calls
+    minimizeFunctionCalls(network);
+    
+    // Use vectorized operations
+    useVectorizedOperations(network);
+    
+    // Optimize memory access
+    optimizeMemoryAccess(network);
+    
+    // Parallelize computations
+    parallelizeComputations(network);
+}
+```
+
+#### Memory Optimization
+```cpp
+// Memory optimization techniques
+void optimizeMemoryUsage(NeuralNetwork& network) {
+    // Use efficient data structures
+    network.useArrayBasedStorage();
+    
+    // Minimize dynamic memory allocation
+    network.reserveMemory();
+    
+    // Use object pooling
+    network.useObjectPooling();
+    
+    // Optimize for cache locality
+    network.optimizeCacheLocality();
+}
+```
+
+### 3. Scalability
+
+#### Scalability Strategies
+```cpp
+// Scalability strategies
+void scaleNetwork(NeuralNetwork& network, int targetNeurons) {
+    // Use distributed computing for large networks
+    if (network.getNeuronCount() > LARGE_NETWORK_THRESHOLD) {
+        network.useDistributedComputing();
+    }
+    
+    // Use hierarchical representation for very large networks
+    if (network.getNeuronCount() > VERY_LARGE_NETWORK_THRESHOLD) {
+        network.useHierarchicalRepresentation();
+    }
+    
+    // Use compression for memory efficiency
+    network.useCompression();
+    
+    // Use approximation methods
+    network.useApproximationMethods();
+}
+```
+
+## Benchmarks
+
+### 1. Performance Benchmarks
+
+#### Advanced Neural Dynamics Benchmarks
+```bash
+# Benchmark adaptive LIF
+./benchmark --model=adaptive_lif --duration=1000 --steps_per_simulation=1000
+
+# Benchmark stochastic LIF
+./benchmark --model=stochastic_lif --duration=1000 --steps_per_simulation=1000
+
+# Benchmark resonant LIF
+./benchmark --model=resonant_lif --duration=1000 --steps_per_simulation=1000
+
+# Benchmark bistable LIF
+./benchmark --model=bistable_lif --duration=1000 --steps_per_simulation=1000
+
+# Benchmark Hindmarsh-Rose
+./benchmark --model=hindmarsh_rose --duration=1000 --steps_per_simulation=1000
+
+# Benchmark Morris-Lecar
+./benchmark --model=morris_lecar --duration=1000 --steps_per_simulation=1000
+
+# Benchmark FitzHugh-Nagumo
+./benchmark --model=fh_nagumo --duration=1000 --steps_per_simulation=1000
+```
+
+#### Neural Field Benchmarks
+```bash
+# Benchmark continuous neural field
+./benchmark --model=continuous_neural_field --size=100 --duration=1000
+
+# Benchmark adaptive neural field
+./benchmark --model=adaptive_neural_field --size=100 --duration=1000
+```
+
+### 2. Network Scale Benchmarks
+
+#### Scale-Free Network Benchmarks
+```bash
+# Benchmark scale-free network with 1000 neurons
+./benchmark --model=scale_free --neurons=1000 --duration=1000
+
+# Benchmark scale-free network with 5000 neurons
+./benchmark --model=scale_free --neurons=5000 --duration=1000
+
+# Benchmark scale-free network with 10000 neurons
+./benchmark --model=scale_free --neurons=10000 --duration=1000
+```
+
+#### Small-World Network Benchmarks
+```bash
+# Benchmark small-world network with 1000 neurons
+./benchmark --model=small_world --neurons=1000 --duration=1000
+
+# Benchmark small-world network with 5000 neurons
+./benchmark --model=small_world --neurons=5000 --duration=1000
+
+# Benchmark small-world network with 10000 neurons
+./benchmark --model=small_world --neurons=10000 --duration=1000
+```
+
+### 3. Integration Benchmarks
+
+#### Integration Performance Benchmarks
+```bash
+# Benchmark integration performance
+./benchmark --integration --duration=10000 --steps_per_simulation=1000
+
+# Benchmark memory integration
+./benchmark --integration=memory --duration=1000
+
+# Benchmark prediction integration
+./benchmark --integration=prediction --duration=1000
+
+# Benchmark cognition integration
+./benchmark --integration=cognition --duration=1000
+
+# Benchmark neuromodulation integration
+./benchmark --integration=neuromodulation --duration=1000
+
+# Benchmark development integration
+./benchmark --integration=development --duration=1000
+```
+
+## Conclusion
+
+Advanced Neural Dynamics extends the basic LIF model to capture more complex neural behaviors and phenomena. This guide covers:
+
+- **Advanced LIF Extensions**: Adaptive, stochastic, resonant, and bistable LIF neurons
+- **Non-Linear Dynamics**: Hindmarsh-Rose, Morris-Lecar, and FitzHugh-Nagumo models
+- **Synaptic Dynamics Extensions**: NMDA, GABA, and acetylcholine receptor dynamics
+- **Temporal Processing Extensions**: STDP variations, eligibility traces, and reward prediction error
+- **Neural Field Models**: Continuous and adaptive neural fields
+- **Advanced Plasticity Mechanisms**: Homeostatic plasticity, meta-plasticity, and synaptic tagging
+- **Dynamic Neural Systems**: Neural Darwinism and embodied neural development
+- **Complex Network Dynamics**: Scale-free and small-world networks
+- **Computational Complexity**: Analysis of computational complexity for various models
+- **Implementation Considerations**: Numerical stability, performance optimization, and scalability
+- **Benchmarks**: Performance benchmarks for all advanced models
+
+Understanding advanced neural dynamics is essential for:
+- **Designing Complex Neural Systems**: Creating systems with advanced neural behaviors
+- **Implementing Advanced Learning**: Building systems with sophisticated learning capabilities
+- **Modeling Biological Neurons**: Creating models that accurately represent biological neurons
+- **Optimizing System Performance**: Building systems with optimal performance
+- **Extending System Capabilities**: Adding new capabilities and features
+
+The advanced neural dynamics guide provides the foundation for exploring NLM's advanced neural capabilities, from complex LIF extensions to sophisticated temporal processing and network dynamics.
+
+## See Also
+- [LIF Neuron Guide](neurons.html): Basic LIF neuron documentation
+- [Synaptic Dynamics Guide](synapses.html): Synaptic dynamics documentation
+- [Plasticity Guide](plasticity.html): Plasticity system documentation
+- [Neuromodulation Guide](neuromodulation.html): Neuromodulator documentation
+- [Memory Guide](memory.html): Memory system documentation
+- [Prediction Guide](prediction.html): Prediction system documentation
+- [Cognition Guide](cognition.html): Cognition system documentation
+
+## References
+- Dayan, P., & Abbott, L. F. (2001). Theoretical Neuroscience. MIT Press.
+- Gerstner, W., Kistler, W., na Galán, R., & Diesmann, M. (2014). Spiking Neuron Models. Cambridge University Press.
+- Ermentrout, B., & Ermentrout, G. B. (2006). Computational Modeling in Neuroscience. Springer.
+- Deco, G., Destexhe, A., Tábor, A., & Sejnowski, T. J. (2008). Synaptic Conductance Based in Temporal Memory Trace. Neural Computation.
+- Song, S., Miller, K. D., & Abbott, L. F. (2000). Competitive Hebbian learning through spike-timing-dependent synaptic plasticity. Neuron.

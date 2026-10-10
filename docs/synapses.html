@@ -1,0 +1,689 @@
+# Synapse Guide
+
+## Overview
+
+Synapses are the fundamental communication channels in NLM, transmitting signals between neurons through chemical and electrical processes. Synapses enable neural communication, plasticity, and network formation in the computational brain.
+
+## Synapse Types
+
+### Electrical Synapses
+**Properties**:
+- **Direct Coupling**: Gap junctions allow direct ion flow
+- **Bidirectional**: Signals flow in both directions
+- **Fast**: No synaptic delay
+- **All-or-Nothing**: Binary transmission
+
+**Use Cases**:
+- Rapid signal propagation
+- Synchronization of neural populations
+- Stability maintenance
+
+### Chemical Synapses
+**Properties**:
+- **Unidirectional**: Signals flow one direction
+- **Modifiable**: Synaptic strength can change
+- **Delayed**: Transmission delay (1-5 ms)
+- **Graduated**: Variable strength based on parameters
+
+**Use Cases**:
+- Complex neural computation
+- Plasticity and learning
+- Network modulation
+- Information filtering
+
+## Synapse Structure
+
+### Basic Synapse Components
+```cpp
+struct Synapse {
+    SynapseId id;
+    NeuronId preNeuronId;
+    NeuronId postNeuronId;
+    
+    // Transmission properties
+    float strength;              // Synaptic efficacy (0.0 - 1.0)
+    float delay;                 // Transmission delay (ms)
+    float voltageThreshold;      // Activation threshold (mV)
+    
+    // Type and properties
+    SynapseType type;            // Excitatory, Inhibitory, Modulatory
+    SynapseDynamics dynamics;    // Transmission characteristics
+    
+    // Plasticity
+    PlasticityFlags plasticityFlags;
+    float eligibilityTrace;      // Current eligibility for plasticity
+    
+    // State
+    bool isActive;               // Current transmission state
+    Timestamp lastActivation;    // Time of last activation
+    float weightHistory;         // Weight change history
+};
+```
+
+### Synapse Parameters
+
+#### Transmission Parameters
+```cpp
+struct TransmissionParameters {
+    // Baseline properties
+    float baselineStrength;      // Baseline synaptic strength
+    float maximumStrength;       // Maximum possible strength
+    float minimumStrength;       // Minimum possible strength
+    
+    // Dynamics
+    float timeConstant;          // Decay time constant
+    float riseTime;              // Rise time to peak
+    float fallTime;              // Fall time to baseline
+    
+    // Influence
+    float spatialRadius;         // Spatial influence range
+    float temporalKernel;        // Temporal influence kernel
+    float probability;            // Release probability
+};
+```
+
+#### Plasticity Parameters
+```cpp
+struct PlasticityParameters {
+    // STDP parameters
+    float stdpLearningRate;      // STDP learning rate
+    float stdpTimeConstant;      // STDP time constant
+    float stdpMaximum;           // Maximum STDP effect
+    
+    // Hebbian parameters
+    float hebbianLearningRate;   // Hebbian learning rate
+    float hebbianThreshold;      // Hebbian threshold
+    
+    // Homeostatic parameters
+    float homeostaticRate;       // Homeostatic learning rate
+    float targetActivity;        // Target firing rate
+    
+    // Neuromodulation parameters
+    float neuromodulationGain;    // Neuromodulator effect strength
+    float neuromodulationTime;   // Neuromodulator time constant
+};
+```
+
+### Synapse Dynamics
+
+#### Activation Dynamics
+```cpp
+// Synaptic activation follows:
+// V_post = V_rest + (V_pre - V_rest) * strength * transmission_efficiency
+
+// Transmission efficiency depends on:
+// - Release probability
+// - Receptor sensitivity
+// - Membrane properties
+// - Ion channel availability
+```
+
+#### Decay Dynamics
+```cpp
+// Synaptic depression:
+// S(t) = S_0 * exp(-t/τ_d)
+
+// Synaptic potentiation:
+// S(t) = S_0 + (S_max - S_0) * (1 - exp(-t/τ_p))
+```
+
+#### Activity-Dependent Dynamics
+```cpp
+// Short-term plasticity
+void updateShortTermPlasticity(float dt)
+// Modifies strength based on recent activity
+
+// Long-term plasticity
+void updateLongTermPlasticity(float dt, const PlasticityRule& rule)
+// Updates strength based on spike timing
+```
+
+## Synapse Operations
+
+### Transmission Operations
+```cpp
+void Synapse::transmit(Neuron& postNeuron, Timestamp time)
+// Transmit signal to post-synaptic neuron
+
+void Synapse::activate()
+// Activate synaptic transmission
+
+void Synapse::deactivate()
+// Deactivate synaptic transmission
+
+bool Synapse::canTransmit(Timestamp time) const
+// Check if transmission is possible at given time
+```
+
+### Weight Management
+```cpp
+void Synapse::setStrength(float strength)
+// Set synaptic strength
+
+void Synapse::modifyStrength(float delta)
+// Adjust synaptic strength
+
+void Synapse::constrainStrength()
+// Constrain strength within valid bounds
+
+float Synapse::getEffectiveStrength() const
+// Get strength considering short-term dynamics
+```
+
+### Plasticity Operations
+```cpp
+void Synapse::applySTDP(Neuron& preNeuron, Neuron& postNeuron, 
+                       Timestamp preTime, Timestamp postTime, 
+                       float learningRate)
+// Apply spike-timing-dependent plasticity
+
+void Synapse::applyHebbian(Neuron& preNeuron, Neuron& postNeuron, 
+                         float learningRate)
+// Apply Hebbian learning rule
+
+void Synapse::applyHomeostatic(float targetActivity, float learningRate)
+// Apply homeostatic synaptic scaling
+
+void Synapse::applyNeuromodulation(float modulatorValue, float gain)
+// Apply neuromodulator effect
+```
+
+### State Management
+```cpp
+void Synapse::updateEligibilityTrace(float dt)
+// Update eligibility trace for plasticity
+
+void Synapse::resetEligibilityTrace()
+// Reset eligibility trace
+
+void Synapse::recordActivation(Timestamp time)
+// Record activation time for plasticity
+
+float Synapse::getEligibilityTrace() const
+// Get current eligibility trace value
+```
+
+## Synapse Types and Properties
+
+### Excitatory Synapses
+**Characteristics**:
+- **Positive Effect**: Depolarize post-synaptic neuron
+- **Higher Threshold**: Require stronger pre-synaptic input
+- **LTP Dominance**: Tendency to strengthen with activity
+- **AMPA Receptors**: Glutamate-based transmission
+
+**Biological Analogy**:
+- **Excitatory Postsynaptic Potentials (EPSPs)**
+- **Glutamatergic Synapses**
+- **AMPA Receptor-Mediated Transmission**
+
+### Inhibitory Synapses
+**Characteristics**:
+- **Negative Effect**: Hyperpolarize post-synaptic neuron
+- **Lower Threshold**: Activated by weaker pre-synaptic input
+- **LTD Dominance**: Tendency to weaken with activity
+- **GABAergic Transmission**: GABA-based transmission
+
+**Biological Analogy**:
+- **Inhibitory Postsynaptic Potentials (IPSPs)**
+- **GABAergic Synapses**
+- **GABA_A Receptor-Mediated Transmission**
+
+### Modulatory Synapses
+**Characteristics**:
+- **Chemical Modulation**: Release neuromodulators
+- **Slow Dynamics**: Longer time constants
+- **Wide Influence**: Diffuse effects
+- **Plasticity Interaction**: Modulate other synapses
+
+**Biological Analogy**:
+- **Dopaminergic Synapses**
+- **Serotonergic Synapses**
+- **Peptidergic Synapses**
+
+## Plasticity Mechanisms
+
+### STDP (Spike-Timing-Dependent Plasticity)
+**Core Principle**: "Neurons that fire together, wire together; neurons that fire apart, unwire together."
+
+#### STDP Learning Rule
+```cpp
+void Synapse::applySTDP(Neuron& preNeuron, Neuron& postNeuron,
+                       Timestamp preTime, Timestamp postTime,
+                       float learningRate) {
+    
+    if (postTime > preTime) {
+        // Post after pre: Long-Term Potentiation (LTP)
+        float delta = A_plus * exp(-(postTime - preTime) / tau_plus);
+        strength += delta * learningRate;
+    } else {
+        // Post before pre: Long-Term Depression (LTD)
+        float delta = -A_minus * exp(-(preTime - postTime) / tau_minus);
+        strength += delta * learningRate;
+    }
+    
+    constrainStrength();
+    recordActivation(preTime);
+}
+```
+
+**Parameters**:
+- `A_plus`: Maximum LTP amplitude
+- `A_minus`: Maximum LTD amplitude
+- `tau_plus`: LTP time constant
+- `tau_minus`: LTD time constant
+
+#### STDP Implementation Details
+```cpp
+// Continuous STDP (alternative to event-based)
+void applyContinuousSTDP(float preRate, float postRate, float dt) {
+    // Rate-based STDP implementation
+    float weightChange = stdpLearningRate * (preRate * postRate - postRate * preRate);
+    strength += weightChange * dt;
+}
+```
+
+### Hebbian Learning
+**Core Principle**: Co-activation strengthens connections.
+
+#### Hebbian Learning Rule
+```cpp
+void Synapse::applyHebbian(Neuron& preNeuron, Neuron& postNeuron, 
+                         float learningRate) {
+    
+    // Calculate correlation-based learning
+    float preActivity = preNeuron.getFiringRate();
+    float postActivity = postNeuron.getFiringRate();
+    
+    // Hebbian rule with normalization
+    float weightChange = learningRate * preActivity * postActivity;
+    if (weightChange > 0) {
+        weightChange *= (1.0f - strength);  // Prevent runaway excitation
+    }
+    
+    strength += weightChange;
+    constrainStrength();
+}
+```
+
+### Homeostatic Plasticity
+**Core Principle**: Network stability through synaptic scaling.
+
+#### Synaptic Scaling
+```cpp
+void Synapse::applyHomeostatic(float targetActivity, float learningRate) {
+    
+    // Calculate average post-synaptic activity
+    float averageActivity = calculatePostSynapticActivity();
+    
+    // Scale strength toward target
+    float scalingFactor = targetActivity / averageActivity;
+    if (scalingFactor > 1.0f) {
+        // Potentiate all synapses
+        strength *= scalingFactor;
+    }
+    
+    constrainStrength();
+}
+```
+
+### Neuromodulation-Dependent Plasticity
+**Core Principle**: Plasticity modulated by global signals.
+
+#### Reward-Modulated STDP
+```cpp
+void Synapse::applyRewardModulatedSTDP(Neuron& preNeuron, Neuron& postNeuron,
+                                       Timestamp preTime, Timestamp postTime,
+                                       float rewardPredictionError,
+                                       float learningRate) {
+    
+    // Apply STDP with reward modulation
+    applySTDP(preNeuron, postNeuron, preTime, postTime, learningRate);
+    
+    // Scale by reward prediction error
+    float modulation = 1.0f + rewardPredictionError * neuromodulationGain;
+    strength *= modulation;
+    
+    constrainStrength();
+}
+```
+
+## Synapse Connectivity
+
+### Neural Network Formation
+```cpp
+// Create synaptic connection
+void createSynapse(Neuron& preNeuron, Neuron& postNeuron, 
+                  SynapseType type, float initialStrength) {
+    
+    SynapseId synId = generateSynapseId();
+    Synapse synapse(synId, preNeuron.getId(), postNeuron.getId());
+    
+    synapse.setType(type);
+    synapse.setStrength(initialStrength);
+    
+    // Add to neuron connectivity
+    preNeuron.addOutgoingSynapse(synId);
+    postNeuron.addIncomingSynapse(synId);
+}
+```
+
+### Network Topology
+```cpp
+// Common network patterns
+struct NetworkTopology {
+    enum Type {
+        RANDOM,      // Random connections
+        EXPANDER,    // Small-world, high clustering
+        RING,        // Circular connections
+        COMPLETE,    // All-to-all connections
+        STAR,        // Hub-and-spoke
+        BA_REPA_SPAWN // Barabasi-Albert scale-free
+    };
+};
+```
+
+### Synaptic Assembly
+**Groups of strongly connected neurons**:
+- **Functional Modules**: Specialized processing units
+- **Memory Engrams**: Enriched memory patterns
+- **Cognitive Circuits**: Information processing pathways
+- **Sensory Maps**: Organized sensory representations
+
+## Mathematical Models
+
+### Synaptic Transmission Equation
+```
+V_post(t) = V_rest + Σ w_ij * Σ S_j(t - d_ij) * R(t)
+
+Where:
+- V_post: Post-synaptic membrane potential
+- V_rest: Resting membrane potential
+- w_ij: Synaptic weight from neuron j to i
+- S_j: Spike train of neuron j
+- d_ij: Transmission delay
+- R(t): Transmission function (time-dependent)
+```
+
+### Short-Term Plasticity Models
+
+#### Tsodyks-Markram Model
+```
+// Synaptic dynamics:
+// dU/dt = (U_0 - U) / τ_rec - U * R * f
+// dR/dt = (1 - R) / τ_fac - U * R * f
+
+// Where:
+// U: Utilization of resources
+// R: Fraction of available resources
+// f: Presynaptic firing rate
+// τ_fac: Facilitation time constant
+// τ_rec: Recovery time constant
+```
+
+### STDP Mathematical Formulation
+```
+// Pair-based STDP:
+// Δw_{ij} = {
+//   A_+ * exp(-(t_post - t_pre)/τ_+), if t_post > t_pre
+//   -A_- * exp(-(t_pre - t_post)/τ_-), if t_pre > t_post
+//   0, otherwise
+// }
+
+// Rate-based STDP:
+// Δw_{ij} = A * (ν_post(t) - ν_pre(t)) * w_{ij}
+```
+
+### Homeostatic Plasticity
+```
+// Synaptic scaling:
+// w_ij(t) = w_ij(0) * (ν_target / ν_avg)
+
+// Where:
+// ν_target: Target average activity
+// ν_avg: Actual average activity
+```
+
+## Implementation Details
+
+### Memory Layout for Efficiency
+```cpp
+struct Synapse::Impl {
+    SynapseId id;
+    NeuronId preNeuronId;
+    NeuronId postNeuronId;
+    
+    // Transmission properties (cache-friendly layout)
+    float strength;              // Aligned to cache line
+    float delay;                 // Next cache line
+    float voltageThreshold;      // Next cache line
+    
+    // Type and properties
+    SynapseType type;
+    SynapseDynamics dynamics;
+    
+    // Plasticity (more frequently accessed)
+    PlasticityFlags plasticityFlags;
+    float eligibilityTrace;      // Often accessed
+    float weightHistory;         // Less frequently accessed
+    
+    // State
+    bool isActive;
+    Timestamp lastActivation;
+    
+    // Transmission buffers
+    float transmissionBuffer;     // For spike timing
+    float recoveryBuffer;         // For short-term plasticity
+};
+```
+
+### Performance Optimizations
+```cpp
+// Local variable caching
+float currentStrength = pImpl->strength;
+float currentDelay = pImpl->delay;
+
+// Vectorized operations for multiple synapses
+void updateMultipleSynapses(std::vector<Synapse*>& synapses, float dt) {
+    // SIMD-friendly processing
+    for (auto synapse : synapses) {
+        synapse->update(dt);
+    }
+}
+```
+
+### Spike Timing Precision
+```cpp
+// High-precision spike timing
+struct SpikeTiming {
+    Timestamp preSpikeTime;
+    Timestamp postSpikeTime;
+    float relativeTiming;
+    float synapticEffect;
+};
+
+// Spike timing window for STDP
+constexpr float STDP_TIME_WINDOW = 50.0f; // milliseconds
+```
+
+## Testing and Validation
+
+### Unit Tests
+- **Transmission Tests**: Verify signal transmission and timing
+- **Weight Change Tests**: Test synaptic strengthening and weakening
+- **Plasticity Tests**: Validate STDP and Hebbian learning
+- **Homeostatic Tests**: Check synaptic scaling and normalization
+- **Neuromodulation Tests**: Verify modulator effects on plasticity
+
+### Integration Tests
+- **Network Functionality**: Test synaptic connectivity and network operation
+- **Circuit Behavior**: Validate neural circuits and signal patterns
+- **Learning Capacity**: Measure network learning capabilities
+- **Stability**: Test network stability and robustness
+
+### Performance Tests
+- **Transmission Speed**: Measure synaptic transmission efficiency
+- **Memory Usage**: Monitor synaptic memory consumption
+- **Plasticity Overhead**: Evaluate computational cost of plasticity
+- **Scalability**: Test performance with increasing network size
+
+## Common Issues and Solutions
+
+### Issue 1: Unstable Network Dynamics
+**Problem**: Oscillations or runaway excitation/ depression.
+**Solution**:
+- Check synaptic weight bounds
+- Verify homeostatic mechanisms
+- Adjust STDP parameters
+- Ensure proper initialization
+
+### Issue 2: Delayed Signal Transmission
+**Problem**: Signals arriving later than expected.
+**Solution**:
+- Verify delay settings
+- Check transmission timing
+- Validate synaptic dynamics
+- Ensure proper spike recording
+
+### Issue 3: Poor Learning Convergence
+**Problem**: Network not learning effectively.
+**Solution**:
+- Check plasticity rule parameters
+- Verify neuromodulator settings
+- Validate learning rate adjustments
+- Ensure proper spike timing
+
+### Issue 4: Synaptic Saturation
+**Problem**: Synapses reaching extreme values.
+**Solution**:
+- Implement stronger weight constraints
+- Add activity-dependent limits
+- Verify homeostatic mechanisms
+- Check input range normalization
+
+## API Reference
+
+### Synapse Class Methods
+```cpp
+// Construction and Destruction
+Synapse(SynapseId id, NeuronId preId, NeuronId postId)
+~Synapse()
+
+// Transmission Operations
+void transmit(Neuron& postNeuron, Timestamp time)
+void activate()
+void deactivate()
+bool canTransmit(Timestamp time) const
+
+// Weight Management
+void setStrength(float strength)
+void modifyStrength(float delta)
+void constrainStrength()
+float getEffectiveStrength() const
+
+// Plasticity Operations
+void applySTDP(Neuron& preNeuron, Neuron& postNeuron,
+              Timestamp preTime, Timestamp postTime,
+              float learningRate)
+void applyHebbian(Neuron& preNeuron, Neuron& postNeuron,
+                 float learningRate)
+void applyHomeostatic(float targetActivity, float learningRate)
+void applyNeuromodulation(float modulatorValue, float gain)
+
+// State Management
+void updateEligibilityTrace(float dt)
+void resetEligibilityTrace()
+void recordActivation(Timestamp time)
+float getEligibilityTrace() const
+
+// Connectivity
+NeuronId getPreNeuronId() const
+NeuronId getPostNeuronId() const
+void setPreNeuronId(NeuronId id)
+void setPostNeuronId(NeuronId id)
+
+// State Queries
+SynapseId getId() const
+SynapseType getType() const
+float getStrength() const
+float getDelay() const
+float getVoltageThreshold() const
+bool isActive() const
+Timestamp getLastActivation() const
+float getWeightHistory() const
+```
+
+### Factory Methods
+```cpp
+// Create synapse with specific type
+Synapse createExcitatorySynapse(Neuron& pre, Neuron& post)
+Synapse createInhibitorySynapse(Neuron& pre, Neuron& post)
+Synapse createModulatorySynapse(Neuron& pre, Neuron& post)
+
+// Create synapse with initial parameters
+Synapse createSynapse(Neuron& pre, Neuron& post,
+                     SynapseType type,
+                     float initialStrength,
+                     float initialDelay)
+```
+
+### Network Building Functions
+```cpp
+// Create random network
+std::vector<Synapse> createRandomNetwork(std::vector<Neuron*>& neurons,
+                                       float connectionProbability,
+                                       float strengthRange)
+
+// Create structured network
+std::vector<Synapse> createStructuredNetwork(std::vector<Neuron*>& neurons,
+                                           NetworkTopology::Type topology,
+                                           float strengthRange)
+
+// Create balanced network
+std::vector<Synapse> createBalancedNetwork(std::vector<Neuron*>& neurons,
+                                         float targetExcitation,
+                                         float targetInhibition)
+```
+
+## Future Directions
+
+### Advanced Synapse Models
+- **Triplet STDP**: More accurate learning rules based on spike triplets
+- **Distance-Dependent Plasticity**: Spatial influence on synaptic strength
+- **Molecular Plasticity**: Detailed biochemical modeling
+- **Activity-Dependent Gene Expression**: Long-term plasticity mechanisms
+
+### Enhanced Neuromodulation
+- **Multi-Neuromodulator Interactions**: Complex interactions between different modulators
+- **State-Dependent Modulation**: Different effects based on network state
+- **Temporal Modulation**: Time-varying neuromodulator dynamics
+- **Spatial Modulation**: Regional variations in neuromodulation
+
+### Computational Advances
+- **Vectorized Plasticity**: Efficient computation of large-scale plasticity
+- **Parallel Transmission**: Concurrent synaptic transmission
+- **Adaptive Networks**: Networks that self-organize
+- **Meta-Learning**: Learning how to learn
+
+## Conclusion
+
+Synapses are the fundamental communication channels that enable neural computation, learning, and network formation in NLM. They provide the biological inspiration for synaptic transmission, plasticity, and network dynamics while maintaining computational efficiency.
+
+Understanding synapse types, properties, and operations is essential for:
+- **Designing Neural Networks**: Creating functional synaptic connections
+- **Implementing Learning**: Understanding and implementing plasticity mechanisms
+- **Debugging Networks**: Identifying and fixing synaptic issues
+- **Extending Functionality**: Adding new synapse types and behaviors
+
+The synapse guide provides the foundation for exploring NLM's synaptic computation capabilities, from basic transmission to advanced network dynamics.
+
+## See Also
+- [Neuron Guide](neurons.html): Neuron documentation
+- [Plasticity Guide](plasticity.html): Plasticity mechanism documentation
+- [Neuromodulation Guide](neuromodulation.html): Neuromodulator documentation
+- [Memory Guide](memory.html): Memory system documentation
+
+## References
+- Abbott, L. F. (1996). The emergence of spatial patterns in neural networks. Neural Computation.
+- Dayan, P., & Abbott, L. F. (2001). Theoretical Neuroscience. MIT Press.
+- Gerstner, W., Kistler, W., na Galán, R., & Diesmann, M. (2014). Spiking Neuron Models. Cambridge University Press.

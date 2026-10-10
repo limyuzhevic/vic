@@ -1,0 +1,1226 @@
+# Tutorial Guide
+
+## Overview
+
+The Tutorial Guide provides step-by-step instructions for common NLM tasks and use cases. It covers tutorials for beginners, intermediate users, and advanced users, with practical examples and hands-on exercises.
+
+## Tutorial Structure
+
+### Tutorial Categories
+1. **Beginner Tutorials**: Basic concepts and simple examples
+2. **Intermediate Tutorials**: More complex tasks and advanced features
+3. **Advanced Tutorials**: Complex use cases and customization
+4. **Project-Based Tutorials**: Complete projects with step-by-step guidance
+
+### Tutorial Format
+Each tutorial includes:
+- **Objective**: What the tutorial aims to accomplish
+- **Prerequisites**: Required knowledge and setup
+- **Step-by-Step Instructions**: Detailed, numbered steps
+- **Code Examples**: Complete, working code examples
+- **Expected Output**: What the user should see or experience
+- **Further Exploration**: Additional topics to explore
+
+## Beginner Tutorials
+
+### Tutorial 1: Hello NLM - Your First Simulation
+
+#### Objective
+Run your first NLM simulation and understand the basic components and workflow.
+
+#### Prerequisites
+- NLM installed and built
+- Basic understanding of neural concepts
+- Familiarity with C++ (optional)
+
+#### Step-by-Step Instructions
+
+**Step 1: Create a Simple Configuration File**
+```json
+{
+    "simulation": {
+        "timestep": 0.001,
+        "max_neurons": 100,
+        "max_synapses": 1000,
+        "random_seed": 42
+    },
+    "development": {
+        "enabled": false
+    },
+    "memory": {
+        "capacity": 50,
+        "replay_enabled": false
+    }
+}
+```
+
+**Step 2: Run Phase 2 Neural Computation Demo**
+```bash
+# Navigate to build directory
+mkdir build
+cd build
+
+# Configure and build NLM
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run Phase 2 neural computation demo
+./bin/nlm_phase2_demo
+```
+
+**Step 3: Analyze Output**
+The simulation will output:
+- Number of neurons simulated
+- Number of synapses created
+- Simulation duration
+- Performance metrics
+
+**Expected Output**
+```
+NLM Phase 2 Neural Computation Demo
+==================================
+Configuration:
+  Timestep: 0.001 ms
+  Max Neurons: 100
+  Max Synapses: 1000
+  Random Seed: 42
+
+Simulation Results:
+  Neurons Created: 100
+  Synapses Created: 1000
+  Simulation Time: 2.34 ms
+  Performance: 42,735 neurons/sec
+
+Success! Your first NLM simulation completed successfully.
+```
+
+#### Code Example
+```cpp
+// src/experiments/Phase2Demo.cpp
+#include "Brain.hpp"
+#include "Config.hpp"
+#include <iostream>
+
+int main() {
+    // Create configuration
+    auto config = std::make_shared<Config>();
+    config->set("timestep", 0.001f);
+    config->set("max_neurons", 100);
+    config->set("max_synapses", 1000);
+    config->set("random_seed", 42);
+    
+    // Create brain
+    auto brain = std::make_unique<Brain>(config);
+    
+    // Initialize brain
+    brain->initialize();
+    
+    // Run simulation
+    brain->step(10.0f);  // Run for 10ms
+    
+    // Print results
+    std::cout << "NLM Phase 2 Neural Computation Demo" << std::endl;
+    std::cout << "==================================" << std::endl;
+    std::cout << "Neurons Created: " << brain->getNeuronCount() << std::endl;
+    std::cout << "Synapses Created: " << brain->getSynapseCount() << std::endl;
+    
+    return 0;
+}
+```
+
+### Tutorial 2: Environment Interaction
+
+#### Objective
+Learn how to use NLM to interact with a simulated environment.
+
+#### Prerequisites
+- NLM built and running
+- Basic understanding of Phase 2 concepts
+- Familiarity with configuration files
+
+#### Step-by-Step Instructions
+
+**Step 1: Create Environment Configuration**
+```json
+{
+    "environment": {
+        "type": "simple",
+        "width": 100,
+        "height": 100,
+        "object_density": 0.1
+    },
+    "sensory": {
+        "vision_enabled": true,
+        "proprioception_enabled": true,
+        "internal_signals_enabled": true
+    },
+    "motor": {
+        "output_enabled": true,
+        "action_space": "continuous"
+    },
+    "simulation": {
+        "timestep": 0.001,
+        "duration": 1000
+    }
+}
+```
+
+**Step 2: Run Phase 3 Environment Interaction Demo**
+```bash
+# Run Phase 3 demo with custom configuration
+./bin/nlm_phase3_demo --config=experiments/phase3_config.json
+
+# Or run with default settings
+./bin/nlm_phase3_demo
+```
+
+**Step 3: Observe Environment Interaction**
+The simulation will show:
+- Agent movement in the environment
+- Sensory processing
+- Motor output
+- Reward feedback
+
+**Expected Output**
+```
+NLM Phase 3 Environment Interaction Demo
+=====================================
+Environment: 100x100 grid
+Agent: [position: (50, 50), energy: 100.0]
+
+Time Step 1:
+  Sensory Input: Vision=[object at (75, 75)], Proprioception=[position (50, 50), orientation 0.0]
+  Neural Processing: [neuron activations computed]
+  Motor Output: [move action (1, 0)]
+  Environment: Agent moved to (51, 50)
+  Reward: 0.0
+
+Time Step 2:
+  Sensory Input: Vision=[object at (76, 75)], Proprioception=[position (51, 50), orientation 0.0]
+  Neural Processing: [neuron activations computed]
+  Motor Output: [move action (1, 0)]
+  Environment: Agent moved to (52, 50)
+  Reward: 0.0
+
+...
+
+Simulation Complete!
+Total Steps: 100
+Total Reward: 0.0
+```
+
+#### Code Example
+```cpp
+// src/experiments/Phase3Demo.cpp
+#include "AgentBrain.hpp"
+#include "Environment.hpp"
+#include <iostream>
+
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    std::string configFile = "experiments/phase3_config.json";
+    if (argc > 1) {
+        configFile = argv[1];
+    }
+    
+    // Load configuration
+    auto config = loadConfig(configFile);
+    
+    // Create environment
+    auto environment = std::make_unique<SimpleWorld>(config->getEnvironmentConfig());
+    
+    // Create agent brain
+    auto agentBrain = std::make_unique<AgentBrain>(config->getBrainConfig());
+    
+    // Run simulation
+    std::cout << "NLM Phase 3 Environment Interaction Demo" << std::endl;
+    std::cout << "=====================================" << std::endl;
+    
+    for (int step = 0; step < config->getSimulationDuration(); ++step) {
+        // Get sensory percept
+        auto percept = environment->getPercept();
+        
+        // Process sensory input
+        agentBrain->processSensoryInput(percept);
+        
+        // Get neural output
+        auto neuralOutput = agentBrain->getNeuralOutput();
+        
+        // Decode motor command
+        Action action = agentBrain->decodeMotorCommand(neuralOutput);
+        
+        // Apply action to environment
+        environment->applyAction(action);
+        
+        // Get reward
+        float reward = environment->getReward();
+        
+        // Print step information
+        std::cout << "Time Step " << step + 1 << ":" << std::endl;
+        std::cout << "  Sensory Input: " << percept.toString() << std::endl;
+        std::cout << "  Neural Processing: [neuron activations computed]" << std::endl;
+        std::cout << "  Motor Output: [" << action.toString() << "]" << std::endl;
+        std::cout << "  Environment: Agent " << environment->getAgentPosition() << std::endl;
+        std::cout << "  Reward: " << reward << std::endl;
+        
+        // Wait a bit for visualization
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    
+    std::cout << "\nSimulation Complete!" << std::endl;
+    std::cout << "Total Steps: " << config->getSimulationDuration() << std::endl;
+    std::cout << "Total Reward: " << agentBrain->getTotalReward() << std::endl;
+    
+    return 0;
+}
+```
+
+### Tutorial 3: Cognitive Emergence
+
+#### Objective
+Learn how to observe and study the emergence of cognitive abilities in NLM.
+
+#### Prerequisites
+- NLM built and running
+- Basic understanding of Phase 4 concepts
+- Experience with environment interaction
+
+#### Step-by-Step Instructions
+
+**Step 1: Create Cognitive Configuration**
+```json
+{
+    "cognition": {
+        "attention_enabled": true,
+        "planning_enabled": true,
+        "concept_formation_enabled": true,
+        "self_model_enabled": true,
+        "social_learning_enabled": true
+    },
+    "memory": {
+        "working_memory_enabled": true,
+        "episodic_memory_enabled": true,
+        "associative_memory_enabled": true,
+        "concept_memory_enabled": true
+    },
+    "prediction": {
+        "temporal_prediction_enabled": true,
+        "action_consequence_prediction_enabled": true,
+        "multi_step_prediction_enabled": true
+    },
+    "simulation": {
+        "timestep": 0.001,
+        "duration": 5000
+    }
+}
+```
+
+**Step 2: Run Phase 4 Cognitive Demo**
+```bash
+# Run Phase 4 demo with extended duration
+./bin/nlm_phase4_demo --config=experiments/phase4_config.json --duration=5000
+
+# Or run with default settings
+./bin/nlm_phase4_demo
+```
+
+**Step 3: Observe Cognitive Emergence**
+The simulation will show:
+- Cognitive processing (attention, planning, self-model)
+- Memory system usage
+- Prediction system activity
+- Social learning (if enabled)
+
+**Expected Output**
+```
+NLM Phase 4 Cognitive Emergence Demo
+===================================
+
+Cognitive Processing:
+  Attention: [selected neural patterns]
+  Working Memory: [stored information]
+  Episodic Memory: [experiences stored]
+  Concept Formation: [abstract patterns discovered]
+  Planning: [action sequences planned]
+  Self-Model: [self-representation updated]
+  Social Learning: [observation and imitation]
+
+Prediction System:
+  Temporal Prediction: [sequences learned]
+  Action Consequence Prediction: [actions mapped to effects]
+  Multi-step Prediction: [future states predicted]
+
+Behavioral Output:
+  Action Selection: [optimal actions chosen]
+  Learning Rate: [adaptation speed]
+  Performance Metrics: [accuracy, efficiency]
+
+Simulation Complete!
+Total Steps: 5000
+Final Performance: [metrics]
+```
+
+#### Code Example
+```cpp
+// src/experiments/Phase4Demo.cpp
+#include "AgentBrain.hpp"
+#include "Environment.hpp"
+#include "MetricsCollector.hpp"
+#include <iostream>
+#include <thread>
+#include <chrono>
+
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    std::string configFile = "experiments/phase4_config.json";
+    int duration = 5000;
+    
+    if (argc > 1) {
+        configFile = argv[1];
+    }
+    if (argc > 2) {
+        duration = std::stoi(argv[2]);
+    }
+    
+    // Load configuration
+    auto config = loadConfig(configFile);
+    config->set("simulation.duration", duration);
+    
+    // Create environment
+    auto environment = std::make_unique<SimpleWorld>(config->getEnvironmentConfig());
+    
+    // Create agent brain
+    auto agentBrain = std::make_unique<AgentBrain>(config->getBrainConfig());
+    
+    // Create metrics collector
+    auto metrics = std::make_unique<MetricsCollector>();
+    
+    // Run simulation
+    std::cout << "NLM Phase 4 Cognitive Emergence Demo" << std::endl;
+    std::cout << "===================================" << std::endl;
+    
+    for (int step = 0; step < duration; ++step) {
+        // Get sensory percept
+        auto percept = environment->getPercept();
+        
+        // Process sensory input
+        agentBrain->processSensoryInput(percept);
+        
+        // Get neural output
+        auto neuralOutput = agentBrain->getNeuralOutput();
+        
+        // Decode motor command
+        Action action = agentBrain->decodeMotorCommand(neuralOutput);
+        
+        // Apply action to environment
+        environment->applyAction(action);
+        
+        // Get reward
+        float reward = environment->getReward();
+        
+        // Record metrics
+        metrics->recordStep(step, percept, action, reward, agentBrain->getPerformance());
+        
+        // Print cognitive status every 100 steps
+        if (step % 100 == 0) {
+            std::cout << "\nCognitive Processing:" << std::endl;
+            std::cout << "  Attention: [selected neural patterns]" << std::endl;
+            std::cout << "  Working Memory: [stored information]" << std::endl;
+            std::cout << "  Episodic Memory: [experiences stored]" << std::endl;
+            std::cout << "  Concept Formation: [abstract patterns discovered]" << std::endl;
+            std::cout << "  Planning: [action sequences planned]" << std::endl;
+            std::cout << "  Self-Model: [self-representation updated]" << std::endl;
+            std::cout << "  Social Learning: [observation and imitation]" << std::endl;
+            
+            std::cout << "\nPrediction System:" << std::endl;
+            std::cout << "  Temporal Prediction: [sequences learned]" << std::endl;
+            std::cout << "  Action Consequence Prediction: [actions mapped to effects]" << std::endl;
+            std::cout << "  Multi-step Prediction: [future states predicted]" << std::endl;
+        }
+        
+        // Wait a bit for visualization
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    std::cout << "\nSimulation Complete!" << std::endl;
+    std::cout << "Total Steps: " << duration << std::endl;
+    std::cout << "Final Performance: " << metrics->getFinalPerformance() << std::endl;
+    
+    // Generate report
+    metrics->generateReport("phase4_simulation_report.html");
+    
+    return 0;
+}
+```
+
+### Tutorial 4: Full Integration
+
+#### Objective
+Learn how to run the complete Phase 6 integration demo and observe all systems working together.
+
+#### Prerequisites
+- NLM built and running
+- Experience with previous phases
+- Understanding of integration concepts
+
+#### Step-by-Step Instructions
+
+**Step 1: Create Integration Configuration**
+```json
+{
+    "integration": {
+        "enable_all_systems": true,
+        "checkpoint_enabled": true,
+        "replay_enabled": true,
+        "consolidation_enabled": true
+    },
+    "systems": {
+        "neural_computation": { "enabled": true },
+        "memory_systems": { "enabled": true },
+        "neuromodulation": { "enabled": true },
+        "prediction_system": { "enabled": true },
+        "cognition_systems": { "enabled": true },
+        "development_system": { "enabled": true }
+    },
+    "simulation": {
+        "timestep": 0.001,
+        "duration": 10000,
+        "checkpoint_interval": 1000
+    }
+}
+```
+
+**Step 2: Run Phase 6 Integration Demo**
+```bash
+# Run Phase 6 demo with checkpointing
+./bin/nlm_phase6_demo --config=experiments/phase6_config.json --checkpoint-interval=1000
+
+# Or run with default settings
+./bin/nlm_phase6_demo
+```
+
+**Step 3: Observe Full Integration**
+The simulation will show:
+- Complete brain system integration
+- All components working together
+- Checkpoint and replay functionality
+- Memory consolidation
+- Development processes
+
+**Expected Output**
+```
+NLM Phase 6 Final Integration Demo
+==================================
+
+Integration Status:
+  ✓ Neural Computation: Active
+  ✓ Memory Systems: Operational
+  ✓ Neuromodulation: Functional
+  ✓ Prediction System: Active
+  ✓ Cognitive Systems: Operational
+  ✓ Development System: Functional
+
+Integration Flow:
+  WORLD → SENSORY PERCEPT → ATTENTION → NEURAL PROCESSING
+  WORLD → SENSORY PERCEPT → PREDICTION → WORKING MEMORY
+  WORLD → SENSORY PERCEPT → EPISODIC MEMORY → CONCEPT FORMATION
+  WORLD → SENSORY PERCEPT → PLANNING → SELF-MODEL
+  WORLD → ACTION → MOTOR OUTPUT → REWARD
+
+System Interactions:
+  Neuromodulation → Plasticity → Learning
+  Development → Plasticity Rates → Adaptation
+  Memory → Prediction → Planning
+  Cognition → Action → Environment
+
+Checkpoint System:
+  Checkpoint Interval: 1000 steps
+  Last Checkpoint: Step 5000
+  Replay Status: Ready
+
+Replay and Consolidation:
+  Replay Interval: 100 steps
+  Consolidation Interval: 1000 steps
+  Current Status: Active
+
+Simulation Complete!
+Total Steps: 10000
+Final State: Integrated brain system
+Performance Metrics: [collected]
+```
+
+#### Code Example
+```cpp
+// src/experiments/Phase6Demo.cpp
+#include "AgentBrain.hpp"
+#include "Environment.hpp"
+#include "CheckpointSystem.hpp"
+#include "ReplaySystem.hpp>
+#include <iostream>
+#include <thread>
+#include <chrono>
+
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    std::string configFile = "experiments/phase6_config.json";
+    int duration = 10000;
+    int checkpointInterval = 1000;
+    
+    if (argc > 1) {
+        configFile = argv[1];
+    }
+    if (argc > 2) {
+        duration = std::stoi(argv[2]);
+    }
+    if (argc > 3) {
+        checkpointInterval = std::stoi(argv[3]);
+    }
+    
+    // Load configuration
+    auto config = loadConfig(configFile);
+    config->set("simulation.duration", duration);
+    config->set("checkpoint.interval", checkpointInterval);
+    
+    // Create environment
+    auto environment = std::make_unique<SimpleWorld>(config->getEnvironmentConfig());
+    
+    // Create agent brain
+    auto agentBrain = std::make_unique<AgentBrain>(config->getBrainConfig());
+    
+    // Create checkpoint system
+    auto checkpointSystem = std::make_unique<CheckpointSystem>(agentBrain->getBrain());
+    
+    // Create replay system
+    auto replaySystem = std::make_unique<ReplaySystem>(agentBrain->getBrain());
+    
+    // Run simulation
+    std::cout << "NLM Phase 6 Final Integration Demo" << std::endl;
+    std::cout << "==================================" << std::endl;
+    
+    for (int step = 0; step < duration; ++step) {
+        // Get sensory percept
+        auto percept = environment->getPercept();
+        
+        // Process sensory input
+        agentBrain->processSensoryInput(percept);
+        
+        // Get neural output
+        auto neuralOutput = agentBrain->getNeuralOutput();
+        
+        // Decode motor command
+        Action action = agentBrain->decodeMotorCommand(neuralOutput);
+        
+        // Apply action to environment
+        environment->applyAction(action);
+        
+        // Get reward
+        float reward = environment->getReward();
+        
+        // Handle checkpointing
+        if (step % checkpointInterval == 0) {
+            checkpointSystem->saveCheckpoint(step);
+            std::cout << "\nCheckpoint saved at step " << step << std::endl;
+        }
+        
+        // Print integration status every 1000 steps
+        if (step % 1000 == 0) {
+            std::cout << "\nIntegration Status:" << std::endl;
+            std::cout << "  ✓ Neural Computation: Active" << std::endl;
+            std::cout << "  ✓ Memory Systems: Operational" << std::endl;
+            std::cout << "  ✓ Neuromodulation: Functional" << std::endl;
+            std::cout << "  ✓ Prediction System: Active" << std::endl;
+            std::cout << "  ✓ Cognitive Systems: Operational" << std::endl;
+            std::cout << "  ✓ Development System: Functional" << std::endl;
+            
+            std::cout << "\nIntegration Flow:" << std::endl;
+            std::cout << "  WORLD → SENSORY PERCEPT → ATTENTION → NEURAL PROCESSING" << std::endl;
+            std::cout << "  WORLD → SENSORY PERCEPT → PREDICTION → WORKING MEMORY" << std::endl;
+            std::cout << "  WORLD → SENSORY PERCEPT → EPISODIC MEMORY → CONCEPT FORMATION" << std::endl;
+            std::cout << "  WORLD → SENSORY PERCEPT → PLANNING → SELF-MODEL" << std::endl;
+            std::cout << "  WORLD → ACTION → MOTOR OUTPUT → REWARD" << std::endl;
+            
+            std::cout << "\nSystem Interactions:" << std::endl;
+            std::cout << "  Neuromodulation → Plasticity → Learning" << std::endl;
+            std::cout << "  Development → Plasticity Rates → Adaptation" << std::endl;
+            std::cout << "  Memory → Prediction → Planning" << std::endl;
+            std::cout << "  Cognition → Action → Environment" << std::endl;
+        }
+        
+        // Handle replay if enabled
+        if (replaySystem->isReplayEnabled()) {
+            replaySystem->processReplayRequest();
+        }
+        
+        // Wait a bit for visualization
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    
+    std::cout << "\nSimulation Complete!" << std::endl;
+    std::cout << "Total Steps: " << duration << std::endl;
+    std::cout << "Final State: Integrated brain system" << std::endl;
+    
+    // Save final checkpoint
+    checkpointSystem->saveCheckpoint(duration);
+    
+    // Generate integration report
+    generateIntegrationReport(agentBrain.get(), checkpointSystem.get(), replaySystem.get());
+    
+    return 0;
+}
+```
+
+## Intermediate Tutorials
+
+### Tutorial 5: Performance Optimization
+
+#### Objective
+Learn how to optimize NLM performance for large-scale simulations.
+
+#### Prerequisites
+- Experience with Phase 4
+- Understanding of performance concepts
+- Familiarity with CMake
+
+#### Step-by-Step Instructions
+
+**Step 1: Configure Performance Optimizations**
+```bash
+# Configure with performance optimizations
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON -DNLM_OPT_LEVEL=2
+
+# Build with parallel processing
+make -j$(nproc)
+```
+
+**Step 2: Run Performance Benchmark**
+```bash
+# Run performance benchmark
+./bin/nlm_benchmark --config=benchmarks/large_scale_benchmark.json
+```
+
+**Step 3: Analyze Performance Results**
+Examine performance metrics and optimization effectiveness.
+
+### Tutorial 6: Experiment Design
+
+#### Objective
+Learn how to design and run custom NLM experiments.
+
+#### Prerequisites
+- Understanding of NLM components
+- Experience with Phase 4
+- Basic knowledge of experimental design
+
+#### Step-by-Step Instructions
+
+**Step 1: Create Experiment Configuration**
+```json
+{
+    "experiment": {
+        "name": "cognitive_development_experiment",
+        "description": "Study cognitive development over time",
+        "type": "longitudinal",
+        "duration": 20000,
+        "replications": 10
+    },
+    "variables": {
+        "environment_complexity": ["simple", "complex"],
+        "neural_network_size": [100, 500, 1000],
+        "plasticity_rates": ["high", "medium", "low"]
+    },
+    "metrics": {
+        "cognitive_performance": true,
+        "learning_rate": true,
+        "memory_retention": true,
+        "behavioral_flexibility": true
+    }
+}
+```
+
+**Step 2: Design Experiment**
+```cpp
+// src/experiments/CognitiveDevelopmentExperiment.cpp
+class CognitiveDevelopmentExperiment : public Experiment {
+public:
+    CognitiveDevelopmentExperiment(const ExperimentConfig& config)
+        : Experiment(config) {}
+    
+    void run() override {
+        // Initialize environment
+        initializeEnvironment();
+        
+        // Run experiment
+        for (int replication = 0; replication < config.replications; ++replication) {
+            runSingleExperiment(replication);
+        }
+        
+        // Analyze results
+        analyzeResults();
+        
+        // Generate report
+        generateReport();
+    }
+    
+private:
+    void runSingleExperiment(int replication) {
+        // Set up experimental conditions
+        setupExperimentalConditions(replication);
+        
+        // Run simulation
+        runSimulation();
+        
+        // Collect data
+        collectData();
+        
+        // Reset environment
+        resetEnvironment();
+    }
+};
+```
+
+**Step 3: Analyze and Report Results**
+```bash
+# Analyze experimental results
+./bin/nlm_experiment_analyzer --input=data/experiment_results.csv --output=reports/experiment_report.html
+
+# Generate statistical analysis
+./bin/nlm_statistical_analyzer --input=data/experiment_results.csv --analysis=anova
+```
+
+## Advanced Tutorials
+
+### Tutorial 7: Custom Neural Network Architecture
+
+#### Objective
+Learn how to create custom neural network architectures in NLM.
+
+#### Prerequisites
+- Deep understanding of NLM architecture
+- Experience with C++ development
+- Understanding of neural network design
+
+#### Step-by-Step Instructions
+
+**Step 1: Create Custom Neuron Type**
+```cpp
+// src/custom_neurons/AdvancedLIFNeuron.hpp
+class AdvancedLIFNeuron : public Neuron {
+public:
+    AdvancedLIFNeuron(NeuronId id) : Neuron(id) {}
+    
+    void step(float dt, float input) override {
+        // Implement advanced LIF dynamics
+        // Include adaptation mechanisms
+        // Add stochastic elements
+        // Implement complex plasticity
+    }
+    
+    void applyNeuromodulation(float dopamine, float curiosity) override {
+        // Implement neuromodulation
+        // Adjust dynamics based on neuromodulators
+    }
+};
+```
+
+**Step 2: Create Custom Synapse Type**
+```cpp
+// src/custom_synapses/ComplexSynapse.hpp
+class ComplexSynapse : public Synapse {
+public:
+    ComplexSynapse(SynapseId id, NeuronId pre, NeuronId post) 
+        : Synapse(id, pre, post) {}
+    
+    void update(float dt) override {
+        // Implement complex synaptic dynamics
+        // Include short-term plasticity
+        // Add neuromodulation
+        // Implement activity-dependent effects
+    }
+};
+```
+
+**Step 3: Integrate Custom Components**
+```cpp
+// src/custom_brain/CustomBrain.hpp
+class CustomBrain : public Brain {
+public:
+    CustomBrain(std::shared_ptr<Config> config) : Brain(config) {}
+    
+    void initialize() override {
+        // Create custom neural population
+        createCustomNeuralPopulation();
+        
+        // Set up custom connectivity
+        setupCustomConnectivity();
+        
+        // Configure custom plasticity
+        configureCustomPlasticity();
+    }
+    
+private:
+    void createCustomNeuralPopulation() {
+        // Create neurons with custom properties
+        // Configure neural populations
+        // Set up regional specialization
+    }
+    
+    void setupCustomConnectivity() {
+        // Establish synaptic connections
+        // Configure connection patterns
+        // Set up synaptic properties
+    }
+    
+    void configureCustomPlasticity() {
+        // Configure plasticity rules
+        // Set up neuromodulation
+        // Implement learning mechanisms
+    }
+};
+```
+
+**Step 4: Build and Test Custom System**
+```bash
+# Build custom NLM
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCUSTOM_NEURONS=ON -DCUSTOM_SYNAPSES=ON
+make -j$(nproc)
+
+# Run custom experiment
+./bin/nlm_custom_experiment --config=experiments/custom_experiment.json
+```
+
+### Tutorial 8: Extending NLM with New Functionality
+
+#### Objective
+Learn how to extend NLM with new functionality and features.
+
+#### Prerequisites
+- Understanding of NLM architecture
+- Experience with C++ development
+- Understanding of plugin systems
+
+#### Step-by-Step Instructions
+
+**Step 1: Create NLM Plugin**
+```cpp
+// src/plugins/CustomPlugin.hpp
+class CustomPlugin : public NLMPlugin {
+public:
+    CustomPlugin() : NLMPlugin("custom_plugin") {}
+    
+    void initialize() override {
+        // Initialize plugin components
+        // Register plugin functions
+        // Set up configuration
+    }
+    
+    void update(float dt) override {
+        // Update plugin state
+        // Apply plugin effects
+        // Integrate with other systems
+    }
+    
+    std::string getName() const override {
+        return "Custom Plugin";
+    }
+    
+    std::string getDescription() const override {
+        return "A custom plugin for NLM extension";
+    }
+};
+```
+
+**Step 2: Register Plugin**
+```cpp
+// src/plugins/PluginRegistry.cpp
+class PluginRegistry {
+public:
+    static PluginRegistry& getInstance() {
+        static PluginRegistry instance;
+        return instance;
+    }
+    
+    void registerPlugin(std::unique_ptr<NLMPlugin> plugin) {
+        plugins.push_back(std::move(plugin));
+    }
+    
+    NLMPlugin* getPlugin(const std::string& name) {
+        for (auto& plugin : plugins) {
+            if (plugin->getName() == name) {
+                return plugin.get();
+            }
+        }
+        return nullptr;
+    }
+    
+    void initializeAllPlugins() {
+        for (auto& plugin : plugins) {
+            plugin->initialize();
+        }
+    }
+    
+    void updateAllPlugins(float dt) {
+        for (auto& plugin : plugins) {
+            plugin->update(dt);
+        }
+    }
+    
+private:
+    PluginRegistry() {}
+    std::vector<std::unique_ptr<NLMPlugin>> plugins;
+};
+```
+
+**Step 3: Integrate Plugin with NLM**
+```cpp
+// src/main.cpp
+int main() {
+    // Initialize NLM
+    NLM::initialize();
+    
+    // Register custom plugin
+    PluginRegistry::getInstance().registerPlugin(
+        std::make_unique<CustomPlugin>()
+    );
+    
+    // Initialize all plugins
+    PluginRegistry::getInstance().initializeAllPlugins();
+    
+    // Run simulation
+    NLM::run();
+    
+    // Update plugins each step
+    while (!NLM::isSimulationComplete()) {
+        float dt = NLM::getTimestep();
+        PluginRegistry::getInstance().updateAllPlugins(dt);
+        NLM::step(dt);
+    }
+    
+    return 0;
+}
+```
+
+## Project-Based Tutorials
+
+### Tutorial 9: Social Learning Simulation
+
+#### Objective
+Create a simulation that studies social learning and imitation in NLM.
+
+#### Prerequisites
+- Understanding of social learning concepts
+- Experience with NLM cognition
+- Basic knowledge of multi-agent systems
+
+#### Step-by-Step Instructions
+
+**Step 1: Design Social Learning Scenario**
+```json
+{
+    "scenario": {
+        "name": "social_learning_simulation",
+        "description": "Study social learning through observation and imitation",
+        "environment": "multi_agent_world",
+        "agents": 10,
+        "social_interactions": true,
+        "imitation_learning": true
+    },
+    "simulation": {
+        "duration": 5000,
+        "timestep": 0.001,
+        "checkpoint_interval": 500
+    }
+}
+```
+
+**Step 2: Implement Social Learning System**
+```cpp
+// src/social_learning/SocialLearningSystem.cpp
+class SocialLearningSystem {
+public:
+    SocialLearningSystem(int numAgents) {
+        // Create multiple agents
+        for (int i = 0; i < numAgents; ++i) {
+            agents.push_back(std::make_unique<SocialLearningAgent>(i));
+        }
+    }
+    
+    void runSimulation() {
+        // Initialize agents
+        initializeAgents();
+        
+        // Run social learning simulation
+        for (int step = 0; step < duration; ++step) {
+            // Each agent observes others
+            observeOtherAgents();
+            
+            // Agents learn from observations
+            learnFromObservations();
+            
+            // Agents imitate successful behaviors
+            performImitationLearning();
+            
+            // Agents act in environment
+            actInEnvironment();
+            
+            // Update social network
+            updateSocialNetwork();
+        }
+        
+        // Analyze social learning
+        analyzeSocialLearning();
+    }
+    
+private:
+    std::vector<std::unique_ptr<SocialLearningAgent>> agents;
+    std::vector<std::vector<bool>> socialConnections;
+    float socialLearningRate;
+};
+```
+
+**Step 3: Run and Analyze Social Learning**
+```bash
+# Run social learning simulation
+./bin/nlm_social_learning_simulation --config=experiments/social_learning_config.json
+
+# Analyze social learning patterns
+./bin/nlm_social_learning_analyzer --input=data/social_learning.csv --output=reports/social_learning_analysis.html
+```
+
+### Tutorial 10: Memory Consolidation Experiment
+
+#### Objective
+Study memory consolidation and replay mechanisms in NLM.
+
+#### Prerequisites
+- Understanding of memory systems
+- Experience with NLM episodic memory
+- Basic knowledge of sleep and consolidation concepts
+
+#### Step-by-Step Instructions
+
+**Step 1: Design Memory Consolidation Experiment**
+```json
+{
+    "experiment": {
+        "name": "memory_consolidation_experiment",
+        "description": "Study memory consolidation during rest and sleep",
+        "type": "memory_research",
+        "duration": 10000,
+        "consolidation_enabled": true,
+        "replay_enabled": true,
+        "sleep_simulation": true
+    },
+    "conditions": {
+        "learning_phase_duration": 2000,
+        "rest_phase_duration": 3000,
+        "replay_phase_duration": 1000,
+        "consolidation_phase_duration": 3000
+    }
+}
+```
+
+**Step 2: Implement Memory Consolidation**
+```cpp
+// src/memory_consolidation/MemoryConsolidationSystem.cpp
+class MemoryConsolidationSystem {
+public:
+    void runMemoryConsolidationExperiment() {
+        // Phase 1: Learning
+        runLearningPhase();
+        
+        // Phase 2: Rest
+        runRestPhase();
+        
+        // Phase 3: Replay
+        runReplayPhase();
+        
+        // Phase 4: Consolidation
+        runConsolidationPhase();
+        
+        // Analyze results
+        analyzeMemoryConsolidation();
+    }
+    
+private:
+    void runLearningPhase() {
+        // Encode experiences in episodic memory
+        episodicMemory->encodeLearningExperiences();
+        
+        // Strengthen memory traces
+        strengthenMemoryTraces();
+    }
+    
+    void runRestPhase() {
+        // Simulate rest/sleep
+        simulateRestPeriod();
+        
+        // Allow memory consolidation
+        allowMemoryConsolidation();
+    }
+    
+    void runReplayPhase() {
+        // Replay important memories
+        replayImportantMemories();
+        
+        // Strengthen replayed memories
+        strengthenReplayedMemories();
+    }
+    
+    void runConsolidationPhase() {
+        // Integrate replayed memories
+        integrateReplayedMemories();
+        
+        // Optimize memory organization
+        optimizeMemoryOrganization();
+    }
+};
+```
+
+**Step 3: Analyze Memory Consolidation**
+```bash
+# Analyze memory consolidation
+./bin/nlm_memory_consolidation_analyzer --input=data/memory_consolidation.csv --output=reports/memory_consolidation_analysis.html
+
+# Generate memory consolidation report
+./bin/nlm_memory_report_generator --input=data/memory_data.csv --output=reports/memory_consolidation_report.pdf
+```
+
+## Tutorial Summary
+
+### Learning Path
+1. **Beginner Tutorials**: Complete Phase 2, 3, and 4 tutorials
+2. **Intermediate Tutorials**: Complete Performance Optimization and Experiment Design tutorials
+3. **Advanced Tutorials**: Complete Custom Neural Network and NLM Extension tutorials
+4. **Project-Based Tutorials**: Complete Social Learning and Memory Consolidation simulations
+
+### Next Steps
+- **Deepen Knowledge**: Explore advanced topics in neural dynamics, plasticity, and cognition
+- **Create Custom Systems**: Design and build custom NLM architectures
+- **Contribute to Research**: Participate in NLM research projects
+- **Join Community**: Connect with other NLM users and developers
+
+## Conclusion
+
+The Tutorial Guide provides comprehensive, step-by-step instructions for using NLM across all skill levels. It covers:
+
+- **Beginner Tutorials**: Basic concepts and simple examples
+- **Intermediate Tutorials**: More complex tasks and advanced features
+- **Advanced Tutorials**: Custom system design and extension
+- **Project-Based Tutorials**: Complete research simulations
+
+Each tutorial provides:
+- Clear objectives and prerequisites
+- Step-by-step instructions
+- Complete code examples
+- Expected output and analysis
+- Further exploration topics
+
+The tutorial guide enables users to:
+- Quickly get started with NLM
+- Learn NLM concepts through hands-on practice
+- Build custom NLM systems
+- Conduct NLM research
+- Contribute to the NLM community
+
+Happy simulating! Neurally yours,
+The NLM Team

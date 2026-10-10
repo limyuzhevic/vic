@@ -1,0 +1,758 @@
+# Prediction System Guide
+
+## Overview
+
+The Prediction System in NLM is a core cognitive component that enables temporal sequence learning, action consequence prediction, and multi-step planning. It implements a neural prediction architecture that allows the system to anticipate future states and guide behavior based on predicted outcomes.
+
+## Prediction System Architecture
+
+### Core Components
+```cpp
+struct PredictionSystem {
+    // Temporal prediction components
+    std::unique_ptr<NeuralPrediction> temporalPredictor;
+    std::unique_ptr<ActionConsequencePredictor> actionConsequencePredictor;
+    
+    // Multi-step prediction
+    std::vector<std::unique_ptr<NeuralPrediction>> multiStepPredictors;
+    
+    // Error computation
+    std::unique_ptr<PredictionErrorSignal> errorSignal;
+    
+    // Integration with other systems
+    std::unique_ptr<MemorySystem> workingMemory;
+    std::unique_ptr<NeuromodulationSystem> neuromodulation;
+};
+```
+
+### Prediction Types
+
+#### Temporal Prediction
+**Purpose**: Learn temporal relationships and sequences
+**Mechanism**: Neural prediction of upcoming events based on past experience
+**Applications**: Pattern completion, temporal reasoning, sequence anticipation
+
+#### Action Consequence Prediction
+**Purpose**: Predict outcomes of actions
+**Mechanism**: Map actions to their expected effects
+**Applications**: Planning, decision making, goal achievement
+
+#### Multi-step Prediction
+**Purpose**: Predict sequences of actions and their consequences
+**Mechanism**: Chain multiple predictions for distant futures
+**Applications**: Complex planning, long-term goal achievement
+
+## NeuralPrediction
+
+### Implementation Overview
+**NeuralPrediction** implements temporal sequence learning through neural pattern completion and association.
+
+#### Core Components
+```cpp
+struct NeuralPrediction {
+    // Pattern storage
+    std::vector<PatternVector> temporalPatterns;
+    std::vector<float> patternWeights;
+    
+    // Temporal dynamics
+    float temporalHorizon;           // How far to predict
+    float predictionConfidence;      // Confidence in predictions
+    float predictionError;           // Current prediction error
+    
+    // Learning mechanisms
+    float learningRate;              // Learning speed
+    float decayRate;                 // Pattern decay
+    bool isOnlineLearning;           // Online vs offline learning
+};
+```
+
+### Pattern Learning
+
+#### Temporal Sequence Encoding
+```cpp
+void NeuralPrediction::encodeTemporalSequence(
+    const std::vector<PatternVector>& sequence,
+    float confidence) {
+    
+    // Learn each consecutive pair
+    for (size_t i = 0; i < sequence.size() - 1; ++i) {
+        PatternVector current = sequence[i];
+        PatternVector next = sequence[i + 1];
+        
+        // Store pattern relationship
+        storePatternPair(current, next, confidence);
+        
+        // Learn inverse relationship
+        storePatternPair(next, current, confidence);
+    }
+}
+```
+
+#### Pattern Completion
+```cpp
+PatternVector NeuralPrediction::predictNext(
+    const PatternVector& currentState,
+    float predictionHorizon) {
+    
+    // Find similar patterns
+    std::vector<std::pair<PatternVector, float>> similarPatterns = 
+        findSimilarPatterns(currentState);
+    
+    if (similarPatterns.empty()) {
+        // No similar patterns found: return current state
+        return currentState;
+    }
+    
+    // Weighted prediction based on confidence
+    PatternVector prediction = similarPatterns[0].first;
+    float confidence = similarPatterns[0].second;
+    
+    // Apply confidence weighting
+    prediction = currentState * (1.0f - confidence) + 
+                 prediction * confidence;
+    
+    return prediction;
+}
+```
+
+### Prediction Confidence and Error
+
+#### Confidence Estimation
+```cpp
+float NeuralPrediction::estimatePredictionConfidence(
+    const PatternVector& currentState,
+    const PatternVector& predictedState) {
+    
+    // Calculate pattern similarity
+    float similarity = calculatePatternSimilarity(currentState, predictedState);
+    
+    // Adjust based on prediction horizon
+    float horizonPenalty = predictionHorizon * 0.1f;
+    
+    // Combine metrics
+    return std::max(0.0f, std::min(1.0f, similarity - horizonPenalty));
+}
+```
+
+#### Prediction Error Computation
+```cpp
+float NeuralPrediction::computePredictionError(
+    const PatternVector& actualState,
+    const PatternVector& predictedState) {
+    
+    // Calculate difference
+    PatternVector error = actualState - predictedState;
+    
+    // Compute error magnitude
+    float errorMagnitude = calculatePatternMagnitude(error);
+    
+    // Apply error penalty
+    float errorPenalty = std::min(1.0f, errorMagnitude * errorSensitivity);
+    
+    return errorPenalty;
+}
+```
+
+### Applications
+
+#### Pattern Completion
+```cpp
+void NeuralPrediction::applyPatternCompletion(
+    std::vector<float>& workingMemory,
+    float completionThreshold) {
+    
+    // Convert working memory to pattern
+    PatternVector pattern(workingMemory);
+    
+    // Predict next state
+    PatternVector prediction = predictNext(pattern);
+    
+    // Complete pattern if confidence is high
+    if (estimatePredictionConfidence(pattern, prediction) > completionThreshold) {
+        workingMemory = prediction;
+    }
+}
+```
+
+#### Temporal Reasoning
+```cpp
+PatternVector NeuralPrediction::reasonTemporally(
+    const PatternVector& currentState,
+    int temporalSteps) {
+    
+    PatternVector current = currentState;
+    
+    // Predict multiple steps forward
+    for (int i = 0; i < temporalSteps; ++i) {
+        current = predictNext(current);
+    }
+    
+    return current;
+}
+```
+
+## ActionConsequencePredictor
+
+### Implementation Overview
+**ActionConsequencePredictor** learns associations between actions and their effects.
+
+#### Core Components
+```cpp
+struct ActionConsequencePredictor {
+    // Action-effect mapping
+    std::vector<ActionEffectPair> actionEffectMapping;
+    
+    // Counterfactual reasoning
+    std::vector<CounterfactualModel> counterfactualModels;
+    
+    // Planning support
+    float planningConfidence;       // Confidence in action predictions
+    float explorationBonus;        // Bonus for uncertain predictions
+};
+```
+
+### Action-Effect Learning
+
+#### Action-Effect Association
+```cpp
+void ActionConsequencePredictor::learnActionEffect(
+    const ActionVector& action,
+    const EffectVector& effect,
+    float outcomeValue) {
+    
+    // Create action-effect pair
+    ActionEffectPair pair;
+    pair.action = action;
+    pair.effect = effect;
+    pair.outcomeValue = outcomeValue;
+    
+    // Store in mapping
+    actionEffectMapping.push_back(pair);
+    
+    // Learn reverse mapping (effect -> action)
+    learnReverseActionEffect(effect, action, outcomeValue);
+}
+```
+
+#### Counterfactual Reasoning
+```cpp
+EffectVector ActionConsequencePredictor::predictCounterfactual(
+    const ActionVector& action,
+    const ContextVector& context,
+    const EffectVector& knownEffects) {
+    
+    // Find similar past experiences
+    std::vector<ActionEffectPair> similarPairs = 
+        findSimilarActionEffects(action, context);
+    
+    if (similarPairs.empty()) {
+        // No similar experiences found
+        return predictDefaultEffect(action);
+    }
+    
+    // Generate counterfactual predictions
+    EffectVector prediction = generateCounterfactualPrediction(
+        similarPairs, action, context);
+    
+    return prediction;
+}
+```
+
+### Planning Support
+
+#### Action Evaluation
+```cpp
+float ActionConsequencePredictor::evaluateAction(
+    const ActionVector& action,
+    const ContextVector& context,
+    const GoalVector& goal) {
+    
+    // Predict action effects
+    EffectVector predictedEffects = predictActionEffects(action, context);
+    
+    // Calculate expected outcome
+    float expectedOutcome = calculateExpectedOutcome(predictedEffects);
+    
+    // Compare with goal
+    float goalAlignment = calculateGoalAlignment(expectedOutcome, goal);
+    
+    // Adjust for uncertainty
+    float confidence = estimatePredictionConfidence(action, context);
+    float adjustedOutcome = expectedOutcome * confidence + 
+                           calculateExplorationBonus(action, context);
+    
+    return adjustedOutcome;
+}
+```
+
+#### Action Selection
+```cpp
+ActionVector ActionConsequencePredictor::selectAction(
+    const ContextVector& context,
+    const GoalVector& goal,
+    const std::vector<ActionVector>& availableActions) {
+    
+    // Evaluate all available actions
+    std::vector<float> actionScores;
+    for (const auto& action : availableActions) {
+        float score = evaluateAction(action, context, goal);
+        actionScores.push_back(score);
+    }
+    
+    // Select action with highest score
+    size_t bestIndex = std::max_element(actionScores.begin(), actionScores.end()) 
+                     - actionScores.begin();
+    
+    return availableActions[bestIndex];
+}
+```
+
+## PredictionErrorSignal
+
+### Implementation Overview
+**PredictionErrorSignal** computes and propagates prediction errors for learning.
+
+#### Core Components
+```cpp
+struct PredictionErrorSignal {
+    // Error computation
+    float errorSensitivity;        // Sensitivity to prediction errors
+    float errorDecay;              // Error decay rate
+    
+    // Error signaling
+    bool isErrorSignaled;          // Whether error is being signaled
+    float errorMagnitude;          // Current error magnitude
+    Timestamp lastErrorTime;       // Time of last error
+    
+    // Learning integration
+    bool errorModulatesLearning;   // Whether error affects learning
+    float errorLearningRate;       // Learning rate when error occurs
+};
+```
+
+### Error Computation
+
+#### Prediction Error Calculation
+```cpp
+float PredictionErrorSignal::computeError(
+    const PatternVector& expectedState,
+    const PatternVector& actualState) {
+    
+    // Calculate error
+    PatternVector errorVector = expectedState - actualState;
+    float errorMagnitude = calculatePatternMagnitude(errorVector);
+    
+    // Apply sensitivity
+    float scaledError = errorMagnitude * errorSensitivity;
+    
+    // Apply decay
+    if (isErrorSignaled) {
+        errorMagnitude *= errorDecay;
+    }
+    
+    // Signal error if significant
+    if (errorMagnitude > ERROR_THRESHOLD) {
+        isErrorSignaled = true;
+        lastErrorTime = currentTime;
+    }
+    
+    return scaledError;
+}
+```
+
+### Error Signaling and Integration
+
+#### Error Propagation
+```cpp
+void PredictionErrorSignal::propagateError(
+    float error,
+    NeuromodulationSystem& neuromodulation,
+    PlasticitySystem& plasticity) {
+    
+    // Signal neuromodulation
+    if (errorModulatesLearning) {
+        neuromodulation.applyPredictionError(error, errorLearningRate);
+    }
+    
+    // Update plasticity
+    plasticity.updateBasedOnPredictionError(error);
+    
+    // Log error
+    logPredictionError(error, lastErrorTime);
+}
+```
+
+#### Learning Modulation
+```cpp
+void PredictionErrorSignal::modulateLearning(
+    PlasticitySystem& plasticity,
+    float learningRate) {
+    
+    // Scale learning by error magnitude
+    float scaledLearningRate = learningRate * errorMagnitude;
+    
+    // Apply scaled learning
+    plasticity.setLearningRate(scaledLearningRate);
+}
+```
+
+## Prediction System Integration
+
+### Integration with Working Memory
+```cpp
+void integratePredictionWithWorkingMemory(
+    PredictionSystem& predictionSystem,
+    NeuralWorkingMemory& workingMemory) {
+    
+    // Use working memory for prediction
+    PatternVector currentPattern = workingMemory.getCurrentPattern();
+    PatternVector prediction = predictionSystem.predictNext(currentPattern);
+    
+    // Update working memory with prediction
+    workingMemory.update(prediction);
+    
+    // Apply pattern completion
+    predictionSystem.applyPatternCompletion(workingMemory);
+}
+```
+
+### Integration with Neuromodulation
+```cpp
+void integratePredictionWithNeuromodulation(
+    PredictionSystem& predictionSystem,
+    NeuromodulationSystem& neuromodulation) {
+    
+    // Get prediction error
+    float predictionError = predictionSystem.getCurrentError();
+    
+    // Apply error to neuromodulation
+    neuromodulation.applyPredictionError(predictionError);
+    
+    // Modulate prediction learning
+    predictionSystem.modulateLearningWithNeuromodulation(neuromodulation);
+}
+```
+
+### Integration with Development
+```cpp
+void integratePredictionWithDevelopment(
+    PredictionSystem& predictionSystem,
+    DevelopmentSystem& development) {
+    
+    // Get developmental stage
+    DevelopmentalStage stage = development.getCurrentStage();
+    
+    // Adjust prediction parameters based on development
+    adjustPredictionForDevelopment(predictionSystem, stage);
+    
+    // Update developmental predictions
+    development.updatePredictions(predictionSystem);
+}
+```
+
+### Integration with Plasticity
+```cpp
+void integratePredictionWithPlasticity(
+    PredictionSystem& predictionSystem,
+    PlasticitySystem& plasticity) {
+    
+    // Get prediction error
+    float predictionError = predictionSystem.getCurrentError();
+    
+    // Apply error to plasticity
+    plasticity.updateBasedOnPredictionError(predictionError);
+    
+    // Learn from prediction errors
+    plasticity.learnFromPredictionErrors(predictionSystem);
+}
+```
+
+## Prediction System Performance Metrics
+
+### Accuracy Metrics
+```cpp
+struct PredictionAccuracyMetrics {
+    float temporalPredictionAccuracy;      // Temporal prediction accuracy
+    float actionConsequenceAccuracy;     // Action-effect prediction accuracy
+    float multiStepPredictionAccuracy;    // Multi-step prediction accuracy
+    float errorReductionRate;             // Rate of error reduction
+    float learningSpeed;                  // Speed of learning new predictions
+};
+```
+
+### Efficiency Metrics
+```cpp
+struct PredictionEfficiencyMetrics {
+    float predictionComputationTime;       // Time to compute predictions
+    float memoryUsage;                    // Memory usage for predictions
+    float patternStorageEfficiency;       // Efficiency of pattern storage
+    float retrievalSpeed;                 // Speed of pattern retrieval
+    float updateSpeed;                    // Speed of pattern updates
+};
+```
+
+### Behavioral Metrics
+```cpp
+struct PredictionBehavioralMetrics {
+    float explorationRate;                // Rate of exploring new predictions
+    float exploitationRate;               // Rate of exploiting known predictions
+    float predictionConfidence;           // Average prediction confidence
+    float actionOutcomeAlignment;         // Alignment between predicted and actual outcomes
+    float planningSuccessRate;            // Success rate of planned actions
+};
+```
+
+## Prediction System Testing and Validation
+
+### Unit Tests
+- **Pattern Learning Tests**: Test pattern encoding and retrieval
+- **Prediction Accuracy Tests**: Test prediction accuracy and confidence
+- **Temporal Prediction Tests**: Test temporal sequence learning
+- **Action Prediction Tests**: Test action-effect prediction
+- **Error Computation Tests**: Test prediction error calculation
+- **Integration Tests**: Test integration with other systems
+
+### Performance Tests
+- **Prediction Speed**: Test speed of prediction computation
+- **Memory Efficiency**: Test memory usage for predictions
+- **Pattern Completion**: Test pattern completion accuracy
+- **Learning Efficiency**: Test learning speed and accuracy
+
+### Behavioral Tests
+- **Exploration-Exploitation Balance**: Test balance between exploring and exploiting
+- **Adaptive Prediction**: Test ability to adapt to changing environments
+- **Generalization**: Test ability to generalize predictions to new situations
+- **Transfer Learning**: Test ability to transfer predictions across tasks
+
+## Prediction System Common Issues and Solutions
+
+### Issue 1: Poor Prediction Accuracy
+**Problem**: Predictions are inaccurate or unreliable.
+**Solution**:
+- Increase training data
+- Adjust learning rates
+- Improve pattern similarity metrics
+- Add regularization to prevent overfitting
+
+### Issue 2: Slow Prediction Speed
+**Problem**: Predictions are computed too slowly.
+**Solution**:
+- Optimize pattern storage and retrieval
+- Use vectorized operations
+- Implement caching mechanisms
+- Reduce prediction horizon when possible
+
+### Issue 3: Memory Overload
+**Problem**: Too many patterns stored in memory.
+**Solution**:
+- Implement pattern compression
+- Use aging to remove old patterns
+- Implement pattern merging
+- Add capacity limits
+
+### Issue 3: Unstable Predictions
+**Problem**: Predictions are unstable or oscillate.
+**Solution**:
+- Add smoothing to predictions
+- Implement confidence-based filtering
+- Use ensemble methods
+- Add regularization
+
+## API Reference
+
+### PredictionSystem Class Methods
+```cpp
+// Construction and Destruction
+PredictionSystem()
+~PredictionSystem()
+
+// Prediction Operations
+PatternVector predictNext(const PatternVector& currentState, float predictionHorizon)
+PatternVector predictMultiStep(const PatternVector& currentState, int steps)
+EffectVector predictActionEffects(const ActionVector& action, const ContextVector& context)
+
+// Learning Operations
+void learnTemporalSequence(const std::vector<PatternVector>& sequence)
+void learnActionEffect(const ActionVector& action, const EffectVector& effect, float outcomeValue)
+
+// Error Computation
+float computePredictionError(const PatternVector& expectedState, const PatternVector& actualState)
+
+// Integration Operations
+void integrateWithWorkingMemory(NeuralWorkingMemory& workingMemory)
+void integrateWithNeuromodulation(NeuromodulationSystem& neuromodulation)
+void integrateWithDevelopment(DevelopmentSystem& development)
+void integrateWithPlasticity(PlasticitySystem& plasticity)
+
+// State Queries
+float getPredictionConfidence() const
+float getPredictionError() const
+int getTemporalHorizon() const
+```
+
+### NeuralPrediction Class Methods
+```cpp
+// Construction and Destruction
+NeuralPrediction()
+~NeuralPrediction()
+
+// Pattern Operations
+void storePatternPair(const PatternVector& pattern1, const PatternVector& pattern2, float confidence)
+PatternVector predictNext(const PatternVector& currentState)
+
+// Learning Operations
+void learnSequence(const std::vector<PatternVector>& sequence)
+void onlineLearnPattern(const PatternVector& pattern, float confidence)
+
+// State Queries
+float getLearningRate() const
+float getPatternDatabaseSize() const
+```
+
+### ActionConsequencePredictor Class Methods
+```cpp
+// Construction and Destruction
+ActionConsequencePredictor()
+~ActionConsequencePredictor()
+
+// Prediction Operations
+EffectVector predictActionEffects(const ActionVector& action, const ContextVector& context)
+ActionVector selectAction(const ContextVector& context, const GoalVector& goal, const std::vector<ActionVector>& availableActions)
+
+// Learning Operations
+void learnActionEffect(const ActionVector& action, const EffectVector& effect, float outcomeValue)
+void learnCounterfactual(const ActionVector& action, const EffectVector& actualEffect, const EffectVector& counterfactualEffect)
+
+// State Queries
+float getPlanningConfidence() const
+float getExplorationBonus() const
+```
+
+### PredictionErrorSignal Class Methods
+```cpp
+// Construction and Destruction
+PredictionErrorSignal()
+~PredictionErrorSignal()
+
+// Error Operations
+float computeError(const PatternVector& expectedState, const PatternVector& actualState)
+void propagateError(float error, NeuromodulationSystem& neuromodulation, PlasticitySystem& plasticity)
+void modulateLearning(PlasticitySystem& plasticity, float learningRate)
+
+// Configuration
+void setErrorSensitivity(float sensitivity)
+void setErrorDecay(float decay)
+void setErrorModulatesLearning(bool modulates)
+
+// State Queries
+float getErrorMagnitude() const
+bool isErrorSignaled() const
+Timestamp getLastErrorTime() const
+```
+
+## Integration Guide
+
+### Phase 6 Prediction System Integration
+The Phase 6 integration brings together prediction capabilities with all other brain systems:
+
+```cpp
+// Prediction systems in Brain::Impl
+predictionSystem.reset(new PredictionSystem());
+
+// Integration relationships
+predictionSystem->setWorkingMemory(workingMemory.get());
+predictionSystem->setNeuromodulation(neuromodulation.get());
+predictionSystem->setDevelopment(developmentSystem.get());
+predictionSystem->setPlasticity(stdp.get());
+```
+
+### Prediction Flow in Phase 6
+```
+WORLD (Environment)
+  ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  ↓
+ATTENTION (competitive selection)
+  ↓
+NEURAL PROCESSING (LIF dynamics)
+  ↓
+PREDICTION (temporal sequence learning)
+  ↓
+WORKING MEMORY (persistent activity)
+  ↓
+EPISODIC MEMORY (experience storage)
+  ↓
+CONCEPT FORMATION (pattern discovery)
+  ↓
+PLANNING (multi-step prediction)
+  ↓
+SELF-MODEL (sensorimotor learning)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD.applyMotorCommand()
+  ↓
+ACTION RESULT
+  ↓
+REWARD / ERROR
+  ↓
+NEUROMODULATION (dopamine, curiosity)
+  ↓
+PLASTICITY (STDP, Hebbian)
+  ↓
+DEVELOPMENT (stage progression)
+  ↓
+PREDICTION ERROR (temporal, action, multi-step)
+  ↓
+BEHAVIORAL CHANGE
+  ↓
+NEW EXPERIENCES
+  ↓
+CONTINUOUS LEARNING
+```
+
+## Future Directions
+
+### Advanced Prediction Systems
+- **Hierarchical Prediction**: Multi-level prediction architectures
+- **Uncertainty Quantification**: Better handling of prediction uncertainty
+- **Meta-Learning**: Learning how to make predictions
+- **Social Prediction**: Predicting other agents' behaviors
+
+### Prediction Optimization
+- **Predictive Coding**: Implementing predictive coding architectures
+- **Neural Prediction Networks**: Advanced neural network-based predictions
+- **Time-to-Event Prediction**: Predicting timing of future events
+- **Multi-sensory Prediction**: Integrating predictions across sensory modalities
+
+### Prediction Neuroscience Integration
+- **Temporal Coding**: Precise temporal prediction mechanisms
+- **Population Coding**: Distributed prediction representations
+- **Prediction Error Signaling**: Neural mechanisms for prediction error
+- **Predictive Processing**: Brain as prediction machine
+
+## Conclusion
+
+The Prediction System is a core cognitive component that enables NLM to anticipate future states, guide behavior, and support complex planning. It implements neural prediction through pattern learning, sequence anticipation, and action consequence prediction.
+
+Understanding prediction systems is essential for:
+- **Designing Cognitive Architectures**: Creating systems that can anticipate and plan
+- **Implementing Intelligence**: Building systems with forward-looking capabilities
+- **Debugging Systems**: Identifying and fixing prediction-related issues
+- **Extending Functionality**: Adding new prediction capabilities
+
+The prediction system guide provides the foundation for exploring NLM's prediction capabilities, from basic sequence learning to advanced cognitive functions.
+
+## See Also
+- [Working Memory Guide](memory.html): Working memory documentation
+- [Neuromodulation Guide](neuromodulation.html): Neuromodulator documentation
+- [Development Guide](development.html): Development system documentation
+- [Planning Guide](planning.html): Planning system documentation
+- [Cognition Guide](cognition.html): Cognition system documentation
+
+## References
+- Hinton, G. E., & Shallice, T. (1991). Lesion simulations: A network model of dyslexia. Cognitive neuropsychology.
+- O'Reilly, R. C., & Munoz, D. J. (1995). Goal-driven learning and the dopamine network. In Neural Information Processing Systems.
+- Sutton, R. S., & Barto, A. G. (1998). Reinforcement learning: An introduction. MIT Press.

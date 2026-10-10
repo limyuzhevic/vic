@@ -1,0 +1,453 @@
+# Neuron Guide
+
+## Overview
+
+Neurons are the fundamental computational units in NLM, implementing Leaky Integrate-and-Fire (LIF) dynamics. Each neuron processes inputs, accumulates membrane potential, and generates spikes when threshold is reached, propagating signals through the neural network.
+
+## LIF Neuron Model
+
+### Core Dynamics
+NLM implements a simplified Leaky Integrate-and-Fire model, which captures the essential properties of biological neurons while remaining computationally efficient:
+
+```
+tau * dV/dt = -g_L * (V - E_L) + I_total
+```
+
+Where:
+- `V` is the membrane potential
+- `tau` is the membrane time constant
+- `g_L` is the leak conductance
+- `E_L` is the resting potential
+- `I_total` is the total synaptic current
+
+### State Variables
+
+#### Membrane Potential (`MembranePotential`)
+The electrical potential across the neuron membrane that integrates incoming synaptic currents.
+
+**Properties**:
+- `membranePotential`: Current membrane potential (mV)
+- `restingPotential`: Equilibrium potential (typically -65mV)
+- `threshold`: Firing threshold (typically -50mV)
+- `leakConductance`: Membrane conductance for passive current
+
+**Dynamics**:
+- **Integration**: Summation of incoming synaptic currents
+- **Leak**: Exponential decay toward resting potential
+- **Reset**: Sudden reset after spike generation
+
+#### Firing State (`FiringState`)
+Represents the current physiological state of the neuron.
+
+**States**:
+- `Resting`: Below threshold, not firing
+- `Active`: Above threshold, firing spikes
+- `Refractory`: Recovery period after firing
+- `Adapting`: Modified dynamics due to adaptation
+
+#### Spike History
+Records recent spiking activity for plasticity and memory:
+- `spikeTimes`: Timestamps of recent spikes
+- `firingRate`: Average firing rate over time window
+- `refractoryRemaining`: Time remaining in refractory period
+
+### Neuron Parameters
+
+#### Basic Parameters
+```cpp
+struct NeuronParameters {
+    // LIF parameters
+    float membraneCapacitance;    // 1.0 nF (default)
+    float timeConstant;           // 20.0 ms (default)
+    float restingPotential;       // -65.0 mV (default)
+    float threshold;              // -50.0 mV (default)
+    float leakConductance;        // 0.1 mS (default)
+    
+    // Refractory parameters
+    uint32_t refractoryPeriod;    // 2.0 ms (default)
+    float adaptationStrength;     // 0.0 (default)
+    
+    // Plasticity parameters
+    float initialSynapticStrength; // 1.0 (default)
+    float plasticityRate;          // 0.01 (default)
+    
+    // Type-specific parameters
+    NeuronType neuronType;        // Internal, Sensory, Motor
+};
+```
+
+#### Advanced Parameters
+```cpp
+struct AdvancedNeuronParameters {
+    // Dynamics parameters
+    float voltageReset;           // Reset voltage after spike
+    float voltageDecay;           // Decay rate during refractory
+    float adaptationTimeConstant; // Adaptation time constant
+    
+    // Plasticity parameters
+    float eligibilityTraceDecay;  // Trace decay time
+    float weightLimit;            // Maximum synaptic weight
+    float weightFloor;            // Minimum synaptic weight
+    
+    // Input parameters
+    float synapticDelay;          // Transmission delay
+    float spatialSpread;          // Spatial influence radius
+    float temporalKernel;         // Temporal influence kernel
+};
+```
+
+### Neuron Operations
+
+#### Initialization
+```cpp
+Neuron::Neuron(NeuronId id)
+// Creates new neuron with specified ID
+
+void Neuron::setType(NeuronType type)
+// Sets neuron type (Internal, Sensory, Motor)
+
+void Neuron::setMembranePotential(MembranePotential potential)
+// Sets initial membrane potential
+
+void Neuron::setThreshold(MembranePotential threshold)
+// Sets firing threshold
+
+void Neuron::setRefractoryPeriod(uint32_t steps)
+// Sets refractory period duration
+```
+
+#### State Update (stepLIF)
+```cpp
+void Neuron::stepLIF(TimestepDuration dt, TimestepDuration time)
+// Updates neuron dynamics for one time step
+
+// Key operations:
+1. Check refractory status
+2. Apply leak dynamics
+3. Integrate synaptic inputs
+4. Check for spike threshold crossing
+5. Generate spike if threshold exceeded
+6. Reset membrane potential
+7. Update spike history
+```
+
+#### Synaptic Operations
+```cpp
+void Neuron::addSynapticInput(SynapseHandle synapse, float weight)
+// Adds synaptic input from specified synapse
+
+void Neuron::removeSynapticInput(SynapseHandle synapse)
+// Removes synaptic input
+
+float Neuron::getTotalSynapticCurrent() const
+// Returns total synaptic current received
+
+std::vector<SynapseHandle> Neuron::getIncomingSynapses() const
+// Returns list of incoming synapses
+```
+
+#### Plasticity Operations
+```cpp
+void Neuron::addToMembranePotential(MembranePotential delta)
+// Manually adjust membrane potential
+
+void Neuron::setFiringRate(FiringRate rate)
+// Sets firing rate for rate-based plasticity
+
+void Neuron::updatePlasticity(float dt, const PlasticityRule& rule)
+// Updates synaptic weights based on plasticity rule
+```
+
+### Spike Generation and Processing
+
+#### Spike Generation
+```cpp
+// Spike generation occurs when:
+// 1. Membrane potential exceeds threshold
+// 2. Neuron is not in refractory period
+// 3. Refractory period has elapsed
+
+void Neuron::generateSpike(Timestamp time)
+// Records spike and triggers downstream effects
+```
+
+#### Refractory Period Management
+```cpp
+void Neuron::enterRefractoryPeriod(uint32_t steps)
+// Enters refractory period after spike
+
+void Neuron::decrementRefractory()
+// Decrements refractory timer
+
+bool Neuron::isInRefractoryPeriod() const
+// Checks if neuron is in refractory period
+```
+
+#### Spike History Management
+```cpp
+c std::vector<Timestamp> Neuron::getSpikeHistory() const
+// Returns recent spike timestamps
+
+void Neuron::addSpikeToHistory(Timestamp time)
+// Records new spike in history
+
+float Neuron::getFiringRate() const
+// Returns average firing rate
+```
+
+### Neuron Types
+
+#### Internal Neurons
+**Purpose**: Core neural processing within the brain
+**Characteristics**:
+- Multiple inputs and outputs
+- Full plasticity capabilities
+- Complex dynamics
+- Internal state management
+
+#### Sensory Neurons
+**Purpose**: Receive external input
+**Characteristics**:
+- Specialized input receptors
+- Limited output capacity
+- Reduced plasticity
+- Fixed response properties
+
+#### Motor Neurons
+**Purpose**: Generate output actions
+**Characteristics**:
+- Specialized output pathways
+- Limited input integration
+- High reliability
+- Fast response times
+
+### Neuron Connectivity
+
+#### Synapse Management
+```cpp
+void Neuron::addIncomingSynapse(SynapseHandle synapse)
+// Adds incoming synaptic connection
+
+void Neuron::addOutgoingSynapse(SynapseHandle synapse)
+// Adds outgoing synaptic connection
+
+bool Neuron::hasConnectionTo(Neuron& other) const
+// Checks if connected to other neuron
+```
+
+#### Neural Population
+**Group of neurons with shared properties**:
+- **Population-based Processing**: Parallel processing of neuron groups
+- **Shared Resources**: Common parameters and state
+- **Efficient Organization**: Reduced memory overhead
+- **Specialized Function**: Distinct roles within brain regions
+
+#### Neural Region
+**Brain region containing multiple populations**:
+- **Regional Specialization**: Different functions per region
+- **Inter-region Connectivity**: Connections between regions
+- **Functional Integration**: Coordinated processing across regions
+- **Development**: Region-specific maturation patterns
+
+### Mathematical Models
+
+#### LIF Differential Equation
+```
+τ_m * dV/dt = -g_L * (V - E_L) + I_syn
+
+Where:
+- V: Membrane potential (mV)
+- τ_m: Membrane time constant (ms)
+- g_L: Leak conductance (mS)
+- E_L: Resting potential (mV)
+- I_syn: Total synaptic current (nA)
+```
+
+#### Spike Generation Condition
+```
+If V ≥ V_th and not in refractory period:
+    Generate spike at time t
+    V ← V_reset
+    Enter refractory period
+```
+
+#### Synaptic Integration
+```
+I_syn(t) = Σ w_ij * ∑ S_j(t - d_ij)
+
+Where:
+- w_ij: Synaptic weight from neuron j to i
+- S_j: Spike train of neuron j
+- d_ij: Transmission delay
+```
+
+#### Refractory Dynamics
+```
+V(t) = {
+    V_reset, if t < t_ref
+    V_leak + (V(t_ref) - V_leak) * exp(-(t - t_ref)/τ_m), otherwise
+}
+```
+
+### Implementation Details
+
+#### Memory Layout
+```cpp
+struct Neuron::Impl {
+    NeuronId id;
+    NeuronType type;
+    NeuronState state;
+    RegionId regionId;
+    PopulationId populationId;
+    
+    // LIF parameters
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
+    static constexpr float TIME_CONSTANT = 20.0f;      // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Synaptic inputs
+    float totalCurrent;           // Total synaptic current this step
+    float synapticInput;          // Accumulated synaptic input
+    std::vector<Timestamp> spikeHistory;
+    std::vector<SynapseHandle> incomingSynapses;
+    std::vector<SynapseHandle> outgoingSynapses;
+    
+    // Plasticity
+    PlasticityFlags plasticityFlags;
+};
+```
+
+#### Performance Optimizations
+```cpp
+// Local variable caching to reduce member access
+float currentV = pImpl->state.membranePotential;
+float currentI = pImpl->totalCurrent;
+
+// Optimized branching logic with early returns
+if (currentV >= pImpl->state.threshold) {
+    if (!pImpl->state.isInRefractory()) {
+        // Generate spike
+    }
+    return;
+}
+```
+
+### Testing and Validation
+
+#### Unit Tests
+- **State Transitions**: Verify resting, active, and refractory states
+- **Spike Generation**: Test threshold crossing and spike timing
+- **Synaptic Integration**: Validate input accumulation and processing
+- **Plasticity Effects**: Check weight changes from spike timing
+- **Refractory Behavior**: Ensure refractory period functionality
+
+#### Integration Tests
+- **Network Operation**: Test neuron connectivity and signal propagation
+- **Circuit Function**: Validate neural circuits and patterns
+- **System Performance**: Measure computational efficiency
+- **Memory Integration**: Test with plasticity and memory systems
+
+### Common Issues and Solutions
+
+#### Issue 1: Unstable Oscillations
+**Problem**: Neurons firing continuously without input.
+**Solution**:
+- Check leak conductance and time constant values
+- Verify refractory period settings
+- Ensure synaptic weights are within bounds
+
+#### Issue 2: Excessive Spiking
+**Problem**: Neurons firing at unrealistic rates.
+**Solution**:
+- Adjust firing thresholds
+- Increase refractory periods
+- Check adaptation mechanisms
+
+#### Issue 3: Poor Convergence
+**Problem**: Learning not progressing effectively.
+**Solution**:
+- Verify STDP parameters
+- Check neuromodulator settings
+- Validate synaptic weight bounds
+
+### API Reference
+
+#### Neuron Class Methods
+```cpp
+// Construction and Destruction
+Neuron(NeuronId id)
+~Neuron()
+Neuron(Neuron&& other) noexcept
+
+// State Management
+void setType(NeuronType type)
+void setMembranePotential(MembranePotential potential)
+void setThreshold(MembranePotential threshold)
+void setFiringState(FiringState state)
+void setFiringRate(FiringRate rate)
+
+// Synaptic Operations
+void addToMembranePotential(MembranePotential delta)
+void setRefractoryPeriod(uint32_t steps)
+
+// State Queries
+MembranePotential getMembranePotential() const
+MembranePotential getThreshold() const
+FiringState getFiringState() const
+FiringRate getFiringRate() const
+uint32_t getRefractoryPeriod() const
+MembranePotential getLeakConductance() const
+
+// Connectivity
+void addIncomingSynapse(SynapseHandle synapse)
+void addOutgoingSynapse(SynapseHandle synapse)
+std::vector<SynapseHandle> getIncomingSynapses() const
+std::vector<SynapseHandle> getOutgoingSynapses() const
+
+// Dynamics
+void decrementRefractory()
+void generateSpike(Timestamp time)
+void stepLIF(TimestepDuration dt, TimestepDuration time)
+void updatePlasticity(float dt, const PlasticityRule& rule)
+
+// State Queries
+bool shouldFire() const
+std::vector<Timestamp> getSpikeHistory() const
+float getTotalSynapticCurrent() const
+NeuronId getId() const
+NeuronType getType() const
+RegionId getRegionId() const
+PopulationId getPopulationId() const
+```
+
+### Future Directions
+
+#### Enhanced Models
+- **Adaptive LIF**: Neurons with dynamic threshold and adaptation
+- **Resonating Neurons**: Oscillatory dynamics and resonance properties
+- **Multi-compartment Models**: Dendritic and compartmental dynamics
+- **Channel-based Models**: Detailed ion channel dynamics
+
+#### Advanced Plasticity
+- **Homeostatic Plasticity**: Synaptic scaling and normalization
+- **Metabolic Plasticity**: Energy-based learning rules
+- **Structural Plasticity**: Synaptic formation and elimination
+- **Neuromodulator Interactions**: Complex plasticity interactions
+
+#### Neuromodulation Integration
+- **Dopamine Integration**: Reward prediction error effects
+- **Curiosity Mechanisms**: Novelty-driven exploration
+- **Attention Modulation**: Top-down and bottom-up influences
+- **Development Integration**: Age-dependent plasticity
+
+## Conclusion
+
+Neurons form the foundation of NLM's computational brain. The LIF model provides a balance between biological plausibility and computational efficiency, enabling complex neural dynamics while remaining tractable for large-scale simulations.
+
+Understanding neuron dynamics, parameters, and operations is essential for:
+- **Designing Neural Circuits**: Creating functional neural networks
+- **Implementing Learning**: Understanding plasticity mechanisms
+- **Debugging Systems**: Identifying and fixing neural issues
+- **Extending Functionality**: Adding new neuron types and behaviors
+
+The neuron guide provides the foundation for exploring NLM's neural computation capabilities, from basic LIF dynamics to advanced neural systems integration.

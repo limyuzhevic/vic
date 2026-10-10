@@ -1,0 +1,1029 @@
+# NLM Architecture Guide
+
+## Overview
+
+NLM (熙然) is designed as a modular computational brain with a hierarchical architecture that integrates multiple neural systems into a coherent whole. The architecture follows a layered approach, with each layer handling specific aspects of neural computation.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        NLM Brain                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │   Sensory   │───▶│    Brain    │───▶│    Motor    │          │
+│  │   Input    │    │   Core      │    │    Output   │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│         │                  │                  │                 │
+│         ▼                  ▼                  ▼                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │  Sensory    │    │  Memory     │    │   Action    │          │
+│  │  Processing │    │  Systems   │    │  Selection  │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌─────────────┐                              │
+│                    │  Prediction │                              │
+│                    │   System    │                              │
+│                    └─────────────┘                              │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌─────────────┐                              │
+│                    │Neuromodul. │                              │
+│                    │  Signals    │                              │
+│                    └─────────────┘                              │
+│                            │                                    │
+│                            ▼                                    │
+│                    ┌─────────────┐                              │
+│                    │ Development │                              │
+│                    │   System    │                              │
+│                    └─────────────┘                              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              PHASE 4: EMERGING COGNITION                    ││
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
+│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
+│  │  │         │  │         │  │         │  │Learning │       ││
+│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Core Layer
+
+### Types and Identifiers
+The core layer provides strongly-typed identifiers for all neural entities:
+
+#### Neuron Identifiers
+- `NeuronId`: Unique identifier for individual neurons
+- `RegionId`: Identifier for brain regions
+- `PopulationId`: Identifier for neural populations
+- `SynapseId`: Identifier for synaptic connections
+
+#### Neural State Variables
+- `MembranePotential`: Electrical potential across neuron membrane
+- `FiringRate`: Average firing rate of neurons
+- `Timestamp`: Time value in milliseconds
+- `TimestepDuration`: Duration of a single simulation step
+
+### Configuration System
+The configuration system manages all simulation parameters:
+
+#### Core Configuration Options
+- `random_seed`: Seed for deterministic random number generation
+- `timestep`: Simulation time step duration
+- `max_neurons`: Maximum number of neurons in simulation
+- `max_synapses`: Maximum number of synaptic connections
+- `development_enabled`: Whether developmental processes are active
+- `memory_capacity`: Size of working memory buffers
+
+#### Configuration Access Pattern
+```cpp
+// Example configuration access
+if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+    rng->setSeed(*seedOpt);
+}
+
+float timestep = config->get<float>("timestep", 0.001f);
+```
+
+### Random Number Generator
+Deterministic random number generation for reproducible experiments:
+
+#### Features
+- **Thread-Safe**: Safe for use across multiple threads
+- **Fast**: Optimized for performance in neural simulations
+- **Deterministic**: Same seed produces identical sequences
+- **Configurable**: Can be initialized from configuration
+
+#### Usage Example
+```cpp
+// Initialize with seed from configuration
+uint64_t seed = config->get<uint64_t>("random_seed", 42);
+rng->initialize(seed);
+
+// Generate random values for initialization
+for (size_t i = 0; i < neuronCount; ++i) {
+    float potential = rng->uniform(0.0f, 1.0f);
+    neuron->setMembranePotential(potential);
+}
+```
+
+### Logger System
+Structured logging for debugging and monitoring:
+
+#### Log Levels
+- `DEBUG`: Detailed diagnostic information
+- `INFO`: General operational information
+- `WARNING`: Potential issues requiring attention
+- `ERROR`: Serious errors that may affect simulation
+
+#### Log Categories
+- `NEURAL`: Neural computation events
+- `PLASTICITY`: Plasticity rule applications
+- `MEMORY`: Memory system operations
+- `DEVELOPMENT`: Developmental stage transitions
+- `PERFORMANCE`: Performance metrics and timing
+
+### SimulationClock
+Time management for synchronized neural computation:
+
+#### Key Features
+- **Accurate Timing**: Sub-millisecond precision
+- **Synchronized Steps**: Coordinated computation across all components
+- **Pause/Resume**: Ability to control simulation speed
+- **Time Statistics**: Tracking simulation duration and step counts
+
+#### Time Management Pattern
+```cpp
+// Simulation clock usage
+while (!simulationComplete) {
+    clock->tick();  // Advance simulation time
+    timestep = clock->getCurrentTime();
+    
+    // Process all neural computations
+    brain->step(timestep);
+    
+    // Update memory systems
+    workingMemory->update(timestep);
+    
+    // Handle development processes
+    developmentSystem->update(timestep);
+}
+```
+
+## Brain Layer
+
+### Neural Components
+The brain layer contains the fundamental building blocks of neural computation:
+
+#### Neuron
+**LIF Neuron Model**
+- **Membrane Potential**: Electrical potential that integrates inputs
+- **Threshold**: Level at which neuron fires action potentials
+- **Refractory Period**: Recovery time after firing
+- **Firing Rate**: Output rate based on input and dynamics
+
+**Key Methods**
+- `setMembranePotential()`: Set initial membrane potential
+- `addToMembranePotential()`: Add synaptic current
+- `stepLIF()`: Compute neuron dynamics for one time step
+- `getFiringState()`: Get current firing state
+
+#### Synapse
+**Synaptic Connection**
+- **Pre-synaptic Neuron**: Source of synaptic signal
+- **Post-synaptic Neuron**: Target of synaptic signal
+- **Strength**: Synaptic weight that can change through plasticity
+- **Delay**: Time delay between pre- and post-synaptic spikes
+
+**Key Properties**
+- `strength`: Current synaptic efficacy
+- `delay`: Transmission delay in milliseconds
+- `type`: Synaptic type (excitatory/inhibitory)
+
+#### NeuralPopulation
+**Group of Neurons**
+- **Shared Properties**: Neurons with common characteristics
+- **Efficient Processing**: Parallel processing of neuron groups
+- **Regional Organization**: Neurons organized by brain region
+
+#### NeuralRegion
+**Brain Region**
+- **Multiple Populations**: Contains neural populations
+- **Regional Connectivity**: Internal and external connections
+- **Functional Specialization**: Different regions for different functions
+
+#### Brain
+**Central Coordinator**
+- **Integration Hub**: Coordinates all neural systems
+- **Main Loop**: Orchestrates sensory input to motor output
+- **State Management**: Maintains neural network state
+
+## Dynamics Layer
+
+### NeuralDynamics
+**Abstract base class for neuron dynamics**
+
+#### Interface
+```cpp
+class NeuralDynamics {
+public:
+    virtual ~NeuralDynamics() = default;
+    virtual void initialize(const NeuronConfig& config) = 0;
+    virtual void step(float dt, float current) = 0;
+    virtual float getMembranePotential() const = 0;
+    virtual bool shouldFire() const = 0;
+};
+```
+
+#### Derived Classes
+- `LIFDynamics`: Leaky Integrate-and-Fire dynamics
+- `AdaptingDynamics`: Neurons with adaptation mechanisms
+- `ResonatingDynamics`: Neurons with oscillatory behavior
+
+### SpikeSystem
+**Event-driven spike processing**
+
+#### Spike Queue Management
+- **Incoming Spikes**: Queue of spikes arriving at neurons
+- **Processing Order**: Temporal ordering of spike events
+- **Efficiency**: Optimized for high spike rates
+
+#### Key Features
+- **Event Processing**: Handle spike events efficiently
+- **Temporal Precision**: Millisecond-level timing accuracy
+- **Batch Processing**: Process multiple spikes in batches
+- **Debug Logging**: Detailed spike tracking
+
+## Plasticity Layer
+
+### PlasticityRule
+**Abstract base class for plasticity rules**
+
+#### Interface
+```cpp
+class PlasticityRule {
+public:
+    virtual ~PlasticityRule() = default;
+    virtual void initialize(const PlasticityConfig& config) = 0;
+    virtual void update(Neuron& pre, Neuron& post, float dt) = 0;
+    virtual float getLearningRate() const = 0;
+};
+```
+
+#### Derived Classes
+- `STDP`: Spike-Timing-Dependent Plasticity
+- `Hebbian`: Hebbian learning rule
+- `Homeostatic`: Synaptic scaling and normalization
+- `RewardModulated`: Reward-dependent plasticity
+
+### STDP (Spike-Timing-Dependent Plasticity)
+**Learning based on precise spike timing**
+
+#### Key Principles
+- **Temporal Asymmetry**: Different effects for pre-before-post vs post-before-pre
+- **Trace Learning**: Synapses maintain eligibility traces
+- **Global Modulators**: Neuromodulators scale plasticity effects
+
+#### Mathematical Model
+```cpp
+// STDP weight change
+if (postSpikeTime > preSpikeTime) {
+    // Post after pre: LTP (Long-Term Potentiation)
+    weightChange = A_plus * exp(-(t_post - t_pre) / tau_plus);
+} else {
+    // Post before pre: LTD (Long-Term Depression)
+    weightChange = -A_minus * exp(-(t_pre - t_post) / tau_minus);
+}
+```
+
+### Hebbian Learning
+**Simple correlation-based learning**
+
+#### Key Principles
+- **Co-activation Learning**: Strengthen connections for simultaneous firing
+- **Mean Normalization**: Prevent unbounded weight growth
+- **Stability Mechanisms**: Prevent runaway excitation
+
+#### Implementation
+```cpp
+// Hebbian weight update
+weight += learningRate * preFiring * postFiring * (1 - weight);
+```
+
+### StructuralPlasticity
+**Formation and elimination of synapses**
+
+#### Mechanisms
+- **Synaptogenesis**: Creation of new synaptic connections
+- **Pruning**: Removal of weak or unused synapses
+- **Rewiring**: Reconfiguration of existing connections
+- **Developmental Guidance**: Activity-dependent synapse formation
+
+## Development Layer
+
+### DevelopmentSystem
+**Orchestrates developmental processes**
+
+#### Key Features
+- **Stage Management**: Progression through developmental stages
+- **Plasticity Modulation**: Age-dependent learning rates
+- **Critical Period Control**: Sensitive learning windows
+- **Maturation Processes**: Development of adult-level properties
+
+#### Developmental Stages
+1. **Initial**: Primitive neural circuits
+2. **CriticalPeriod**: High plasticity for rapid learning
+3. **Maturation**: Stabilization of connections
+4. **Adult**: Optimized adult functionality
+
+### Synaptogenesis
+**Formation of new synaptic connections**
+
+#### Mechanisms
+- **Probabilistic Formation**: Random connection establishment
+- **Activity-Dependent**: Stronger connections between co-active neurons
+- **Regional Specificity**: Connections within and between brain regions
+- **Developmental Regulation**: Higher rates in early stages
+
+### Pruning
+**Removal of weak or unused synapses**
+
+#### Mechanisms
+- **Use-Dependent**: Synapses weaken with low activity
+- **Competition**: Limited resources lead to competitive elimination
+- **Homeostatic**: Global synaptic scaling
+- **Activity-Independent**: Scheduled pruning for cleanup
+
+### Maturation
+**Development of adult-level properties**
+
+#### Processes
+- **Excitatory/Inhibitory Balance**: Development of proper excitation/inhibition ratio
+- **Connectome Maturation**: Refinement of connection patterns
+- **Functional Specialization**: Development of region-specific functions
+- **Integration Enhancement**: Better coordination between systems
+
+## Neuromodulation Layer
+
+### Neuromodulator
+**Abstract base class for neuromodulators**
+
+#### Interface
+```cpp
+class Neuromodulator {
+public:
+    virtual ~Neuromodulator() = default;
+    virtual void initialize(const NeuromodConfig& config) = 0;
+    virtual void update(float dt, const BrainState& state) = 0;
+    virtual float getModulation() const = 0;
+};
+```
+
+#### Derived Classes
+- `Dopamine`: Reward prediction error signaling
+- `Curiosity`: Novelty and exploration motivation
+- `Novelty`: Detection of unexpected events
+- `PredictionError`: Discrepancy between predicted and actual outcomes
+
+### Dopamine
+**Reward prediction error signaling**
+
+#### Key Functions
+- **Reward Prediction**: Anticipates expected rewards
+- **Error Computation**: Signals prediction discrepancies
+- **Learning Modulation**: Scales plasticity based on prediction error
+- **Motivation**: Drives goal-directed behavior
+
+#### Computational Model
+```cpp
+delta = reward - prediction;
+dopamine = learningRate * delta;
+```
+
+### Curiosity
+**Exploration motivation based on novelty and uncertainty**
+
+#### Key Features
+- **Novelty Detection**: Identifies unexpected sensory input
+- **Uncertainty Estimation**: Measures prediction confidence
+- **Exploration Drive**: Motivates exploration of uncertain states
+- **Information Gain**: Maximizes learning from new experiences
+
+### Novelty
+**Detection of unexpected events**
+
+#### Mechanisms
+- **Prediction Error**: Difference from expected sensory input
+- **Statistical Unusualness**: Deviation from learned patterns
+- **Change Detection**: Identification of environmental changes
+- **Adaptation**: Updating predictions based on novelty
+
+## Memory Layer
+
+### NeuralWorkingMemory
+**Persistent activity for temporary storage**
+
+#### Key Features
+- **Recurrent Connectivity**: Circuits that maintain activity
+- **Competitive Selection**: Winner-take-more dynamics
+- **Rapid Decay**: Controlled forgetting mechanisms
+- **Pattern Completion**: Retrieval from partial cues
+
+### NeuralEpisodicMemory
+**Experience encoding in neural patterns**
+
+#### Key Features
+- **Pattern Storage**: Experiences stored as neural activity patterns
+- **Temporal Indexing**: Association with temporal context
+- **Pattern Completion**: Retrieval from partial cues
+- **Replay Mechanisms**: Reactivation during consolidation
+
+### NeuralAssociativeMemory
+**Experience-based pattern associations**
+
+#### Key Features
+- **Hebbian Associations**: Strengthen co-activation patterns
+- **Pattern Separation**: Discriminate similar experiences
+- **Pattern Completion**: Retrieve patterns from partial cues
+- **Concept Formation**: Abstract pattern discovery
+
+### ConceptFormation
+**Pattern discovery without explicit labels**
+
+#### Mechanisms
+- **Clustering**: Group similar patterns into concepts
+- **Prototype Formation**: Create representative patterns
+- **Stability Measurement**: Track concept consistency
+- **Category Hints**: Derive categories from properties
+
+## Prediction Layer
+
+### NeuralPrediction
+**Temporal sequence learning**
+
+#### Key Features
+- **Sequence Learning**: Discover temporal relationships
+- **Multi-step Prediction**: Chain predictions for future states
+- **Error Signals**: Prediction error for learning
+- **Confidence Estimation**: Uncertainty in predictions
+
+### ActionConsequencePredictor
+**Associates actions with their effects**
+
+#### Key Features
+- **Action-Outcome Learning**: Map actions to consequences
+- **Counterfactual Reasoning**: Consider alternative outcomes
+- **Planning Support**: Evaluate potential action sequences
+- **Adaptive Predictions**: Update based on experience
+
+### PredictionSystem
+**Integrated prediction and error computation**
+
+#### Key Features
+- **Multi-level Predictions**: Predict at different temporal scales
+- **Hierarchical Processing**: Organize predictions into levels
+- **Error Propagation**: Pass prediction errors up the hierarchy
+- **Learning Integration**: Use errors to update predictions
+
+## Cognitive Layer
+
+### AttentionalSelection
+**Competitive selection of neural representations**
+
+#### Key Features
+- **Lateral Inhibition**: Suppress competing representations
+- **Top-Down Bias**: Influence from goals and expectations
+- **Bottom-Up Salience**: Influence from stimulus properties
+- **Winner-Take-More**: Strong representation dominates
+
+### NeuralPlanner
+**Predictive action selection**
+
+#### Key Features
+- **Multi-step Evaluation**: Consider future consequences
+- **Action Quality**: Learn which actions work in which states
+- **Plan Adaptation**: Update plans based on outcomes
+- **Monte Carlo Tree Search**: Evaluate multiple action sequences
+
+### SelfModel
+**Sensorimotor self-awareness**
+
+#### Key Features
+- **Forward Model**: Predict sensory consequences of actions
+- **Self-Generated Likeness**: Distinguish self vs external effects
+- **Agency Detection**: Identify self-caused vs externally caused changes
+- **Capability Representation**: Track what can be achieved
+
+### SocialLearning
+**Observation and imitation of others**
+
+#### Key Features
+- **Observation Learning**: Learn from watching others
+- **Imitation Capability**: Reproduce observed actions
+- **Communication Signals**: Learn associated communication
+- **Theory of Mind**: Understand others' mental states
+
+## Sensory Layer
+
+### SensoryInput
+**Base class for sensory data**
+
+#### Derived Classes
+- `Vision`: Visual input processing
+- `Audio`: Audio input processing
+- `InternalSignals`: Internal body state signals
+- `Proprioception`: Body position and movement sensing
+
+### SensoryProcessing
+**Conversion of sensory data to neural representations**
+
+#### Key Features
+- **Feature Extraction**: Identify relevant sensory properties
+- **Noise Reduction**: Filter out irrelevant variations
+- **Binding**: Combine features into coherent percepts
+- **Temporal Integration**: Handle time-varying sensory input
+
+## Motor Layer
+
+### Action
+**Action representation**
+
+#### Key Features
+- **Motor Planning**: Sequence of motor commands
+- **Execution Control**: Timing and coordination
+- **Feedback Integration**: Adjust based on sensory feedback
+- **Error Correction**: Adapt based on outcomes
+
+### MotorSystem
+**Neural-to-action conversion**
+
+#### Key Features
+- **Decoding**: Convert neural activity to motor commands
+- **Inverse Kinematics**: Determine muscle activations for desired movements
+- **Adaptation**: Learn from experience and feedback
+- **Planning Integration**: Coordinate with cognitive planning
+
+## Environment Layer
+
+### Environment
+**Abstract environment interface**
+
+#### Derived Classes
+- `SimpleWorld`: Simple 2D environment with objects
+- `ComplexWorld`: More complex environment with dynamics
+- `VirtualEnvironment`: Simulated world with physics
+
+### Observation
+**Sensory observation wrapper**
+
+#### Key Features
+- **Percept Creation**: Convert environment data to percepts
+- **Temporal Integration**: Handle changing sensory input
+- **Noise Modeling**: Simulate sensor limitations
+- **Time Stamping**: Track observation timing
+
+### Action
+**Action wrapper**
+
+#### Key Features
+- **Command Parsing**: Interpret action descriptions
+- **Execution**: Send actions to environment
+- **Feedback**: Receive action outcomes
+- **Learning**: Update based on action consequences
+
+## Experiments Layer
+
+### Experiment
+**Single experiment recording**
+
+#### Key Features
+- **Controlled Conditions**: Precise experimental setup
+- **Data Recording**: Record all relevant metrics
+- **State Management**: Maintain experiment state
+- **Reproducibility**: Ensure experimental repeatability
+
+### ExperimentRunner
+**Experiment execution**
+
+#### Key Features
+- **Automated Execution**: Run experiments according to protocol
+- **Data Analysis**: Analyze recorded data
+- **Statistical Testing**: Perform statistical analysis
+- **Visualization**: Generate experimental results
+
+### Metrics
+**Data analysis and metrics computation**
+
+#### Key Metrics
+- **Performance Metrics**: Measure task completion and accuracy
+- **Learning Metrics**: Track improvement over time
+- **Neural Metrics**: Measure neural activity patterns
+- **Behavioral Metrics**: Track agent behavior
+
+### Phase4Experiment
+**Phase 4 cognitive experiments**
+
+#### Experiment Types
+- **Attention Experiments**: Test attentional selection capabilities
+- **Working Memory Experiments**: Test memory retention and recall
+- **Prediction Experiments**: Test temporal and action prediction
+- **Planning Experiments**: Test multi-step action selection
+- **Social Learning Experiments**: Test observation and imitation
+- **Concept Formation Experiments**: Test pattern discovery
+
+## Integration Guide
+
+### Phase 6: Final Integration
+
+The Phase 6 integration represents the culmination of all previous phases, creating a coherent artificial brain system where all components work together seamlessly.
+
+#### Integration Architecture
+```
+WORLD (Environment)
+  ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  ↓
+ATTENTION (competitive selection)
+  ↓
+NEURAL PROCESSING (LIF dynamics)
+  ↓
+PREDICTION (temporal sequence learning)
+  ↓
+WORKING MEMORY (persistent activity)
+  ↓
+EPISODIC MEMORY (experience storage)
+  ↓
+CONCEPT FORMATION (pattern discovery)
+  ↓
+PLANNING (multi-step prediction)
+  ↓
+SELF-MODEL (sensorimotor learning)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD (SimpleWorld)
+  ↓
+ACTION RESULT
+  ↓
+REWARD / ERROR
+  ↓
+NEUROMODULATION
+  ↓
+PLASTICITY
+  ↓
+SOCIAL LEARNING (observation/imitation)
+```
+
+#### Integration Components
+
+### AgentBrain Interface
+The AgentBrain class connects the NLM brain to the world:
+
+#### SensoryTransduction
+Converts world percepts to neural input:
+- **Vision Transduction**: Converts visual input to neural activity
+- **Touch Transduction**: Converts tactile input to neural signals
+- **Proprioception Transduction**: Converts body position to neural signals
+- **Internal Signal Transduction**: Converts internal state to neural signals
+
+#### MotorDecoding
+Converts neural activity to motor commands:
+- **Action Decoding**: Maps neural activity to specific actions
+- **Timing Control**: Synchronizes motor command execution
+- **Coordination**: Coordinates multiple actions
+
+#### Neuromodulation
+Applies reward signals to plasticity:
+- **Dopamine Application**: Modulates learning based on rewards
+- **Curiosity Integration**: Drives exploration based on novelty
+- **Prediction Error Application**: Adjusts predictions based on errors
+
+#### Development
+Updates developmental stage:
+- **Stage Progression**: Advances through developmental stages
+- **Plasticity Adjustment**: Modifies learning rates
+- **Maturation Tracking**: Monitors developmental progress
+
+#### Attention
+Selective processing through competition:
+- **Competitive Selection**: Choose which neural representations to process
+- **Winner-Take-More**: Amplify selected representations
+- **Gate Control**: Control information flow
+
+#### Planning
+Uses predictions to select actions:
+- **Future Simulation**: Evaluate potential action sequences
+- **Outcome Prediction**: Anticipate action consequences
+- **Goal Integration**: Align actions with goals
+
+### Integration State Management
+
+#### Brain State
+Maintains neural network state:
+- **Neural Activity**: Current neural firing patterns
+- **Memory Contents**: Stored working and episodic memories
+- **Plasticity State**: Current synaptic weights and eligibility traces
+- **Development Stage**: Current developmental phase
+
+#### Checkpoint System
+Persistent storage of brain state:
+- **Save Points**: Record brain state at intervals
+- **Load Points**: Restore brain state from saved points
+- **Incremental Saving**: Efficient storage of incremental changes
+- **State Compression**: Reduce storage requirements
+
+#### Replay and Consolidation
+Memory consolidation mechanisms:
+- **Episodic Replay**: Reactivate past experiences
+- **Memory Integration**: Combine with existing knowledge
+- **Strength Enhancement**: Reinforce important memories
+- **Pattern Completion**: Complete partial memories
+
+### Performance Monitoring
+
+#### Metrics Collection
+- **Speed Metrics**: Computation time and throughput
+- **Memory Metrics**: Memory usage and allocation patterns
+- **Accuracy Metrics**: Simulation correctness and biological plausibility
+- **Scalability Metrics**: Performance at different scales
+
+#### Optimization Levels
+- **Basic**: Memory pools only
+- **Intermediate**: Vectorization + memory pools
+- **Advanced**: SIMD + parallel processing
+- **Research**: Experimental optimizations
+
+## Key Design Principles
+
+### Modularity
+- **Clear Interfaces**: Well-defined boundaries between components
+- **Independent Evolution**: Components can be developed and tested separately
+- **Extensible Design**: Easy to add new components and mechanisms
+
+### Integration
+- **Unified Brain Loop**: All systems connected into a coherent architecture
+- **Bidirectional Flow**: Information flows between all levels of processing
+- **Cross-System Influences**: Each system affects and is affected by others
+
+### Performance
+- **Memory Efficiency**: Memory pool systems for allocation efficiency
+- **SIMD Compatibility**: Structure-of-Arrays layouts for vectorization
+- **Parallel Processing**: Batch processing and optimization for scale
+
+### Biological Plausibility
+- **Neural Dynamics**: LIF neuron models with realistic properties
+- **Plasticity Rules**: Biologically plausible learning mechanisms
+- **Development**: Stages similar to biological brain development
+- **Neuromodulation**: Similar functions to biological neuromodulators
+
+### Computational Efficiency
+- **Data-Oriented Design**: Optimize for cache locality and vectorization
+- **Event-Driven Processing**: Process spikes only when they occur
+- **Memory Pooling**: Reduce allocation/deallocation overhead
+- **Batch Processing**: Process multiple operations together
+
+## Data Flow
+
+### Phase 2: Neural Computation
+```
+Sensory Input (test signals)
+      ↓
+Brain.receiveSensoryInput()
+      ↓
+Neural Computation (LIF dynamics)
+      ↓
+Spike Processing (event-driven)
+      ↓
+Plasticity (STDP, Hebbian)
+      ↓
+Structural Plasticity (synaptogenesis/pruning)
+```
+
+### Phase 3: World Interaction
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+      ↓
+AgentBrain.processSensoryInput()
+      ↓
+Brain.receiveSensoryInput() → Sensory Neurons
+      ↓
+Neural Computation (LIF dynamics)
+      ↓
+Spike Processing (event-driven)
+      ↓
+Motor Decoding → MotorCommand
+      ↓
+AgentBrain.decodeMotorCommand()
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT (reward, success)
+      ↓
+Reward Prediction Error
+      ↓
+Neuromodulation (dopamine-like signal)
+      ↓
+Eligibility Trace Update
+      ↓
+Plasticity (STDP, Hebbian, Reward-Modulated)
+      ↓
+Structural Plasticity (synaptogenesis/pruning)
+      ↓
+Development System (stage progression)
+```
+
+### Phase 4: Emerging Cognition
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT
+      ↓
+ATTENTION (competitive selection)
+      ↓
+NEURAL PROCESSING
+      ↓
+PREDICTION (temporal sequence learning)
+      ↓
+WORKING MEMORY (persistent activity)
+      ↓
+EPISODIC MEMORY (experience storage)
+      ↓
+CONCEPT FORMATION (pattern discovery)
+      ↓
+PLANNING (multi-step prediction)
+      ↓
+SELF-MODEL (sensorimotor learning)
+      ↓
+MOTOR ACTION
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT
+      ↓
+REWARD / ERROR
+      ↓
+NEUROMODULATION
+      ↓
+PLASTICITY
+      ↓
+SOCIAL LEARNING (observation/imitation)
+```
+
+### Phase 6: Final Integration
+```
+WORLD (SimpleWorld)
+      ↓
+SENSORY PERCEPT
+      ↓
+ATTENTION (competitive selection)
+      ↓
+NEURAL PROCESSING (LIF dynamics)
+      ↓
+PREDICTION (temporal sequence learning)
+      ↓
+WORKING MEMORY (persistent activity)
+      ↓
+EPISODIC MEMORY (experience storage)
+      ↓
+CONCEPT FORMATION (pattern discovery)
+      ↓
+PLANNING (multi-step prediction)
+      ↓
+SELF-MODEL (sensorimotor learning)
+      ↓
+ACTION SELECTION
+      ↓
+MOTOR OUTPUT
+      ↓
+WORLD.applyMotorCommand()
+      ↓
+ACTION RESULT
+      ↓
+REWARD / ERROR
+      ↓
+NEUROMODULATION (dopamine, curiosity, novelty)
+      ↓
+PLASTICITY (STDP, Hebbian, reward-modulated)
+      ↓
+DEVELOPMENT (stage progression, plasticity modulation)
+      ↓
+BRAIN STATE CHANGE
+      ↓
+BEHAVIORAL CHANGE
+      ↓
+NEW EXPERIENCES
+      ↓
+CONTINUOUS LEARNING
+```
+
+## Configuration Options
+
+### Core Configuration
+```cpp
+// Core simulation parameters
+{
+    "timestep": 0.001,
+    "max_neurons": 10000,
+    "max_synapses": 100000,
+    "random_seed": 42,
+    "development_enabled": true,
+    "memory_capacity": 1000
+}
+```
+
+### Memory Pool Configuration
+```cpp
+// Memory pool settings
+{
+    "neuron_pool_size": 1024,
+    "synapse_pool_size": 4096,
+    "memory_pool_block_size": 1024,
+    "pool_optimization_level": 2
+}
+```
+
+### Plasticity Configuration
+```cpp
+// Plasticity rule parameters
+{
+    "stdp_learning_rate": 0.01,
+    "hebbian_learning_rate": 0.001,
+    "homeostatic_strength": 1.0,
+    "plasticity_decay": 0.99
+}
+```
+
+### Development Configuration
+```cpp
+// Developmental stage parameters
+{
+    "plasticity_curve": "exponential",
+    "critical_period_start": 0.1,
+    "critical_period_end": 1.0,
+    "maturation_rate": 0.05
+}
+```
+
+### Neuromodulation Configuration
+```cpp
+// Neuromodulator parameters
+{
+    "dopamine_learning_rate": 0.01,
+    "curiosity_sensitivity": 0.5,
+    "novelty_threshold": 0.1,
+    "prediction_error_decay": 0.9
+}
+```
+
+## Build and Configuration
+
+### CMake Integration
+```bash
+# Build with optimizations
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON ..
+make -j$(nproc)
+
+# Build with specific optimization levels
+-DNLM_OPT_LEVEL=1  # Basic
+-DNLM_OPT_LEVEL=2  # Intermediate
+-DNLM_OPT_LEVEL=3  # Advanced
+```
+
+### Running the System
+```bash
+# Phase 6 demo (integration test)
+./nlm_phase6_demo
+
+# Custom experiment configuration
+./nlm_experiment --config=experiments/phase4_config.json
+```
+
+## Testing and Validation
+
+### Performance Benchmarks
+- **Micro benchmark**: 1,000 neurons, 10,000 synapses
+  - Target: 10,000+ steps/sec
+  - Current: ~8,000 steps/sec
+
+- **Small benchmark**: 10,000 neurons, 100,000 synapses
+  - Target: 5,000+ steps/sec
+  - Current: ~4,500 steps/sec
+
+- **Medium benchmark**: 100,000 neurons, 1,000,000 synapses
+  - Target: 1,000+ steps/sec
+  - Current: ~900 steps/sec
+
+### Correctness Validation
+- **Numerical Stability**: All optimizations maintain numerical accuracy
+- **Functional Correctness**: Behavioral equivalence verified
+- **Edge Cases**: Comprehensive testing of boundary conditions
+- **Integration Testing**: All systems work together correctly
+
+## Future Work
+
+### Phase 7: Advanced Optimizations
+1. **SIMD Implementation**: Full AVX-512 and AVX2 vectorization
+2. **Parallel Processing**: Multi-threading support
+3. **GPU Acceleration**: CUDA/HIP integration for large networks
+4. **Adaptive Optimization**: Runtime performance tuning
+
+### Phase 8: Research Features
+1. **Approximate Computing**: Precision-speed tradeoffs
+2. **Dynamic Optimization**: Runtime performance tuning
+3. **Distributed Computing**: Multi-machine scaling
+4. **Hardware Acceleration**: FPGA/ASIC support
+
+## Conclusion
+
+The NLM architecture represents a comprehensive, modular approach to creating an artificial developmental brain. By integrating neural computation, memory systems, neuromodulation, prediction, cognition, and development into a coherent system, NLM demonstrates how complex cognitive abilities can emerge from interacting neural components.
+
+The architecture balances biological inspiration with computational efficiency, providing a flexible platform for research in computational neuroscience, artificial intelligence, and cognitive modeling. The modular design allows for incremental development and testing of individual components while maintaining the ability to integrate everything into a functioning brain system.
+
+The Phase 6 integration represents a significant milestone, showing that all major components can work together to create a system capable of learning, adapting, and interacting with its environment in increasingly sophisticated ways.

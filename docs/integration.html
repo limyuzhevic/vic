@@ -1,0 +1,824 @@
+# Integration Guide
+
+## Overview
+
+The Integration Guide provides a comprehensive overview of how all NLM systems work together to create a coherent artificial brain. It covers the integration architecture, data flows, and implementation details that enable Phase 6 functionality.
+
+## Integration Architecture
+
+### Main Integration Structure
+```cpp
+struct Brain::Impl {
+    // ========== CORE SYSTEMS ==========
+    std::shared_ptr<Config> config;
+    std::unique_ptr<RandomGenerator> rng;
+    std::vector<std::unique_ptr<NeuralRegion>> regions;
+    std::vector<InterRegionConnection> interRegionConnections;
+    
+    // ========== NEURAL COMPUTATION ==========
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // ========== MEMORY SYSTEMS ==========
+    std::unique_ptr<NeuralWorkingMemory> workingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    
+    // ========== PREDICTION SYSTEM ==========
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    
+    // ========== COGNITIVE SYSTEMS ==========
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    
+    // ========== NEUROMODULATION ==========
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<PredictionError> predictionError;
+    
+    // ========== DEVELOPMENT ==========
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+    // ========== AGENT INTERFACE ==========
+    std::unique_ptr<SensoryTransduction> sensoryTransduction;
+    std::unique_ptr<MotorDecoding> motorDecoding;
+    std::unique_ptr<NeuromodulationInterface> neuromodulationInterface;
+    
+    // ========== EXPERIMENT FRAMEWORK ==========
+    std::unique_ptr<ExperimentRunner> experimentRunner;
+    std::unique_ptr<MetricsCollector> metricsCollector;
+    
+    // ========== PERMANENCE ==========
+    std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // ========== SIMULATION STATE ==========
+    TimestepDuration timestep;
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    bool isResting;
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    
+    // ========== SENSE-MOTOR NEURONS ==========
+    std::vector<Neuron*> sensoryNeurons;
+    std::vector<Neuron*> motorNeurons;
+};
+```
+
+## Integration Flow
+
+### Complete Integration Cycle
+```
+WORLD (Environment)
+  ↓
+SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
+  ↓
+SENSORY NEURONS (Pattern encoding)
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+SPIKE SYSTEM (Event-driven processing)
+  ↓
+NEUROMODULATION (Dopamine, curiosity, novelty)
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+DEVELOPMENT (Stage progression)
+  ↓
+MEMORY SYSTEMS
+  ├─ WORKING MEMORY (Persistent activity)
+  ├─ EPISODIC MEMORY (Experience storage)
+  ├─ ASSOCIATIVE MEMORY (Pattern associations)
+  └─ CONCEPT FORMATION (Abstract representation)
+  ↓
+PREDICTION SYSTEM (Temporal and action prediction)
+  ↓
+COGNITIVE SYSTEMS
+  ├─ ATTENTION (Competitive selection)
+  ├─ PLANNING (Multi-step prediction)
+  ├─ SELF-MODEL (Self-awareness)
+  └─ SOCIAL LEARNING (Imitation)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR NEURONS (Action generation)
+  ↓
+MOTOR DECODING (Action commands)
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD.applyMotorCommand()
+  ↓
+ACTION RESULT
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+NEUROMODULATION (Feedback)
+  ↓
+CONTINUOUS LEARNING CYCLE
+```
+
+## Integration Components
+
+### AgentBrain Interface
+The AgentBrain class serves as the interface between the NLM brain and the world:
+
+#### SensoryTransduction
+```cpp
+class SensoryTransduction {
+public:
+    virtual ~SensoryTransduction() = default;
+    
+    virtual void processSensoryInput(
+        const WorldPercept& percept,
+        NeuralNetwork& neuralNetwork) = 0;
+    
+    virtual void encodeSensoryPatterns(
+        const std::vector<float>& sensoryData,
+        NeuralWorkingMemory& workingMemory) = 0;
+};
+```
+
+#### MotorDecoding
+```cpp
+class MotorDecoding {
+public:
+    virtual ~MotorDecoding() = default;
+    
+    virtual ActionVector decodeMotorCommand(
+        const NeuralNetwork& neuralNetwork) = 0;
+    
+    virtual float getActionQuality(
+        const ActionVector& action,
+        const std::vector<float>& sensoryInput) = 0;
+};
+```
+
+#### NeuromodulationInterface
+```cpp
+class NeuromodulationInterface {
+public:
+    virtual ~NeuromodulationInterface() = default;
+    
+    virtual void applyRewardSignal(
+        float reward,
+        PlasticitySystem& plasticity) = 0;
+    
+    virtual void applyPredictionError(
+        float predictionError,
+        PlasticitySystem& plasticity) = 0;
+    
+    virtual void updateDevelopmentalStage(
+        DevelopmentSystem& development) = 0;
+};
+```
+
+## Data Flow Integration
+
+### Phase 2: Neural Computation
+```cpp
+// Sensory input processing
+sensoryNeurons.clear();
+for (float sensoryData : sensoryPercept) {
+    Neuron* sensoryNeuron = findAvailableSensoryNeuron();
+    sensoryNeuron->addSynapticInput(sensoryData);
+    sensoryNeurons.push_back(sensoryNeuron);
+}
+
+// Neural computation
+for (Neuron* neuron : sensoryNeurons) {
+    neuron->stepLIF(timestep, currentTime);
+    if (neuron->shouldFire()) {
+        spikeSystem->processSpike(neuron->getSpike(), *neuron);
+    }
+}
+
+// Plasticity updates
+for (auto& connection : interRegionConnections) {
+    stdp->update(*connection.preNeuron, *connection.postNeuron);
+    hebbian->update(*connection.preNeuron, *connection.postNeuron);
+}
+```
+
+### Phase 3: Environment Interaction
+```cpp
+// Agent processes sensory input
+AgentBrain::processSensoryInput(worldPercept);
+
+// Brain receives sensory input
+Brain::receiveSensoryInput(worldPercept);
+
+// Neural computation with sensory input
+Brain::step(timestep);
+
+// Motor decoding
+ActionVector motorCommand = AgentBrain::decodeMotorCommand();
+
+// Environment applies action
+World::applyMotorCommand(motorCommand);
+
+// Action result
+float reward = World::getCurrentReward();
+float predictionError = calculatePredictionError();
+
+// Neuromodulation
+NeuromodulationInterface::applyRewardSignal(reward, plasticity);
+NeuromodulationInterface::applyPredictionError(predictionError, plasticity);
+```
+
+### Phase 4: Emerging Cognition
+```cpp
+// Sensory input processing
+AgentBrain::processSensoryInput(worldPercept);
+
+// Cognitive processing
+CognitionSystem::processAttention(worldPercept);
+
+// Working memory management
+WorkingMemory::update();
+
+// Episodic memory encoding
+EpisodicMemory::encodeExperience(worldPercept);
+
+// Concept formation
+ConceptFormation::extractConcepts(worldPercept);
+
+// Prediction
+PredictionSystem::predictNextState();
+
+// Planning
+Planner::generateActionSequence();
+
+// Self-model
+SelfModel::updateSelfModel(worldPercept);
+
+// Social learning
+SocialLearning::observeOtherAgents();
+
+// Action selection
+ActionVector action = CognitionSystem::selectAction();
+
+// Motor output
+AgentBrain::decodeMotorCommand(action);
+
+// Environment interaction
+World::applyMotorCommand(action);
+```
+
+### Phase 6: Final Integration
+```cpp
+// Complete integration cycle
+void Brain::step(TimestepDuration dt) {
+    // Update simulation time
+    currentTime += dt;
+    currentStep++;
+    
+    // Process sensory input
+    processSensoryInput();
+    
+    // Update working memory
+    workingMemory->update(dt);
+    
+    // Update episodic memory
+    episodicMemory->update(dt);
+    
+    // Update prediction system
+    predictionSystem->update(dt);
+    
+    // Update cognitive systems
+    attention->update(dt);
+    planner->update(dt);
+    selfModel->update(dt);
+    socialLearning->update(dt);
+    
+    // Update neuromodulation
+    dopamine->update(dt, calculateRewardPredictionError());
+    curiosity->update(dt, calculateNovelty());
+    novelty->update(dt, calculatePredictionError());
+    predictionError->update(dt, calculateMultiSourceError());
+    
+    // Update development system
+    developmentSystem->update(dt);
+    
+    // Update plasticity
+    stdp->update(dt);
+    hebbian->update(dt);
+    structuralPlasticity->update(dt);
+    
+    // Process spikes
+    spikeSystem->processSpikes(dt);
+    
+    // Update motor system
+    if (!isResting) {
+        motorNeurons.clear();
+        for (Neuron* neuron : attention->getActiveNeurons()) {
+            motorNeurons.push_back(neuron);
+        }
+    }
+    
+    // Check for episode boundaries
+    checkEpisodeBoundaries();
+    
+    // Update statistics
+    totalSpikesThisStep = calculateTotalSpikes();
+    totalSpikesTotal += totalSpikesThisStep;
+}
+```
+
+## Integration Patterns
+
+### 1. Hierarchical Integration
+```cpp
+// Brain integrates multiple systems hierarchically
+class Brain {
+private:
+    std::unique_ptr<NeuromodulationSystem> neuromodulation;
+    std::unique_ptr<MemorySystem> memorySystem;
+    std::unique_ptr<CognitionSystem> cognitionSystem;
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+public:
+    void integrateSystems() {
+        // Neuromodulation provides global signals
+        float globalModulation = neuromodulation->calculateGlobalModulation();
+        
+        // Memory systems use neuromodulation
+        memorySystem->setModulationLevel(globalModulation);
+        
+        // Cognition systems use memory and neuromodulation
+        cognitionSystem->integrate(memorySystem.get(), neuromodulation.get());
+        
+        // Development system uses all systems
+        developmentSystem->integrate(neuromodulation.get(), 
+                                   memorySystem.get(),
+                                   cognitionSystem.get());
+    }
+};
+```
+
+### 2. Bidirectional Integration
+```cpp
+// Systems integrate bidirectionally
+class IntegratedSystem {
+private:
+    std::vector<std::function<void()>> integrationFunctions;
+    
+public:
+    void integrate() {
+        // Apply all integration functions
+        for (auto& func : integrationFunctions) {
+            func();
+        }
+    }
+    
+    void addIntegration(std::function<void()> func) {
+        integrationFunctions.push_back(func);
+    }
+};
+
+// Usage
+IntegratedSystem brain;
+brain.addIntegration([&]() { 
+    memorySystem->integrateWithNeuralNetwork(neuralNetwork); 
+});
+brain.addIntegration([&]() {
+    cognitionSystem->integrateWithMemorySystem(memorySystem);
+});
+brain.addIntegration([&]() {
+    neuromodulation->integrateWithPlasticitySystem(plasticitySystem);
+});
+```
+
+### 3. Event-Driven Integration
+```cpp
+// Systems integrate through events
+class EventDrivenIntegration {
+public:
+    void processEvent(BrainEvent event) {
+        switch (event.type) {
+            case BRAIN_EVENT_SPIKE:
+                handleSpikeEvent(event);
+                break;
+            case BRAIN_EVENT_REWARD:
+                handleRewardEvent(event);
+                break;
+            case BRAIN_EVENT_PREDICTION_ERROR:
+                handlePredictionErrorEvent(event);
+                break;
+            case BRAIN_EVENT_DEVELOPMENTAL_CHANGE:
+                handleDevelopmentalChangeEvent(event);
+                break;
+            case BRAIN_EVENT_MEMORY_UPDATE:
+                handleMemoryUpdateEvent(event);
+                break;
+        }
+    }
+    
+private:
+    void handleSpikeEvent(const BrainEvent& event) {
+        // Update memory systems
+        workingMemory->recordSpike(event.neuronId);
+        episodicMemory->recordExperience(event);
+        
+        // Update prediction system
+        predictionSystem->updatePrediction(event);
+        
+        // Update plasticity
+        plasticitySystem->applySpikeBasedPlasticity(event);
+    }
+    
+    void handleRewardEvent(const BrainEvent& event) {
+        // Update neuromodulation
+        neuromodulationSystem->applyReward(event.reward, event.predictionError);
+        
+        // Update working memory
+        workingMemory->recordReward(event.reward);
+        
+        // Update episodic memory
+        episodicMemory->recordRewardExperience(event);
+    }
+    // ... other event handlers
+};
+```
+
+## Integration Configuration
+
+### Integration Settings
+```cpp
+struct IntegrationSettings {
+    // Neural computation settings
+    bool enableNeuralComputation;
+    float neuralComputationTimeStep;
+    
+    // Memory system settings
+    bool enableWorkingMemory;
+    bool enableEpisodicMemory;
+    bool enableAssociativeMemory;
+    bool enableConceptFormation;
+    
+    // Prediction system settings
+    bool enableTemporalPrediction;
+    bool enableActionConsequencePrediction;
+    bool enableMultiStepPrediction;
+    
+    // Cognitive system settings
+    bool enableAttention;
+    bool enablePlanning;
+    bool enableSelfModel;
+    bool enableSocialLearning;
+    
+    // Neuromodulation settings
+    bool enableDopamine;
+    bool enableCuriosity;
+    bool enableNovelty;
+    bool enablePredictionError;
+    
+    // Development settings
+    bool enableDevelopment;
+    DevelopmentalStage initialStage;
+    float developmentSpeed;
+    
+    // Integration settings
+    bool enableBidirectionalIntegration;
+    bool enableEventDrivenIntegration;
+    bool enableHierarchicalIntegration;
+    
+    // Performance settings
+    bool enablePerformanceOptimizations;
+    int integrationLevel;
+};
+```
+
+### Integration Configuration Example
+```json
+{
+    "integration": {
+        "neuralComputation": {
+            "enabled": true,
+            "timeStep": 0.001
+        },
+        "memorySystems": {
+            "workingMemory": { "enabled": true },
+            "episodicMemory": { "enabled": true },
+            "associativeMemory": { "enabled": true },
+            "conceptFormation": { "enabled": true }
+        },
+        "predictionSystem": {
+            "temporalPrediction": { "enabled": true },
+            "actionConsequencePrediction": { "enabled": true },
+            "multiStepPrediction": { "enabled": true }
+        },
+        "cognitiveSystems": {
+            "attention": { "enabled": true },
+            "planning": { "enabled": true },
+            "selfModel": { "enabled": true },
+            "socialLearning": { "enabled": true }
+        },
+        "neuromodulation": {
+            "dopamine": { "enabled": true },
+            "curiosity": { "enabled": true },
+            "novelty": { "enabled": true },
+            "predictionError": { "enabled": true }
+        },
+        "development": {
+            "enabled": true,
+            "initialStage": "CriticalPeriod",
+            "developmentSpeed": 1.0
+        },
+        "integrationPatterns": {
+            "bidirectional": { "enabled": true },
+            "eventDriven": { "enabled": true },
+            "hierarchical": { "enabled": true }
+        }
+    }
+}
+```
+
+## Integration Testing
+
+### Integration Testing Framework
+```cpp
+class IntegrationTester {
+public:
+    bool testIntegration() {
+        // Test each integration component
+        if (!testNeuralComputationIntegration()) return false;
+        if (!testMemoryIntegration()) return false;
+        if (!testPredictionIntegration()) return false;
+        if (!testCognitionIntegration()) return false;
+        if (!testNeuromodulationIntegration()) return false;
+        if (!testDevelopmentIntegration()) return false;
+        
+        return true;
+    }
+    
+private:
+    bool testNeuralComputationIntegration() {
+        // Test neural computation integration
+        return true;
+    }
+    
+    bool testMemoryIntegration() {
+        // Test memory system integration
+        return true;
+    }
+    
+    bool testPredictionIntegration() {
+        // Test prediction system integration
+        return true;
+    }
+    
+    bool testCognitionIntegration() {
+        // Test cognition system integration
+        return true;
+    }
+    
+    bool testNeuromodulationIntegration() {
+        // Test neuromodulation integration
+        return true;
+    }
+    
+    bool testDevelopmentIntegration() {
+        // Test development system integration
+        return true;
+    }
+};
+```
+
+## Integration Validation
+
+### Validation Metrics
+```cpp
+struct IntegrationValidationMetrics {
+    // Integration quality metrics
+    float integrationCompleteness;      // How complete the integration is
+    float integrationCohesion;          // How cohesive the integration is
+    float integrationCoupling;          // How coupled the integration is
+    float integrationEfficiency;        // How efficient the integration is
+    float integrationMaintainability;   // How maintainable the integration is
+    
+    // Functional metrics
+    float systemFunctionality;           // Overall system functionality
+    float performanceQuality;            // Performance quality
+    float behavioralQuality;             // Behavioral quality
+    float learningQuality;               // Learning quality
+};
+```
+
+### Validation Tests
+```cpp
+class IntegrationValidator {
+public:
+    IntegrationValidationMetrics validateIntegration() {
+        IntegrationValidationMetrics metrics;
+        
+        // Test integration completeness
+        metrics.integrationCompleteness = testIntegrationCompleteness();
+        
+        // Test integration cohesion
+        metrics.integrationCohesion = testIntegrationCohesion();
+        
+        // Test integration coupling
+        metrics.integrationCoupling = testIntegrationCoupling();
+        
+        // Test integration efficiency
+        metrics.integrationEfficiency = testIntegrationEfficiency();
+        
+        // Test integration maintainability
+        metrics.integrationMaintainability = testIntegrationMaintainability();
+        
+        // Test system functionality
+        metrics.systemFunctionality = testSystemFunctionality();
+        
+        // Test performance quality
+        metrics.performanceQuality = testPerformanceQuality();
+        
+        // Test behavioral quality
+        metrics.behavioralQuality = testBehavioralQuality();
+        
+        // Test learning quality
+        metrics.learningQuality = testLearningQuality();
+        
+        return metrics;
+    }
+    
+private:
+    float testIntegrationCompleteness() {
+        // Test if all systems are properly integrated
+        // Check if all required components are present
+        // Check if all integration points are established
+        return 1.0f;  // Placeholder
+    }
+    
+    float testIntegrationCohesion() {
+        // Test if integrated systems work together well
+        // Check if systems share common goals
+        // Check if systems communicate effectively
+        return 1.0f;  // Placeholder
+    }
+    
+    float testIntegrationCoupling() {
+        // Test if integration creates appropriate coupling
+        // Check if systems are neither too coupled nor too independent
+        return 1.0f;  // Placeholder
+    }
+    
+    float testIntegrationEfficiency() {
+        // Test if integration is efficient
+        // Check if integration minimizes overhead
+        // Check if integration maximizes performance
+        return 1.0f;  // Placeholder
+    }
+    
+    float testIntegrationMaintainability() {
+        // Test if integration is maintainable
+        // Check if integration is modular
+        // Check if integration follows good design principles
+        return 1.0f;  // Placeholder
+    }
+    
+    float testSystemFunctionality() {
+        // Test overall system functionality
+        // Check if system performs all required functions
+        return 1.0f;  // Placeholder
+    }
+    
+    float testPerformanceQuality() {
+        // Test performance quality
+        // Check if system performance meets requirements
+        return 1.0f;  // Placeholder
+    }
+    
+    float testBehavioralQuality() {
+        // Test behavioral quality
+        // Check if system behavior is appropriate
+        return 1.0f;  // Placeholder
+    }
+    
+    float testLearningQuality() {
+        // Test learning quality
+        // Check if system learns effectively
+        return 1.0f;  // Placeholder
+    }
+};
+```
+
+## Integration Maintenance
+
+### Integration Health Monitoring
+```cpp
+class IntegrationMonitor {
+public:
+    void monitorIntegration() {
+        // Monitor integration health
+        checkIntegrationHealth();
+        
+        // Track integration metrics
+        trackIntegrationMetrics();
+        
+        // Alert on integration issues
+        alertOnIntegrationIssues();
+    }
+    
+private:
+    void checkIntegrationHealth() {
+        // Check if integration is healthy
+        // Check if all systems are responsive
+        // Check if integration is stable
+    }
+    
+    void trackIntegrationMetrics() {
+        // Track integration metrics
+        // Record integration performance
+        // Log integration statistics
+    }
+    
+    void alertOnIntegrationIssues() {
+        // Alert on integration issues
+        // Check for performance degradation
+        // Check for system failures
+        // Send alerts to system administrators
+    }
+};
+```
+
+### Integration Updates
+```cpp
+class IntegrationUpdater {
+public:
+    void updateIntegration() {
+        // Update integration configuration
+        updateConfiguration();
+        
+        // Update integration code
+        updateCode();
+        
+        // Update integration documentation
+        updateDocumentation();
+        
+        // Update integration tests
+        updateTests();
+    }
+    
+private:
+    void updateConfiguration() {
+        // Update integration configuration files
+        // Apply new integration settings
+        // Test integration configuration
+    }
+    
+    void updateCode() {
+        // Update integration code
+        // Implement new integration features
+        // Fix integration bugs
+    }
+    
+    void updateDocumentation() {
+        // Update integration documentation
+        // Update integration guides
+        // Update API documentation
+    }
+    
+    void updateTests() {
+        // Update integration tests
+        // Add new integration tests
+        // Update existing integration tests
+    }
+};
+```
+
+## Conclusion
+
+The Integration Guide provides a comprehensive overview of how all NLM systems work together to create a coherent artificial brain. It covers the integration architecture, data flows, integration patterns, configuration, testing, and maintenance.
+
+Understanding integration is essential for:
+- **Designing Integrated Systems**: Creating systems where all components work together
+- **Implementing Complex Architectures**: Building systems with multiple interacting components
+- **Debugging Integration Issues**: Identifying and fixing integration problems
+- **Maintaining Integrated Systems**: Keeping integrated systems functional and efficient
+
+The integration guide provides the foundation for exploring NLM's integration capabilities, from basic neural computation to advanced cognitive functions.
+
+## See Also
+- [Architecture Guide](architecture.html): Architecture overview and diagrams
+- [Neural Computation Guide](neural-computation.html): Neural computation integration
+- [Memory Integration Guide](memory-integration.html): Memory system integration
+- [Prediction Integration Guide](prediction-integration.html): Prediction system integration
+- [Cognition Integration Guide](cognition-integration.html): Cognition system integration
+- [Neuromodulation Integration Guide](neuromodulation-integration.html): Neuromodulation integration
+- [Development Integration Guide](development-integration.html): Development system integration
+
+## References
+- Baddeley, A. D. (2000). The episodic buffer: A slot-and address architecture for complex working memory tasks. Quarterly Journal of Experimental Psychology.
+- Haber, S. N., & Oppenheim, R. W. (2003). Executive functions in the brain. Trends in Cognitive Sciences.
+- Rolls, E. T. (2016). The brain as a prediction engine. Computational Brain & Behaviour.
+- Friston, K., et al. (2006). Predictive coding: a free-energy principle for brain function. Nature Reviews Neuroscience.
