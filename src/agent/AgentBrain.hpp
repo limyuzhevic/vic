@@ -52,6 +52,16 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Record complete experience in episodic memory
+    void recordExperience(const SensoryPercept& percept, 
+                         MotorCommand action, 
+                         float reward, 
+                         SimulationStep step);
+    
+    // Enable/disable episodic recording
+    void enableEpisodicRecording(bool enable) { episodicRecordingEnabled_ = enable; }
+    bool isEpisodicRecordingEnabled() const { return episodicRecordingEnabled_; }
+    
     // Reset agent for new episode
     void reset();
     
@@ -108,6 +118,7 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool episodicRecordingEnabled_;  // NEW: Enable episodic recording
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

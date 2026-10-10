@@ -21,6 +21,12 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Set predicted pattern (for integration with other systems)
+    void setPredictedPattern(const std::vector<float>& pattern);
+    
+    // Get predicted pattern
+    const std::vector<float>& getPredictedPattern() const;
+    
     // Get prediction error
     float getPredictionError() const;
     

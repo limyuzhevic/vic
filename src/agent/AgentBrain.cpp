@@ -18,6 +18,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , episodicRecordingEnabled_(true)  // NEW: Enable episodic recording by default
     , sensoryNoveltyDecay_(0.99f)
 {
     // Initialize motor and sensory neuron groups
@@ -124,6 +125,42 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // ENHANCEMENT: Store sensory input in working memory
+    // Convert sensory percept to neural pattern for working memory
+    std::vector<float> sensoryPattern;
+    
+    // Vision pattern (256 values)
+    sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+    
+    // Touch pattern (8 values)
+    std::vector<float> touchPattern(touch.begin(), touch.end());
+    sensoryPattern.insert(sensoryPattern.end(), touchPattern.begin(), touchPattern.end());
+    
+    // Internal pattern (4 values)
+    std::vector<float> internalPattern(intern.begin(), intern.end());
+    sensoryPattern.insert(sensoryPattern.end(), internalPattern.begin(), internalPattern.end());
+    
+    // Proprioception pattern (6 values)
+    std::vector<float> proprioPattern(proprio.begin(), proprio.end());
+    sensoryPattern.insert(sensoryPattern.end(), proprioPattern.begin(), proprioPattern.end());
+    
+    // Store in working memory with strength based on overall sensory activity
+    if (brain_ && brain_->getWorkingMemory()) {
+        // Calculate overall sensory activity level
+        float totalActivity = 0.0f;
+        for (float val : vision) totalActivity += std::abs(val);
+        for (float val : touch) totalActivity += std::abs(val);
+        for (float val : intern) totalActivity += std::abs(val);
+        for (float val : proprio) totalActivity += std::abs(val);
+        
+        float strength = std::min(1.0f, totalActivity / 10.0f);  // Normalize to 0-1
+        
+        // Store pattern in working memory
+        brain_->getWorkingMemory()->store(sensoryPattern, strength);
+        
+        NLM_LOG_DEBUG("Stored sensory pattern in working memory: " + std::to_string(sensoryPattern.size()) + " elements, strength=" + std::to_string(strength));
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -152,14 +189,74 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Get current sensory state from working memory for planning
+    std::vector<float> currentState;
+    if (brain_->getWorkingMemory()) {
+        currentState = brain_->getWorkingMemory()->retrieve();
+    }
+    
+    // Get neural planner for planned action selection
+    auto* planner = brain_->getPlanner();
+    bool plannerAvailable = (planner != nullptr);
+    
+    MotorCommand plannedAction = MotorCommand::Wait;
+    
+    if (plannerAvailable && !currentState.empty()) {
+        // Use neural planner to plan action based on current state
+        // Target reward encourages exploration and learning
+        float targetReward = 0.5f;  // Balanced exploration/exploitation
+        plannedAction = planner->planAction(currentState, targetReward);
+        
+        // Get planner confidence for decision making
+        float planningConfidence = planner->getPlanningConfidence();
+        
+        NLM_LOG_DEBUG("AgentBrain: Planner selected action " + std::to_string(static_cast<int>(plannedAction)) + 
+                     " with confidence " + std::to_string(planningConfidence));
+    }
+    
+    // Get motor command from both planned action and motor neurons
+    MotorCommand motorBasedCommand = decodeFromMotorNeurons();
+    
+    // Decide which command to use based on availability and confidence
+    MotorCommand finalCommand;
+    
+    if (plannerAvailable && !currentState.empty()) {
+        // Use neural planning as primary method when available
+        float planningConfidence = planner->getPlanningConfidence();
+        
+        if (planningConfidence > 0.6f) {
+            // High confidence: trust the planned action
+            finalCommand = plannedAction;
+            NLM_LOG_DEBUG("AgentBrain: Using planned action (high confidence)");
+        } else if (planningConfidence > 0.3f) {
+            // Medium confidence: blend planned and motor-based actions
+            // For now, prioritize planned action but with curiosity
+            finalCommand = plannedAction;
+            // Add curiosity-driven variation
+            if (curiosityEnabled_ && curiosityLevel_ > 0.5f) {
+                finalCommand = selectWithCuriosity(finalCommand);
+            }
+            NLM_LOG_DEBUG("AgentBrain: Using planned action with curiosity (medium confidence)");
+        } else {
+            // Low confidence: rely on motor neuron activity (reactive)
+            finalCommand = motorBasedCommand;
+            NLM_LOG_DEBUG("AgentBrain: Using reactive motor neurons (low confidence)");
+        }
+    } else {
+        // No planner available: use motor neuron activity only
+        finalCommand = motorBasedCommand;
+        NLM_LOG_DEBUG("AgentBrain: No planner available, using reactive motor neurons");
+    }
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        finalCommand = selectWithCuriosity(finalCommand);
     }
     
-    return decoded;
+    // Log decision
+    NLM_LOG_DEBUG("AgentBrain: Final command = " + std::to_string(static_cast<int>(finalCommand)));
+    
+    return finalCommand;
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -347,4 +444,101 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+// ENHANCEMENT: Record complete experience in episodic memory
+void AgentBrain::recordExperience(const SensoryPercept& percept, 
+                                   MotorCommand action, 
+                                   float reward, 
+                                   SimulationStep step) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Convert sensory percept to neural pattern
+    std::vector<float> sensoryPattern;
+    
+    // Vision pattern (256 values)
+    const auto& vision = percept.getVision();
+    sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+    
+    // Touch pattern (8 values)
+    const auto& touch = percept.getTouch();
+    std::vector<float> touchPattern(touch.begin(), touch.end());
+    sensoryPattern.insert(sensoryPattern.end(), touchPattern.begin(), touchPattern.end());
+    
+    // Internal pattern (4 values)
+    const auto& intern = percept.getInternal();
+    std::vector<float> internalPattern(intern.begin(), intern.end());
+    sensoryPattern.insert(sensoryPattern.end(), internalPattern.begin(), internalPattern.end());
+    
+    // Proprioception pattern (6 values)
+    const auto& proprio = percept.getProprioception();
+    std::vector<float> proprioPattern(proprio.begin(), proprio.end());
+    sensoryPattern.insert(sensoryPattern.end(), proprioPattern.begin(), proprioPattern.end());
+    
+    // Create episodic memory item
+    EpisodicMemoryItem episode;
+    episode.timestamp = step;
+    episode.age = 0;
+    episode.sensoryState = sensoryPattern;
+    
+    // Convert MotorCommand to ActionType
+    ActionType actionType;
+    switch (action) {
+        case MotorCommand::MoveForward: actionType = ActionType::MoveForward; break;
+        case MotorCommand::MoveBackward: actionType = ActionType::MoveBackward; break;
+        case MotorCommand::TurnLeft: actionType = ActionType::TurnLeft; break;
+        case MotorCommand::TurnRight: actionType = ActionType::TurnRight; break;
+        case MotorCommand::LookLeft: actionType = ActionType::Look; break;
+        case MotorCommand::LookRight: actionType = ActionType::Look; break;
+        case MotorCommand::Interact: actionType = ActionType::Interact; break;
+        default: actionType = ActionType::Wait; break;
+    }
+    episode.action = actionType;
+    
+    // Internal state (energy, reward, etc.)
+    episode.reward = reward;
+    episode.energy = noveltyLevel_;  // Use novelty as proxy for energy
+    episode.novelty = noveltyLevel_;
+    
+    // Location information (would come from environment - placeholder)
+    episode.positionX = 0.0f;
+    episode.positionY = 0.0f;
+    episode.orientation = 0.0f;
+    
+    // Consequence of action (same as initial state for now)
+    episode.resultingSensoryState = sensoryPattern;
+    episode.resultingReward = reward;
+    
+    // Also get some neural activity from brain
+    episode.activeNeurons.clear();
+    episode.neuronActivations.clear();
+    
+    if (brain_->getTotalNeuronCount() > 0) {
+        // Sample some neurons from the brain
+        size_t sampleCount = std::min<size_t>(50, brain_->getTotalNeuronCount());
+        for (size_t i = 0; i < sampleCount; ++i) {
+            // Use deterministic sampling based on step
+            size_t neuronIndex = (i * 137 + step) % brain_->getTotalNeuronCount();
+            
+            // Get a neuron - this is simplified
+            // In a real implementation, we would have access to specific neurons
+            // For now, just add some placeholder data
+            NeuronId dummyNeuron(static_cast<uint64_t>(neuronIndex));
+            episode.activeNeurons.push_back(dummyNeuron);
+            episode.neuronActivations.push_back(0.1f);  // Placeholder
+        }
+    }
+    
+    // Store in episodic memory
+    brain_->getEpisodicMemory()->storeEpisode(episode);
+    
+    NLM_LOG_DEBUG("AgentBrain::recordExperience - stored episode at step " + std::to_string(step) + 
+                 " with action " + std::to_string(static_cast<int>(actionType)) + 
+                 " and reward " + std::to_string(reward));
+}
+
+void AgentBrain::enableEpisodicRecording(bool enable) {
+    episodicRecordingEnabled_ = enable;
+}
+
+bool AgentBrain::isEpisodicRecordingEnabled() const {
+    return episodicRecordingEnabled_;
+}
