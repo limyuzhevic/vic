@@ -6,22 +6,34 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Better C++ features
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter -Wno-unused-variable -fPIC")
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# Build type options
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Installation directories
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Installation prefix")
+set(INSTALL_RPATH "$ORIGIN")
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Option to enable JSON support
+find_package(nlohmann_json QUIET)
+if (NOT nlohmann_json_FOUND)
+    message(WARNING "nlohmann_json not found - JSON config support will be limited")
+    set(HAVE_NLOHMANN_JSON FALSE)
+else()
+    set(HAVE_NLOHMANN_JSON TRUE)
+    include(${nlohmann_json_SOURCE_DIR}/nlohmann_json.cmake)
+endif()
+
+# Option to enable enhanced config system
+option(ENABLE_ENHANCED_CONFIG "Enable enhanced configuration system with validation" ON)
+
+# Core library with enhanced components
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -29,6 +41,9 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Enhanced neural components
+    src/brain/EnhancedNeuron.cpp
+    src/brain/EnhancedSynapse.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -87,6 +102,21 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+if (ENABLE_ENHANCED_CONFIG)
+    target_sources(nlm_core PRIVATE src/core/Config/EnhancedConfig.cpp)
+    target_include_directories(nlm_core PUBLIC src/core/Config)
+endif()
+
+if (ENABLE_ENHANCED_NEURAL)
+    target_sources(nlm_core PRIVATE src/brain/EnhancedNeuron.cpp src/brain/EnhancedSynapse.cpp)
+    target_include_directories(nlm_core PUBLIC src/brain)
+endif()
+
+if (ENABLE_ENHANCED_CONFIG)
+    target_sources(nlm_core PRIVATE src/core/Config/EnhancedConfig.cpp)
+    target_include_directories(nlm_core PUBLIC src/core/Config)
+endif()
+
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
@@ -139,13 +169,38 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
+
+# Phase 6 experiment library (for integration)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Package configuration (for future)
+include(GNUInstallDirs)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NLMConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
 )
