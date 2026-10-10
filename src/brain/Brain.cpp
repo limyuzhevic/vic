@@ -1,16 +1,35 @@
 #include "Brain.hpp"
+
+// Forward declarations for commonly used classes to reduce include dependencies
+namespace nlm {
+    class NeuralRegion;
+    class NeuralPopulation;
+    class Neuron;
+    class Synapse;
+    class SpikeSystem;
+    class STDP;
+    class Hebbian;
+    class StructuralPlasticity;
+}
+
+// Core system headers
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
+
+// Agent and world systems  
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+
+// Memory systems
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+
+// Other systems
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -31,9 +50,10 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
+    // Associative memory is part of episodic memory functionality
+    // (NeuralEpisodicMemory contains associative learning methods)
+    
     std::unique_ptr<PredictionSystem> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
@@ -111,7 +131,9 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Associative memory functionality is integrated into
+        // NeuralEpisodicMemory through its methods
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -239,8 +261,8 @@ bool Brain::initialize() {
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Note: Associative memory functionality is integrated into
+    // NeuralEpisodicMemory, not a separate system
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -755,7 +777,6 @@ void Brain::reset() {
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
@@ -1011,10 +1032,6 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

@@ -55,11 +55,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -78,7 +74,6 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -96,6 +91,7 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/motor/Action.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
@@ -103,6 +99,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
+    src/world/Observation.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)

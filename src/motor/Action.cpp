@@ -1,4 +1,6 @@
 #include "Action.hpp"
+#include <string>
+#include <memory>
 
 namespace nlm {
 

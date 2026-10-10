@@ -35,6 +35,7 @@ struct Phase6IntegrationResult {
     bool neuromodulationIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
+    bool phase3IntegrationWorks;
     bool checkpointingWorks;
     bool replayWorks;
     
@@ -58,6 +59,7 @@ struct Phase6IntegrationResult {
         , neuromodulationIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
+        , phase3IntegrationWorks(false)
         , checkpointingWorks(false)
         , replayWorks(false)
         , totalReward(0.0f)
@@ -115,11 +117,14 @@ public:
     bool verifyIntegration();
     
     /**
-     * Test memory integration
+     * Test Phase 3 integration (world interaction)
      */
-    bool testMemoryIntegration();
+    bool testPhase3Integration();
     
     /**
+     * Convert motor command to string
+     */
+    const char* motorCommandToString(MotorCommand cmd);
      * Test neuromodulation integration
      */
     bool testNeuromodulationIntegration();

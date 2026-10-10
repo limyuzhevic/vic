@@ -60,6 +60,13 @@ struct LearningExperiment {
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    ~LearningExperiment() {
+        // Clean up memory
+        initialWeights.clear();
+        finalWeights.clear();
+        mostActiveNeurons.clear();
+    }
+    
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();

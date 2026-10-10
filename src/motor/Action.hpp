@@ -1,57 +1,62 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include <string>
 #include <vector>
-#include <memory>
+#include <string>
 
 namespace nlm {
 
-// Action types for motor output
 enum class ActionType {
-    MoveForward,
-    MoveBackward,
-    MoveLeft,
-    MoveRight,
-    TurnLeft,
-    TurnRight,
-    Look,
-    LookUp,
-    LookDown,
-    Interact,
-    Eat,
-    Drink,
-    Rest,
-    Wait,
-    Custom
+    MoveForward = 0,
+    MoveBackward = 1,
+    MoveLeft = 2,
+    MoveRight = 3,
+    Look = 4,
+    Interact = 5,
+    Wait = 6,
+    LookLeft = 7,
+    LookRight = 8,
+    LookUp = 9,
+    LookDown = 10,
+    Eat = 11,
+    Drink = 12,
+    Rest = 13,
+    Custom = 14
 };
 
-// Action representation
 class Action {
 public:
     Action();
     Action(ActionType type);
-    Action(ActionType type, const std::vector<float>& parameters);
+    Action(ActionType type, const std::vector<float>& params);
     ~Action();
     
-    // Action type
-    ActionType getType() const;
-    void setType(ActionType type);
+    ActionType getType() const { return type_; }
+    void setType(ActionType type) { type_ = type; }
     
-    // Action parameters
-    const std::vector<float>& getParameters() const;
-    void setParameters(const std::vector<float>& params);
+    const std::vector<float>& getParameters() const { return parameters_; }
+    void setParameters(const std::vector<float>& params) { parameters_ = params; }
     
-    // Get action name
+    float getReward() const { return reward_; }
+    void setReward(float r) { reward_ = r; }
+    
+    bool getSuccess() const { return success_; }
+    void setSuccess(bool s) { success_ = s; }
+    
+    const std::string& getMessage() const { return message_; }
+    void setMessage(const std::string& m) { message_ = m; }
+    
+    static const char* actionTypeToString(ActionType type);
+    
     std::string getName() const;
     
-    // Clone
     std::unique_ptr<Action> clone() const;
     
 private:
     ActionType type_;
     std::vector<float> parameters_;
-    static const char* actionTypeToString(ActionType type);
+    float reward_;
+    bool success_;
+    std::string message_;
 };
 
 } // namespace nlm
