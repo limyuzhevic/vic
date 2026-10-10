@@ -398,7 +398,182 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Neuromodulation access methods
+        .def("getDopamineLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* dopamine = brain->getDopamine()) {
+                    return dopamine->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get dopamine level")
+        .def("getAcetylcholineLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* ach = brain->getAcetylcholine()) {
+                    return ach->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get acetylcholine (ACh) level")
+        .def("getNorepinephrineLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* ne = brain->getNorepinephrine()) {
+                    return ne->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get norepinephrine (NE) level")
+        .def("getSerotoninLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* ser = brain->getSerotonin()) {
+                    return ser->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get serotonin (5-HT) level")
+        .def("getPredictionErrorLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* pe = brain->getPredictionErrorSignal()) {
+                    return pe->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get prediction error level")
+        .def("getCuriosityLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* curiosity = brain->getCuriosity()) {
+                    return curiosity->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get curiosity level (duplicate for consistency)")
+        .def("getNoveltyLevel", [](AgentBrain& self) { 
+            if (auto* brain = self.getBrain()) {
+                if (auto* novelty = brain->getNovelty()) {
+                    return novelty->getLevel();
+                }
+            }
+            return 0.0f;
+        }, "Get novelty level (duplicate for consistency)")
+        .def("enableAcetylcholine", [](AgentBrain& self, bool enable) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* ach = brain->getAcetylcholine()) {
+                    // Enable acetylcholine by setting level above baseline
+                    if (enable) ach->setLevel(0.1f);
+                    else ach->setLevel(0.0f);
+                }
+            }
+        }, "Enable/disable acetylcholine neuromodulation")
+        .def("enableNorepinephrine", [](AgentBrain& self, bool enable) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* ne = brain->getNorepinephrine()) {
+                    if (enable) ne->setLevel(0.05f);
+                    else ne->setLevel(0.0f);
+                }
+            }
+        }, "Enable/disable norepinephrine neuromodulation")
+        .def("enableSerotonin", [](AgentBrain& self, bool enable) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* ser = brain->getSerotonin()) {
+                    if (enable) ser->setLevel(0.03f);
+                    else ser->setLevel(0.0f);
+                }
+            }
+        }, "Enable/disable serotonin neuromodulation")
+        .def("signalNovelty", [](AgentBrain& self, float novelty) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* noveltySys = brain->getNovelty()) {
+                    noveltySys->detectNovelty({novelty});
+                }
+                if (auto* curiosity = brain->getCuriosity()) {
+                    curiosity->signalNovelty(novelty);
+                }
+                if (auto* ach = brain->getAcetylcholine()) {
+                    ach->signalNoveltyDetection(novelty);
+                }
+            }
+        }, "Signal novelty detection for curiosity and novelty systems")
+        .def("signalSocialInteraction", [](AgentBrain& self) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* ser = brain->getSerotonin()) {
+                    ser->signalSocialInteraction();
+                }
+            }
+        }, "Signal social interaction for serotonin modulation")
+        .def("triggerBurstMode", [](AgentBrain& self) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* ne = brain->getNorepinephrine()) {
+                    ne->triggerBurstMode();
+                }
+            }
+        }, "Trigger norepinephrine burst mode for enhanced vigilance")
+        .def("signalAttentionBoost", [](AgentBrain& self) {
+            if (auto* brain = self.getBrain()) {
+                if (auto* ach = brain->getAcetylcholine()) {
+                    ach->signalAttentionBoost();
+                }
+            }
+        }, "Signal attention boost for acetylcholine modulation")
+        .def("getBrainStats", [](AgentBrain& self) {
+            py::dict stats;
+            if (auto* brain = self.getBrain()) {
+                stats["total_neurons"] = brain->getTotalNeuronCount();
+                stats["total_synapses"] = brain->getTotalSynapseCount();
+                stats["active_neurons"] = brain->getActiveNeuronCount();
+                stats["firing_neurons"] = brain->getFiringNeuronCount();
+                stats["average_firing_rate"] = brain->getAverageFiringRate();
+                stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+                stats["total_spikes"] = brain->getTotalSpikeCount();
+                
+                // Neuromodulation stats
+                if (auto* dopamine = brain->getDopamine()) {
+                    stats["dopamine"] = dopamine->getLevel();
+                }
+                if (auto* ach = brain->getAcetylcholine()) {
+                    stats["acetylcholine"] = ach->getLevel();
+                }
+                if (auto* ne = brain->getNorepinephrine()) {
+                    stats["norepinephrine"] = ne->getLevel();
+                }
+                if (auto* ser = brain->getSerotonin()) {
+                    stats["serotonin"] = ser->getLevel();
+                }
+                if (auto* curiosity = brain->getCuriosity()) {
+                    stats["curiosity"] = curiosity->getLevel();
+                }
+                if (auto* novelty = brain->getNovelty()) {
+                    stats["novelty"] = novelty->getLevel();
+                }
+                if (auto* predictionError = brain->getPredictionErrorSignal()) {
+                    stats["prediction_error"] = predictionError->getLevel();
+                }
+                
+                // Memory stats
+                if (auto* workingMemory = brain->getWorkingMemory()) {
+                    stats["working_memory_traces"] = workingMemory->getActiveTraces();
+                }
+                if (auto* episodicMemory = brain->getEpisodicMemory()) {
+                    stats["episodic_memory_episodes"] = episodicMemory->getEpisodeCount();
+                }
+                if (auto* attention = brain->getAttention()) {
+                    stats["attention_focus"] = attention->getCurrentFocus();
+                }
+                if (auto* conceptFormation = brain->getConceptFormation()) {
+                    stats["concept_count"] = conceptFormation->getConceptCount();
+                }
+                if (auto* planner = brain->getPlanner()) {
+                    stats["planning_depth"] = planner->getPlanningDepth();
+                }
+                if (auto* predictionSystem = brain->getPredictionSystem()) {
+                    stats["prediction_confidence"] = predictionSystem->getConfidence();
+                }
+                if (auto* development = brain->getDevelopmentSystem()) {
+                    stats["developmental_stage"] = static_cast<int>(development->getDevelopmentalStage());
+                }
+            }
+            return stats;
+        }, "Get comprehensive brain statistics including neuromodulation and cognitive systems");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -415,6 +590,145 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced factory functions with built-in neuromodulation
+    m.def("createDefaultExperimentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("neuron_count", static_cast<int64_t>(2000));
+        config->set("region_count", static_cast<int64_t>(3));
+        config->set("connection_probability", 0.15f);
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.018f);
+        config->set("synaptogenesis_rate", 0.001f);
+        config->set("pruning_rate", 0.0001f);
+        config->set("replay_interval", 100);
+        config->set("consolidation_interval", 1000);
+        config->set("visualization_enabled", true);
+        config->set("checkpoint_dir", "./nlm_checkpoints");
+        return config;
+    }, "Create a default configuration for advanced experiments");
+
+    // Convenience functions for common simulation patterns
+    m.def("run_simple_simulation", [](std::shared_ptr<Brain> brain, 
+                                     std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent,
+                                     int numSteps, bool enableLearning = true) {
+        // Enable key neuromodulation systems
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            
+            // Enable other neuromodulators if available
+            if (auto* ach = brain->getAcetylcholine()) {
+                ach->setLevel(0.1f);
+            }
+            if (auto* ne = brain->getNorepinephrine()) {
+                ne->setLevel(0.05f);
+            }
+            if (auto* ser = brain->getSerotonin()) {
+                ser->setLevel(0.03f);
+            }
+        }
+        
+        // Run simulation loop
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (step % 100 == 0) {
+                float reward = world->computeReward(*agent);
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+           py::arg("numSteps"), py::arg("enableLearning") = true,
+           "Run a simple simulation with learning enabled");
+
+    m.def("run_development_simulation", [](std::shared_ptr<Brain> brain,
+                                           std::shared_ptr<SimpleWorld> world,
+                                           std::shared_ptr<AgentBrain> agent,
+                                           int numSteps, bool enableAllNeuromodulators = true) {
+        // Comprehensive neuromodulation setup
+        if (enableAllNeuromodulators) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+            
+            // Enable all neuromodulators
+            if (auto* ach = brain->getAcetylcholine()) ach->setLevel(0.1f);
+            if (auto* ne = brain->getNorepinephrine()) ne->setLevel(0.08f);
+            if (auto* ser = brain->getSerotonin()) ser->setLevel(0.05f);
+            if (auto* dopamine = brain->getDopamine()) dopamine->setLevel(0.05f);
+            if (auto* curiosity = brain->getCuriosity()) curiosity->setLevel(0.1f);
+            if (auto* novelty = brain->getNovelty()) novelty->setLevel(0.1f);
+            if (auto* predictionError = brain->getPredictionErrorSignal()) predictionError->setLevel(0.05f);
+        }
+        
+        // Development-focused simulation
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Track development metrics
+            if (step % 50 == 0) {
+                float reward = world->computeReward(*agent);
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+           py::arg("numSteps"), py::arg("enableAllNeuromodulators") = true,
+           "Run a development-focused simulation with comprehensive neuromodulation");
+
+    m.def("quick_start_example", []() {
+        std::cout << "=== NLM Quick Start Example ===\n";
+        std::cout << "1. Create configuration\n";
+        std::cout << "   config = pynlm.createDefaultConfig()\n";
+        std::cout << "\n";
+        std::cout << "2. Create brain and agent\n";
+        std::cout << "   brain = pynlm.createBrain(config)\n";
+        std::cout << "   agent = pynlm.createAgentBrain(brain)\n";
+        std::cout << "\n";
+        std::cout << "3. Enable learning systems\n";
+        std::cout << "   agent.enableRewardModulation(True)\n";
+        std::cout << "   agent.enableCuriosity(True)\n";
+        std::cout << "\n";
+        std::cout << "4. Run simulation\n";
+        std::cout << "   for i in range(100):\n";
+        std::cout << "       # Your simulation loop here\n";
+        std::cout << "\n";
+        std::cout << "For advanced examples, see the NLM documentation."
+    }, "Print a quick start example");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -56,6 +56,7 @@ public:
     Config& operator=(Config&&) noexcept;
     
     // Load from file (JSON format)
+    // TODO: Implement proper JSON/YAML parser for complex nested configurations
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments

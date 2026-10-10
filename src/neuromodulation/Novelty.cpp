@@ -2,27 +2,37 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
     float level;
-    float decayRate;
-    std::vector<float> history;
-    std::vector<float> lastPattern;
-    float noveltyThreshold;
-    
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    float baselineLevel;
+    float sensorySurprise;
+    float statisticalRarity;
+    float predictionError;
+    float changeDetection;
+    float memoryAccessCost;
+    std::vector<float> recentInputHistory;
+    static constexpr size_t historySize = 100;
 };
 
-Novelty::Novelty() : pImpl(new Impl) {}
+Novelty::Novelty() : pImpl(new Impl()) {
+    pImpl->level = 0.0f;
+    pImpl->baselineLevel = 0.01f;
+    pImpl->sensorySurprise = 0.0f;
+    pImpl->statisticalRarity = 0.0f;
+    pImpl->predictionError = 0.0f;
+    pImpl->changeDetection = 0.0f;
+    pImpl->memoryAccessCost = 0.1f;
+    pImpl->recentInputHistory.reserve(pImpl->historySize);
+}
 
 Novelty::~Novelty() = default;
 
-void Novelty::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+const char* Novelty::getName() const {
+    return "Novelty Detection";
 }
 
 float Novelty::getLevel() const {
@@ -30,55 +40,82 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+    
+    // Novelty affects sensory surprise
+    pImpl->sensorySurprise = pImpl->level * 1.5f;
+    if (pImpl->sensorySurprise > 1.0f) pImpl->sensorySurprise = 1.0f;
+    
+    // Novelty affects statistical rarity calculation
+    pImpl->statisticalRarity = 1.0f - pImpl->level;
+    
+    // Novelty modulates prediction error sensitivity
+    pImpl->predictionError = pImpl->level;
+    
+    NLM_LOG_DEBUG("Novelty level set to " + std::to_string(level) + 
+                  ", surprise: " + std::to_string(pImpl->sensorySurprise) +
+                  ", rarity: " + std::to_string(pImpl->statisticalRarity));
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
-}
-
-void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
-    if (currentPattern.empty() || previousPattern.empty()) {
-        pImpl->level = 0.0f;
-        return;
-    }
-    
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
-    size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
-    
-    for (size_t i = 0; i < compareLen; ++i) {
-        float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
-    }
-    
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
-    
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
-    pImpl->history.push_back(pImpl->level);
-    
-    // Store current pattern for next comparison
-    pImpl->lastPattern = currentPattern;
+float Novelty::getPlasticityFactor() const {
+    // Novelty enhances plasticity for learning new patterns
+    return 1.5f + pImpl->level * 1.0f;  // Up to 2.5x plasticity
 }
 
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Novelty decays
+    pImpl->level *= std::pow(0.9f, dt);
+    
+    // Maintain recent input history
+    if (pImpl->recentInputHistory.size() >= pImpl->historySize) {
+        pImpl->recentInputHistory.erase(pImpl->recentInputHistory.begin());
+    }
 }
 
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
+void Novelty::detectNovelty(const std::vector<float>& input) {
+    if (input.empty()) return;
+    
+    // Add to history
+    pImpl->recentInputHistory.insert(pImpl->recentInputHistory.end(), 
+                                     input.begin(), input.end());
+    if (pImpl->recentInputHistory.size() > pImpl->historySize) {
+        pImpl->recentInputHistory.erase(pImpl->recentInputHistory.begin(), 
+                                       pImpl->recentInputHistory.begin() + 
+                                       (pImpl->recentInputHistory.size() - pImpl->historySize));
+    }
+    
+    // Calculate statistical deviation
+    if (!pImpl->recentInputHistory.empty()) {
+        float mean = std::accumulate(pImpl->recentInputHistory.begin(), 
+                                     pImpl->recentInputHistory.end(), 0.0f) / 
+                     pImpl->recentInputHistory.size();
+        float variance = 0.0f;
+        for (float val : pImpl->recentInputHistory) {
+            variance += (val - mean) * (val - mean);
+        }
+        variance /= pImpl->recentInputHistory.size();
+        float stdDev = std::sqrt(variance);
+        
+        // Calculate current deviation from mean
+        float currentMean = std::accumulate(input.begin(), input.end(), 0.0f) / input.size();
+        float deviation = std::abs(currentMean - mean);
+        
+        // Normalize by std dev (handle zero case)
+        float normalizedNovelty = stdDev > 0.0f ? deviation / stdDev : 0.0f;
+        normalizedNovelty = std::min(normalizedNovelty, 1.0f);
+        
+        pImpl->changeDetection = normalizedNovelty;
+        setLevel(std::min(pImpl->level + normalizedNovelty * 0.3f, 1.0f));
+        
+        NLM_LOG_INFO("Novelty detected: deviation=" + std::to_string(deviation) + 
+                     ", novelty_level=" + std::to_string(pImpl->level));
+    }
 }
 
-void Novelty::clearHistory() {
-    pImpl->history.clear();
+void Novelty::signalSensorySurprise() {
+    // Strong surprise triggers novelty system
+    setLevel(std::min(pImpl->level + 0.2f, 1.0f));
+    NLM_LOG_INFO("Sensory surprise triggers novelty system");
 }
 
 } // namespace nlm
