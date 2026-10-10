@@ -152,6 +152,76 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        
+        // Value retrieval with type safety
+        .def("get", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            if (value) {
+                return py::make_tuple(*value, "string");
+            }
+            value = self.get<int>(key);
+            if (value) {
+                return py::make_tuple(*value, "int");
+            }
+            value = self.get<double>(key);
+            if (value) {
+                return py::make_tuple(*value, "double");
+            }
+            value = self.get<bool>(key);
+            if (value) {
+                return py::make_tuple(*value, "bool");
+            }
+            value = self.get<std::vector<int>>(key);
+            if (value) {
+                return py::make_tuple(*value, "vector<int>");
+            }
+            value = self.get<std::vector<double>>(key);
+            if (value) {
+                return py::make_tuple(*value, "vector<double>");
+            }
+            value = self.get<std::vector<std::string>>(key);
+            if (value) {
+                return py::make_tuple(*value, "vector<string>");
+            }
+            return py::none();
+        }, py::arg("key"), "Get configuration value with type detection")
+        
+        .def("getOr", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+            // Try to determine type of default value
+            if (py::isinstance<py::int_>(defaultValue)) {
+                return self.getOr<int>(key, defaultValue.cast<int>());
+            } else if (py::isinstance<py::float_>(defaultValue)) {
+                return self.getOr<double>(key, defaultValue.cast<double>());
+            } else if (py::isinstance<py::bool_>(defaultValue)) {
+                return self.getOr<bool>(key, defaultValue.cast<bool>());
+            } else if (py::isinstance<py::str>(defaultValue)) {
+                return self.getOr<std::string>(key, defaultValue.cast<std::string>());
+            } else if (py::isinstance<py::list>(defaultValue)) {
+                // Try to infer vector type from default value
+                py::list list = defaultValue.cast<py::list>();
+                if (!list.empty()) {
+                    if (py::isinstance<py::int_>(list[0])) {
+                        std::vector<int> vec;
+                        for (size_t i = 0; i < list.size(); ++i) {
+                            vec.push_back(list[i].cast<int>());
+                        }
+                        return self.getOr<std::vector<int>>(key, vec);
+                    } else if (py::isinstance<py::float_>(list[0])) {
+                        std::vector<double> vec;
+                        for (size_t i = 0; i < list.size(); ++i) {
+                            vec.push_back(list[i].cast<double>());
+                        }
+                        return self.getOr<std::vector<double>>(key, vec);
+                    }
+                }
+            }
+            // Fallback to string
+            return self.getOr<std::string>(key, defaultValue.cast<std::string>());
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default")
+        
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -308,14 +378,86 @@ PYBIND11_MODULE(pynlm, m) {
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
+        
+        // Statistics
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        
+        // Produce motor/action output based on motor neuron activity
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
+        
+        // Memory systems access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             "Get associative memory system")
+        
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             "Get prediction system")
+        
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             "Get attentional selection system")
+        
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             "Get development system")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        
+        // Neuromodulation systems
+        .def("getDopamine", &Brain::getDopamine,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             "Get prediction error signal")
+        
+        // Get current configuration
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        
+        // Reset brain state
         .def("reset", &Brain::reset,
              "Reset brain state")
+        
+        // Save brain state to file (checkpointing)
         .def("save", &Brain::save, py::arg("filepath"),
              "Save brain state to file")
+        
+        // Load brain state from file
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        
+        // Region management
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
@@ -328,28 +470,25 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+        
+        // Apply neuromodulatory signals
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signals")
+        
+        // Update plasticity rules (called automatically in step)
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules")
+        
+        // Apply developmental changes (called automatically in step)
+        .def("develop", &Brain::develop,
+             "Apply developmental changes")
+        
+        // Get random generator
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             "Get random generator")
+        
+        // Logging
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 

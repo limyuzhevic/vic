@@ -1,21 +1,22 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+requires = ["setuptools>=61.0", "wheel", "pybind11>=2.11.0", "scikit-build-core>=0.5.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) - A computational brain simulation framework"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Authors", email = "contact@nlm.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+license = {text = "MIT"}
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "AI"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,33 +26,63 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Framework :: Pytest",
 ]
-
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "numpy>=1.20",
+    "matplotlib>=3.0",
+    "plotly>=5.0",
+    "psutil>=5.0",
+    "pandas>=1.5",
+    "scikit-learn>=1.3",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
 
-[tool.scikit-build]
-cmake.minimum-version = "3.16"
-cmake.build-type = "Release"
-cmake.args = [
-    "-DCMAKE_CXX_STANDARD=20",
-    "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
+[project.scripts]
+nlm = "python.nlm_cli:main"
+
+[tool.setuptools]
+packages = ["python"]
+include-package-data = true
+package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+python = [
+    "*.py",
+    "*.md",
+    "*.txt",
+    "*.json",
+    "*.html",
 ]
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
-
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = ["python", "tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["python"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == __main__:",
+    "if __name__ == '__main__':",
+    "if TYPE_CHECKING:",
+]
