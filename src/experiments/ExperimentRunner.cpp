@@ -36,8 +36,8 @@ bool ExperimentRunner::runExperiment(std::shared_ptr<Experiment> experiment,
     
     // Run simulation loop
     for (SimulationStep step = 0; step < maxSteps && !environment->isDone(); ++step) {
-        // Brain step
-        brain->step(step);
+        // Brain step with timestep
+        brain->step(step, step * 0.001);  // 1ms timestep
         
         // Record data
         experiment->recordStep(

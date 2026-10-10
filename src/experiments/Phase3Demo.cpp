@@ -81,7 +81,7 @@ public:
                 
                 // 3. Simulate brain (multiple steps per action)
                 for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
+                    brain->step(neuralStep, neuralStep * 0.01);  // Increment time per neural step
                 }
                 
                 // 4. Decode motor command from brain activity
@@ -132,7 +132,9 @@ public:
             metrics.finalCuriosity = agentBrain.getCuriosityLevel();
             metrics.finalEnergy = world.getAgentBody().energy;
             metrics.predictionError = agentBrain.getPredictionError();
-            metrics.developmentalAge = agentBrain.getBrain()->getTotalSynapseCount();  // Use as proxy
+            
+            // Get developmental age from simulation clock if available
+            metrics.developmentalAge = brain->getSimulationClock()->getTotalSteps();
             metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
             metrics.totalSynapses = brain->getTotalSynapseCount();
             metrics.averageFiringRate = brain->getAverageFiringRate();
@@ -169,7 +171,11 @@ public:
             
             // Calculate behavior change
             float rewardChange = last.totalReward - first.totalReward;
-            float actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
+            float actionChange = 0.0f;
+            
+            if (first.forwardCount > 0) {
+                actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
+            }
             
             std::cout << "\nBehavioral change:\n";
             if (rewardChange > 0) {

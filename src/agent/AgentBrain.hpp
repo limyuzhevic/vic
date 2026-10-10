@@ -76,6 +76,11 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for neuron distribution and validation
+    void distributeMotorNeuron(Neuron* neuron);
+    void distributeSensoryNeuron(Neuron* neuron);
+    void validateNeuronDistribution();
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -112,6 +117,23 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Constants for neural scaling and processing
+    static constexpr float NOVELTY_DECAY_RATE = 0.99f;
+    static constexpr float VISION_INPUT_SCALE = 5.0f;
+    static constexpr float TOUCH_INPUT_SCALE = 8.0f;
+    static constexpr float INTERNAL_INPUT_SCALE = 5.0f;
+    static constexpr float PROPRIOCEPTION_INPUT_SCALE = 3.0f;
+    static constexpr float NOVELTY_DECAY_BASE = 0.1f;
+    
+    // Helper methods for input processing
+    float centerAndScaleInput(float value, float scale) const {
+        return (value * 2.0f - 1.0f) * scale;
+    }
+    
+    float computeCuriosityLevel(float novelty, float predictionError) const {
+        return novelty * 2.0f + std::abs(predictionError) * 0.5f;
+    }
 };
 
 } // namespace nlm
