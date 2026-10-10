@@ -7,9 +7,12 @@
 #include <vector>
 #include <chrono>
 
+// Include the new comprehensive logging system
+#include "logging/Logger.hpp"
+
 namespace nlm {
 
-// Log severity levels
+// Forward declaration for backward compatibility
 enum class LogLevel {
     Debug = 0,
     Info = 1,
@@ -28,7 +31,12 @@ struct LogEntry {
     std::chrono::system_clock::time_point timestamp;
 };
 
-// Logger interface
+// Define TRACE and FATAL levels for backward compatibility
+    TRACE = 255,
+    FATAL = 256
+};
+
+// Logger interface (deprecated - use the new nlm::Logger)
 class ILogger {
 public:
     virtual ~ILogger() = default;
@@ -37,7 +45,7 @@ public:
     virtual LogLevel getLevel() const = 0;
 };
 
-// Console logger implementation
+// Console logger implementation (deprecated - use nlm::ConsoleLogger)
 class ConsoleLogger : public ILogger {
 public:
     ConsoleLogger();
@@ -64,7 +72,7 @@ private:
     std::string levelToColor(LogLevel level) const;
 };
 
-// Main Logger class
+// Main Logger class (forward to new system)
 class Logger {
 public:
     Logger();
@@ -103,7 +111,17 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Delegate to new system
+    static void initializeSystem() {
+        // Initialize the new comprehensive logging system
+        auto& globalLogger = nlm::Logger::getGlobal();
+    }
+    
+    static nlm::Logger& getNewGlobalLogger() {
+        return nlm::Logger::getGlobal();
+    }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

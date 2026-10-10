@@ -7,6 +7,9 @@
 
 namespace nlm {
 
+// We'll keep the old implementations but delegate to the new system
+// where appropriate
+
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
@@ -87,6 +90,8 @@ std::string ConsoleLogger::levelToString(LogLevel level) const {
         case LogLevel::Warning: return "WARN";
         case LogLevel::Error: return "ERROR";
         case LogLevel::Critical: return "CRIT";
+        case LogLevel::TRACE: return "TRACE";
+        case LogLevel::FATAL: return "FATAL";
         default: return "UNKNOWN";
     }
 }
@@ -98,6 +103,8 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
         case LogLevel::Warning: return "\033[33m";   // Yellow
         case LogLevel::Error: return "\033[31m";     // Red
         case LogLevel::Critical: return "\033[35m"; // Magenta
+        case LogLevel::TRACE: return "\033[90m";    // Bright Black
+        case LogLevel::FATAL: return "\033[1;31m";  // Bold Red
         default: return "\033[0m";
     }
 }
@@ -130,7 +137,7 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -178,6 +185,15 @@ bool Logger::isEnabled(LogLevel level) const {
 
 Logger& Logger::getGlobal() {
     static Logger globalLogger;
+    
+    // Initialize with a console logger for backward compatibility
+    static bool initialized = false;
+    if (!initialized) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        globalLogger.addLogger(consoleLogger);
+        initialized = true;
+    }
+    
     return globalLogger;
 }
 

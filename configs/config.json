@@ -1,0 +1,46 @@
+{
+  "nlm": {
+    "version": "2.0",
+    "description": "Neural Learning Machine Configuration",
+    
+    "system": {
+      "random_seed": 42,
+      "simulation_timestep": 0.001
+    },
+    
+    "neural": {
+      "neuron_count": 500,
+      "region_count": 1,
+      "connection_probability": 0.15
+    },
+    
+    "plasticity": {
+      "stdp": {
+        "ltp_weight": 0.02,
+        "ltd_weight": 0.015,
+        "time_constant": 20.0
+      },
+      "structural": {
+        "synaptogenesis_rate": 0.0001,
+        "pruning_rate": 0.00001
+      }
+    },
+    
+    "logging": {
+      "level": "INFO",
+      "to_file": false,
+      "filename": "nlm.log"
+    },
+    
+    "environment": {
+      "name": "GridWorld",
+      "width": 10,
+      "height": 10
+    },
+    
+    "simulation": {
+      "max_steps": 10000,
+      "time_limit": 0.0
+    }
+  }
+}

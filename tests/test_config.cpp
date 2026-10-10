@@ -1,7 +1,10 @@
-// Config Tests
+// Enhanced Config Tests for the new JSON/YAML-based configuration system
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace test_config {
 
@@ -78,12 +81,168 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testJSONLoading() {
+    nlm::Config config;
+    
+    // Create a temporary JSON file
+    std::string testContent = R"({
+        "test_int": 42,
+        "test_double": 3.14,
+        "test_string": "hello",
+        "test_bool": true,
+        "test_array": [1, 2, 3, 4, 5]
+    })";
+    
+    std::ofstream jsonFile("test_config.json");
+    jsonFile << testContent;
+    jsonFile.close();
+    
+    // Load JSON file
+    assert(config.loadFromFile("test_config.json"));
+    
+    // Verify values
+    assert(config.getOr<int>("test_int", 0) == 42);
+    assert(config.getOr<double>("test_double", 0.0) == 3.14);
+    assert(config.getOr<std::string>("test_string", "") == "hello");
+    assert(config.getOr<bool>("test_bool", false) == true);
+    
+    // Test array
+    assert(config.has("test_array"));
+    
+    // Clean up
+    std::remove("test_config.json");
+    
+    std::cout << "    testJSONLoading passed" << std::endl;
+}
+
+void testYAMLLoading() {
+    nlm::Config config;
+    
+    // Create a temporary YAML file
+    std::string testContent = """test_int: 42
+test_double: 3.14
+test_string: hello
+test_bool: true
+test_array:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+""";
+    
+    std::ofstream yamlFile("test_config.yaml");
+    yamlFile << testContent;
+    yamlFile.close();
+    
+    // Load YAML file
+    assert(config.loadFromFile("test_config.yaml"));
+    
+    // Verify values
+    assert(config.getOr<int>("test_int", 0) == 42);
+    assert(config.getOr<double>("test_double", 0.0) == 3.14);
+    assert(config.getOr<std::string>("test_string", "") == "hello");
+    assert(config.getOr<bool>("test_bool", false) == true);
+    
+    // Test array
+    assert(config.has("test_array"));
+    
+    // Clean up
+    std::remove("test_config.yaml");
+    
+    std::cout << "    testYAMLLoading passed" << std::endl;
+}
+
+void testConfigSchema() {
+    nlm::ConfigSchema schema;
+    
+    // Add some schema entries
+    schema.addEntry(nlm::ConfigSchemaEntry(
+        "test_key", "Test configuration key", nlm::ConfigCategory::System,
+        std::optional<nlm::ConfigValue>(42), false, "int"
+    ));
+    
+    schema.addEntry(nlm::ConfigSchemaEntry(
+        "test_string", "Test string key", nlm::ConfigCategory::Neural,
+        std::optional<nlm::ConfigValue>(std::string("default")), false, "string"
+    ));
+    
+    // Create config and set schema
+    nlm::Config config;
+    config.setSchema(schema);
+    
+    // Set valid value
+    config.set("test_key", 100, nlm::ConfigSource::Runtime);
+    assert(config.getOr<int>("test_key", 0) == 100);
+    
+    // Set string value
+    config.set("test_string", std::string("custom"), nlm::ConfigSource::Runtime);
+    assert(config.getOr<std::string>("test_string", "") == "custom");
+    
+    std::cout << "    testConfigSchema passed" << std::endl;
+}
+
+void testConfigSaving() {
+    nlm::Config config;
+    
+    // Set some values
+    config.set("int_val", 42, nlm::ConfigSource::Runtime);
+    config.set("string_val", std::string("test"), nlm::ConfigSource::Runtime);
+    config.set("double_val", 3.14, nlm::ConfigSource::Runtime);
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    
+    // Save to JSON
+    assert(config.saveToFile("test_config.json", true));
+    
+    // Create a new config and load from JSON
+    nlm::Config config2;
+    assert(config2.loadFromFile("test_config.json"));
+    
+    // Verify values
+    assert(config2.getOr<int>("int_val", 0) == 42);
+    assert(config2.getOr<std::string>("string_val", "") == "test");
+    assert(config2.getOr<double>("double_val", 0.0) == 3.14);
+    assert(config2.getOr<bool>("bool_val", false) == true);
+    
+    // Clean up
+    std::remove("test_config.json");
+    
+    std::cout << "    testConfigSaving passed" << std::endl;
+}
+
+void testConfigInheritance() {
+    nlm::Config baseConfig;
+    baseConfig.set("inherited_key", "base_value", nlm::ConfigSource::Default);
+    baseConfig.set("base_key", "base_value", nlm::ConfigSource::Default);
+    
+    nlm::Config derivedConfig;
+    derivedConfig.set("derived_key", "derived_value", nlm::ConfigSource::Runtime);
+    
+    // Merge base into derived
+    derivedConfig.merge(baseConfig, nlm::ConfigSource::Inherited);
+    
+    // Verify both keys exist
+    assert(derivedConfig.getOr<std::string>("inherited_key", "") == "base_value");
+    assert(derivedConfig.getOr<std::string>("derived_key", "") == "derived_value");
+    
+    std::cout << "    testConfigInheritance passed" << std::endl;
+}
+
 void runAll() {
+    std::cout << "=== Running Enhanced Config Tests ===\n" << std::endl;
+    
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testJSONLoading();
+    testYAMLLoading();
+    testConfigSchema();
+    testConfigSaving();
+    testConfigInheritance();
+    
+    std::cout << "\n=== All Tests Passed ===\n" << std::endl;
 }
 
 } // namespace test_config
