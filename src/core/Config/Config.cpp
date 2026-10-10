@@ -19,40 +19,48 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Try to parse as JSON first (Phase 6 standard)
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    if (content.empty()) {
+        return false;
     }
     
-    return true;
+    // Check if it's JSON (starts with { or [)
+    if (content.find('{') != std::string::npos || content.find('[') != std::string::npos) {
+        // Parse JSON configuration
+        return loadFromJSON(content);
+    } else {
+        // Fallback to simple key=value format for backward compatibility
+        std::istringstream stream(content);
+        std::string line;
+        while (std::getline(stream, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        return true;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +92,35 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Save in JSON format for Phase 6 compatibility
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Convert value to JSON representation
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, double>) {
+                file << arg;
+            } else {
+                file << "\"" << "unknown_type" << "\"";
+            }
+        }, entry.value);
+        
+        file << " (Source: " << static_cast<int>(entry.source) << ")";
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
     }
+    file << "}\n";
     
     return true;
 }

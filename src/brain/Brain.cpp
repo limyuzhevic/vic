@@ -242,8 +242,27 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+// Initialize prediction system
+     if (pImpl->predictionSystem) {
+         // PredictionSystem integration for Phase 6
+         pImpl->predictionSystem->configure(pImpl->config.get());
+         // Note: PredictionSystem initialization is handled through the configure method
+         // rather than a separate initialize method
+     }
+     
+     // Configure neuromodulation systems with Phase 6 parameters
+     if (pImpl->dopamine) {
+         pImpl->dopamine->configure(pImpl->config.get());
+     }
+     if (pImpl->curiosity) {
+         pImpl->curiosity->configure(pImpl->config.get());
+     }
+     if (pImpl->predictionError) {
+         pImpl->predictionError->configure(pImpl->config.get());
+     }
+     if (pImpl->novelty) {
+         pImpl->novelty->configure(pImpl->config.get());
+     }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
