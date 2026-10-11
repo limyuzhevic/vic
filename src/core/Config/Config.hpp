@@ -69,7 +69,13 @@ public:
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
+    std::optional<T> getAuto(const std::string& key) const;
+    
+    template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
+    
+    template<typename T>
+    T getOrAuto(const std::string& key, const T& defaultValue) const;
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
@@ -100,6 +106,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Type conversion helpers
+    static std::optional<int> stringToInt(const std::string& str);
+    static std::optional<double> stringToDouble(const std::string& str);
+    static std::optional<bool> stringToBool(const std::string& str);
+    static std::optional<std::string> stringToString(const std::string& str);
+    static std::optional<std::vector<int>> stringToVectorInt(const std::string& str);
+    static std::optional<std::vector<double>> stringToVectorDouble(const std::string& str);
+    static std::optional<std::vector<std::string>> stringToVectorString(const std::string& str);
 };
 
 } // namespace nlm

@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <numeric>
+#include <cctype>
 
 namespace nlm {
 
@@ -86,12 +88,49 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Helper function to write ConfigValue to file
+        auto writeValue = [&file](const ConfigValue& val) {
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << arg[i];
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << arg[i] << "\"";
+                    }
+                    file << "]";
+                } else {
+                    file << arg;
+                }
+            }, val);
+        };
+        
+        writeValue(entry.value);
+        file << "\n";
     }
     
     return true;
 }
 
+// Type conversion utilities
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -108,9 +147,201 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
+// Enhanced get function with automatic type detection
+template<typename T>
+std::optional<T> Config::getAuto(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    const std::string& strValue = std::get<std::string>(it->value);
+    
+    if constexpr (std::is_same_v<T, int>) {
+        return stringToInt(strValue);
+    } else if constexpr (std::is_same_v<T, double>) {
+        return stringToDouble(strValue);
+    } else if constexpr (std::is_same_v<T, bool>) {
+        return stringToBool(strValue);
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        return stringToString(strValue);
+    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+        return stringToVectorInt(strValue);
+    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+        return stringToVectorDouble(strValue);
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        return stringToVectorString(strValue);
+    } else {
+        return std::nullopt;
+    }
+}
+
+// Helper function implementations for type conversion
+inline std::optional<int> Config::stringToInt(const std::string& str) {
+    try {
+        size_t pos;
+        int value = std::stoi(str, &pos);
+        if (pos == str.size()) return value;
+        return std::nullopt;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+inline std::optional<double> Config::stringToDouble(const std::string& str) {
+    try {
+        size_t pos;
+        double value = std::stod(str, &pos);
+        if (pos == str.size()) return value;
+        return std::nullopt;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+inline std::optional<bool> Config::stringToBool(const std::string& str) {
+    if (str == "true" || str == "1" || str == "yes") return true;
+    if (str == "false" || str == "0" || str == "no") return false;
+    return std::nullopt;
+}
+
+inline std::optional<std::string> Config::stringToString(const std::string& str) {
+    // Remove surrounding quotes
+    if (str.size() >= 2 && ((str.front() == '"' && str.back() == '"') ||
+                           (str.front() == '\'' && str.back() == '\''))) {
+        return str.substr(1, str.size() - 2);
+    }
+    return str;
+}
+
+inline std::optional<std::vector<int>> Config::stringToVectorInt(const std::string& str) {
+    std::vector<int> result;
+    size_t pos = 0;
+    size_t start = 0;
+    
+    while (pos < str.size()) {
+        if (str[pos] == ',' || str[pos] == ' ') {
+            if (pos > start) {
+                std::string token = str.substr(start, pos - start);
+                auto val = stringToInt(token);
+                if (val.has_value()) {
+                    result.push_back(val.value());
+                } else {
+                    return std::nullopt;
+                }
+            }
+            // Skip delimiters
+            while (pos < str.size() && (str[pos] == ',' || str[pos] == ' ' || str[pos] == '[' || str[pos] == ']')) {
+                ++pos;
+            }
+            start = pos;
+        } else {
+            ++pos;
+        }
+    }
+    if (start < str.size()) {
+        std::string token = str.substr(start);
+        auto val = stringToInt(token);
+        if (val.has_value()) {
+            result.push_back(val.value());
+        } else {
+            return std::nullopt;
+        }
+    }
+    return result;
+}
+
+inline std::optional<std::vector<double>> Config::stringToVectorDouble(const std::string& str) {
+    std::vector<double> result;
+    size_t pos = 0;
+    size_t start = 0;
+    
+    while (pos < str.size()) {
+        if (str[pos] == ',' || str[pos] == ' ') {
+            if (pos > start) {
+                std::string token = str.substr(start, pos - start);
+                auto val = stringToDouble(token);
+                if (val.has_value()) {
+                    result.push_back(val.value());
+                } else {
+                    return std::nullopt;
+                }
+            }
+            // Skip delimiters
+            while (pos < str.size() && (str[pos] == ',' || str[pos] == ' ' || str[pos] == '[' || str[pos] == ']')) {
+                ++pos;
+            }
+            start = pos;
+        } else {
+            ++pos;
+        }
+    }
+    if (start < str.size()) {
+        std::string token = str.substr(start);
+        auto val = stringToDouble(token);
+        if (val.has_value()) {
+            result.push_back(val.value());
+        } else {
+            return std::nullopt;
+        }
+    }
+    return result;
+}
+
+inline std::optional<std::vector<std::string>> Config::stringToVectorString(const std::string& str) {
+    std::vector<std::string> result;
+    size_t pos = 0;
+    size_t start = 0;
+    
+    while (pos < str.size()) {
+        if (str[pos] == ',') {
+            if (pos > start) {
+                std::string token = str.substr(start, pos - start);
+                auto val = stringToString(token);
+                if (val.has_value()) {
+                    result.push_back(val.value());
+                } else {
+                    return std::nullopt;
+                }
+            }
+            // Skip comma and spaces
+            while (pos < str.size() && (str[pos] == ',' || str[pos] == ' ')) {
+                ++pos;
+            }
+            start = pos;
+        } else if (str[pos] == ' ') {
+            // Skip spaces between elements
+            while (pos < str.size() && str[pos] == ' ') {
+                ++pos;
+            }
+            start = pos;
+        } else {
+            ++pos;
+        }
+    }
+    if (start < str.size()) {
+        std::string token = str.substr(start);
+        auto val = stringToString(token);
+        if (val.has_value()) {
+            result.push_back(val.value());
+        } else {
+            return std::nullopt;
+        }
+    }
+    return result;
+}
+
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+template<typename T>
+T Config::getOrAuto(const std::string& key, const T& defaultValue) const {
+    auto val = getAuto<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
@@ -177,6 +408,27 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
@@ -200,16 +452,46 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+// Basic types
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
+// Vector types
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
+
+// getOr templates
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Vector getOr templates
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
+
+// getAuto templates
+template std::optional<int> Config::getAuto<int>(const std::string&) const;
+template std::optional<double> Config::getAuto<double>(const std::string&) const;
+template std::optional<bool> Config::getAuto<bool>(const std::string&) const;
+template std::optional<std::string> Config::getAuto<std::string>(const std::string&) const;
+template std::optional<std::vector<int>> Config::getAuto<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::getAuto<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::getAuto<std::vector<std::string>>(const std::string&) const;
+
+// getOrAuto templates
+template int Config::getOrAuto<int>(const std::string&, const int&) const;
+template double Config::getOrAuto<double>(const std::string&, const double&) const;
+template bool Config::getOrAuto<bool>(const std::string&, const bool&) const;
+template std::string Config::getOrAuto<std::string>(const std::string&, const std::string&) const;
+template std::vector<int> Config::getOrAuto<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOrAuto<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOrAuto<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
 
 } // namespace nlm

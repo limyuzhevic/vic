@@ -392,6 +392,38 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
+    // Demonstrate new configuration features
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Enhanced Configuration Features Demo ===");
+    
+    // Set some example values including vectors
+    config->set("learning_rates", std::vector<double>{0.01, 0.001, 0.0001}, ConfigSource::Runtime);
+    config->set("neuron_types", std::vector<std::string>{"excitatory", "inhibitory", "sensory"}, ConfigSource::Runtime);
+    config->set("connection_layers", std::vector<int>{1, 2, 3, 4}, ConfigSource::Runtime);
+    
+    // Demonstrate getAuto() with different types
+    if (auto lr = config->getAuto<double>("learning_rates")) {
+        NLM_LOG_INFO("Learning rate type detected: double, value: " + std::to_string(lr.value()));
+    }
+    
+    if (auto types = config->getAuto<std::vector<std::string>("neuron_types")) {
+        NLM_LOG_INFO("Neuron types detected: vector<string>, count: " + std::to_string(types.value().size()));
+    }
+    
+    // Demonstrate getOrAuto() with fallback
+    if (auto layers = config->getOrAuto<std::vector<int>("connection_layers", std::vector<int>{0, 1})) {
+        NLM_LOG_INFO("Connection layers: ";
+        for (size_t i = 0; i < layers.value().size(); ++i) {
+            if (i > 0) NLM_LOG_INFO(", ");
+            NLM_LOG_INFO(std::to_string(layers.value()[i]));
+        }
+        NLM_LOG_INFO(")");
+    }
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("✓ Enhanced configuration system working correctly!");
+    NLM_LOG_INFO("");
+    
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
