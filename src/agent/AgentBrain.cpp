@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include "../cognition/NeuralPlanner.hpp"
 
 namespace nlm {
 
@@ -18,9 +19,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , neuralPlanningEnabled_(false)  // Neural planning starts disabled
+    , planningConfidenceThreshold_(0.7f)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize neural planner if available
+    if (brain_) {
+        planner_ = brain_->getPlanner();
+        if (planner_) {
+            NLM_LOG_INFO("AgentBrain: Neural planner initialized");
+        }
+    }
+    
+    // Initialize motor and sensory neuron groups (existing code)
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -28,7 +39,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
+                        // Distribute motor neurons to different action groups (existing code)
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
@@ -44,7 +55,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
+                        // Distribute sensory neurons (existing code)
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
@@ -152,6 +163,39 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // First, try neural planning if enabled and planner is available
+    std::vector<ActionType> plannedActions;
+    MotorCommand plannedCommand = MotorCommand::Wait;
+    
+    if (neuralPlanningEnabled_ && planner_) {
+        // Convert current brain state to planning state
+        // For now, use a simple encoding of brain activity
+        std::vector<float> currentState;
+        
+        // Add some brain state information
+        size_t totalNeurons = brain_->getTotalNeuronCount();
+        if (totalNeurons > 0) {
+            currentState.push_back(static_cast<float>(brain_->getFiringNeuronCount()) / totalNeurons);
+            currentState.push_back(static_cast<float>(brain_->getActiveNeuronCount()) / totalNeurons);
+            currentState.push_back(brain_->getAverageFiringRate());
+            currentState.push_back(brain_->getExcitationInhibitionRatio());
+            
+            // Add curiosity level to influence planning
+            currentState.push_back(curiosityLevel_);
+            currentState.push_back(noveltyLevel_);
+        }
+        
+        // Use the neural planner to plan action
+        plannedCommand = decodeWithPlanner(currentState, plannedActions);
+        
+        // Only use planned command if it has high confidence
+        if (plannedCommand != MotorCommand::Wait) {
+            NLM_LOG_INFO("AgentBrain: Planning-based action selected");
+            return plannedCommand;
+        }
+    }
+    
+    // Fall back to traditional motor neuron decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -235,7 +279,73 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+// Neural planning integration
+MotorCommand AgentBrain::decodeWithPlanner(const std::vector<float>& currentState,
+                                          std::vector<ActionType>& plannedActions) {
+    if (!planner_ || !neuralPlanningEnabled_) {
+        return MotorCommand::Wait;
+    }
+    
+    // Convert current state to planning format
+    currentPlanningState_ = currentState;
+    
+    // Set planning depth based on curiosity and developmental stage
+    size_t planningDepth = 3;  // Default depth
+    if (planner_) {
+        planningDepth = std::min(static_cast<size_t>(planner_->getPlanningDepth()), 5u);
+    }
+    
+    // Use curiosity to modulate planning - high curiosity = more exploration
+    float explorationBonus = 1.0f - (curiosityLevel_ * 0.3f);
+    
+    // Plan action using the neural planner
+    ActionType action = ActionType::Wait;
+    if (planner_) {
+        action = planner_->planAction(currentState, 0.5f);  // Target reward of 0.5
+        plannedActions.push_back(action);
+        
+        // Check planning confidence
+        float confidence = planner_->getPlanningConfidence();
+        if (confidence < planningConfidenceThreshold_) {
+            // Low confidence - fall back to traditional decoding
+            return MotorCommand::Wait;
+        }
+    }
+    
+    // Apply action type to motor command
+    switch (action) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Look: return MotorCommand::Look;
+        case ActionType::LookUp: return MotorCommand::LookUp;
+        case ActionType::LookDown: return MotorCommand::LookDown;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::MoveForward;  // Simplified
+        case ActionType::Drink: return MotorCommand::MoveForward;  // Simplified
+        case ActionType::Rest: return MotorCommand::Wait;
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;  // Custom actions need special handling
+        default: return MotorCommand::Wait;
+    }
+}
+
+// Get planning depth
+size_t AgentBrain::getPlanningDepth() const {
+    if (planner_) {
+        return planner_->getPlanningDepth();
+    }
+    return 0;
+}
+
+// Set planning depth
+void AgentBrain::setPlanningDepth(size_t depth) {
+    if (planner_) {
+        planner_->setPlanningDepth(depth);
+        NLM_LOG_INFO("AgentBrain: Planning depth set to " + std::to_string(depth));
+    }
+}
     if (!brain_ || !rewardModulationEnabled_) return;
     
     // Compute prediction error
@@ -347,4 +457,9 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+void AgentBrain::setPlanningDepth(size_t depth) {
+    if (planner_) {
+        planner_->setPlanningDepth(depth);
+        NLM_LOG_INFO("AgentBrain: Planning depth set to " + std::to_string(depth));
+    }
+}

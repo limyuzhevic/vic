@@ -58,6 +58,14 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // Neural planner integration
+    void enableNeuralPlanning(bool enable) { neuralPlanningEnabled_ = enable; }
+    bool isNeuralPlanningEnabled() const { return neuralPlanningEnabled_; }
+    
+    // Get planner statistics
+    size_t getPlanningDepth() const;
+    void setPlanningDepth(size_t depth);
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
@@ -76,7 +84,20 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Neural planning integration
+    MotorCommand decodeWithPlanner(const std::vector<float>& currentState,
+                                 std::vector<ActionType>& plannedActions);
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Neural planner integration
+    std::shared_ptr<class NeuralPlanner> planner_;
+    bool neuralPlanningEnabled_;
+    float planningConfidenceThreshold_;
+    
+    // State for planning
+    std::vector<float> currentPlanningState_;
+    std::vector<ActionType> currentPlannedActions_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

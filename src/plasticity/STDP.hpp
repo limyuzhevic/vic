@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Enhanced with synaptic scaling and metaplasticity
 
 class STDP : public PlasticityRule {
 public:
@@ -27,8 +27,23 @@ public:
     void setTimeConstant(float tau);    // STDP time constant (ms)
     float getTimeConstant() const;
     
+    // Synaptic scaling (homeostatic mechanism)
+    void setSynapticScalingFactor(float factor);    // Overall scaling factor
+    float getSynapticScalingFactor() const;
+    void setScalingPeriod(int steps);               // Steps between scaling events
+    int getScalingPeriod() const;
+    
+    // Metaplasticity - plasticity of plasticity
+    void setLearningRate(float rate);               // Global learning rate modifier
+    float getLearningRate() const;
+    void setMetaplasticityThreshold(float threshold); // Threshold for metaplastic changes
+    float getMetaplasticityThreshold() const;
+    
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    
+    // Manually trigger synaptic scaling
+    void triggerSynapticScaling();
     
 private:
     struct Impl;
