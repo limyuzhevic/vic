@@ -1,0 +1,77 @@
+# NLM Configuration File Example
+# 
+# This file contains configuration options for the NLM (Neural Learning Machine) brain simulation.
+# All values are optional and use default values if not specified.
+# 
+# File format: key = value
+# Comments start with #
+# Blank lines are ignored
+
+# ===== Core Configuration =====
+neuron_count = 1000              # Total number of neurons in the brain
+region_count = 1                 # Number of neural regions (subdomains)
+connection_probability = 0.1     # Probability of synapses between neurons
+simulation_timestep = 0.001      # Time step duration in seconds (default: 1ms)
+random_seed = 123456             # Seed for random number generator
+
+# ===== Memory Systems =====
+working_memory_capacity = 100    # Capacity of working memory (number of traces)
+episodic_memory_max_episodes = 1000  # Maximum number of episodes in episodic memory
+
+# ===== Development =====
+development_stage = "Initial"     # Initial developmental stage
+replay_interval = 100            # Steps between memory replay events
+consolidation_interval = 1000     # Steps between memory consolidation
+
+# ===== Neuromodulation =====
+# Dopamine levels
+dopamine_baseline = 0.0
+dopamine_peak = 1.0
+
+# Curiosity settings
+curiosity_novelty_weight = 0.5
+curiosity_prediction_error_weight = 0.5
+
+# Novelty detection
+novelty_threshold = 0.3
+novelty_decay_rate = 0.1
+
+# ===== Plasticity =====
+stdp_ltp_weight = 0.01          # Spike-timing dependent plasticity LTP weight
+stdp_ltd_weight = 0.012         # STDP LTD weight
+stdp_tau = 20.0                 # STDP time constant (ms)
+
+# ===== Structural Plasticity =====
+synaptogenesis_rate = 0.0001    # Rate of new synapse formation
+pruning_rate = 0.00001          # Rate of synapse elimination
+
+# ===== Planning and Cognition =====
+planning_depth = 3              # Look-ahead depth for neural planning
+attention_inhibition_strength = 0.5
+attention_excitation_strength = 1.5
+competition_threshold = 0.3
+
+# ===== Checkpoints =====
+checkpoint_dir = "./checkpoints"  # Directory for checkpoint files
+checkpoint_max_files = 10       # Maximum number of checkpoints to keep
+checkpoint_compression = "balanced"  # Compression level: none, fast, balanced, best
+
+# ===== Environment =====
+environment_type = "simple"       # Type of environment: simple, complex, custom
+world_width = 100               # Width of simulation world
+world_height = 100              # Height of simulation world
+
+# ===== Performance =====
+enable_vectorization = true     # Enable SIMD vectorization
+enable_multithreading = true    # Enable parallel processing
+use_sparse_connectivity = true  # Use sparse neural connectivity
+
+# ===== Logging =====
+log_level = "info"              # Logging level: trace, debug, info, warn, error, critical
+log_file = "nlm.log"            # Log file name
+verbose = false                 # Enable verbose console output
+
+# ===== Experimental =====
+experiment_name = "nlm_phase6"   # Name of current experiment
+track_metrics = true            # Track and record performance metrics
+save_results = true             # Save experiment results to files

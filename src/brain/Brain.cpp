@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +132,14 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize additional neuromodulators
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        acetylcholine->initialize(this);
+        norepinephrine->initialize(this);
+        serotonin->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -414,7 +425,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get global novelty and prediction error for curiosity
+        float globalNovelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float globalPredictionError = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+        pImpl->curiosity->update(globalNovelty, globalPredictionError, pImpl->timestep);
+    }
+    
+    // Update prediction error (from reward computation)
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(0.001);
     }
     
     // Update dopamine (reward prediction error)
@@ -439,11 +458,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Update additional neuromodulators
+    if (pImpl->acetylcholine) pImpl->acetylcholine->update(pImpl->timestep);
+    if (pImpl->norepinephrine) pImpl->norepinephrine->update(pImpl->timestep);
+    if (pImpl->serotonin) pImpl->serotonin->update(pImpl->timestep);
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
+    
+    // Combine effects of all neuromodulators
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        plasticityMod *= pImpl->dopamine->getPlasticityFactor();
+    }
+    if (pImpl->acetylcholine) {
+        plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+    }
+    if (pImpl->norepinephrine) {
+        plasticityMod *= pImpl->norepinephrine->getPlasticityFactor();
+    }
+    if (pImpl->serotonin) {
+        plasticityMod *= pImpl->serotonin->getPlasticityFactor();
     }
     
     for (auto& region : pImpl->regions) {
@@ -582,9 +617,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 15: Sleep/rest cycle ==========
+    pImpl->isResting = false;  // For now, simplified
+    if (pImpl->episodicMemory) {
+        // Occasionally trigger replay for consolidation
+        if (currentStep % pImpl->replayInterval == 0 && !pImpl->isResting) {
+            // Get episodes for replay
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+    }
+    
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 17: Performance infrastructure optimization ==========
+    // Memory pool management
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->optimizeMemoryPools();
+    }
+    
+    // Event queue management
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->optimizeEventQueues();
+    }
+    
+    // Sparse connectivity optimization
+    for (auto& region : pImpl->regions) {
+        region->optimizeSparseConnectivity();
+    }
+    
+    // SIMD vectorization
+    for (auto& region : pImpl->regions) {
+        region->enableSIMDOptimization();
+    }
+    
+    // Parallel processing setup
+    for (auto& region : pImpl->regions) {
+        region->setupParallelProcessing();
     }
 }
 
@@ -721,8 +795,29 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setLTPWeight(0.01f * modulation);
+        pImpl->dopamine->setLTDWeight(0.012f * modulation);
+    }
+}
+
+void Brain::applyFullNeuromodulation() {
+    // Apply all neuromodulators for full integration
+    if (pImpl->dopamine) pImpl->dopamine->update(0.001);
+    if (pImpl->curiosity) pImpl->curiosity->update(0.5f, 0.5f, 0.001);
+    if (pImpl->novelty) pImpl->novelty->update(0.001);
+    if (pImpl->predictionError) pImpl->predictionError->update(0.001);
+    if (pImpl->acetylcholine) pImpl->acetylcholine->update(0.001);
+    if (pImpl->norepinephrine) pImpl->norepinephrine->update(0.001);
+    if (pImpl->serotonin) pImpl->serotonin->update(0.001);
+}
+
+// Set all neuromodulator levels based on global state
+void Brain::updateAllNeuromodulators(float globalNovelty, float globalPredictionError) {
+    if (pImpl->dopamine) pImpl->dopamine->update(0.001);
+    if (pImpl->curiosity) pImpl->curiosity->update(globalNovelty, globalPredictionError, 0.001);
+    if (pImpl->novelty) pImpl->novelty->update(0.001);
+    if (pImpl->predictionError) pImpl->predictionError->computeError(pImpl->predictionError->getError(), globalPredictionError);
 }
 
 void Brain::updatePlasticity() {
@@ -1023,6 +1118,21 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
+// Set prediction system observation
+void Brain::setPredictionObservation(const std::vector<float>& sensoryInput) {
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->updateObservation(sensoryInput);
+    }
+}
+
+// Get prediction error from prediction system
+float Brain::getPredictionError() const {
+    if (pImpl->predictionSystem) {
+        return pImpl->predictionSystem->getPredictionError();
+    }
+    return 0.0f;
+}
+
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
@@ -1035,6 +1145,27 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// Set current state for cognitive systems
+void Brain::setCognitiveInput(const std::vector<float>& state) {
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->updateInput(state);
+    }
+    if (pImpl->attention) {
+        pImpl->attention->setInput(state);
+    }
+    if (pImpl->planner) {
+        pImpl->planner->setCurrentState(state);
+    }
+}
+
+// Get planned action from planner
+ActionType Brain::getPlannedAction(const std::vector<float>& state, float targetReward) {
+    if (pImpl->planner) {
+        return pImpl->planner->planAction(state, targetReward);
+    }
+    return ActionType::Wait;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
@@ -1067,6 +1198,18 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
