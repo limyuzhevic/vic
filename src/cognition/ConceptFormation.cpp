@@ -1,5 +1,6 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"  // Added for NeuronType
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -397,6 +398,51 @@ void SpatialRepresentation::clear() {
     placeCells_.clear();
     currentX_ = 0;
     currentY_ = 0;
+}
+
+// Update concept formation system based on current neural activity
+void ConceptFormation::updateConceptFromNeuralActivity(SimulationStep currentTime) {
+    if (!brain_) return;
+    
+    // Sample neural activity patterns from different brain regions
+    for (auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            // Process internal and sensory neuron activity
+            if (pop->getNeuronType() == NeuronType::Internal || 
+                pop->getNeuronType() == NeuronType::Sensory) {
+                
+                // Collect pattern of neural activity
+                std::vector<float> pattern;
+                std::vector<float> features;
+                
+                for (auto* neuron : pop->getNeurons()) {
+                    float activity = (neuron->getMembranePotential() + 10.0f) / 20.0f;
+                    activity = std::max(0.0f, std::min(1.0f, activity));
+                    
+                    // Only consider active neurons for concept formation
+                    if (activity > 0.3f) {
+                        pattern.push_back(activity);
+                        
+                        // Extract features based on neuron type
+                        float feature = (pop->getNeuronType() == NeuronType::Sensory) ? 1.0f : 0.0f;
+                        features.push_back(feature);
+                    }
+                }
+                
+                if (pattern.size() >= 3) {  // Require minimum pattern size
+                    // Calculate reward based on prediction confidence
+                    float reward = 0.5f;  // Default moderate reward
+                    if (pImpl->brain && pImpl->brain->getPredictionSystem()) {
+                        float predError = pImpl->brain->getPredictionSystem()->getPredictionError();
+                        reward = 1.0f - predError;  // Lower error = higher reward
+                    }
+                    
+                    // Present this neural pattern as experience
+                    presentExperience(pattern, features, reward, currentTime);
+                }
+            }
+        }
+    }
 }
 
 // TemporalRelation Implementation

@@ -148,10 +148,8 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+// Neural prediction system for temporal sequence learning and prediction
+    NeuralPrediction* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     

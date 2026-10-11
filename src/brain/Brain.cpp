@@ -11,9 +11,9 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
+#include "../memory/MemoryIntegration.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -28,13 +28,8 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    // ========== MEMORY INTEGRATION SYSTEM ==========
+    std::unique_ptr<MemoryIntegrationSystem> memoryIntegrationSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -286,11 +281,8 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+    // Initialize memory integration system
+    pImpl->memoryIntegrationSystem = std::make_unique<MemoryIntegrationSystem>(this);
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
@@ -509,10 +501,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // Use NeuralPrediction which has advanced temporal sequence learning
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from sensory neurons
+        SensoryInput currentState;
+        std::vector<float> sensoryData;
+        
+        // Sample from sensory neurons to create input state
+        for (auto* sensoryNeuron : pImpl->sensoryNeurons) {
+            // Normalize neuron activity to [0,1] range
+            float activity = (sensoryNeuron->getMembranePotential() + 10.0f) / 20.0f;
+            activity = std::max(0.0f, std::min(1.0f, activity));
+            sensoryData.push_back(activity);
+        }
+        
+        currentState.setData(sensoryData);
+        
+        // Make prediction using NeuralPrediction's advanced temporal learning
+        std::vector<float> predictedState = pImpl->predictionSystem->generatePrediction(pImpl->currentStep);
+        
+        // Update predictions with NeuralPrediction's learning
+        float error = pImpl->predictionSystem->updateWithObservation(predictedState, pImpl->currentStep);
+        
+        // Train prediction system with actual experience
+        pImpl->predictionSystem->recordSensoryState(currentState.getData(), pImpl->currentStep);
+        
+        // Apply prediction error to influence learning
+        if (error > 0.5f) {
+            // High prediction error indicates need for exploration
+            if (pImpl->novelty) {
+                pImpl->novelty->setSensitivity(1.0f);
+            }
+            if (pImpl->curiosity) {
+                pImpl->curiosity->setExplorationDrive(std::min(1.0f, pImpl->curiosity->getExplorationDrive() + 0.1f));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +551,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Create experience representation from current neural activity
+        std::vector<float> pattern;
+        std::vector<float> features;
+        
+        // Sample neural activity patterns for concept formation
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->getNeuronType() == NeuronType::Internal || 
+                        neuron->getNeuronType() == NeuronType::Sensory) {
+                        // Create pattern from neural activity
+                        float activity = (neuron->getMembranePotential() + 10.0f) / 20.0f;
+                        activity = std::max(0.0f, std::min(1.0f, activity));
+                        pattern.push_back(activity);
+                        
+                        // Extract features (simplified)
+                        float feature = neuron->getNeuronType() == NeuronType::Sensory ? 1.0f : 0.0f;
+                        features.push_back(feature);
+                    }
+                }
+            }
+        }
+        
+        // Only form concepts if we have sufficient data
+        if (pattern.size() > 10) {
+            // Calculate reward based on prediction error and learning progress
+            float reward = 0.0f;
+            if (pImpl->dopamine) {
+                reward = pImpl->dopamine->getLevel();
+            }
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(pattern, features, reward, currentStep);
+            
+            // If a new concept was formed, adjust attention to explore it
+            if (conceptId > 0) {
+                // Boost attention to novel concepts
+                if (pImpl->attention) {
+                    pImpl->attention->boostAttention(0.5f);
+                }
+            }
+            
+            // Update concept formation with neural activity
+            pImpl->conceptFormation->updateConceptFromNeuralActivity(currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1019,7 +1085,7 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
+NeuralPrediction* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 

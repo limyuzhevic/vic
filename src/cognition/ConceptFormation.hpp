@@ -88,6 +88,9 @@ public:
                             float reward,
                             SimulationStep currentTime);
 
+    // Update concept formation system based on current neural activity
+    void updateConceptFromNeuralActivity(SimulationStep currentTime);
+
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
                               float similarityThreshold = 0.7f) const;
@@ -136,6 +139,7 @@ public:
 
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
+    void setStabilityThreshold(float t) { stabilityThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
 private:
@@ -156,7 +160,7 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
-    
+
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
