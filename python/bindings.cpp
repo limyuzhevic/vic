@@ -353,6 +353,66 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Add bindings for integrated systems access
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system")
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner for action planning")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get concept formation system")
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get attentional selection system")
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine neuromodulation system")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity neuromodulation system")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty detection system")
+    .def("getPredictionError", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error neuromodulation system");
+
+    // Add convenience methods for common operations
+    .def("getSensoryNeuronsCount", &Brain::getSensoryNeuronCount,
+         "Get number of sensory neurons")
+    .def("getMotorNeuronsCount", &Brain::getMotorNeuronCount,
+         "Get number of motor neurons")
+    .def("getActiveNeuronsCount", &Brain::getActiveNeuronCount,
+         "Get number of active neurons")
+    .def("getFiringNeuronsCount", &Brain::getFiringNeuronCount,
+         "Get number of firing neurons")
+    .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+         "Get total spike count")
+    .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+         "Get average firing rate")
+    .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+         "Get excitation/inhibition balance ratio")
+    .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+         "Get total neuron count")
+    .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+         "Get total synapse count")
+    .def("getRegionCount", &Brain::getRegionCount,
+         "Get number of brain regions");
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),

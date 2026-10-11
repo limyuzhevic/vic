@@ -1,4 +1,5 @@
 #include "Phase6IntegratedExperiment.hpp"
+#include "Phase6Config.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"

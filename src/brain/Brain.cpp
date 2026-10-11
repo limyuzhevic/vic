@@ -510,9 +510,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->neuralPrediction) {
+        // Update neural prediction system with current brain state
+        std::vector<float> currentSensoryState;
+        
+        // Collect sensory neuron activities as current state representation
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activity = neuron->isFiring() ? 1.0f : 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+            currentSensoryState.push_back(activity);
+        }
+        
+        // Learn temporal sequence from this state
+        pImpl->neuralPrediction->recordSensoryState(currentSensoryState, currentStep);
+        
+        // Generate prediction for next timestep
+        std::vector<float> predictedState = pImpl->neuralPrediction->generatePrediction(currentStep);
+        
+        // Update prediction with actual sensory input (if available)
+        if (pImpl->sensoryInput) {
+            float predictionError = pImpl->neuralPrediction->updateWithObservation(
+                currentSensoryState, currentStep);
+            
+            // Apply prediction error as neuromodulation signal
+            if (predictionError > 0.1f) {  // Significant prediction error
+                NeuromodulationSignal neuromodSignal;
+                neuromodSignal.type = NeuromodulationSignal::PredictionError;
+                neuromodSignal.level = predictionError;
+                neuromodSignal.duration = 100;
+                neuromodSignal.target = NeuromodulationSignal::TargetAll;
+                
+                applyNeuromodulation(neuromSignal);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +557,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->neuralPrediction) {
+        // Concept formation learns from predicted and actual sensory states
+        // Extract pattern from neural prediction system
+        std::vector<float> currentPattern = pImpl->neuralPrediction->generatePrediction(currentStep);
+        
+        // Extract features from current neural activity (could include attention weights, working memory)
+        std::vector<float> features;
+        
+        // Add attention-based features
+        if (pImpl->attention) {
+            float attentionStrength = pImpl->attention->getCurrentAttentionStrength();
+            features.push_back(attentionStrength);
+        }
+        
+        // Add working memory features
+        if (pImpl->workingMemory) {
+            float memoryActivity = pImpl->workingMemory->getMemoryActivity();
+            features.push_back(memoryActivity);
+        }
+        
+        // Add neuromodulation features
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            features.push_back(dopamineLevel);
+        }
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, features, 
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, 
+            currentStep);
+        
+        // If concept was formed or matched, update it with new experience
+        if (conceptId > 0) {
+            // Get the current sensory state for pattern matching
+            std::vector<float> currentSensoryState;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activity = neuron->isFiring() ? 1.0f : 
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                currentSensoryState.push_back(activity);
+            }
+            
+            pImpl->conceptFormation->updateConcept(conceptId, currentSensoryState, features,
+                                                   pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+        }
+    }
+    
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
+    
+    // ========== STEP 12: Replay important memories ==========
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+        // Get episodes for replay
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -550,36 +636,193 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        // Enhanced development integration - goes beyond plasticity rates
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        
+        // 1. Neural excitability changes with development
+        float neuralExcitabilityMod = 1.0f;
+        float synapticConductanceMod = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                // Initial stage: high baseline excitability, strong responses
+                neuralExcitabilityMod = 1.2f;
+                synapticConductanceMod = 1.1f;
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                // Critical period: high plasticity, guided by experience
+                neuralExcitabilityMod = 1.1f;
+                synapticConductanceMod = 1.0f;
+                break;
+            case DevelopmentalStage::Maturation:
+                // Maturation: refining connections, moderate excitability
+                neuralExcitabilityMod = 1.0f;
+                synapticConductanceMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:
+                // Adult: stable, optimized network
+                neuralExcitabilityMod = 0.9f;
+                synapticConductanceMod = 1.0f;
+                break;
+            case DevelopmentalStage::Aging:
+                // Aging: declining function, compensatory mechanisms
+                neuralExcitabilityMod = 0.8f;
+                synapticConductanceMod = 1.1f;  // Compensatory strengthening
+                break;
+        }
+        
+        // Apply excitability changes to all neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Adjust neuron excitability based on developmental stage
+                    // This affects how easily neurons reach threshold
+                    float thresholdAdjustment = (neuralExcitabilityMod - 1.0f) * 5.0f;
+                    neuron->setThreshold(neuron->getState().threshold - thresholdAdjustment);
+                    
+                    // Adjust synaptic conductance properties
+                    if (stage == DevelopmentalStage::CriticalPeriod) {
+                        // In critical period, synapses are more responsive
+                        neuron->setLeakConductance(neuron->getState().leakConductance * synapticConductanceMod);
+                    } else if (stage == DevelopmentalStage::Maturation) {
+                        // In maturation, refine synaptic strength based on activity
+                        float activityBasedConductance = neuron->getState().leakConductance * (1.0f + neuralExcitabilityMod * 0.1f);
+                        neuron->setLeakConductance(activityBasedConductance);
+                    }
+                }
+            }
+        }
+        
+        // 2. Memory system development
+        if (pImpl->workingMemory) {
+            // Working memory capacity increases with development
+            size_t initialCapacity = 50;
+            size_t matureCapacity = 200;
+            size_t capacityIncrease = static_cast<size_t>((matureCapacity - initialCapacity) * 
+                                                          pImpl->developmentSystem->getDevelopmentalAge() / 100.0);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            if (capacityIncrease > 0) {
+                pImpl->workingMemory->setCapacity(std::min(pImpl->workingMemory->getCapacity() + capacityIncrease, matureCapacity));
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Working memory stability increases with development
+            if (stage == DevelopmentalStage::Maturation || stage == DevelopmentalStage::Adult) {
+                pImpl->workingMemory->strengthenMemory(1.2f);  // Make memories more stable
+            }
         }
+        
+        if (pImpl->episodicMemory) {
+            // Episodic memory consolidation improves with age
+            if (stage == DevelopmentalStage::Maturation || stage == DevelopmentalStage::Adult) {
+                pImpl->episodicMemory->consolidate(0.5f);  // Stronger consolidation
+            }
+        }
+        
+        // 3. Attention system development
+        if (pImpl->attention) {
+            // Attention control improves with development
+            float attentionMaturity = 1.0f;
+            if (stage == DevelopmentalStage::CriticalPeriod) {
+                attentionMaturity = 0.7f;  // Less focused attention
+            } else if (stage == DevelopmentalStage::Maturation) {
+                attentionMaturity = 0.9f;  // Improving focus
+            } else if (stage == DevelopmentalStage::Adult) {
+                attentionMaturity = 1.2f;  // Well-developed attentional control
+            }
+            
+            // Adjust attentional parameters
+            pImpl->attention->setInhibitionStrength(0.5f * attentionMaturity);
+            pImpl->attention->setExcitationStrength(1.5f * attentionMaturity);
+            pImpl->attention->setCompetitionThreshold(0.3f * attentionMaturity);
+        }
+        
+        // 4. Neuromodulation system development
+        if (stage == DevelopmentalStage::CriticalPeriod) {
+            // In critical period, neuromodulators prime the system for learning
+            if (pImpl->dopamine) {
+                // Dopamine prepares for reward learning
+                pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * 1.5f);
+            }
+            if (pImpl->curiosity) {
+                // Curiosity increases during exploration phase
+                pImpl->curiosity->setLevel(pImpl->curiosity->getLevel() * 1.3f);
+            }
+        } else if (stage == DevelopmentalStage::Maturation) {
+            // In maturation, neuromodulators calibrate learning rates
+            if (pImpl->dopamine) {
+                // Dopamine optimizes reward prediction learning
+                float currentLevel = pImpl->dopamine->getLevel();
+                pImpl->dopamine->setLevel(currentLevel * 0.9f);
+            }
+        } else if (stage == DevelopmentalStage::Adult) {
+            // In adult, neuromodulators support stable performance
+            if (pImpl->dopamine) {
+                // Dopamine maintains optimal learning for maintenance
+                float currentLevel = pImpl->dopamine->getLevel();
+                pImpl->dopamine->setLevel(currentLevel * 0.8f);
+            }
+        }
+        
+        // 5. Concept formation development
+        if (pImpl->conceptFormation && stage >= DevelopmentalStage::Maturation) {
+            // In mature stages, concept formation becomes more robust
+            if (stage == DevelopmentalStage::Maturation) {
+                pImpl->conceptFormation->setFormationThreshold(0.8f);  // More conservative concept formation
+                pImpl->conceptFormation->setStabilityWindow(100);     // Longer stability evaluation
+            } else if (stage == DevelopmentalStage::Adult) {
+                pImpl->conceptFormation->setFormationThreshold(0.9f);  // Very conservative
+                pImpl->conceptFormation->setStabilityWindow(200);     // Even longer evaluation
+            }
+        }
+        
+        // 6. Plasticity rule changes (beyond just rates)
+        if (pImpl->stdp) {
+            // Adjust STDP parameters based on developmental stage
+            if (stage == DevelopmentalStage::CriticalPeriod) {
+                // In critical period, STDP is broader and more influential
+                pImpl->stdp->setLTPWeight(0.015f);
+                pImpl->stdp->setLTDWeight(0.018f);
+            } else if (stage == DevelopmentalStage::Adult) {
+                // In adult, STDP is more precise and constrained
+                pImpl->stdp->setLTPWeight(0.005f);
+                pImpl->stdp->setLTDWeight(0.006f);
+            }
+        }
+        
+        // 7. Development affects attention-to-memory connections
+        if (pImpl->attention && pImpl->workingMemory) {
+            // During maturation, strengthen attention-memory connections
+            if (stage == DevelopmentalStage::Maturation) {
+                // This would involve creating or strengthening connections between
+                // attention neurons and working memory neurons
+                // In a real implementation, this would involve modifying neural connectivity
+            }
+        }
+        
+        // Log developmental stage progression
+        NLM_LOG_INFO("Developmental stage: " + std::string(pImpl->developmentSystem->getStageName()));
+        NLM_LOG_INFO("Age: " + std::to_string(pImpl->developmentSystem->getDevelopmentalAge()) + " steps");
+        NLM_LOG_INFO("Plasticity modifier: " + std::to_string(pImpl->developmentSystem->getPlasticityModifier()));
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        float consolidationStrength = 0.3f;
+        
+        // Increase consolidation strength during development
+        if (pImpl->developmentSystem) {
+            DevelopmentalStage stage = pImpl->developmentalStage;
+            if (stage == DevelopmentalStage::CriticalPeriod) {
+                consolidationStrength = 0.2f;  // Moderate during exploration
+            } else if (stage == DevelopmentalStage::Maturation) {
+                consolidationStrength = 0.5f;  // Strong during refinement
+            } else if (stage == DevelopmentalStage::Adult) {
+                consolidationStrength = 0.8f;  // Very strong in adult
+            }
+        }
+        
+        pImpl->episodicMemory->consolidate(consolidationStrength);
     }
     
     // ========== STEP 15: Checkpoint management ==========
