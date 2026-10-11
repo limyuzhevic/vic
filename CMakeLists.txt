@@ -119,13 +119,50 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Main executable (Phase 6 final integration)
+add_executable(nlm_phase6
+    src/main.cpp
+)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Python bindings for main API
+add_library(pynlm MODULE
+    python/bindings.cpp
+)
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world)
+target_compile_features(pynlm PUBLIC cxx_std_20)
+
+# Advanced Python bindings
+add_library(pynlm_advanced MODULE
+    python/bindings_advanced.cpp
+)
+target_link_libraries(pynlm_advanced PUBLIC nlm_core nlm_agent nlm_world pybind11::module)
+target_compile_features(pynlm_advanced PUBLIC cxx_std_20)
+
+# Python package installation
+install(TARGETS nlm
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    RUNTIME DESTINATION bin
+)
+
+install(TARGETS pynlm_advanced
+    LIBRARY DESTINATION pynlm
+    RUNTIME DESTINATION bin
+)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
