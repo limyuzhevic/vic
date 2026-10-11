@@ -69,6 +69,149 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced debugging and exploration commands for experienced users
+    
+    // Manual neuromodulation control
+    void setDopamineLevel(float level) {
+        dopamineLevel_ = std::clamp(level, -1.0f, 1.0f);
+        if (brain_) {
+            auto* dopamine = brain_->getDopamine();
+            if (dopamine) {
+                dopamine->setLevel(dopamineLevel_);
+            }
+        }
+    }
+    
+    void setCuriosityLevel(float level) {
+        curiosityLevel_ = std::clamp(level, 0.0f, 1.0f);
+    }
+    
+    void setNoveltyLevel(float level) {
+        noveltyLevel_ = std::clamp(level, 0.0f, 1.0f);
+    }
+    
+    // Memory system access and manipulation
+    NeuralWorkingMemory* getWorkingMemory() {
+        return brain_ ? brain_->getWorkingMemory() : nullptr;
+    }
+    
+    NeuralEpisodicMemory* getEpisodicMemory() {
+        return brain_ ? brain_->getEpisodicMemory() : nullptr;
+    }
+    
+    NeuralAssociativeMemory* getAssociativeMemory() {
+        return brain_ ? brain_->getAssociativeMemory() : nullptr;
+    }
+    
+    // Cognitive system access and manipulation
+    NeuralPlanner* getPlanner() {
+        return brain_ ? brain_->getPlanner() : nullptr;
+    }
+    
+    ConceptFormation* getConceptFormation() {
+        return brain_ ? brain_->getConceptFormation() : nullptr;
+    }
+    
+    AttentionalSelection* getAttention() {
+        return brain_ ? brain_->getAttention() : nullptr;
+    }
+    
+    // Performance and monitoring
+    float getTotalSpikeCount() const {
+        return brain_ ? brain_->getTotalSpikeCount() : 0;
+    }
+    
+    float getAverageFiringRate() const {
+        return brain_ ? brain_->getAverageFiringRate() : 0.0f;
+    }
+    
+    float getExcitationInhibitionRatio() const {
+        return brain_ ? brain_->getExcitationInhibitionRatio() : 1.0f;
+    }
+    
+    // Exploration and control commands
+    
+    // Trigger exploration behavior
+    void triggerExploration() {
+        if (brain_) {
+            auto* curiosity = brain_->getCuriosity();
+            if (curiosity) {
+                // Set curiosity to high level to trigger exploration
+                curiosityLevel_ = 0.8f;
+            }
+        }
+    }
+    
+    // Set development stage
+    void setDevelopmentStage(DevelopmentalStage stage) {
+        if (brain_) {
+            brain_->setDevelopmentalStage(stage);
+        }
+    }
+    
+    // Get developmental stage
+    DevelopmentalStage getDevelopmentStage() const {
+        return brain_ ? brain_->getDevelopmentalStage() : DevelopmentalStage::Initial;
+    }
+    
+    // Memory consolidation command
+    void triggerMemoryConsolidation() {
+        if (brain_) {
+            auto* episodicMemory = brain_->getEpisodicMemory();
+            if (episodicMemory) {
+                // Trigger consolidation of episodic memories
+                episodicMemory->consolidate(0.5f);
+            }
+        }
+    }
+    
+    // Replay command
+    void triggerMemoryReplay(size_t episodeCount = 3) {
+        if (brain_) {
+            auto* episodicMemory = brain_->getEpisodicMemory();
+            if (episodicMemory) {
+                // Get episodes for replay
+                auto episodes = episodicMemory->getEpisodesForReplay(episodeCount);
+                // Replay the episodes
+                for (const auto* episode : episodes) {
+                    episodicMemory->replayEpisode(episode);
+                }
+            }
+        }
+    }
+    
+    // Reset brain and all systems
+    void fullReset() {
+        // Reset agent brain state
+        reset();
+        
+        // Reset cognitive systems if accessible
+        if (brain_) {
+            auto* workingMemory = brain_->getWorkingMemory();
+            if (workingMemory) {
+                workingMemory->clear();
+            }
+            
+            auto* episodicMemory = brain_->getEpisodicMemory();
+            if (episodicMemory) {
+                episodicMemory->clear();
+            }
+            
+            auto* conceptFormation = brain_->getConceptFormation();
+            if (conceptFormation) {
+                conceptFormation->clear();
+            }
+            
+            auto* planner = brain_->getPlanner();
+            if (planner) {
+                planner->clearCache();
+            }
+            
+            // Reset development stage
+            brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+        }
+    }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
