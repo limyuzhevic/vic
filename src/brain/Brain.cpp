@@ -149,9 +149,49 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+// Helper function to create sensory input from current neural state
+std::unique_ptr<SensoryInput> createSensoryInputFromCurrentState() {
+    std::vector<float> neuralPattern;
+    
+    // Collect neural activity patterns from all regions
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            // Get activity pattern from population
+            auto pattern = pop->getActivityPattern();
+            neuralPattern.insert(neuralPattern.end(), 
+                                 pattern.begin(), pattern.end());
+        }
     }
+    
+    // If no neurons found, create empty pattern
+    if (neuralPattern.empty()) {
+        // Create a simple internal state input
+        auto internalSignals = std::make_unique<InternalSignals>();
+        internalSignals->addSignal(0.5f);  // Neutral state
+        internalSignals->addSignal(0.3f);  // Low activity
+        internalSignals->addSignal(0.2f);  // Low novelty
+        return internalSignals;
+    }
+    
+    // Normalize pattern to reasonable range
+    float maxVal = 0.0f;
+    for (float v : neuralPattern) {
+        maxVal = std::max(maxVal, v);
+    }
+    if (maxVal > 0.0f) {
+        for (float& v : neuralPattern) {
+            v /= maxVal;  // Normalize to [0, 1]
+        }
+    }
+    
+    // Create InternalSignals for neural state
+    auto internalSignals = std::make_unique<InternalSignals>();
+    for (float v : neuralPattern) {
+        internalSignals->addSignal(v);
+    }
+    
+    return internalSignals;
+}
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -401,6 +441,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
+    // Store neuron firing patterns in associative memory
+    if (pImpl->associativeMemory) {
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    // Check if neuron just fired this step
+                    const auto& state = neuron->getState();
+                    bool justFired = (state.firingState == FiringState::Refractory &&
+                                     state.lastSpikeTime >= 0.0f &&
+                                     std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                    
+                    if (justFired) {
+                        // Store firing pattern in associative memory
+                        // Create pattern based on neuron's population and activity
+                        std::vector<float> pattern;
+                        pattern.reserve(3);  // neuron ID + activation + time
+                        pattern.push_back(static_cast<float>(neuron->getId()));
+                        
+                        // Activation level (normalized membrane potential deviation)
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 50.0f;
+                        activation = std::min(1.0f, std::max(0.0f, activation));
+                        pattern.push_back(activation);
+                        
+                        // Timing information
+                        float timeSinceLastSpike = static_cast<float>(currentTime) - state.lastSpikeTime;
+                        float normalizedTime = std::min(1.0f, timeSinceLastSpike / 0.1f);
+                        pattern.push_back(normalizedTime);
+                        
+                        // Store in associative memory
+                        pImpl->associativeMemory->storePattern(pattern, activation * 0.1f);
+                        
+                        // Also record in prediction system as potential next state
+                        if (pImpl->predictionSystem) {
+                            // Update prediction with this firing pattern
+                            auto inputSignals = std::make_unique<InternalSignals>();
+                            inputSignals->addSignal(activation);
+                            inputSignals->addSignal(normalizedTime);
+                            pImpl->predictionSystem->train(*inputSignals);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
@@ -511,8 +596,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create sensory input from current neural state for prediction
+        auto sensoryInput = createSensoryInputFromCurrentState();
+        
+        // Update prediction with current sensory state
+        if (pImpl->predictionSystem->getLastPredictedState()) {
+            pImpl->predictionSystem->updatePredictions(
+                pImpl->predictionSystem->getLastPredictedState(),
+                sensoryInput
+            );
+        }
+        
+        // Train prediction system with new observation
+        pImpl->predictionSystem->train(sensoryInput);
+        
+        // Get prediction error
+        float error = pImpl->predictionSystem->getPredictionError();
+        
+        // Create prediction error signal and connect to neuromodulation
+        if (pImpl->predictionError && pImpl->dopamine) {
+            // Set error based on prediction system output
+            pImpl->predictionError->computeError(
+                pImpl->predictionSystem->getLastPredictedState() ? 
+                    pImpl->predictionSystem->getLastPredictedState()->getData()[0] : 0.0f,
+                error
+            );
+            
+            // Update dopamine based on prediction error (RPE)
+            // Positive error = reward prediction error = increase dopamine
+            float dopamineModulation = std::min(1.0f, std::max(-1.0f, error * 2.0f));
+            
+            // Apply prediction error to dopamine system
+            pImpl->dopamine->updatePredictionError(dopamineModulation);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,11 +644,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get neural activity patterns to form concepts from
+        auto neuralPattern = extractNeuralActivityPattern();
+        auto sensoryPattern = extractSensoryPattern();
+        
+        // Present neural patterns to concept formation system
+        // Use current firing rate as reward signal
+        float reward = (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) * 0.1f;
+        
+        // Add some noise to pattern to increase exploration
+        for (float& v : neuralPattern) {
+            v += (pImpl->rng->getFloat() - 0.5f) * 0.05f;
+            v = std::max(0.0f, std::min(1.0f, v));
+        }
+        
+        // Present patterns to concept formation
+        pImpl->conceptFormation->presentExperience( neuralPattern,
+                                                   sensoryPattern,
+                                                   reward,
+                                                   currentStep);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner && pImpl->workingMemory) {
+        // Get current neural state for planning
+        auto neuralPattern = extractNeuralActivityPattern();
+        
+        // Get current goal from working memory or use default
+        std::vector<float> goal(10, 0.5f);  // Default neutral goal
+        if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use highest priority working memory item as goal
+            goal = extractSensoryPattern();
+            if (goal.size() > 10) {
+                goal.resize(10);
+            }
+        }
+        
+        // Calculate reward from dopamine system
+        float reward = (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) * 0.1f;
+        
+        // Plan action based on current state and goal
+        ActionType plannedAction = pImpl->planner->planAction(neuralPattern, reward);
+        
+        // Update planner with actual outcomes
+        if (pImpl->workingMemory) {
+            // Get actual action taken (simplified - could use motor neuron activity)
+            auto actualAction = produceAction();
+            ActionType actualActionType = actualAction->getType();
+            
+            // Update planner with success/failure
+            pImpl->planner->updatePlanQuality(std::vector<ActionType>{plannedAction}, 
+                                            std::vector<ActionType>{actualActionType}, 
+                                            reward);
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -1114,4 +1281,66 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// Extract neural activity patterns from all brain regions
+    std::vector<float> Brain::extractNeuralActivityPattern() const {
+        std::vector<float> neuralPattern;
+        
+        // Collect neural activity patterns from all regions
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                // Get activity pattern from population
+                auto pattern = pop->getActivityPattern();
+                neuralPattern.insert(neuralPattern.end(), 
+                                     pattern.begin(), pattern.end());
+            }
+        }
+        
+        return neuralPattern;
+    }
+    
+    // Extract sensory-ready patterns from active neurons
+    std::vector<float> Brain::extractSensoryPattern() const {
+        std::vector<float> sensoryPattern;
+        
+        // Focus on sensory and motor populations for sensory encoding
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory || 
+                    pop->getNeuronType() == NeuronType::Motor) {
+                    auto pattern = pop->getActivityPattern();
+                    sensoryPattern.insert(sensoryPattern.end(),
+                                         pattern.begin(), pattern.end());
+                }
+            }
+        }
+        
+        return sensoryPattern;
+    }
+    
+    // Get neural firing statistics
+    float Brain::getAverageFiringRate() const {
+        if (pImpl->regions.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                sum += pop->getAverageFiringRate();
+            }
+        }
+        return sum / static_cast<float>(pImpl->regions.size());
+    }
+    
+    size_t Brain::getTotalFiringCount() const {
+        return pImpl->totalSpikesThisStep;
+    }
+    
+    // ========== PREDICTION SYSTEM ==========
+
+    // Get the last predicted state from prediction system
+    std::unique_ptr<SensoryInput> PredictionSystem::getLastPredictedState() const {
+        // For now, return the last prediction error as a simple sensory input
+        // In a real implementation, this would track the actual predicted state
+        auto input = std::make_unique<InternalSignals>();
+        input->addSignal(pImpl->predictionError);
+        input->addSignal(pImpl->confidence);
+        return input;
+    }

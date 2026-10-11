@@ -37,6 +37,12 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
+std::unique_ptr<SensoryInput> PredictionSystem::getLastPredictedState() const {
+    // Return the last predicted sensory state
+    // TODO PHASE 2: Store and return actual predicted state
+    return nullptr;
+}
+
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
 }

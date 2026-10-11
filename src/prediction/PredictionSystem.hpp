@@ -27,6 +27,9 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
+    // Get last predicted state
+    std::unique_ptr<SensoryInput> getLastPredictedState() const;
+    
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();

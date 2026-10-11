@@ -62,12 +62,10 @@ public:
     // Get neuron IDs in this population
     std::vector<NeuronId> getNeuronIds() const;
     
-    // Statistics tracking
-    void recordActivity();  // Record current state for statistics
-    float getMeanMembranePotential() const;
-    float getVarianceMembranePotential() const;
+    // Convert neural activity to pattern for memory systems
+    std::vector<float> getActivityPattern() const;
     
-private:
+    // Statistics
     struct Impl;
     Impl* pImpl;
 };

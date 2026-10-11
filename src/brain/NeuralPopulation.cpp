@@ -175,4 +175,33 @@ float NeuralPopulation::getVarianceMembranePotential() const {
     return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
 }
 
+// Convert neural activity to pattern for memory systems
+std::vector<float> NeuralPopulation::getActivityPattern() const {
+    std::vector<float> pattern;
+    pattern.reserve(pImpl->neurons.size());
+    
+    for (const auto* neuron : pImpl->neurons) {
+        const auto& state = neuron->getState();
+        
+        // Normalize membrane potential to [0, 1] range
+        float normalized = (state.membranePotential + 70.0f) / 150.0f;  // Scale from ~-70 to ~80
+        normalized = std::max(0.0f, std::min(1.0f, normalized));
+        
+        // Also consider firing state and rate for richer representation
+        float activity = normalized;
+        if (neuron->isFiring()) {
+            activity = std::min(1.0f, activity * 1.5f);
+        }
+        
+        float firingRate = neuron->getFiringRate();
+        if (firingRate > 0.0f) {
+            activity = std::min(1.0f, activity * (1.0f + firingRate));
+        }
+        
+        pattern.push_back(activity);
+    }
+    
+    return pattern;
+}
+
 } // namespace nlm

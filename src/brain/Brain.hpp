@@ -148,6 +148,18 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // ========== NEURAL ACTIVITY EXTRACTION ==========
+    
+    // Extract neural activity patterns from all brain regions
+    std::vector<float> extractNeuralActivityPattern() const;
+    
+    // Extract sensory-ready patterns from active neurons
+    std::vector<float> extractSensoryPattern() const;
+    
+    // Get neural firing statistics
+    float getAverageFiringRate() const;
+    size_t getTotalFiringCount() const;
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
