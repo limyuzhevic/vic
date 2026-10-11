@@ -42,6 +42,27 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+### NEW: Command-Line Interface
+
+NLM now has a powerful command-line interface! Run `nlm --mode help` to see all options.
+
+```bash
+# Run neural tests
+nlm --mode test --steps 1000 --neuron-count 500
+
+# Run demonstration
+nlm --mode demo --episodes 5 --steps-per-episode 200
+
+# Performance benchmarking
+nlm --mode benchmark --sizes 100 500 1000 2000
+
+# Interactive exploration
+nlm --mode interactive --slow
+
+# Show help
+nlm --mode help
+```
+
 ### Example 2: Brain in a Simple World
 
 ```python

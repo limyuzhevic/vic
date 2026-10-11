@@ -1,0 +1,20 @@
+{
+  "integration_success": false,
+  "experiment_results": {
+    "total_reward": 10.0,
+    "avg_firing_rate": 0.0,
+    "memory_episodes_stored": 100,
+    "dopamine_level": 0.53,
+    "memory_working_memory_integrated": true,
+    "memory_episodic_memory_integrated": true,
+    "neuromodulation_integrated": false,
+    "prediction_integrated": false,
+    "development_integrated": false,
+    "checkpointing_works": true,
+    "replay_works": true,
+    "total_wall_clock_time": 0.00047326087951660156
+  },
+  "memory_episodes": 100,
+  "total_spikes": 0,
+  "dopamine_level": 0.53
+}
