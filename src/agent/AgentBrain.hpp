@@ -4,6 +4,17 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <memory>
 #include <vector>
 
@@ -15,6 +26,12 @@ class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -68,6 +85,47 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Get sensory and motor neuron groups
+    const std::vector<Neuron*>& getSensoryVision() const { return sensoryVision_; }
+    const std::vector<Neuron*>& getSensoryTouch() const { return sensoryTouch_; }
+    const std::vector<Neuron*>& getSensoryInternal() const { return sensoryInternal_; }
+    const std::vector<Neuron*>& getSensoryProprioception() const { return sensoryProprioception_; }
+    const std::vector<Neuron*>& getMotorForward() const { return motorForward_; }
+    const std::vector<Neuron*>& getMotorBackward() const { return motorBackward_; }
+    const std::vector<Neuron*>& getMotorTurnLeft() const { return motorTurnLeft_; }
+    const std::vector<Neuron*>& getMotorTurnRight() const { return motorTurnRight_; }
+    const std::vector<Neuron*>& getMotorInteract() const { return motorInteract_; }
+    const std::vector<Neuron*>& getMotorWait() const { return motorWait_; }
+    
+    // Advanced cognitive integration methods (Phase 6)
+    void processWithWorkingMemory(const std::vector<NeuronId>& activeNeurons);
+    void updateWithEpisodicMemory();
+    void updateWithPredictionSystem();
+    void updateWithPlanning();
+    void updateWithConceptFormation();
+    void updateWithAttention();
+    
+    // Configuration for cognitive integration
+    void enableCuriosity(bool enabled) { curiosityEnabled_ = enabled; }
+    void enableDevelopment(bool enabled) { developmentEnabled_ = enabled; }
+    void enableRewardModulation(bool enabled) { rewardModulationEnabled_ = enabled; }
+    void enableStructuralPlasticity(bool enabled) { structuralPlasticityEnabled_ = enabled; }
+    
+    // Memory and cognition access (for advanced integration)
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    NeuralAssociativeMemory* getAssociativeMemory() { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    NeuralPlanner* getPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
+    ConceptFormation* getConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    AttentionalSelection* getAttention() { return brain_ ? brain_->getAttention() : nullptr; }
+    
+    // Neuromodulators
+    Dopamine* getDopamine() { return brain_ ? brain_->getDopamine() : nullptr; }
+    Curiosity* getCuriosity() { return brain_ ? brain_->getCuriosity() : nullptr; }
+    Novelty* getNovelty() { return brain_ ? brain_->getNovelty() : nullptr; }
+    PredictionError* getPredictionError() { return brain_ ? brain_->getPredictionErrorSignal() : nullptr; }
     
 private:
     // Motor decoding: convert neural activity to motor command
