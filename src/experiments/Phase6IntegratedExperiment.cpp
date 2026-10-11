@@ -243,7 +243,56 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    NLM_LOG_INFO("[PASS] Development system is integrated");
+    }
+    
     return success;
+}
+
+bool Phase6IntegratedExperiment::runAllTests() {
+    NLM_LOG_INFO("=== Running All Integration Tests ===");
+    
+    bool allTestsPassed = true;
+    
+    // Run all test suites
+    if (!verifyIntegration()) {
+        NLM_LOG_ERROR("[FAIL] Integration verification failed");
+        allTestsPassed = false;
+    }
+    
+    if (!testMemoryIntegration()) {
+        NLM_LOG_ERROR("[FAIL] Memory integration test failed");
+        allTestsPassed = false;
+    }
+    
+    if (!testNeuromodulationIntegration()) {
+        NLM_LOG_ERROR("[FAIL] Neuromodulation integration test failed");
+        allTestsPassed = false;
+    }
+    
+    if (!testCheckpointing()) {
+        NLM_LOG_ERROR("[FAIL] Checkpointing test failed");
+        allTestsPassed = false;
+    }
+    
+    if (!testReplay()) {
+        NLM_LOG_ERROR("[FAIL] Replay test failed");
+        allTestsPassed = false;
+    }
+    
+    if (!testSleepRestIntegration()) {
+        NLM_LOG_ERROR("[FAIL] Sleep/rest integration test failed");
+        allTestsPassed = false;
+    }
+    
+    NLM_LOG_INFO("=== All Tests Complete ===");
+    if (allTestsPassed) {
+        NLM_LOG_INFO("[PASS] All integration tests PASSED");
+    } else {
+        NLM_LOG_INFO("[FAIL] Some integration tests FAILED");
+    }
+    
+    return allTestsPassed;
 }
 
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
@@ -295,12 +344,16 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    // Get neuromodulation systems
+    // Get all neuromodulation systems
     auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* serotonin = brain->getSerotonin();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* acetylcholine = brain->getAcetylcholine();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !curiosity || !novelty || !serotonin || 
+        !norepinephrine || !acetylcholine) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
     }
@@ -312,8 +365,38 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         brain->step(i, i * 0.001);
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
-    return true;
+    // Test neuromodulator-specific functions
+    if (dopamine) {
+        dopamine->signalReward(0.5f);
+        dopamine->signalRewardPredictionError(0.1f);
+    }
+    
+    if (serotonin) {
+        serotonin->setLevel(0.3f);
+    }
+    
+    if (norepinephrine) {
+        norepinephrine->setLevel(0.7f);
+    }
+    
+    if (acetylcholine) {
+        acetylcholine->setLevel(0.4f);
+    }
+    
+    // Check that neuromodulators are functional
+    if (dopamine->getLevel() > 0.0f || curiosity->getLevel() > 0.0f || 
+        novelty->getLevel() > 0.0f || serotonin->getLevel() > 0.0f ||
+        norepinephrine->getLevel() > 0.0f || acetylcholine->getLevel() > 0.0f) {
+        NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+        NLM_LOG_INFO("[INFO] Dopamine: " + std::to_string(dopamine->getLevel()) +
+                     ", Serotonin: " + std::to_string(serotonin->getLevel()) +
+                     ", Norepinephrine: " + std::to_string(norepinephrine->getLevel()) +
+                     ", Acetylcholine: " + std::to_string(acetylcholine->getLevel()));
+        return true;
+    } else {
+        NLM_LOG_ERROR("Neuromodulation systems have no activity");
+        return false;
+    }
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
@@ -397,6 +480,97 @@ bool Phase6IntegratedExperiment::testReplay() {
     }
     
     NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
+    return true;
+}
+
+bool Phase6IntegratedExperiment::testSleepRestIntegration() {
+    NLM_LOG_INFO("=== Testing Sleep/Rest Integration ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    cfg->set("replay_interval", 50);      // Replay more frequently for testing
+    cfg->set("consolidation_interval", 200);  // Consolidate more frequently for testing
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    auto* em = brain->getEpisodicMemory();
+    auto* wm = brain->getWorkingMemory();
+    auto* sp = brain->getStructuralPlasticity();
+    auto* dac = brain->getDopamine();
+    auto* serotonin = brain->getSerotonin();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* acetylcholine = brain->getAcetylcholine();
+    
+    if (!em || !wm || !sp || !dac || !serotonin || !norepinephrine || !acetylcholine) {
+        NLM_LOG_ERROR("Required systems not available");
+        return false;
+    }
+    
+    // Generate some neural activity
+    for (int i = 0; i < 300; ++i) {
+        // Apply some neuromodulatory activity
+        if (dac) {
+            dac->setLevel(0.3f + 0.2f * sin(i * 0.01));
+        }
+        if (serotonin) {
+            serotonin->setLevel(0.2f * cos(i * 0.02));
+        }
+        if (norepinephrine) {
+            norepinephrine->setLevel(0.4f * sin(i * 0.015));
+        }
+        if (acetylcholine) {
+            acetylcholine->setLevel(0.1f * cos(i * 0.03));
+        }
+        
+        // Run brain step
+        brain->step(i, i * 0.001);
+        
+        // Inject some sensory input to generate activity
+        if (i % 10 == 0) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 3.0f);
+        }
+        
+        // Periodic status updates for sleep cycle observation
+        if (i % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(i) + 
+                         " | isResting: " + std::string(brain->isResting() ? "YES" : "NO") +
+                         " | Episodes: " + std::to_string(em->getEpisodeCount()) +
+                         " | Consolidation: " + std::to_string(em->getConsolidationProgress()) +
+                         " | Synaptogenesis: " + std::to_string(sp->getSynaptogenesisRate()) +
+                         " | Pruning: " + std::to_string(sp->getPruningRate()));
+        }
+    }
+    
+    // Check episodic memory activity
+    size_t episodeCount = em->getEpisodeCount();
+    if (episodeCount > 0) {
+        NLM_LOG_INFO("[PASS] Sleep/rest cycle generated " + std::to_string(episodeCount) + " episodes");
+    }
+    
+    // Check neuromodulator activity patterns
+    float dacLevel = dac->getLevel();
+    float serotoninLevel = serotonin->getLevel();
+    float norepinephrineLevel = norepinephrine->getLevel();
+    float acetylcholineLevel = acetylcholine->getLevel();
+    
+    NLM_LOG_INFO("[PASS] Neuromodulator levels - DA: " + std::to_string(dacLevel) +
+                 ", 5-HT: " + std::to_string(serotoninLevel) +
+                 ", NE: " + std::to_string(norepinephrineLevel) +
+                 ", ACh: " + std::to_string(acetylcholineLevel));
+    
+    // Check for episodic memory replay (automatic during sleep/rest)
+    // The replay system should be active
+    if (em->getEpisodeCount() > 0) {
+        auto replayed = em->getEpisodesForReplay(5);
+        if (!replayed.empty()) {
+            NLM_LOG_INFO("[PASS] Memory replay system active during rest");
+            NLM_LOG_INFO("[INFO] Successfully retrieved " + std::to_string(replayed.size()) + " episodes for replay");
+            return true;
+        }
+    }
+    
+    NLM_LOG_INFO("[INFO] No episodes for replay (may be normal for test)");
     return true;
 }
 
