@@ -356,7 +356,7 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with JSON/YAML support
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
@@ -366,21 +366,53 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 using the new configuration builder
+    auto builder = config->getBuilder();
+    
+    // Phase 2 core configuration
+    builder->addInt("random_seed", 42, "Random seed for reproducible simulations")
+           ->addDouble("simulation_timestep", 0.001, "Time step for simulation")
+           ->addInt("neuron_count", 500, "Number of neurons (smaller for faster tests)")
+           ->addInt("region_count", 1, "Number of neural regions")
+           ->addDouble("connection_probability", 0.15, "Probability of initial connections");
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    builder->addDouble("stdp_ltp_weight", 0.02, "STDP long-term potentiation weight")
+           ->addDouble("stdp_ltd_weight", 0.015, "STDP long-term depression weight")
+           ->addDouble("stdp_tau", 20.0, "STDP time constant");
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    builder->addDouble("synaptogenesis_rate", 0.0001, "Rate of new synapse formation")
+           ->addDouble("pruning_rate", 0.00001, "Rate of synapse removal");
+    
+    // Apply the builder configuration
+    auto phase2Config = builder->build();
+    
+    // Merge the builder's configuration with the existing config
+    for (const auto& key : phase2Config->getKeys()) {
+        auto value = phase2Config->get(key);
+        if (value) {
+            config->set(key, *value, ConfigSource::Default);
+        }
+    }
+    
+    // Add Phase 6 specific configuration
+    auto phase6Builder = config->getBuilder();
+    phase6Builder->addInt("max_steps", 10000, "Maximum simulation steps for Phase 6")
+               ->addBool("enable_checkpointing", true, "Enable checkpoint save/load")
+               ->addBool("enable_replay", true, "Enable replay system")
+               ->addBool("enable_development", true, "Enable development system")
+               ->addString("checkpoint_path", "./checkpoint_test.bin", "Path for checkpoint files");
+    
+    auto phase6Config = phase6Builder->build();
+    
+    // Merge Phase 6 configuration
+    for (const auto& key : phase6Config->getKeys()) {
+        auto value = phase6Config->get(key);
+        if (value) {
+            config->set(key, *value, ConfigSource::Builder);
+        }
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
