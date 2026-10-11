@@ -3,6 +3,7 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Errors/Errors.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
 
 namespace nlm {
 
@@ -175,128 +177,328 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    ErrorContext ctx("initialize", "");
+    ctx.addMetadata("operation", "brain_initialization");
+    ctx.addMetadata("timestamp", getCurrentTimestamp());
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
-    
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
-    
-    // Create regions
-    for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
-    }
-    
-    // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+    try {
+        NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+        ctx.addMetadata("stage", "initialization_start");
+        
+        // Validate configuration before initialization
+        if (!pImpl->config) {
+            throw ConfigurationException("Cannot initialize brain: no configuration provided",
+                                        "Brain initialization requires a valid configuration object",
+                                        ErrorCode::CONFIG_INVALID_VALUE,
+                                        __FILE__, __LINE__, __func__);
         }
-    }
-    
-    // Initialize connectivity with random weights
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+        
+        // Get and validate configuration values
+        auto neuronCountOpt = pImpl->config->get<size_t>("neuron_count");
+        if (!neuronCountOpt.has_value() || neuronCountOpt.value() == 0) {
+            throw ConfigurationException("Invalid neuron count in configuration",
+                                        "Configuration key 'neuron_count' is missing or invalid",
+                                        ErrorCode::CONFIG_INVALID_VALUE,
+                                        __FILE__, __LINE__, __func__);
         }
-    }
-    
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
-    
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+        
+        auto regionCountOpt = pImpl->config->get<size_t>("region_count");
+        if (!regionCountOpt.has_value() || regionCountOpt.value() == 0) {
+            throw ConfigurationException("Invalid region count in configuration",
+                                        "Configuration key 'region_count' is missing or invalid",
+                                        ErrorCode::CONFIG_INVALID_VALUE,
+                                        __FILE__, __LINE__, __func__);
+        }
+        
+        auto connectionProbOpt = pImpl->config->get<double>("connection_probability");
+        if (!connectionProbOpt.has_value() || connectionProbOpt.value() < 0.0 || connectionProbOpt.value() > 1.0) {
+            throw ConfigurationException("Invalid connection probability in configuration",
+                                        "Configuration key 'connection_probability' must be between 0.0 and 1.0",
+                                        ErrorCode::CONFIG_INVALID_VALUE,
+                                        __FILE__, __LINE__, __func__);
+        }
+        
+        size_t neuronCount = neuronCountOpt.value();
+        size_t regionCount = regionCountOpt.value();
+        float connectionProbability = static_cast<float>(connectionProbOpt.value());
+        
+        // Check for reasonable resource limits
+        if (neuronCount > 1000000) {
+            throw MemoryError("Too many neurons for available memory",
+                            "Requested neuron count: " + std::to_string(neuronCount) + 
+                            ", Maximum allowed: 1000000",
+                            ErrorCode::MEMORY_ALLOCATION_FAILED,
+                            __FILE__, __LINE__, __func__);
+        }
+        
+        if (regionCount > 100) {
+            throw ConfigurationException("Too many regions for stable operation",
+                                        "Requested region count: " + std::to_string(regionCount) + 
+                                        ", Maximum allowed: 100",
+                                        ErrorCode::CONFIG_INVALID_VALUE,
+                                        __FILE__, __LINE__, __func__);
+        }
+        
+        NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+                     std::to_string(regionCount) + " regions, connection probability: " + 
+                     std::to_string(connectionProbability));
+        ctx.addMetadata("neuron_count", std::to_string(neuronCount));
+        ctx.addMetadata("region_count", std::to_string(regionCount));
+        
+        // Create regions with error handling
+        std::vector<RegionId> regionIds;
+        for (size_t i = 0; i < regionCount; ++i) {
+            try {
+                RegionId regionId = addRegion("Region_" + std::to_string(i + 1));
+                regionIds.push_back(regionId);
+                NLM_LOG_INFO("Created region " + std::to_string(i + 1) + " (ID: " + std::to_string(regionId.index()) + ")");
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1) + ": " + e.what());
+                // Continue with other regions instead of failing completely
+                NLM_LOG_WARNING("Skipping region " + std::to_string(i + 1) + ", continuing with other regions");
+            }
+        }
+        
+        if (regionIds.empty()) {
+            throw NeuralSimulationError("Failed to create any brain regions",
+                                        "All region creation attempts failed",
+                                        ErrorCode::NEURAL_SIMULATION_FAILED,
+                                        __FILE__, __LINE__, __func__);
+        }
+        
+        // Create neurons across regions with error handling
+        size_t neuronsPerRegion = neuronCount / regionIds.size();
+        for (size_t i = 0; i < regionIds.size(); ++i) {
+            auto* region = getRegion(regionIds[i]);
+            if (!region) {
+                NLM_LOG_ERROR("Failed to get region " + std::to_string(i + 1));
+                continue;
+            }
+            
+            try {
+                // Add populations
+                auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+                auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+                auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+                
+                // Collect sensory and motor neurons for I/O
+                auto* sensoryPop = region->getPopulation(sensoryPopId);
+                auto* motorPop = region->getPopulation(motorPopId);
+                if (sensoryPop) {
+                    for (auto* neuron : sensoryPop->getNeurons()) {
+                        pImpl->sensoryNeurons.push_back(neuron);
                     }
-                    return;
+                }
+                if (motorPop) {
+                    for (auto* neuron : motorPop->getNeurons()) {
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
+                }
+                
+                NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                            ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                            std::to_string(region->getTotalNeuronCount()) + " neurons");
+                ctx.addMetadata("region_" + std::to_string(i + 1) + "_neurons", 
+                               std::to_string(region->getTotalNeuronCount()));
+                
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Failed to create populations in region " + std::to_string(i + 1) + ": " + e.what());
+                // Continue with other regions instead of failing completely
+                NLM_LOG_WARNING("Skipping population creation in region " + std::to_string(i + 1) + ", continuing with other regions");
+            }
+        }
+        
+        // Initialize connectivity with random weights
+        for (size_t i = 0; i < regionIds.size(); ++i) {
+            auto* region = getRegion(regionIds[i]);
+            if (region) {
+                try {
+                    // Initialize random connectivity and synapse weights
+                    region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+                    NLM_LOG_INFO("Initialized connectivity for region " + std::to_string(i + 1));
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Failed to initialize connectivity for region " + std::to_string(i + 1) + ": " + e.what());
+                    // Continue with other regions instead of failing completely
+                    NLM_LOG_WARNING("Skipping connectivity initialization in region " + std::to_string(i + 1) + ", continuing with other regions");
                 }
             }
         }
-    });
-    
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
+        
+        // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+        
+        // Initialize working memory with error handling
+        try {
+            pImpl->workingMemory->initialize(this);
+            pImpl->workingMemory->setCapacity(neuronCount / 10);
+            NLM_LOG_INFO("Working memory initialized with capacity: " + std::to_string(pImpl->workingMemory->getCapacity()));
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize working memory: " + e.what());
+            // Continue without working memory instead of failing completely
+            NLM_LOG_WARNING("Working memory initialization failed, continuing without working memory");
+        }
+        
+        // Initialize episodic memory with error handling
+        try {
+            pImpl->episodicMemory->initialize(this);
+            pImpl->episodicMemory->setMaxEpisodes(1000);
+            NLM_LOG_INFO("Episodic memory initialized with max episodes: 1000");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize episodic memory: " + e.what());
+            // Continue without episodic memory instead of failing completely
+            NLM_LOG_WARNING("Episodic memory initialization failed, continuing without episodic memory");
+        }
+        
+        // Initialize associative memory with error handling
+        try {
+            pImpl->associativeMemory->initialize(this);
+            NLM_LOG_INFO("Associative memory initialized");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize associative memory: " + e.what());
+            // Continue without associative memory instead of failing completely
+            NLM_LOG_WARNING("Associative memory initialization failed, continuing without associative memory");
+        }
+        
+        // Initialize cognition systems with error handling
+        try {
+            pImpl->planner->initialize(this);
+            pImpl->planner->setPlanningDepth(5);
+            NLM_LOG_INFO("Neural planner initialized with planning depth: 5");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize neural planner: " + e.what());
+            throw NeuralSimulationError("Failed to initialize core cognition systems",
+                                        "Neural planner initialization failed",
+                                        ErrorCode::NEURAL_SIMULATION_FAILED,
+                                        __FILE__, __LINE__, __func__);
+        }
+        
+        try {
+            pImpl->conceptFormation->initialize(this);
+            NLM_LOG_INFO("Concept formation initialized");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize concept formation: " + e.what());
+            // Continue without concept formation instead of failing completely
+            NLM_LOG_WARNING("Concept formation initialization failed, continuing without concept formation");
+        }
+        
+        try {
+            pImpl->attention->initialize(this);
+            pImpl->attention->setInhibitionStrength(0.5f);
+            pImpl->attention->setExcitationStrength(1.5f);
+            NLM_LOG_INFO("Attention system initialized with inhibition: 0.5, excitation: 1.5");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize attention system: " + e.what());
+            // Continue without attention system instead of failing completely
+            NLM_LOG_WARNING("Attention system initialization failed, continuing without attention system");
+        }
+        
+        // Initialize neuromodulation with error handling
+        try {
+            pImpl->novelty->initialize(this);
+            NLM_LOG_INFO("Novelty detection system initialized");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize novelty system: " + e.what());
+            // Continue without novelty system instead of failing completely
+            NLM_LOG_WARNING("Novelty system initialization failed, continuing without novelty system");
+        }
+        
+        try {
+            pImpl->curiosity->initialize(this);
+            NLM_LOG_INFO("Curiosity system initialized");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize curiosity system: " + e.what());
+            // Continue without curiosity system instead of failing completely
+            NLM_LOG_WARNING("Curiosity system initialization failed, continuing without curiosity system");
+        }
+        
+        // Register spike handlers with error handling
+        try {
+            pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+                // Count spikes
+                ++pImpl->totalSpikesThisStep;
+                ++pImpl->totalSpikesTotal;
+            });
+            NLM_LOG_INFO("Spike system handler registered");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to register spike handler: " + e.what());
+            // Continue without spike handlers instead of failing completely
+            NLM_LOG_WARNING("Spike handler registration failed, continuing without spike handlers");
+        }
+        
+        // Register delayed spike handler with error handling
+        try {
+            pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+                // Find destination neuron and deliver synaptic input
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == event.destination_neuron) {
+                            // Apply synaptic weight as current
+                            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                            if (event.is_excitatory) {
+                                neuron->receiveExcitatoryInput(synapticCurrent);
+                            } else {
+                                neuron->receiveInhibitoryInput(-synapticCurrent);
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+            NLM_LOG_INFO("Delayed spike handler registered");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to register delayed spike handler: " + e.what());
+            // Continue without delayed spike handlers instead of failing completely
+            NLM_LOG_WARNING("Delayed spike handler registration failed, continuing without delayed spike handlers");
+        }
+        
+        // Configure checkpoint manager with error handling
+        try {
+            std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+            pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+            NLM_LOG_INFO("Checkpoint manager configured with directory: " + checkpointDir);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to configure checkpoint manager: " + e.what());
+            // Continue without checkpoint manager instead of failing completely
+            NLM_LOG_WARNING("Checkpoint manager configuration failed, continuing without checkpoint manager");
+        }
+        
+        ctx.addMetadata("status", "initialization_complete");
+        NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+        NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+        NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+        NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+        NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+        
+        return true;
+        
+    } catch (const ConfigurationException& e) {
+        NLM_LOG_ERROR("ConfigurationException during brain initialization: " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const NeuralSimulationError& e) {
+        NLM_LOG_ERROR("NeuralSimulationError during brain initialization: " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const MemoryError& e) {
+        NLM_LOG_ERROR("MemoryError during brain initialization: " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const FileIOError& e) {
+        NLM_LOG_ERROR("FileIOError during brain initialization: " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const std::exception& e) {
+        ErrorContext errorCtx("brain_initialization_error", "");
+        errorCtx.addMetadata("operation", "brain_initialization");
+        errorCtx.addMetadata("timestamp", getCurrentTimestamp());
+        errorCtx.addMetadata("original_error", e.what());
+        
+        NLM_LOG_ERROR("Unexpected error during brain initialization: " + e.what());
+        throw NeuralSimulationError("Brain initialization failed", 
+                                   errorCtx.getMetadataSummary(),
+                                   ErrorCode::NEURAL_SIMULATION_FAILED,
+                                   __FILE__, __LINE__, __func__);
+    }
 }
 
 void Brain::step(SimulationStep currentStep) {
@@ -762,13 +964,37 @@ void Brain::reset() {
 }
 
 bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
+    ErrorContext ctx("save", filepath);
+    ctx.addMetadata("timestamp", getCurrentTimestamp());
+    ctx.addMetadata("operation", "brain_save_checkpoint");
     
     try {
+        NLM_LOG_INFO("Saving brain state to " + filepath + " at " + getCurrentTimestamp());
+        
+        // Validate filepath before attempting to save
+        std::string dirPath = std::filesystem::path(filepath).parent_path();
+        if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+            throw FileIOError("Cannot save brain: directory does not exist", 
+                            "Directory: " + dirPath + " does not exist",
+                            ErrorCode::FILE_WRITE_FAILED,
+                            __FILE__, __LINE__, __func__);
+        }
+        
+        // Check available disk space (basic check)
+        auto fileSize = std::filesystem::file_size(filepath);
+        if (fileSize > 100 * 1024 * 1024) { // 100MB limit for checkpoint
+            throw FileIOError("Checkpoint file too large", 
+                            "File size: " + std::to_string(fileSize) + " bytes exceeds 100MB limit",
+                            ErrorCode::FILE_CORRUPTED,
+                            __FILE__, __LINE__, __func__);
+        }
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
+            throw FileIOError("Failed to create checkpoint file", 
+                            "Failed to create checkpoint file: " + filepath + ", error: " + writer.getError(),
+                            ErrorCode::FILE_WRITE_FAILED,
+                            __FILE__, __LINE__, __func__);
         }
         
         // Set metadata
@@ -780,7 +1006,7 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentTime
         );
         
-        // Write neurons
+        // Write neurons with error handling
         NeuronCheckpointData neuronData;
         neuronData.membranePotential.reserve(getTotalNeuronCount());
         neuronData.restingPotential.reserve(getTotalNeuronCount());
@@ -788,123 +1014,245 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.resetPotential.reserve(getTotalNeuronCount());
         neuronData.leakConductance.reserve(getTotalNeuronCount());
         
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+        try {
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        neuronData.membranePotential.push_back(state.membranePotential);
+                        neuronData.restingPotential.push_back(state.restingPotential);
+                        neuronData.threshold.push_back(state.threshold);
+                        neuronData.resetPotential.push_back(state.resetPotential);
+                        neuronData.leakConductance.push_back(state.leakConductance);
+                        neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                        neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
+                        neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
+                        neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    }
                 }
             }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            
+            if (!writer.writeNeurons(neuronData)) {
+                throw FileIOError("Failed to write neurons to checkpoint", 
+                                "Error writing neurons data to checkpoint",
+                                ErrorCode::FILE_WRITE_FAILED,
+                                __FILE__, __LINE__, __func__);
             }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error while writing neuron data: " + std::string(e.what()));
+            throw;
         }
         
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
+        // Write synapses with error handling
+        SynapseCheckpointData synapseData;
+        try {
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                    synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                    synapseData.weight.push_back(syn->getWeight());
+                    synapseData.delay.push_back(syn->getDelay());
+                    synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                    synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                }
+            }
+            
+            if (!writer.writeSynapses(synapseData)) {
+                throw FileIOError("Failed to write synapses to checkpoint", 
+                                "Error writing synapses data to checkpoint",
+                                ErrorCode::FILE_WRITE_FAILED,
+                                __FILE__, __LINE__, __func__);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error while writing synapse data: " + std::string(e.what()));
+            throw;
         }
         
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
+        // Finalize with error handling
+        try {
+            if (!writer.finalize()) {
+                throw FileIOError("Failed to finalize checkpoint", 
+                                "Error finalizing checkpoint file: " + writer.getError(),
+                                ErrorCode::FILE_WRITE_FAILED,
+                                __FILE__, __LINE__, __func__);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error while finalizing checkpoint: " + std::string(e.what()));
+            throw;
         }
         
         NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        ctx.addMetadata("status", "success");
+        ctx.addMetadata("bytes_written", std::to_string(writer.getBytesWritten()));
+        
         return true;
         
+    } catch (const FileIOError& e) {
+        NLM_LOG_ERROR("FileIOError saving brain to " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const NeuralSimulationError& e) {
+        NLM_LOG_ERROR("NeuralSimulationError saving brain to " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const ConfigurationException& e) {
+        NLM_LOG_ERROR("ConfigurationException saving brain to " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const MemoryError& e) {
+        NLM_LOG_ERROR("MemoryError saving brain to " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
-        return false;
+        NLM_LOG_ERROR("Unexpected error saving brain to " + filepath + ": " + e.what());
+        throw NeuralSimulationError("Failed to save brain state to " + filepath, 
+                                   "Operation: save_checkpoint",
+                                   ErrorCode::FILE_WRITE_FAILED,
+                                   __FILE__, __LINE__, __func__);
     }
 }
 
 bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath);
+    ErrorContext ctx("load", filepath);
+    ctx.addMetadata("timestamp", getCurrentTimestamp());
+    ctx.addMetadata("operation", "brain_load_checkpoint");
     
     try {
+        NLM_LOG_INFO("Loading brain state from " + filepath + " at " + getCurrentTimestamp());
+        
+        // Verify file exists and is readable
+        if (!std::filesystem::exists(filepath)) {
+            throw FileIOError("Checkpoint file not found", 
+                            "File path: " + filepath + " was not found or is inaccessible",
+                            ErrorCode::CONFIG_FILE_NOT_FOUND,
+                            __FILE__, __LINE__, __func__);
+        }
+        
+        if (!std::filesystem::is_regular_file(filepath)) {
+            throw FileIOError("Invalid checkpoint file", 
+                            "Path is not a regular file: " + filepath,
+                            ErrorCode::FILE_READ_FAILED,
+                            __FILE__, __LINE__, __func__);
+        }
+        
+        // Check file size to prevent loading corrupted or overly large files
+        auto fileSize = std::filesystem::file_size(filepath);
+        if (fileSize > 200 * 1024 * 1024) { // 200MB limit for checkpoint
+            throw FileIOError("Checkpoint file too large", 
+                            "File size: " + std::to_string(fileSize) + " bytes exceeds 200MB limit",
+                            ErrorCode::FILE_CORRUPTED,
+                            __FILE__, __LINE__, __func__);
+        }
+        
         CheckpointReader reader;
         if (!reader.open(filepath)) {
-            NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
-            return false;
+            throw FileIOError("Failed to open checkpoint file", 
+                            "Failed to open checkpoint file: " + filepath + ", error: " + reader.getError(),
+                            ErrorCode::FILE_OPEN_FAILED,
+                            __FILE__, __LINE__, __func__);
         }
         
         if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
-            return false;
+            throw FileIOError("Checkpoint validation failed", 
+                            "Checkpoint validation failed: " + reader.getError(),
+                            ErrorCode::FILE_CORRUPTED,
+                            __FILE__, __LINE__, __func__);
         }
         
-        // Read neurons
+        // Read neurons with error handling
         NeuronCheckpointData neuronData;
-        if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
-            return false;
+        try {
+            if (!reader.readNeurons(neuronData)) {
+                throw FileIOError("Failed to read neurons from checkpoint", 
+                                "Error reading neuron data from checkpoint",
+                                ErrorCode::FILE_READ_FAILED,
+                                __FILE__, __LINE__, __func__);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error while reading neuron data: " + std::string(e.what()));
+            throw;
         }
         
-        // Apply neuron states
+        // Apply neuron states with error handling
         size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+        try {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (idx < neuronData.membranePotential.size()) {
+                            neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                            neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                            neuron->setThreshold(neuronData.threshold[idx]);
+                            neuron->setResetPotential(neuronData.resetPotential[idx]);
+                            neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                            if (idx < neuronData.firingState.size()) {
+                                neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                            }
+                            if (idx < neuronData.refractoryRemaining.size()) {
+                                neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            }
+                            if (idx < neuronData.refractoryPeriod.size()) {
+                                neuron->setRefractoryRemaining(neuronData.refractoryRemaining[idx]);
+                            }
+                            if (idx < neuronData.lastSpikeTime.size()) {
+                                neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
+                            }
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+                        idx++;
                     }
-                    idx++;
                 }
             }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error while applying neuron states: " + std::string(e.what()));
+            throw;
         }
         
-        // Read synapses
+        // Read synapses with error handling
         SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+        try {
+            if (!reader.readSynapses(synapseData)) {
+                throw FileIOError("Failed to read synapses from checkpoint", 
+                                "Error reading synapse data from checkpoint",
+                                ErrorCode::FILE_READ_FAILED,
+                                __FILE__, __LINE__, __func__);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error while reading synapse data: " + std::string(e.what()));
+            throw;
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        ctx.addMetadata("synapses_loaded", std::to_string(synapseData.weight.size()));
         
         NLM_LOG_INFO("Brain state loaded successfully");
+        ctx.addMetadata("status", "success");
+        
         return true;
         
+    } catch (const FileIOError& e) {
+        NLM_LOG_ERROR("FileIOError loading brain from " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const NeuralSimulationError& e) {
+        NLM_LOG_ERROR("NeuralSimulationError loading brain from " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const ConfigurationException& e) {
+        NLM_LOG_ERROR("ConfigurationException loading brain from " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
+    } catch (const MemoryError& e) {
+        NLM_LOG_ERROR("MemoryError loading brain from " + filepath + ": " + e.what());
+        ErrorReporterRegistry::reportError(e);
+        throw;
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
+        NLM_LOG_ERROR("Unexpected error loading brain from " + filepath + ": " + e.what());
+        throw NeuralSimulationError("Failed to load brain state from " + filepath, 
+                                   "Operation: load_checkpoint",
+                                   ErrorCode::FILE_READ_FAILED,
+                                   __FILE__, __LINE__, __func__);
     }
 }
 

@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "Errors.hpp"
 
 namespace nlm {
 
@@ -100,6 +101,44 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced error handling methods
+    void setupDefaultValidationRules();
+    bool validate() const;
+    
+    // Serialization methods
+    bool hasJSONContent() const;
+    bool saveJSON(const std::string& filepath) const;
+    bool saveSimpleFormat(const std::string& filepath) const;
+    
+    // JSON parsing methods
+    bool loadJSON(std::ifstream& file);
+    bool tryLoadJSON(const std::string& filepath);
+    bool tryLoadSimpleFormat(const std::string& filepath);
+    
+    // JSON value conversion
+    ConfigValue parseJSONValue(const std::string& jsonValue) const;
+    std::string getTypeName(const ConfigValue& value) const;
+    std::string toDict() const;
+    std::string escapeJSON(const std::string& str) const;
+    std::string formatHex(unsigned int value) const;
+    
+    // Dict interface
+    std::map<std::string, std::string> getStringDict() const;
+    void updateFromDict(const std::map<std::string, std::string>& dict);
+    
+    // Configuration validation setup
+    void setRequiredKey(const std::string& key);
+    void setForbiddenKey(const std::string& key);
+    void addValidationRule(const std::string& key, std::function<bool(const ConfigValue&)> rule);
+    
+    // Detailed string output
+    std::string toDetailedString() const;
+    
+    // Exception handling
+    void handleError(const NLMException& error) const;
+    void handleError(const std::exception& error) const;
 };
 
 } // namespace nlm
+
