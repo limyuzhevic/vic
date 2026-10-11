@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -55,14 +56,25 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Enhanced file loading with automatic format detection
     bool loadFromFile(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromKeyValue(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Enhanced file saving with automatic format detection
     bool saveToFile(const std::string& filepath) const;
+    void saveToJSON(const std::string& filepath) const;
+    void saveToYAML(const std::string& filepath) const;
+    void saveToKeyValue(const std::string& filepath) const;
+    
+    // Internal stream-based methods
+    void saveToJSON(std::ostream& os) const;
+    void saveToYAML(std::ostream& os) const;
+    void saveToKeyValue(std::ostream& os) const;
     
     // Get values
     template<typename T>
@@ -100,6 +112,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format detection and conversion
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLOFile(const std::string& filepath);
+    
+    // Helper for JSON/YAML parsing (to be implemented)
+    std::string valueToString(const ConfigValue& value) const;
+    ConfigValue stringToValue(const std::string& str) const;
+    bool isNumber(const std::string& str, double& result) const;
+    bool isInteger(const std::string& str, int64_t& result) const;
 };
 
 } // namespace nlm

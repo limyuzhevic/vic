@@ -322,11 +322,131 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command-line arguments for enhanced configuration system
+    bool showHelp = false;
+    bool showConfigHelp = false;
+    bool showExampleConfigs = false;
+    bool validateConfig = false;
+    bool listConfigs = false;
+    bool showConfig = false;
+    bool quietMode = false;
+    bool verboseMode = false;
+    std::string configFile = "configs/default.cfg";
+    std::string configFormat;
+    std::string logLevel;
+    std::string logFile;
+    std::string experimentName;
+    int steps = 1000;
+    double timestep = 0.001;
+    
+    // Parse command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--config-help") {
+            showConfigHelp = true;
+        } else if (arg == "--examples") {
+            showExampleConfigs = true;
+        } else if (arg == "--validate" && i + 1 < argc) {
+            validateConfig = true;
+            configFile = argv[++i];
+        } else if (arg == "--list-configs") {
+            listConfigs = true;
+        } else if (arg == "--show-config") {
+            showConfig = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quietMode = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        } else if (arg == "--log-level" && i + 1 < argc) {
+            logLevel = argv[++i];
+        } else if (arg == "--log-file" && i + 1 < argc) {
+            logFile = argv[++i];
+        } else if (arg.find("--config=") == 0) {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string format = arg.substr(0, pos);
+                configFile = arg.substr(pos + 1);
+                
+                if (format == "--config=json") {
+                    configFormat = "json";
+                } else if (format == "--config=yaml") {
+                    configFormat = "yaml";
+                } else if (format == "--config") {
+                    configFormat = "keyvalue";
+                }
+            }
+        } else if (arg.find("--set=") == 0) {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string keyValue = arg.substr(pos + 1);
+                size_t keyPos = keyValue.find('=');
+                if (keyPos != std::string::npos) {
+                    std::string key = keyValue.substr(0, keyPos);
+                    std::string value = keyValue.substr(keyPos + 1);
+                    // Store for later processing
+                }
+            }
+        } else if (arg.substr(0, 2) == "--config") {
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 4) == "--set") {
+            if (i + 2 < argc && argv[i + 1][0] != '-' && argv[i + 2][0] != '-') {
+                std::string key = argv[++i];
+                std::string value = argv[++i];
+                // Store for later processing
+            }
+        } else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            printHelp(argv[0]);
+            return 1;
+        }
+    }
+    
+    // Show help and exit if requested
+    if (showHelp) {
+        printHelp(argv[0]);
+        return 0;
+    }
+    
+    if (showConfigHelp) {
+        printConfigHelp();
+        return 0;
+    }
+    
+    if (showExampleConfigs) {
+        printExampleConfigs();
+        return 0;
+    }
+    
+    if (validateConfig) {
+        validateConfigFile(configFile);
+        return 0;
+    }
+    
+    if (listConfigs) {
+        listAvailableConfigs();
+        return 0;
+    }
+    
+    if (showConfig) {
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(configFile)) {
+            std::cout << config->summary() << std::endl;
+        } else {
+            std::cerr << "Failed to load configuration from: " << configFile << std::endl;
+        }
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with enhanced verbosity settings
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
