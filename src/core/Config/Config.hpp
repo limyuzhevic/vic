@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -100,6 +102,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string escapeForFileOutput(const std::string& str);
+    static std::string unescapeFromFileInput(const std::string& str);
+    static std::string valueToString(const ConfigValue& value);
 };
 
 } // namespace nlm

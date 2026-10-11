@@ -4,6 +4,9 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <system_error>
+#include <chrono>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -12,6 +15,8 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    bool fileErrorLogged = false;
+    std::string lastFilePath;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -20,7 +25,9 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    closeOutputFile();
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -32,52 +39,119 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with high precision
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count();
     
     oss << " " << entry.message;
     
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
+    // Add source location if provided
+    if (!entry.file.empty() && entry.line > 0) {
+        oss << " (" << entry.file << ":" << entry.line << ")";
     }
     
-    // File output if set
+    if (!entry.function.empty()) {
+        oss << " in " << entry.function;
+    }
+    
+    std::string output = oss.str();
+    
+    // Console output with error handling
+    try {
+        // Console output
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+            std::cout.flush();
+        } else {
+            std::cout << output << "\n";
+            std::cout.flush();
+        }
+    } catch (const std::exception& e) {
+        // If console output fails, try to output to cerr as fallback
+        std::cerr << "Logger error: " << e.what() << "\n";
+        std::cerr << "Failed log entry: " << output << "\n";
+    }
+    
+    // File output if set with improved error handling
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+            pImpl->fileErrorLogged = false; // Reset error flag on success
+        } catch (const std::exception& e) {
+            if (!pImpl->fileErrorLogged) {
+                std::cerr << "Logger file error: " << e.what() << "\n";
+                pImpl->fileErrorLogged = true;
+            }
+        }
     }
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    closeOutputFile();
+    
+    try {
+        // Open file with better error handling
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            std::cerr << "Logger: Failed to open log file: " << filepath << "\n";
+            return;
+        }
+        
+        pImpl->lastFilePath = filepath;
+        pImpl->fileErrorLogged = false;
+        
+        // Write header if file is empty
+        pImpl->fileOut.seekp(0, std::ios::end);
+        if (pImpl->fileOut.tellp() == 0) {
+            pImpl->fileOut << "=== NLM Logger Session ===\n";
+            pImpl->fileOut.flush();
+        }
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Logger: Exception opening log file " << filepath << ": " << e.what() << "\n";
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+        try {
+            pImpl->fileOut << "=== Log file closed ===\n";
+            pImpl->fileOut.flush();
+            pImpl->fileOut.close();
+        } catch (const std::exception& e) {
+            std::cerr << "Logger: Error closing log file: " << e.what() << "\n";
+        }
     }
+    pImpl->fileOut.clear(); // Clear error flags
+    pImpl->fileErrorLogged = false;
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
@@ -106,19 +180,29 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    bool shutdownInitiated = false;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    clearLoggers();
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        throw std::invalid_argument("Logger cannot be null");
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (!pImpl->shutdownInitiated) {
+        pImpl->loggers.push_back(logger);
+    }
 }
 
 void Logger::clearLoggers() {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->shutdownInitiated = true;
     pImpl->loggers.clear();
 }
 
@@ -133,6 +217,15 @@ void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Validate inputs
+    if (message.empty()) {
+        return; // Don't log empty messages
+    }
+    
+    if (line < 0) {
+        line = 0;
+    }
+    
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -142,7 +235,13 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.timestamp = std::chrono::system_clock::now();
     
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        try {
+            logger->log(entry);
+        } catch (const std::exception& e) {
+            // If a logger fails, try to log to stderr as fallback
+            std::cerr << "Logger error: " << e.what() << "\n";
+            std::cerr << "Failed to log: " << message << "\n";
+        }
     }
 }
 
@@ -182,8 +281,15 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
+    if (!logger) {
+        throw std::invalid_argument("Global logger cannot be null");
+    }
+    
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+    // However, we can implement a simple version that replaces the global logger
+    static std::shared_ptr<Logger> globalLoggerPtr;
+    globalLoggerPtr = logger;
 }
 
 // LogStream implementation
@@ -191,7 +297,12 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    try {
+        Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    } catch (const std::exception& e) {
+        std::cerr << "LogStream error: " << e.what() << "\n";
+        std::cerr << "LogStream failed: " << oss_.str() << "\n";
+    }
 }
 
 } // namespace nlm

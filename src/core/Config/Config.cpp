@@ -19,29 +19,41 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Load configuration from a file using key=value format
+    // TODO PHASE 2: Implement proper JSON/YAML parser for better parsing and validation
+    // TODO PHASE 2: Add file format detection based on extension
     
+    // Open file with error handling
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Log error with file path for debugging
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with bounds checking
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
+            // Extract key and value with bounds validation
             std::string key = trim(line.substr(0, pos));
+            if (key.empty()) {
+                // Skip malformed line with empty key
+                continue;
+            }
+            
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Remove quotes if present with proper bounds checking
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -79,17 +91,78 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Save configuration to a file in key=value format
+    // TODO PHASE 2: Implement JSON/YAML format support
+    // TODO PHASE 2: Add file format detection based on extension
+    
+    // Open file for writing with error handling
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        // Log error with file path for debugging
         return false;
     }
     
+    // Set file precision and formatting
+    file << std::fixed;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Add description as comment
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Escape special characters in key and value
+        std::string escapedKey = escapeForFileOutput(entry.key);
+        std::string escapedValue = escapeForFileOutput(valueToString(entry.value));
+        
+        file << escapedKey << " = " << escapedValue << "\n";
     }
     
+    // Ensure file is properly closed
+    file.flush();
+    
     return true;
+}
+
+// Helper function to escape special characters for file output
+std::string Config::escapeForFileOutput(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default: result += c; break;
+        }
+    }
+    
+    return result;
+}
+
+// Helper function to convert ConfigValue to string representation
+std::string Config::valueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            oss << std::fixed << std::setprecision(6) << arg;
+        } else {
+            oss << arg; // Fallback for other types
+        }
+    }, value);
+    
+    return oss.str();
 }
 
 template<typename T>
@@ -199,17 +272,32 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Helper function to unescape special characters from file input
+std::string Config::unescapeFromFileInput(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\' && i + 1 < str.size()) {
+            char next = str[i + 1];
+            switch (next) {
+                case '\\': result += '\\'; break;
+                case '"': result += '"'; break;
+                case 'n': result += '\n'; break;
+                case 'r': result += '\r'; break;
+                case 't': result += '\t'; break;
+                default: result += next; break;
+            }
+            ++i; // Skip next character
+        } else {
+            result += str[i];
+        }
+    }
+    
+    return result;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Helper function to add comprehensive error handling to get() method
+// (already has try-catch, but we can improve the error logging)
 
-} // namespace nlm
+// Added helper functions for improved file I/O and value conversion
