@@ -1,3 +1,4 @@
+#include "BasePimpl.hpp"
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
@@ -21,30 +22,30 @@ Novelty::Novelty() : pImpl(new Impl) {}
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    pImpl->get()->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
 
 float Novelty::getLevel() const {
-    return pImpl->level;
+    return pImpl->get()->level;
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->get()->level = level;
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+    pImpl->get()->level = 1.0f;
+    pImpl->get()->history.push_back(pImpl->get()->level);
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
                             const std::vector<float>& previousPattern) {
     if (currentPattern.empty() || previousPattern.empty()) {
-        pImpl->level = 0.0f;
+        pImpl->get()->level = 0.0f;
         return;
     }
     
@@ -61,24 +62,24 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     float avgDiff = totalDiff / compareLen;
     
     // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
-    pImpl->history.push_back(pImpl->level);
+    pImpl->get()->level = std::min(1.0f, avgDiff / pImpl->get()->noveltyThreshold);
+    pImpl->get()->history.push_back(pImpl->get()->level);
     
     // Store current pattern for next comparison
-    pImpl->lastPattern = currentPattern;
+    pImpl->get()->lastPattern = currentPattern;
 }
 
 void Novelty::update(TimestepDuration dt) {
     // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    pImpl->get()->level = std::max(0.0f, pImpl->get()->level - pImpl->get()->decayRate * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
+    return pImpl->get()->history;
 }
 
 void Novelty::clearHistory() {
-    pImpl->history.clear();
+    pImpl->get()->history.clear();
 }
 
 } // namespace nlm

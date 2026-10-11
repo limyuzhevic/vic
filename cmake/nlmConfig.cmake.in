@@ -1,0 +1,41 @@
+include(CMakeFindDependencyMacro)
+
+# Find the core targets
+include("${CMAKE_CURRENT_LIST_DIR}/nlmTargets.cmake")
+
+# Provide variables to help users find NLM
+
+set(NLM_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include")
+
+# Add the core library to the global target namespace
+add_library(NLM::nlm_core ALIAS nlm_core)
+add_library(NLM::nlm_agent ALIAS nlm_agent)
+add_library(NLM::nlm_world ALIAS nlm_world)
+add_library(NLM::nlm_phase3 ALIAS nlm_phase3)
+add_library(NLM::nlm_phase4 ALIAS nlm_phase4)
+
+# Provide Python bindings target if available
+if(TARGET pynlm)
+    add_library(NLM::pynlm ALIAS pynlm)
+endif()
+
+# Add executables to namespace
+if(TARGET nlm)
+    add_executable(NLM::nlm ALIAS nlm)
+endif()
+
+if(TARGET nlm_phase3_demo)
+    add_executable(NLM::nlm_phase3_demo ALIAS nlm_phase3_demo)
+endif()
+
+if(TARGET nlm_phase4_demo)
+    add_executable(NLM::nlm_phase4_demo ALIAS nlm_phase4_demo)
+endif()
+
+# Create convenience functions
+function(nlm_setup_paths)
+    include_directories("${NLM_INCLUDE_DIR}")
+endfunction()
+
+# Summary message
+message(STATUS "NLM package configuration loaded")

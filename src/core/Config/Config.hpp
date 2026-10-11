@@ -52,8 +52,8 @@ public:
     // Disable copying, enable moving
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    Config(Config&&) noexcept = default;
+    Config& operator=(Config&&) noexcept = default;
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
@@ -95,7 +95,7 @@ public:
     
 private:
     struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    BasePimplUnique<Config, Impl> pImpl;
     
     // Internal helpers
     static std::string trim(const std::string& str);

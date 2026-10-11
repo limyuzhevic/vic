@@ -3,8 +3,11 @@
 #include "../core/Types/Types.hpp"
 #include <string>
 #include <vector>
+#include "../core/BasePimpl.hpp"
 
 namespace nlm {
+
+class Dopamine;
 
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
@@ -50,7 +53,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    SimplePimpl<Dopamine, Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation

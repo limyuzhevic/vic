@@ -1,3 +1,4 @@
+#include "BasePimpl.hpp"
 #include "Curiosity.hpp"
 #include "../core/Logger/Logger.hpp"
 
@@ -23,40 +24,40 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    pImpl->get()->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
 
 float Curiosity::getLevel() const {
-    return pImpl->level;
+    return pImpl->get()->level;
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
     // Curiosity increases with novelty and prediction error
-    float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
+    float target = pImpl->get()->noveltyWeight * novelty + 
+                   pImpl->get()->predictionErrorWeight * predictionError;
     
     // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
+    pImpl->get()->level += (target - pImpl->get()->level) * 0.1f;
     
     // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    pImpl->get()->level = std::max(0.0f, pImpl->get()->level - pImpl->get()->decayRate * static_cast<float>(dt));
 }
 
 float Curiosity::getExplorationDrive() const {
-    return pImpl->level;
+    return pImpl->get()->level;
 }
 
 void Curiosity::setNoveltyWeight(float weight) {
-    pImpl->noveltyWeight = weight;
+    pImpl->get()->noveltyWeight = weight;
 }
 
 void Curiosity::setPredictionErrorWeight(float weight) {
-    pImpl->predictionErrorWeight = weight;
+    pImpl->get()->predictionErrorWeight = weight;
 }
 
 void Curiosity::reset() {
-    pImpl->level = 0.0f;
+    pImpl->get()->level = 0.0f;
 }
 
 } // namespace nlm

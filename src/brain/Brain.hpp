@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/BasePimpl.hpp"
 #include <memory>
 #include <string>
 
@@ -58,8 +59,8 @@ public:
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
+    Brain(Brain&&) noexcept = default;
+    Brain& operator=(Brain&&) noexcept = default;
     
     // Initialize brain with configuration
     bool initialize();
@@ -195,7 +196,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    BasePimpl<Brain, Impl> pImpl;
 };
 
 } // namespace nlm

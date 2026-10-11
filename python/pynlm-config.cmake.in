@@ -1,0 +1,24 @@
+@PACKAGE_INIT@
+
+# Find dependencies and setup Python bindings
+include("${CMAKE_CURRENT_LIST_DIR}/pynlmTargets.cmake")
+
+# Create an alias for the Python module
+add_library(NLM::pynlm ALIAS pynlm)
+
+# Provide module path for finding the Python package
+set(NLM_PYTHON_MODULE_PATH "${PACKAGE_PREFIX_DIR}/@Python_SITEARCH@")
+
+# Set up Python package
+if(PYTHON_EXECUTABLE)
+    execute_process(
+        COMMAND ${PYTHON_EXECUTABLE} -c "import sys; print(sys.version)"
+        OUTPUT_VARIABLE PYTHON_VERSION_OUTPUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(PYTHON_VERSION "${PYTHON_VERSION_OUTPUT}")
+    message(STATUS "Found Python ${PYTHON_VERSION} at ${PYTHON_EXECUTABLE}")
+endif()
+
+# Summary
+message(STATUS "NLM Python bindings configuration loaded")

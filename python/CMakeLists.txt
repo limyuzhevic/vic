@@ -5,12 +5,40 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Build type for Python bindings
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build for Python bindings (Debug, Release, RelWithDebInfo, MinSizeRel)")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 
+# Find Python and dependencies
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
+
+# Python-specific optimization flags
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+    if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+        add_compile_options(/O2 /fp:fast /arch:AVX2)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo")
+        add_compile_options(/O1 /fp:fast /GS)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
+        add_compile_options(/O1 /Gy /GF /fp:fast)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        add_compile_options(/Od /Zi /debug)
+    endif()
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror -fvisibility=hidden)
+    if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+        add_compile_options(-O3 -march=native -mtune=native -flto -ffast-math -fomit-frame-pointer -DNDEBUG)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo")
+        add_compile_options(-O2 -g -march=native -flto -ffast-math)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
+        add_compile_options(-Os -march=native -flto -ffast-math -DNDEBUG)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        add_compile_options(-O0 -g -ggdb -DDEBUG)
+    endif()
+endif()
+
+# Source directory
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
@@ -95,8 +123,26 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Python module install with better configuration
+target_compile_options(pynlm PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Werror -fvisibility=hidden>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+# Install Python module to appropriate Python library path
 install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+    LIBRARY DESTINATION ${Python_SITEARCH}
+    ARCHIVE DESTINATION ${Python_SITEARCH}
+    RUNTIME DESTINATION ${Python_SITEARCH}
+)
+
+# Install Python package metadata
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/pynlm-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm-config.cmake
+    @ONLY
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pynlm-config.cmake
+    DESTINATION ${Python_SITEARCH}
 )

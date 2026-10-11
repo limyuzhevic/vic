@@ -1,3 +1,4 @@
+#include "BasePimpl.hpp"
 #include "Reward.hpp"
 
 namespace nlm {
@@ -15,21 +16,21 @@ Reward::Reward() : pImpl(new Impl) {}
 Reward::~Reward() = default;
 
 float Reward::getValue() const {
-    return pImpl->currentValue;
+    return pImpl->get()->currentValue;
 }
 
 void Reward::setValue(float value) {
-    pImpl->currentValue = value;
+    pImpl->get()->currentValue = value;
 }
 
 void Reward::add(float delta) {
-    pImpl->accumulatedReward += delta;
-    pImpl->currentValue += delta;
+    pImpl->get()->accumulatedReward += delta;
+    pImpl->get()->currentValue += delta;
 }
 
 void Reward::reset() {
-    pImpl->currentValue = 0.0f;
-    pImpl->accumulatedReward = 0.0f;
+    pImpl->get()->currentValue = 0.0f;
+    pImpl->get()->accumulatedReward = 0.0f;
 }
 
 float Reward::computeReward(const Observation& observation) const {
@@ -39,11 +40,11 @@ float Reward::computeReward(const Observation& observation) const {
 }
 
 const std::vector<float>& Reward::getHistory() const {
-    return pImpl->history;
+    return pImpl->get()->history;
 }
 
 void Reward::clearHistory() {
-    pImpl->history.clear();
+    pImpl->get()->history.clear();
 }
 
 } // namespace nlm

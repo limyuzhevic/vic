@@ -1,3 +1,4 @@
+#include "BasePimpl.hpp"
 #include "NeuralPopulation.hpp"
 #include <algorithm>
 #include <numeric>
@@ -32,56 +33,56 @@ NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept
 }
 
 PopulationId NeuralPopulation::getId() const {
-    return pImpl->id;
+    return pImpl->get()->id;
 }
 
 size_t NeuralPopulation::getSize() const {
-    return pImpl->size;
+    return pImpl->get()->size;
 }
 
 bool NeuralPopulation::isEmpty() const {
-    return pImpl->neurons.empty();
+    return pImpl->get()->neurons.empty();
 }
 
 Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
-    if (index >= pImpl->neurons.size()) {
+    if (index >= pImpl->get()->neurons.size()) {
         return nullptr;
     }
-    return pImpl->neurons[index];
+    return pImpl->get()->neurons[index];
 }
 
 const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
-    if (index >= pImpl->neurons.size()) {
+    if (index >= pImpl->get()->neurons.size()) {
         return nullptr;
     }
-    return pImpl->neurons[index];
+    return pImpl->get()->neurons[index];
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
-    pImpl->neurons.push_back(neuron);
-    if (pImpl->size < pImpl->neurons.size()) {
-        pImpl->size = pImpl->neurons.size();
+    pImpl->get()->neurons.push_back(neuron);
+    if (pImpl->get()->size < pImpl->get()->neurons.size()) {
+        pImpl->get()->size = pImpl->get()->neurons.size();
     }
 }
 
 const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
-    return pImpl->neurons;
+    return pImpl->get()->neurons;
 }
 
 NeuronType NeuralPopulation::getNeuronType() const {
-    return pImpl->neuronType;
+    return pImpl->get()->neuronType;
 }
 
 void NeuralPopulation::setNeuronType(NeuronType type) {
-    pImpl->neuronType = type;
-    for (auto* neuron : pImpl->neurons) {
+    pImpl->get()->neuronType = type;
+    for (auto* neuron : pImpl->get()->neurons) {
         neuron->setType(type);
     }
 }
 
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto* neuron : pImpl->get()->neurons) {
         if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
             ++count;
         }
@@ -91,7 +92,7 @@ size_t NeuralPopulation::getActiveCount() const {
 
 size_t NeuralPopulation::getFiringCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto* neuron : pImpl->get()->neurons) {
         if (neuron->isFiring()) {
             ++count;
         }
@@ -100,79 +101,79 @@ size_t NeuralPopulation::getFiringCount() const {
 }
 
 float NeuralPopulation::getAverageFiringRate() const {
-    if (pImpl->neurons.empty()) {
+    if (pImpl->get()->neurons.empty()) {
         return 0.0f;
     }
     float sum = 0.0f;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto* neuron : pImpl->get()->neurons) {
         sum += neuron->getFiringRate();
     }
-    return sum / static_cast<float>(pImpl->neurons.size());
+    return sum / static_cast<float>(pImpl->get()->neurons.size());
 }
 
 float NeuralPopulation::getActivityLevel() const {
-    if (pImpl->neurons.empty()) {
+    if (pImpl->get()->neurons.empty()) {
         return 0.0f;
     }
-    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
+    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->get()->neurons.size());
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
-    for (auto* neuron : pImpl->neurons) {
+    for (auto* neuron : pImpl->get()->neurons) {
         neuron->initializeRandom(rng);
     }
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
-    for (auto* neuron : pImpl->neurons) {
+    for (auto* neuron : pImpl->get()->neurons) {
         neuron->step(currentTime);
     }
 }
 
 void NeuralPopulation::reset() {
-    for (auto* neuron : pImpl->neurons) {
+    for (auto* neuron : pImpl->get()->neurons) {
         neuron->reset();
     }
-    pImpl->membranePotentials.clear();
+    pImpl->get()->membranePotentials.clear();
 }
 
 std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
     std::vector<NeuronId> ids;
-    ids.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
+    ids.reserve(pImpl->get()->neurons.size());
+    for (const auto* neuron : pImpl->get()->neurons) {
         ids.push_back(neuron->getId());
     }
     return ids;
 }
 
 void NeuralPopulation::recordActivity() {
-    pImpl->membranePotentials.clear();
-    pImpl->membranePotentials.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
-        pImpl->membranePotentials.push_back(neuron->getMembranePotential());
+    pImpl->get()->membranePotentials.clear();
+    pImpl->get()->membranePotentials.reserve(pImpl->get()->neurons.size());
+    for (const auto* neuron : pImpl->get()->neurons) {
+        pImpl->get()->membranePotentials.push_back(neuron->getMembranePotential());
     }
 }
 
 float NeuralPopulation::getMeanMembranePotential() const {
-    if (pImpl->membranePotentials.empty()) {
+    if (pImpl->get()->membranePotentials.empty()) {
         return 0.0f;
     }
-    float sum = std::accumulate(pImpl->membranePotentials.begin(), 
-                                 pImpl->membranePotentials.end(), 0.0f);
-    return sum / static_cast<float>(pImpl->membranePotentials.size());
+    float sum = std::accumulate(pImpl->get()->membranePotentials.begin(), 
+                                 pImpl->get()->membranePotentials.end(), 0.0f);
+    return sum / static_cast<float>(pImpl->get()->membranePotentials.size());
 }
 
 float NeuralPopulation::getVarianceMembranePotential() const {
-    if (pImpl->membranePotentials.size() < 2) {
+    if (pImpl->get()->membranePotentials.size() < 2) {
         return 0.0f;
     }
     float mean = getMeanMembranePotential();
     float sumSquares = 0.0f;
-    for (float v : pImpl->membranePotentials) {
+    for (float v : pImpl->get()->membranePotentials) {
         float diff = v - mean;
         sumSquares += diff * diff;
     }
-    return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
+    return sumSquares / static_cast<float>(pImpl->get()->membranePotentials.size() - 1);
 }
 
 } // namespace nlm

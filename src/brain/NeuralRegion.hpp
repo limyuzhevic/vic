@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
+#include "../core/BasePimpl.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>
@@ -25,8 +26,8 @@ public:
     // Disable copying, enable moving
     NeuralRegion(const NeuralRegion&) = delete;
     NeuralRegion& operator=(const NeuralRegion&) = delete;
-    NeuralRegion(NeuralRegion&&) noexcept;
-    NeuralRegion& operator=(NeuralRegion&&) noexcept;
+    NeuralRegion(NeuralRegion&&) noexcept = default;
+    NeuralRegion& operator=(NeuralRegion&&) noexcept = default;
     
     // Identity
     RegionId getId() const;
@@ -81,7 +82,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    BasePimpl<NeuralRegion, Impl> pImpl;
 };
 
 } // namespace nlm

@@ -1,3 +1,4 @@
+#include "BasePimpl.hpp"
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <cmath>
@@ -19,35 +20,35 @@ PredictionError::PredictionError() : pImpl(new Impl) {}
 PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    pImpl->get()->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
 
 float PredictionError::getError() const {
-    return pImpl->error;
+    return pImpl->get()->error;
 }
 
 void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
-    pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+    pImpl->get()->predictedValue = predicted;
+    pImpl->get()->actualValue = actual;
+    pImpl->get()->error = actual - predicted;
+    pImpl->get()->history.push_back(pImpl->get()->error);
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
+    pImpl->get()->predictedValue = newPrediction;
 }
 
 const std::vector<float>& PredictionError::getHistory() const {
-    return pImpl->history;
+    return pImpl->get()->history;
 }
 
 void PredictionError::clearHistory() {
-    pImpl->history.clear();
+    pImpl->get()->history.clear();
 }
 
 float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+    return std::abs(pImpl->get()->error);
 }
 
 } // namespace nlm

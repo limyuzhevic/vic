@@ -6,17 +6,45 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Build type and optimization flags
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build (Debug, Release, RelWithDebInfo, MinSizeRel)")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Compiler detection and optimization flags
+if(MSVC)
+    # Microsoft Visual C++ specific optimizations
+    add_compile_options(/W4)
+    if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+        add_compile_options(/O2 /fp:fast /arch:AVX2)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo")
+        add_compile_options(/O1 /fp:fast /GS /arch:AVX2)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
+        add_compile_options(/O1 /Gy /GF /fp:fast /arch:AVX2)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        add_compile_options(/Od /Zi /debug /arch:AVX2)
+    endif()
+else()
+    # GCC and Clang optimizations
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+    if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+        add_compile_options(-O3 -march=native -mtune=native -flto -ffast-math -fomit-frame-pointer)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfo")
+        add_compile_options(-O2 -g -march=native -flto -ffast-math)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "MinSizeRel")
+        add_compile_options(-Os -march=native -flto -ffast-math -DNDEBUG)
+    elseif(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        add_compile_options(-O0 -g -ggdb -DDEBUG)
+    endif()
 endif()
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# Architecture-specific optimizations
+add_compile_options($<$<CXX_COMPILER_ID:GNU,Clang>:-mfpmath=sse>)
+
+# Position Independent Code (PIC) for shared libraries
+add_compile_options(-fPIC)
+
+# Source directory
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -54,6 +82,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Dopamine.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -114,18 +143,19 @@ add_library(nlm_phase3 STATIC
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Phase 6 experiments (integrated brain systems)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,13 +169,83 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable (Phase 6 integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Enhanced install targets
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
+    EXPORT nlmTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
 )
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+    PATTERN ".*" EXCLUDE  # This excludes CMakeLists.txt files
+)
+
+# Package configuration
+include(CMakePackageConfigHelpers)
+
+# Generate and install package configuration
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/nlmConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+# Create a config file for finding the targets
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/nlmConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/nlmConfig.cmake
+    INSTALL_DESTINATION lib/cmake/nlm
+)
+
+# Install package configuration files
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/nlmConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/nlmConfigVersion.cmake
+    DESTINATION lib/cmake/nlm
+)
+
+install(EXPORT nlmTargets
+    FILE nlmTargets.cmake
+    DESTINATION lib/cmake/nlm
+)
+
+# Documentation installation
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/HOW_TO_USE.md
+    DESTINATION doc
+)
+
+# Python bindings installation
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/python/CMakeLists.txt)
+    enable_language(Python)
+    add_subdirectory(python)
+    install(EXPORT pythonTargets
+        FILE pynlmTargets.cmake
+        DESTINATION lib/cmake/pynlm
+    )
+endif()
+
+# Summary
+message(STATUS "Build configuration:")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "  Optimization flags: enabled")
+message(STATUS "  Warning levels: enabled")
+message(STATUS "  Install targets: configured")
+message(STATUS "  Packaging: enabled")

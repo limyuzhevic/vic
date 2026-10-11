@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/BasePimpl.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -20,8 +22,8 @@ public:
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    Synapse(Synapse&&) noexcept = default;
+    Synapse& operator=(Synapse&&) noexcept = default;
     
     // Identity
     SynapseId getId() const;
@@ -82,7 +84,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    BasePimpl<Synapse, Impl> pImpl;
 };
 
 } // namespace nlm

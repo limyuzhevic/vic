@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/BasePimpl.hpp"
 #include <vector>
 #include <array>
 
@@ -52,8 +53,8 @@ public:
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    Neuron(Neuron&&) noexcept = default;
+    Neuron& operator=(Neuron&&) noexcept = default;
     
     // Identity
     NeuronId getId() const;
@@ -145,7 +146,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    BasePimpl<Neuron, Impl> pImpl;
 };
 
 } // namespace nlm

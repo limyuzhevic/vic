@@ -49,10 +49,12 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
-        SpikeEvent event = pImpl->pendingSpikes.front();
-        pImpl->pendingSpikes.pop();
+    // Process all pending immediate spikes with cache-optimized access
+    std::queue<SpikeEvent>& pendingSpikes = pImpl->pendingSpikes;
+    
+    while (!pendingSpikes.empty()) {
+        SpikeEvent event = pendingSpikes.front();
+        pendingSpikes.pop();
         
         // Create detailed event
         DetailedSpikeEvent detailed;
@@ -82,8 +84,9 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
-        // Process all spikes scheduled for this step
-        for (const auto& delayedEvent : it->second) {
+        // Process all spikes scheduled for this step with direct reference
+        std::vector<DelayedSpikeEvent>& delayedEvents = it->second;
+        for (const auto& delayedEvent : delayedEvents) {
             // Call delayed spike handlers (these will deliver synaptic input)
             for (auto& handler : pImpl->delayedHandlers) {
                 handler(delayedEvent);
