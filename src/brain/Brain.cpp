@@ -1,24 +1,15 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
+// Include checkpoint system for save/load operations
+#include "../performance/CheckpointSystem.hpp"
+#include "../memory/WorkingMemory.hpp"
+#include "../memory/EpisodicMemory.hpp"
+#include "../memory/AssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 
 namespace nlm {
 
@@ -576,13 +567,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 14: Working memory update ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // ========== STEP 15: Episodic memory storage ==========
+    // Store current experience as an episode
+    if (currentStep % 10 == 0 && pImpl->episodicMemory) {  // Store every 10 steps
+        // Capture current brain state as an episode
+        EpisodicMemoryItem episode;
+        episode.timestamp = currentStep;
+        episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Store active neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.activeNeurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+    
+    // ========== STEP 16: Memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 17: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -841,6 +862,7 @@ bool Brain::save(const std::string& filepath) const {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
         return false;
     }
+}
 }
 
 bool Brain::load(const std::string& filepath) {
