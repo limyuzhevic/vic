@@ -8,6 +8,9 @@
 
 namespace nlm {
 
+// Include configuration constants
+#include "ConfigConstants.hpp"
+
 // Forward declarations
 class Config;
 
