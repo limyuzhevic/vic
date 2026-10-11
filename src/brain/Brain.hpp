@@ -11,23 +11,27 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+// Forward declarations for performance monitoring
+class VisualizationInterface;
+class PerformanceProfiler;
+
+// Performance monitoring data
+struct PerformanceStats {
+    double neuronsPerSecond;
+    double spikesPerSecond;
+    double synapticEventsPerSecond;
+    double realTimeFactor;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    size_t pendingSpikes;
+    size_t pendingDelayedSpikes;
+    float avgFiringRate;
+    float memoryUsageMB;
+    double stepTimeMs;
+    double updateTimeMs;
+    double renderTimeMs;
+    size_t visualizationFrames;
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -187,15 +191,42 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Performance monitoring data
+struct PerformanceStats {
+    double neuronsPerSecond;
+    double spikesPerSecond;
+    double synapticEventsPerSecond;
+    double realTimeFactor;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    size_t pendingSpikes;
+    size_t pendingDelayedSpikes;
+    float avgFiringRate;
+    float memoryUsageMB;
+    double stepTimeMs;
+    double updateTimeMs;
+    double renderTimeMs;
+    size_t visualizationFrames;
+};
+
+// Forward declarations for visualization and performance
+class VisualizationInterface;
+class PerformanceProfiler;
+
+// Statistics-related methods
+PerformanceStats getPerformanceStats() const;
+void resetPerformanceStats();
+void logPerformanceReport() const;
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Internal initialization method
+    bool initializeInternal();
+    
+    // Internal step method
+    void stepInternal(SimulationStep currentStep, Timestamp currentTime);
 };
 
 } // namespace nlm

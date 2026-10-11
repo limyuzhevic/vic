@@ -11,12 +11,55 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Find nlohmann/json
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
+# Enable performance optimizations by default
+if(NOT DEFINED NLM_PERFORMANCE_ENABLED)
+    set(NLM_PERFORMANCE_ENABLED ON)
+endif()
+
+# Enable visualization support
+if(NOT DEFINED NLM_VISUALIZATION_ENABLED)
+    set(NLM_VISUALIZATION_ENABLED ON)
+endif()
+
+# Performance optimization options
+option(NLM_PERFORMANCE_ENABLED "Enable performance optimizations (memory pools, SOA, event queues)" ON)
+option(NLM_VISUALIZATION_ENABLED "Enable visualization support" ON)
+option(NLM_ENABLE_PROFILING "Enable detailed performance profiling" OFF)
+
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
+# Compiler flags for optimization
+add_compile_options(
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -march=native -mtune=native>
+    $<$<CXX_COMPILER_ID:MSVC>:/O2 /arch:AVX2>
+)
+
+# Optimization flags
+if(MSVC)
+    add_compile_options(/fp:fast /vec-report2 /vec:vector
+                         /Qvec-report2 /Qvec-report3 /Qvec-report4
+                         /Qipo-report-all /Qipo-report-detailed /Qipo-report-unrolled /Qipo-report-subsumed)
+else()
+    add_compile_options(-ffast-math -funroll-loops -fomit-frame-pointer
+                        -fprofile-generate -fprofile-use
+                        -falign-functions=32 -falign-loops=32 -falign-jumps=32
+                        -flto -fipa-sra -fcommon -fno-protect-parity
+                        -Wframe-larger-than=4096)
+endif()
+
+# SIMD optimization flags
+add_compile_options(
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-msse4.1 -mavx -mavx2>
+    $<$<CXX_COMPILER_ID:MSVC>:/arch:AVX2>
+)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -87,10 +130,63 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
+
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Threading and parallelism options
+set(CMAKE_THREAD_PREFER_PTHREAD ON)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+# Parallel build options
+include(ProcessorCount)
+ProcessorCount(NLM_THREAD_COUNT)
+if(NLM_THREAD_COUNT EQUAL 0)
+    set(NLM_THREAD_COUNT 4)
+endif()
+
+# Add performance and visualization directories
+set(NLM_PERFORMANCE_SOURCES
+    src/performance/MemoryPool.cpp
+    src/performance/EventQueue.cpp
+    src/performance/SparseConnectivity.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+)
+
+set(NLM_VISUALIZATION_SOURCES
+    src/visualization/VisualizationInterface.cpp
+)
+
+# Add performance libraries if enabled
+if(NLM_PERFORMANCE_ENABLED)
+    add_library(nlm_performance STATIC ${NLM_PERFORMANCE_SOURCES})
+    target_include_directories(nlm_performance PUBLIC src/performance)
+    target_compile_definitions(nlm_performance PUBLIC NLM_PERFORMANCE_ENABLED)
+    
+    if(NLM_ENABLE_PROFILING)
+        target_compile_definitions(nlm_performance PUBLIC NLM_PROFILING_ENABLED)
+    endif()
+endif()
+
+# Add visualization library if enabled
+if(NLM_VISUALIZATION_ENABLED)
+    add_library(nlm_visualization STATIC ${NLM_VISUALIZATION_SOURCES})
+    target_include_directories(nlm_visualization PUBLIC src/visualization)
+    target_compile_definitions(nlm_visualization PUBLIC NLM_VISUALIZATION_ENABLED)
+endif()
+
+# Update core library to link with performance and visualization
+if(NLM_PERFORMANCE_ENABLED)
+    target_link_libraries(nlm_core PUBLIC nlm_performance)
+endif()
+
+if(NLM_VISUALIZATION_ENABLED)
+    target_link_libraries(nlm_core PUBLIC nlm_visualization)
+endif()
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

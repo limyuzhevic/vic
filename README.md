@@ -1,230 +1,572 @@
-# NLM — 熙然
+# NLM Build System - Modern CMake Enhancement
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+This document outlines the enhanced CMake build system for the NLM (Neural Learning Machine) framework, implementing modern CMake practices with comprehensive test suites and performance benchmarking.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Build System Improvements
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### 1. Modern Target-Based CMake Structure
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+The build system now uses modern CMake practices with proper target-based dependencies:
 
-## Current Phase
+```cmake
+# Core library (static)
+add_library(nlm_core STATIC
+    src/core/Types/Types.cpp
+    src/core/Config/Config.cpp
+    # ... other core sources
+)
 
-**PHASE 6: FINAL INTEGRATION**
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+# Optional libraries (conditionally built)
+if(NLM_PERFORMANCE_ENABLED)
+    add_library(nlm_performance STATIC ${NLM_PERFORMANCE_SOURCES})
+    target_link_libraries(nlm_core PUBLIC nlm_performance)
+endif()
 
-### Phase 6 Integration Achievements
+# Python bindings (pybind11)
+pybind11_add_module(pynlm bindings.cpp)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+```
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### 2. Build Options
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+The build system provides the following configuration options:
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+```cmake
+# Core build options
+option(NLM_PERFORMANCE "Enable performance optimizations (SIMD, multithreading)" ON)
+option(NLM_VISUALIZATION "Enable visualization support" ON)
+option(NLM_PYTHON_BINDINGS "Build Python bindings" ON)
+option(NLM_TESTS "Build test suite" ON)
+option(NLM_BENCHMARKS "Build performance benchmarks" ON)
+option(NLM_COVERAGE "Enable code coverage reporting" OFF)
+option(NLM_ASAN "Enable AddressSanitizer" OFF)
+option(NLM_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+# Performance tuning
+option(NLM_USE_SIMD "Enable SIMD optimizations" ON)
+option(NLM_THREAD_COUNT "Number of threads for parallel processing" AUTO)
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+# Platform-specific options
+option(NLM_PLATFORM_LINUX "Linux-specific optimizations" ON)
+option(NLM_PLATFORM_MACOS "macOS-specific optimizations" OFF)
+option(NLM_PLATFORM_WINDOWS "Windows-specific optimizations" OFF)
+```
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+### 3. Installation Targets
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+The build system provides comprehensive installation support:
 
-## Building
+```cmake
+# Install libraries
+install(TARGETS nlm_core
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(TARGETS nlm_performance
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.hpp"
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# Install executables
+install(TARGETS nlm nlm_phase3_demo nlm_phase4_demo
+    RUNTIME DESTINATION bin
+)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
+
+# Install configuration
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/nlm-config.cmake
+    DESTINATION lib/cmake/nlm
+)
+```
+
+### 4. Configuration Export
+
+The build system provides CMake package configuration for find_package support:
+
+```cmake
+# Create nlm-config.cmake
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/nlm-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm-config.cmake
+    INSTALL_DESTINATION lib/cmake/nlm
+)
+
+# Create nlm-config-version.cmake
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm-config-version.cmake
+    VERSION ${NLM_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm-config-version.cmake
+    DESTINATION lib/cmake/nlm
+)
+```
+
+## Testing Framework
+
+### 1. Google Test Integration
+
+The test suite uses Google Test framework:
+
+```cmake
+# Find Google Test
+find_package(GTest REQUIRED)
+include(GoogleTest)
+
+# Create test target
+gtest_discover_tests(nlm_test
+    TEST_PREFIX "nlm_"
+    PROPERTY working_directory ${CMAKE_CURRENT_BINARY_DIR}
+)
+```
+
+### 2. Test Categories
+
+The test suite is organized into categories:
+
+#### Unit Tests
+- **Brain tests**: Brain creation, initialization, step execution, reset functionality
+- **Config tests**: Configuration loading, parameter validation, serialization
+- **Performance tests**: Performance monitoring, benchmarking
+- **Visualization tests**: Visualization interface, rendering, update rates
+
+#### Integration Tests
+- **System integration**: Component interaction, data flow
+- **Cross-platform**: Platform-specific behavior
+- **Memory management**: Memory leak detection, allocation tracking
+
+### 3. Performance Benchmarking
+
+Performance benchmarks are implemented as standalone executables:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Run all benchmarks
+./benchmark --runs 100 --size medium
+
+# Specific benchmark types
+./benchmark --benchmark-type memory_pool
+./benchmark --benchmark-type event_queue
+./benchmark --benchmark-type simd_vectorization
 ```
 
-## Running
+### 4. Memory Leak Detection
 
-### Phase 6 Demo (Integration Test)
+Memory leak detection is enabled with sanitizers:
+
 ```bash
-./nlm_phase6_demo
+# Build with AddressSanitizer
+cmake .. -DNLM_ASAN=ON
+make -j$(nproc)
+
+# Run tests with memory leak detection
+./nlm_test --gtest_filter=*Leak* --leaks_report
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### 5. Cross-Platform Testing
 
-## Project Structure
+Cross-platform testing support:
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+```cmake
+# Platform-specific test configuration
+if(UNIX AND NOT APPLE)
+    # Linux-specific tests
+    target_compile_definitions(nlm_test PRIVATE NLM_PLATFORM_LINUX)
+endif()
+
+if(APPLE)
+    # macOS-specific tests
+    target_compile_definitions(nlm_test PRIVATE NLM_PLATFORM_MACOS)
+endif()
+
+if(WIN32)
+    # Windows-specific tests
+    target_compile_definitions(nlm_test PRIVATE NLM_PLATFORM_WINDOWS)
+endif()
 ```
 
-## Phase Summary
+## Python Bindings Enhancement
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### 1. Modern pybind11 Integration
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+Enhanced Python bindings with better documentation:
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+```cmake
+find_package(pybind11 CONFIG REQUIRED)
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+pybind11_add_module(pynlm bindings.cpp)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+# Install Python package
+install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+# Create Python package metadata
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/python/setup.py.in
+    ${CMAKE_CURRENT_BINARY_DIR}/setup.py @ONLY)
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+### 2. Python Test Suite
+
+```python
+# tests/python_test_suite.py
+import pynlm
+import pytest
+import tempfile
+import json
+import os
+
+class TestPythonBindings:
+    def test_config_creation(self):
+        config = pynlm.createDefaultConfig()
+        assert config is not None
+        
+        config.set("neuron_count", 100)
+        assert config.get("neuron_count") == 100
+        
+    def test_brain_creation(self):
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        assert brain is not None
+        
+        brain.initialize()
+        assert brain.getTotalNeuronCount() > 0
+        
+    def test_visualization(self):
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        vis = pynlm.createVisualization()
+        vis.initialize()
+        vis.setUpdateRate(30.0)
+        
+        assert vis.isActive()
+        assert vis.getUpdateRate() == 30.0
+        
+        vis.close()
 ```
+
+### 3. Performance Monitoring
+
+Performance monitoring from Python:
+
+```python
+import pynlm
+import time
+
+config = pynlm.createDefaultConfig()
+config.set("performance.monitoring", True)
+config.set("performance.profiling", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation with performance tracking
+for step in range(100):
+    brain.step(step)
+    
+    if step % 10 == 0:
+        stats = brain.getPerformanceStats()
+        print(f"Step {step}: {stats.neuronsPerSecond} neurons/sec")
+        brain.logPerformanceReport()
+```
+
+## Build Commands
+
+### Standard Build
+
+```bash
+# Configure with all options
+mkdir build && cd build
+cmake .. \
+    -DNLM_PERFORMANCE=ON \
+    -DNLM_VISUALIZATION=ON \
+    -DNLM_PYTHON_BINDINGS=ON \
+    -DNLM_TESTS=ON \
+    -DNLM_BENCHMARKS=ON \
+    -DNLM_THREAD_COUNT=8 \
+    -DNLM_USE_SIMD=ON
+
+# Build
+make -j$(nproc)
+```
+
+### Installation
+
+```bash
+# Install to system
+cmake --build . --target install
+
+# Install to custom location
+cmake .. -DCMAKE_INSTALL_PREFIX=/opt/nlm
+cmake --build . --target install
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test categories
+ctest -R "test_brain"
+ctest -R "test_config"
+ctest -R "test_performance"
+
+# Run performance benchmarks
+./benchmark --help
+./benchmark --runs 100
+```
+
+### Python Package Installation
+
+```bash
+# Install Python bindings
+cd python
+pip install -e .
+
+# Test Python bindings
+python -m pytest python_tests.py -v
+```
+
+### Performance Testing
+
+```bash
+# Build with optimizations
+cmake .. -DNLM_PERFORMANCE=ON -DNLM_USE_SIMD=AVX2 -DNLM_THREAD_COUNT=8
+make -j$(nproc)
+
+# Run performance benchmarks
+./benchmark --benchmark-type all --runs 50
+```
+
+## Documentation
+
+### Advanced Usage Documentation
+
+The advanced usage documentation (`docs/USAGE_ADVANCED.md`) provides:
+
+- Configuration optimization guides
+- Performance tuning techniques
+- Cross-platform compatibility information
+- Debugging and troubleshooting
+- Advanced usage examples
+
+### API Documentation
+
+Python bindings include comprehensive documentation:
+
+```python
+import pynlm
+help(pynlm)
+```
+
+### Examples
+
+Example usage from Python:
+
+```python
+import pynlm
+
+# Create and configure brain
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 1000)
+config.set("region_count", 2)
+config.set("simulation_timestep", 0.001)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+    
+    if step % 100 == 0:
+        stats = brain.getPerformanceStats()
+        print(f"Step {step}: {stats.neuronsPerSecond:.0f} neurons/sec")
+
+# Get final statistics
+brain.logPerformanceReport()
+```
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml
+name: NLM Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Debug, Release]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . 
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DNLM_TESTS=ON
+          -DNLM_PYTHON_BINDINGS=ON
+    
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }}
+    
+    - name: Run Tests
+      run: cd build && ctest --output-on-failure
+    
+    - name: Run Python Tests
+      run: cd python && pip install -e . && python -m pytest
+```
+
+### Azure Pipelines Example
+
+```yaml
+stages:
+- stage: Build
+  jobs:
+  - job: Linux
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: |
+        mkdir build
+        cd build
+        cmake .. -DNLM_TESTS=ON -DNLM_PYTHON_BINDINGS=ON
+        make -j$(nproc)
+        ctest --output-on-failure
+      displayName: 'Build and Test'
+  
+  - job: macOS
+    pool:
+      vmImage: 'macOS-latest'
+    steps:
+    - script: |
+        mkdir build
+        cd build
+        cmake .. -DNLM_TESTS=ON -DNLM_PYTHON_BINDINGS=ON
+        make -j$(sysctl -n hw.ncpu)
+        ctest --output-on-failure
+      displayName: 'Build and Test'
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Build fails with SIMD errors**
+   ```bash
+   # Disable SIMD optimizations
+cmake .. -DNLM_USE_SIMD=OFF
+   ```
+
+2. **Python bindings not found**
+   ```bash
+   # Install Python dependencies
+   pip install pybind11 numpy matplotlib
+   
+   # Rebuild Python bindings
+   cd python && rm -rf build && mkdir build && cd build && cmake .. && make
+   ```
+
+3. **Tests fail with memory errors**
+   ```bash
+   # Build with AddressSanitizer
+cmake .. -DNLM_ASAN=ON
+make -j$(nproc)
+
+   # Run with memory leak detection
+   ./nlm_test --leaks_report
+   ```
+
+4. **Cross-platform compilation issues**
+   ```bash
+   # Check platform-specific options
+   cmake .. -DNLM_PLATFORM_LINUX=ON
+   cmake .. -DNLM_PLATFORM_MACOS=ON
+   cmake .. -DNLM_PLATFORM_WINDOWS=ON
+   ```
+
+## Future Enhancements
+
+### Planned Improvements
+
+1. **Export Configuration**
+   - Support for JSON configuration export
+   - External configuration management
+
+2. **Distributed Computing**
+   - Multi-node simulation support
+   - MPI integration for large-scale simulations
+
+3. **Advanced Visualization**
+   - 3D visualization support
+   - Web-based visualization interface
+
+4. **Plugin Architecture**
+   - Extensible plugin system
+   - Dynamic module loading
+
+5. **Advanced Profiling**
+   - Detailed performance analysis
+   - Visualization of performance bottlenecks
+
+6. **Machine Learning Integration**
+   - Integration with ML frameworks (TensorFlow, PyTorch)
+   - Neural network transfer learning
+
+7. **Real-time Data Streaming**
+   - Real-time data ingestion
+   - Live visualization updates
+
+8. **Export Capabilities**
+   - Multiple output formats (JSON, HDF5, Parquet)
+   - Simulation result archiving
 
 ## License
 
-MIT
+This enhanced build system is licensed under the NLM License.
 
-## Authors
+## Acknowledgments
 
-Research project — See docs for scientific background.
+Special thanks to the open-source community for Google Test, pybind11, and other contributing projects.

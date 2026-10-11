@@ -1,15 +1,25 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
+// Configuration system for NLM (Neural Learning Machine)
 
 // Forward declarations
 class Config;
+
+// Performance monitoring data
+struct PerformanceStats {
+    double neuronsPerSecond;
+    double spikesPerSecond;
+    double synapticEventsPerSecond;
+    double realTimeFactor;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    size_t pendingSpikes;
+    size_t pendingDelayedSpikes;
+    float avgFiringRate;
+    float memoryUsageMB;
+    double stepTimeMs;
+    double updateTimeMs;
+    double renderTimeMs;
+    size_t visualizationFrames;
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -92,6 +102,10 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // JSON serialization helpers
+    static nlohmann::json toJson(const ConfigValue& value);
+    static ConfigValue fromJson(const nlohmann::json& json);
     
 private:
     struct Impl;

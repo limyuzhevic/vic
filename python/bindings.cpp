@@ -5,19 +5,38 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <sstream>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// Helper function to create ID classes
+template<typename T>
+void bindIdClass(py::module_& m, const std::string& name, const std::string& doc) {
+    py::class_<T>(m, name.c_str(), doc.c_str())
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &T::value)
+        .def("index", &T::index)
+        .def("__eq__", &T::operator==)
+        .def("__ne__", &T::operator!=);
+}
+
+// Helper function to create enum bindings
+template<typename EnumType>
+void bindEnumClass(py::module_& m, const std::string& name, const std::string& doc) {
+    py::enum_<EnumType>(m, name.c_str(), doc.c_str())
+        .value("Excitatory", EnumType::Excitatory)
+        .value("Inhibitory", EnumType::Inhibitory)
+        .value("Modulatory", EnumType::Modulatory)
+        .export_values();
+}
+
+// ============================================================================
+// TYPE BINDINGS
+// ============================================================================
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -29,118 +48,24 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+    // ID Classes
+    bindIdClass<NeuronId>(m, "NeuronId", "Unique identifier for a neuron");
+    bindIdClass<SynapseId>(m, "SynapseId", "Unique identifier for a synapse");
+    bindIdClass<RegionId>(m, "RegionId", "Unique identifier for a brain region");
+    bindIdClass<PopulationId>(m, "PopulationId", "Unique identifier for a neuron population");
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+    // Enum Classes
+    bindEnumClass<NeuronType>(m, "NeuronType", "Neuron type enumeration");
+    bindEnumClass<SynapseType>(m, "SynapseType", "Synapse type enumeration");
+    bindEnumClass<DevelopmentalStage>(m, "DevelopmentalStage", "Developmental stage enumeration");
+    bindEnumClass<FiringState>(m, "FiringState", "Neuron firing state enumeration");
+    bindEnumClass<ActionType>(m, "ActionType", "Action type enumeration");
+    bindEnumClass<MotorCommand>(m, "MotorCommand", "Low-level motor command enumeration");
+    bindEnumClass<WorldObjectType>(m, "WorldObjectType", "World object type enumeration");
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
-
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
-
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
-
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
-
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
-
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
-
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
-
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    // ============================================================================
+    // CONFIG BINDINGS
+    // ============================================================================
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -164,6 +89,11 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // ============================================================================
+    // SENSORY INPUT CLASSES
+    // ============================================================================
+
+    // Base class
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -172,6 +102,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
              "Set the timestamp");
 
+    // Derived classes
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
@@ -198,6 +129,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // ============================================================================
+    // ACTION CLASSES
+    // ============================================================================
+
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -208,6 +143,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
         .def("clone", &Action::clone);
+
+    // ============================================================================
+    // WORLD OBJECTS
+    // ============================================================================
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -245,6 +184,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    // ============================================================================
+    // PERCEPT CLASS
+    // ============================================================================
+
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -262,6 +205,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+
+    // ============================================================================
+    // WORLD SYSTEM
+    // ============================================================================
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -288,6 +235,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
+    // ============================================================================
+    // BRAIN SYSTEM
+    // ============================================================================
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -400,6 +351,52 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // ============================================================================
+    // PERFORMANCE MONITORING
+    // ============================================================================
+
+    py::class_<PerformanceStats>(m, "PerformanceStats", R"pbdoc(Performance statistics for neural simulation)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("neuronsPerSecond", &PerformanceStats::neuronsPerSecond)
+        .def_readwrite("spikesPerSecond", &PerformanceStats::spikesPerSecond)
+        .def_readwrite("synapticEventsPerSecond", &PerformanceStats::synapticEventsPerSecond)
+        .def_readwrite("realTimeFactor", &PerformanceStats::realTimeFactor)
+        .def_readwrite("activeNeurons", &PerformanceStats::activeNeurons)
+        .def_readwrite("firingNeurons", &PerformanceStats::firingNeurons)
+        .def_readwrite("pendingSpikes", &PerformanceStats::pendingSpikes)
+        .def_readwrite("pendingDelayedSpikes", &PerformanceStats::pendingDelayedSpikes)
+        .def_readwrite("avgFiringRate", &PerformanceStats::avgFiringRate)
+        .def_readwrite("memoryUsageMB", &PerformanceStats::memoryUsageMB)
+        .def_readwrite("stepTimeMs", &PerformanceStats::stepTimeMs)
+        .def_readwrite("updateTimeMs", &PerformanceStats::updateTimeMs)
+        .def_readwrite("renderTimeMs", &PerformanceStats::renderTimeMs)
+        .def_readwrite("visualizationFrames", &PerformanceStats::visualizationFrames);
+
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface for neural simulation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &VisualizationInterface::initialize,
+             "Initialize visualization")
+        .def("update", &VisualizationInterface::update,
+             "Update visualization data")
+        .def("render", &VisualizationInterface::render,
+             "Render current state")
+        .def("close", &VisualizationInterface::close,
+             "Close visualization")
+        .def("isActive", &VisualizationInterface::isActive,
+             "Check if visualization is active")
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate,
+             py::arg("hz"), "Set update rate (Hz)")
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate,
+             "Get update rate (Hz)")
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork,
+             py::arg("brain"), "Visualize network structure")
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity,
+             py::arg("brain"), "Visualize neural activity")
+        .def("visualizeSpikes", &VisualizationInterface::visualizeSpikes,
+             py::arg("spikes"), "Visualize spike raster plot")
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights,
+             py::arg("brain"), "Visualize weight matrix");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +413,23 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createPerformanceStats", []() -> PerformanceStats {
+        PerformanceStats stats;
+        stats.neuronsPerSecond = 0.0;
+        stats.spikesPerSecond = 0.0;
+        stats.synapticEventsPerSecond = 0.0;
+        stats.realTimeFactor = 1.0;
+        stats.activeNeurons = 0;
+        stats.firingNeurons = 0;
+        stats.pendingSpikes = 0;
+        stats.pendingDelayedSpikes = 0;
+        stats.avgFiringRate = 0.0f;
+        stats.memoryUsageMB = 0.0f;
+        stats.stepTimeMs = 0.0;
+        stats.updateTimeMs = 0.0;
+        stats.renderTimeMs = 0.0;
+        stats.visualizationFrames = 0;
+        return stats;
+    }, "Create default performance statistics");
 
 } // namespace nlm

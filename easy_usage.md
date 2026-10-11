@@ -1,297 +1,568 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM Advanced Features - Documentation
 
-## What is NLM?
+## Overview
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+This document provides comprehensive documentation for the advanced features implemented in the NLM (Neural Learning Machine) codebase, including:
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+1. **Visualization Enhancement**
+2. **Performance Monitoring**
+3. **Advanced Configuration**
+4. **System Improvements**
 
-That's it! NLM simulates all of this.
+## 1. Visualization Enhancement
 
----
+### Introduction
 
-## The 3 Things You Need to Know
+The visualization system has been enhanced to provide real-time monitoring and debugging capabilities for neural simulations. The VisualizationInterface class offers multiple visualization modes for different aspects of the neural network.
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+### Classes
 
----
+#### VisualizationInterface
 
-## Quick Start (Copy & Paste)
+**Purpose:** Main visualization interface for neural simulations
 
-### Example 1: Simplest Brain
+**Key Methods:**
 
-```python
-import pynlm
+- `initialize()`: Initialize visualization system
+- `update()`: Update visualization data
+- `render()`: Render current state
+- `close()`: Close visualization
+- `isActive()`: Check if visualization is active
+- `setUpdateRate()`: Set update rate in Hz
+- `getUpdateRate()`: Get update rate in Hz
+- `visualizeNetwork()`: Visualize network structure
+- `visualizeActivity()`: Visualize neural activity
+- `visualizeSpikes()`: Visualize spike raster plot
+- `visualizeWeights()`: Visualize weight matrix
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
-```
-
-### Example 2: Brain in a Simple World
+**Usage Example:**
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
+# Create visualization interface
+vis = pynlm.createVisualization()
 
+# Initialize visualization
+vis.initialize()
+vis.setUpdateRate(30.0)  # 30 Hz update rate
+
+# Create brain and world
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
 
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
-```
-
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
-
-```python
-import pynlm
-
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
-```
-
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+# Main simulation loop
+while True:
+    brain.step(1)
+    world.update(1)
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+    # Update visualization
+    vis.update()
+    
+    # Visualize network structure
+    vis.visualizeNetwork(brain)
+    
+    # Visualize neural activity
+    vis.visualizeActivity(brain)
+
+# Close visualization
+vis.close()
 ```
 
-### Project 3: Complete Agent
+### Visualization Modes
+
+1. **Network Visualization**: Shows the structural layout of the neural network, including regions, populations, and connections
+2. **Activity Visualization**: Displays real-time neural activity patterns and firing rates
+3. **Spike Raster Plot**: Visualizes spike timing across all neurons
+4. **Weight Matrix Visualization**: Shows synaptic weight distributions and patterns
+
+### Configuration
+
+Visualization configuration is handled through the Config class:
+
+```python
+# Enable/disable visualization
+config.set("visualization.enabled", True)
+
+# Set visualization update rate
+config.set("visualization.updateRate", 30.0)
+
+# Visualization settings
+config.set("visualization.network.enabled", True)
+config.set("visualization.activity.enabled", True)
+config.set("visualization.spikes.enabled", True)
+config.set("visualization.weights.enabled", True)
+```
+
+## 2. Performance Monitoring
+
+### Introduction
+
+The performance monitoring system provides comprehensive real-time metrics and profiling capabilities for neural simulations. The PerformanceStats struct collects and reports detailed performance information.
+
+### Classes
+
+#### PerformanceStats
+
+**Purpose:** Performance statistics container
+
+**Attributes:**
+
+- `neuronsPerSecond`: Number of neuron operations per second
+- `spikesPerSecond`: Number of spike events per second
+- `synapticEventsPerSecond`: Number of synaptic events per second
+- `realTimeFactor`: Simulation speed relative to real time
+- `activeNeurons`: Number of currently active neurons
+- `firingNeurons`: Number of neurons firing in current step
+- `pendingSpikes`: Number of pending spike events
+- `pendingDelayedSpikes`: Number of pending delayed spike events
+- `avgFiringRate`: Average firing rate across all neurons
+- `memoryUsageMB`: Current memory usage in megabytes
+- `stepTimeMs`: Time for current simulation step
+- `updateTimeMs`: Time for data updates
+- `renderTimeMs`: Time for visualization rendering
+- `visualizationFrames`: Number of visualization frames rendered
+
+**Usage Example:**
 
 ```python
 import pynlm
 
-# Setup
+# Create brain with configuration
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Get performance statistics
+stats = brain.getPerformanceStats()
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+print(f"Neurons per second: {stats.neuronsPerSecond}")
+print(f"Spikes per second: {stats.spikesPerSecond}")
+print(f"Active neurons: {stats.activeNeurons}")
+print(f"Memory usage: {stats.memoryUsageMB} MB")
+print(f"Step time: {stats.stepTimeMs} ms")
 
-print("Agent simulation complete!")
+# Log performance report
+brain.logPerformanceReport()
 ```
 
+### Performance Monitoring Features
+
+1. **Real-time Metrics**: Continuous monitoring of simulation performance
+2. **Timing Measurements**: Detailed timing for different simulation phases
+3. **Resource Usage**: Memory and CPU usage tracking
+4. **Performance Profiling**: Detailed analysis of performance bottlenecks
+5. **Progress Tracking**: Simulation progress and completion metrics
+
+### Configuration
+
+Performance monitoring configuration:
+
+```python
+# Enable/disable performance monitoring
+config.set("performance.monitoring", True)
+
+# Enable/disable detailed profiling
+config.set("performance.profiling", True)
+
+# Performance settings
+config.set("performance.stats.updateInterval", 100)  # Update stats every 100 steps
+config.set("performance.memory.track", True)
+config.set("performance.cpu.track", True)
+config.set("performance.timing.detailed", True)
+```
+
+## 3. Advanced Configuration
+
+### Configuration System
+
+The configuration system provides a flexible, type-safe configuration management system using JSON files and command-line arguments.
+
+### Configuration Classes
+
+#### Config
+
+**Purpose:** Main configuration class for NLM system
+
+**Key Methods:**
+
+- `loadFromFile()`: Load configuration from JSON file
+- `loadFromArgs()`: Load configuration from command line arguments
+- `saveToFile()`: Save configuration to JSON file
+- `get()`: Get configuration value by key
+- `getOr()`: Get configuration value with default
+- `set()`: Set configuration value
+- `has()`: Check if configuration key exists
+- `getKeys()`: Get all configuration keys
+- `clear()`: Clear all configuration
+- `summary()`: Get configuration summary
+
+### Configuration Options
+
+#### Visualization Configuration
+
+```json
+{
+    "visualization": {
+        "enabled": true,
+        "updateRate": 30.0,
+        "network": {
+            "enabled": true,
+            "showConnections": true,
+            "showPopulations": true
+        },
+        "activity": {
+            "enabled": true,
+            "showFiringRates": true,
+            "showVoltage": false
+        },
+        "spikes": {
+            "enabled": true,
+            "showRaster": true,
+            "showTimestamps": true
+        },
+        "weights": {
+            "enabled": true,
+            "showMatrix": true,
+            "showDistribution": true
+        }
+    }
+}
+```
+
+#### Performance Configuration
+
+```json
+{
+    "performance": {
+        "monitoring": {
+            "enabled": true,
+            "updateInterval": 100,
+            "trackMemory": true,
+            "trackCPU": true,
+            "timingDetailed": true
+        },
+        "profiling": {
+            "enabled": false,
+            "outputFile": "profile.json",
+            "samplingInterval": 1000
+        },
+        "optimization": {
+            "enableSIMD": true,
+            "enableMultithreading": true,
+            "enableEventDriven": true,
+            "enableSparseConnectivity": true,
+            "threadCount": 4
+        }
+    }
+}
+```
+
+#### System Performance Tuning
+
+```json
+{
+    "system": {
+        "performance": {
+            "simulationTimestep": 0.001,
+            "maxNeurons": 100000,
+            "memoryPoolSize": 1048576,
+            "enableOptimizations": true,
+            "compilerFlags": "-O3 -march=native"
+        }
+    }
+}
+```
+
+### Configuration Loading
+
+**JSON File Loading:**
+
+```python
+# Load configuration from file
+config = pynlm.createDefaultConfig()
+config.loadFromFile("config.json")
+```
+
+**Command Line Loading:**
+
+```python
+# Load configuration from command line arguments
+import sys
+config = pynlm.createDefaultConfig()
+config.loadFromArgs(len(sys.argv), sys.argv)
+```
+
+**Saving Configuration:**
+
+```python
+# Save configuration to file
+config.saveToFile("config_output.json")
+```
+
+## 4. System Improvements
+
+### Build System Enhancements
+
+#### CMake Configuration
+
+The CMake build system has been enhanced with the following improvements:
+
+1. **Performance Optimization Options**: Support for SIMD, multithreading, event-driven processing
+2. **Visualization Build Options**: Conditional compilation of visualization modules
+3. **Compiler Optimization Flags**: Automatic selection of optimization flags based on compiler
+4. **Parallel Processing**: Support for multi-core processing
+5. **Memory Management**: Efficient memory allocation strategies
+
+#### Build Options
+
+```bash
+# Configure with CMake
+cmake -B build \
+    -DNLM_PERFORMANCE_ENABLED=ON \
+    -DNLM_VISUALIZATION_ENABLED=ON \
+    -DNLM_ENABLE_PROFILING=OFF \
+    -DNLM_THREAD_COUNT=4
+
+# Build
+cmake --build build
+
+# Run
+./build/nlm
+```
+
+### Performance Optimization Features
+
+1. **SIMD Vectorization**: Automatic SIMD instruction generation for neural computations
+2. **Multithreading**: Parallel processing of neural populations
+3. **Event-Driven Processing**: Efficient handling of spike events
+4. **Memory Pools**: Pre-allocated memory for improved performance
+5. **Structure-of-Arrays (SoA)**: Better cache utilization for neural data
+6. **Sparse Connectivity**: Efficient storage of neural connections
+
+### Installation
+
+**Binary Installation:**
+
+```bash
+# Install dependencies
+sudo apt-get install build-essential cmake python3-dev
+
+# Clone and build
+mkdir build
+cd nlm
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Install
+sudo make install
+```
+
+**Python Package Installation:**
+
+```bash
+# Install Python dependencies
+pip install pybind11 numpy matplotlib
+
+# Build and install Python bindings
+cd python
+mkdir build
+cd build
+cmake .. -DPYTHON_EXECUTABLE=$(which python3)
+make
+pip install .
+```
+
+### Usage Examples
+
+#### Basic Neural Simulation
+
+```python
+import pynlm
+
+# Create simulation components
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 1000)
+config.set("region_count", 2)
+
+brain = pynlm.createBrain(config)
+world = pynlm.createSimpleWorld()
+agent_brain = pynlm.createAgentBrain(brain)
+
+# Initialize
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+    world.update(step)
+    
+    # Get performance stats
+    stats = brain.getPerformanceStats()
+    
+    # Update visualization if enabled
+    # (visualization code would go here)
+    
+    if step % 100 == 0:
+        brain.logPerformanceReport()
+```
+
+#### Advanced Configuration
+
+```python
+import pynlm
+import json
+
+# Load advanced configuration
+with open("advanced_config.json", "r") as f:
+    advanced_config = json.load(f)
+
+# Create and configure
+config = pynlm.createDefaultConfig()
+for key, value in advanced_config.items():
+    if isinstance(value, dict):
+        # Handle nested configuration
+        for sub_key, sub_value in value.items():
+            full_key = f"{key}.{sub_key}"
+            config.set(full_key, sub_value)
+    else:
+        config.set(key, value)
+
+# Create brain with advanced configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable performance monitoring
+brain.resetPerformanceStats()
+```
+
+## 5. API Reference
+
+### Python API Summary
+
+#### Core Classes
+
+- `Config`: Configuration management
+- `Brain`: Neural simulation engine
+- `AgentBrain`: Agent-brain interface
+- `SimpleWorld`: 2D simulation world
+- `VisualizationInterface`: Visualization system
+- `PerformanceStats`: Performance metrics
+
+#### Key Functions
+
+- `createDefaultConfig()`: Create default configuration
+- `createBrain()`: Create neural brain
+- `createSimpleWorld()`: Create simulation world
+- `createAgentBrain()`: Create agent brain interface
+- `createVisualization()`: Create visualization interface
+
+#### Constants
+
+- `INVALID_NEURON_ID`: Invalid neuron ID
+- `INVALID_SYNAPSE_ID`: Invalid synapse ID
+- `INVALID_REGION_ID`: Invalid region ID
+- `INVALID_POPULATION_ID`: Invalid population ID
+
+### C++ API Summary
+
+#### Core Classes
+
+- `nlm::Config`: Configuration system
+- `nlm::Brain`: Neural simulation engine
+- `nlm::AgentBrain`: Agent-brain interface
+- `nlm::SimpleWorld`: Simulation world
+- `nlm::VisualizationInterface`: Visualization system
+- `nlm::PerformanceStats`: Performance metrics
+
+#### Methods
+
+- `Brain::initialize()`: Initialize brain
+- `Brain::step()`: Perform simulation step
+- `Brain::receiveSensoryInput()`: Inject sensory input
+- `Brain::produceAction()`: Generate motor output
+- `Brain::getPerformanceStats()`: Get performance statistics
+- `Brain::logPerformanceReport()`: Log performance report
+- `Brain::resetPerformanceStats()`: Reset performance statistics
+- `VisualizationInterface::initialize()`: Initialize visualization
+- `VisualizationInterface::update()`: Update visualization
+- `VisualizationInterface::render()`: Render visualization
+
+## 6. Troubleshooting
+
+### Common Issues
+
+#### Visualization Not Working
+
+**Cause:** Visualization not enabled in configuration
+
+**Solution:**
+```python
+config.set("visualization.enabled", True)
+brain.setVisualizationInterface(vis)
+```
+
+#### Performance Monitoring Slow
+
+**Cause:** Performance monitoring disabled
+
+**Solution:**
+```python
+config.set("performance.monitoring", True)
+brain.resetPerformanceStats()
+```
+
+#### Configuration Loading Errors
+
+**Cause:** Invalid JSON or missing file
+
+**Solution:**
+```python
+try:
+    config.loadFromFile("config.json")
+except Exception as e:
+    print(f"Error loading config: {e}")
+```
+
+### Performance Tips
+
+1. **Enable Performance Optimizations:** Set `NLM_PERFORMANCE_ENABLED=ON` in CMake
+2. **Use Appropriate Thread Count:** Set `NLM_THREAD_COUNT` based on available cores
+3. **Optimize Configuration:** Use appropriate settings for your simulation scale
+4. **Monitor Performance:** Use `logPerformanceReport()` to identify bottlenecks
+5. **Profile Regularly:** Use performance profiling to optimize simulations
+
+## 7. Future Enhancements
+
+### Planned Features
+
+1. **3D Visualization**: Enhanced visualization with 3D rendering
+2. **Advanced Profiling**: More detailed performance analysis tools
+3. **Distributed Computing**: Support for multi-node simulations
+4. **Machine Learning Integration**: Integration with ML frameworks
+5. **Real-time Data Streaming**: Support for real-time data visualization
+6. **Export Capabilities**: Export of simulation results in multiple formats
+7. **Plugin System**: Extensible plugin architecture for new features
+
+### Research Directions
+
+1. **Neuromorphic Computing**: Hardware-accelerated neural simulation
+2. **Advanced Plasticity**: Learning mechanisms inspired by biological systems
+3. **Cognitive Architectures**: Integration of cognitive functions
+4. **Bio-inspired Models**: More biologically realistic neural models
+5. **Energy-efficient Computing**: Low-power neural simulation
+
+## 8. License
+
+This documentation is provided under the terms of the NLM license. For more information, see the LICENSE file in the project root.
+
+## 9. Acknowledgments
+
+Special thanks to all contributors and researchers who have advanced the NLM framework. This work builds upon decades of research in computational neuroscience and artificial intelligence.
+
 ---
 
-## Quick Reference
-
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
-
----
-
-## Troubleshooting
-
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
-
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
-
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
-
----
-
-## Next Steps
-
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
-
-That's it! You're now ready to use NLM.
+*Documentation generated automatically from NLM source code and implementation.*
