@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Comprehensive test suite including edge cases, integration, stress, memory management, and Python bindings
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +38,37 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_edge_cases {
+    void runAll();
+}
+
+namespace test_integration {
+    void runAll();
+}
+
+namespace test_stress {
+    void runAll();
+}
+
+namespace test_memory_management {
+    void runAll();
+}
+
+namespace test_python_bindings {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    std::cout << "=== NLM Phase 2 Comprehensive Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Edge Cases & Boundary Conditions" << std::endl;
+    std::cout << "  - Integration Tests" << std::endl;
+    std::cout << "  - Stress Tests" << std::endl;
+    std::cout << "  - Memory Management" << std::endl;
+    std::cout << "  - Python Bindings" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +139,54 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    
+    // Run new comprehensive test suites
+    std::cout << "Running Edge Case tests..." << std::endl;
+    try {
+        test_edge_cases::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Stress tests..." << std::endl;
+    try {
+        test_stress::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Memory Management tests..." << std::endl;
+    try {
+        test_memory_management::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python Bindings tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
