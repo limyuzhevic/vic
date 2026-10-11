@@ -1,0 +1,24 @@
+{
+    "configuration": {
+        "format": "NLM v1.0",
+        "timestamp": "2026-10-11T19:37:39Z",
+        "profile": "advanced",
+        "neuronCount": 5000,
+        "learningRate": 0.05,
+        "timeSteps": 200,
+        "stdpLTPWeight": 0.1,
+        "stdpLTDWeight": 0.12,
+        "stdpTimeConstant": 20.0,
+        "plasticityLearningRate": 0.05,
+        "threadCount": 8,
+        "simdEnabled": true,
+        "memoryPoolSize": 131072,
+        "debugLevel": 2,
+        "profilingEnabled": false,
+        "validationEnabled": true,
+        "synapticDensity": 0.15,
+        "populationSize": 200,
+        "regionSize": 2.0,
+        "neuronTypes": "excitatory,inhibitory,modulatory"
+    }
+}

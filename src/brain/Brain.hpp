@@ -80,14 +80,47 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    // Spike system access with null validation
+    SpikeSystem* getSpikeSystem() {
+        if (!pImpl || !pImpl->spikeSystem) {
+            NLM_LOG_WARNING("Brain: Null spike system accessed");
+            return nullptr;
+        }
+        return pImpl->spikeSystem.get();
+    }
     
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    const SpikeSystem* getSpikeSystem() const {
+        if (!pImpl || !pImpl->spikeSystem) {
+            NLM_LOG_WARNING("Brain: Null spike system accessed (const)");
+            return nullptr;
+        }
+        return pImpl->spikeSystem.get();
+    }
+    
+    // Plasticity system access with null validation
+    STDP* getSTDP() {
+        if (!pImpl || !pImpl->stdp) {
+            NLM_LOG_WARNING("Brain: Null STDP accessed");
+            return nullptr;
+        }
+        return pImpl->stdp.get();
+    }
+    
+    Hebbian* getHebbian() {
+        if (!pImpl || !pImpl->hebbian) {
+            NLM_LOG_WARNING("Brain: Null Hebbian accessed");
+            return nullptr;
+        }
+        return pImpl->hebbian.get();
+    }
+    
+    StructuralPlasticity* getStructuralPlasticity() {
+        if (!pImpl || !pImpl->structuralPlasticity) {
+            NLM_LOG_WARNING("Brain: Null structural plasticity accessed");
+            return nullptr;
+        }
+        return pImpl->structuralPlasticity.get();
+    }
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -115,15 +148,56 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
+    // Region management with null validation
     RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
+    
+    NeuralRegion* getRegion(RegionId id) {
+        if (!pImpl) {
+            NLM_LOG_WARNING("Brain: Null brain implementation in getRegion");
+            return nullptr;
+        }
+        for (auto& region : pImpl->regions) {
+            if (region->getId() == id) {
+                return region.get();
+            }
+        }
+        NLM_LOG_WARNING("Brain: Null region for ID " + std::to_string(id.index()));
+        return nullptr;
+    }
+    
+    const NeuralRegion* getRegion(RegionId id) const {
+        if (!pImpl) {
+            NLM_LOG_WARNING("Brain: Null brain implementation in getRegion (const)");
+            return nullptr;
+        }
+        for (const auto& region : pImpl->regions) {
+            if (region->getId() == id) {
+                return region.get();
+            }
+        }
+        NLM_LOG_WARNING("Brain: Null region for ID " + std::to_string(id.index()) + " (const)");
+        return nullptr;
+    }
+    
+    size_t getRegionCount() const {
+        if (!pImpl) {
+            NLM_LOG_WARNING("Brain: Null brain implementation in getRegionCount");
+            return 0;
+        }
+        return pImpl->regions.size();
+    }
+    
     std::vector<RegionId> getRegionIds() const;
     
     // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const {
+        if (!pImpl) {
+            NLM_LOG_WARNING("Brain: Null brain implementation in getRegions");
+            static const std::vector<std::unique_ptr<NeuralRegion>> empty;
+            return empty;
+        }
+        return pImpl->regions;
+    }
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
@@ -140,55 +214,154 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getWorkingMemory() {
+        if (!pImpl || !pImpl->workingMemory) {
+            NLM_LOG_WARNING("Brain: Null working memory accessed");
+            return nullptr;
+        }
+        return pImpl->workingMemory.get();
+    }
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getEpisodicMemory() {
+        if (!pImpl || !pImpl->episodicMemory) {
+            NLM_LOG_WARNING("Brain: Null episodic memory accessed");
+            return nullptr;
+        }
+        return pImpl->episodicMemory.get();
+    }
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() {
+        if (!pImpl || !pImpl->associativeMemory) {
+            NLM_LOG_WARNING("Brain: Null associative memory accessed");
+            return nullptr;
+        }
+        return pImpl->associativeMemory.get();
+    }
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem() {
+        if (!pImpl || !pImpl->predictionSystem) {
+            NLM_LOG_WARNING("Brain: Null prediction system accessed");
+            return nullptr;
+        }
+        return pImpl->predictionSystem.get();
+    }
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    NeuralPlanner* getPlanner() {
+        if (!pImpl || !pImpl->planner) {
+            NLM_LOG_WARNING("Brain: Null planner accessed");
+            return nullptr;
+        }
+        return pImpl->planner.get();
+    }
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    ConceptFormation* getConceptFormation() {
+        if (!pImpl || !pImpl->conceptFormation) {
+            NLM_LOG_WARNING("Brain: Null concept formation accessed");
+            return nullptr;
+        }
+        return pImpl->conceptFormation.get();
+    }
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    AttentionalSelection* getAttention() {
+        if (!pImpl || !pImpl->attention) {
+            NLM_LOG_WARNING("Brain: Null attention system accessed");
+            return nullptr;
+        }
+        return pImpl->attention.get();
+    }
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Development system
+    DevelopmentSystem* getDevelopmentSystem() {
+        if (!pImpl || !pImpl->developmentSystem) {
+            NLM_LOG_WARNING("Brain: Null development system accessed");
+            return nullptr;
+        }
+        return pImpl->developmentSystem.get();
+    }
+    
+    DevelopmentalStage getDevelopmentalStage() const {
+        if (!pImpl) {
+            NLM_LOG_WARNING("Brain: Null brain implementation in getDevelopmentalStage");
+            return DevelopmentalStage::Initial;
+        }
+        return pImpl->developmentalStage;
+    }
+    
+    void setDevelopmentalStage(DevelopmentalStage stage) {
+        if (!pImpl) {
+            NLM_LOG_WARNING("Brain: Null brain implementation in setDevelopmentalStage");
+            return;
+        }
+        pImpl->developmentalStage = stage;
+    }
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    Dopamine* getDopamine() {
+        if (!pImpl || !pImpl->dopamine) {
+            NLM_LOG_WARNING("Brain: Null dopamine accessed");
+            return nullptr;
+        }
+        return pImpl->dopamine.get();
+    }
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    Curiosity* getCuriosity() {
+        if (!pImpl || !pImpl->curiosity) {
+            NLM_LOG_WARNING("Brain: Null curiosity accessed");
+            return nullptr;
+        }
+        return pImpl->curiosity.get();
+    }
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    Novelty* getNovelty() {
+        if (!pImpl || !pImpl->novelty) {
+            NLM_LOG_WARNING("Brain: Null novelty accessed");
+            return nullptr;
+        }
+        return pImpl->novelty.get();
+    }
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionErrorSignal() {
+        if (!pImpl || !pImpl->predictionError) {
+            NLM_LOG_WARNING("Brain: Null prediction error accessed");
+            return nullptr;
+        }
+        return pImpl->predictionError.get();
+    }
     
     // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    std::shared_ptr<const Config> getConfig() const {
+        if (!pImpl || !pImpl->config) {
+            NLM_LOG_WARNING("Brain: Null config accessed");
+            return nullptr;
+        }
+        return pImpl->config;
+    }
     
     // Get random generator
-    RandomGenerator* getRandomGenerator();
+    RandomGenerator* getRandomGenerator() {
+        if (!pImpl || !pImpl->rng) {
+            NLM_LOG_WARNING("Brain: Null random generator accessed");
+            return nullptr;
+        }
+        return pImpl->rng.get();
+    }
     
     // Logging
     void logStatus() const;

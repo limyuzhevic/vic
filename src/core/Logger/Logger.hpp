@@ -56,6 +56,10 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Error handling
+    bool isOutputFileOpen() const;
+    std::string getLastError() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -98,12 +102,24 @@ public:
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
+    // Thread safety
+    bool isThreadSafe() const;
+    size_t getLoggerCount() const;
+    
     // Get global logger instance
     static Logger& getGlobal();
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Validation
+    static bool validateLogEntry(const LogEntry& entry);
+    static bool validateLogLevel(LogLevel level);
+    
+    // Error handling
+    std::string getLastError() const;
+    void clearLastError();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
