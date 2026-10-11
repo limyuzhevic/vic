@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Random/Random.hpp"
 #include <string>
 #include <vector>
 
@@ -27,6 +28,9 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Enhanced dopamine integration with learning
+    virtual void integrateWithLearning(float learningRate, float predictionError) {}
+    
 protected:
     Neuromodulator() = default;
 };
@@ -48,9 +52,12 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Enhanced integration with learning
+    void integrateWithLearning(float learningRate, float predictionError) override;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
