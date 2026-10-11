@@ -1,0 +1,95 @@
+{
+    "nlm_version": "6.0",
+    "phase": "Phase 6 - Final Integration",
+    "description": "Neural Learning Machine Phase 6: Final integration of all brain systems",
+    
+    "core_simulation": {
+        "random_seed": 42,
+        "simulation_timestep": 0.001,
+        "neuron_count": 2000,
+        "region_count": 2,
+        "connection_probability": 0.1,
+        "max_simulation_steps": 100000,
+        "simulation_time_limit": 0.0
+    },
+    
+    "plasticity": {
+        "plasticity_learning_rate": 0.01,
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "stdp_time_constant": 20.0,
+        "synaptogenesis_rate": 0.0001,
+        "pruning_rate": 0.00001
+    },
+    
+    "development": {
+        "development_synaptogenesis_rate": 0.001,
+        "development_pruning_rate": 0.0001,
+        "developmental_stage": "Adult",
+        "plasticity_modulation_enabled": true
+    },
+    
+    "neuromodulation": {
+        "dopamine_baseline": 0.0,
+        "dopamine_enabled": true,
+        "curiosity_enabled": true,
+        "novelty_detection_enabled": true,
+        "prediction_error_enabled": true,
+        "reward_discount_factor": 0.99
+    },
+    
+    "environment": {
+        "environment_name": "GridWorld",
+        "environment_width": 10,
+        "environment_height": 10,
+        "world_boundary_enabled": true
+    },
+    
+    "logging": {
+        "log_level": "INFO",
+        "log_to_file": true,
+        "log_filename": "nlm_phase6.log",
+        "log_rotation_enabled": true,
+        "log_rotation_max_files": 10,
+        "log_rotation_max_size_kb": 10000
+    },
+    
+    "memory": {
+        "working_memory_capacity": 500,
+        "episodic_memory_max_episodes": 5000,
+        "associative_memory_enabled": true,
+        "replay_interval": 100,
+        "consolidation_interval": 1000
+    },
+    
+    "prediction": {
+        "prediction_system_enabled": true,
+        "prediction_accuracy_tracking": true,
+        "confidence_threshold": 0.7,
+        "prediction_error_smoothing": 0.95
+    },
+    
+    "cognition": {
+        "neural_planner_enabled": true,
+        "concept_formation_enabled": true,
+        "attention_system_enabled": true,
+        "planning_depth": 5,
+        "attention_inhibition_strength": 0.5,
+        "attention_excitation_strength": 1.5
+    },
+    
+    "visualization": {
+        "visualization_enabled": false,
+        "visualization_update_rate": 30.0,
+        "visualization_data_file": "nlm_visualization.json",
+        "visualization_realtime_enabled": true
+    },
+    
+    "checkpoint": {
+        "checkpoint_dir": "./checkpoints_phase6",
+        "checkpoint_interval": 10000,
+        "checkpoint_max_files": 50,
+        "checkpoint_compression": "balanced",
+        "checkpoint_autosave_enabled": true
+    }
+}
