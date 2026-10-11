@@ -93,13 +93,16 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string getCurrentTimeString();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Internal parsing helper
+    void parseAndSetValue(const std::string& key, const std::string& valueStr);
+    bool loadFromJsonFile(const std::string& filepath);
 };
-
-} // namespace nlm
