@@ -398,28 +398,265 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+                 .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Advanced Brain Methods for Memory Systems
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "AdvancedBrain")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attention system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error system")
+        .def("enableDevelopment", &Brain::enableDevelopment,
+             py::arg("enable"), "Enable/disable development")
+        .def("enableStructuralPlasticity", &Brain::enableStructuralPlasticity,
+             py::arg("enable"), "Enable/disable structural plasticity")
+        .def("enableRewardModulation", &Brain::enableRewardModulation,
+             py::arg("enable"), "Enable/disable reward modulation")
+        .def("enableCuriosity", &Brain::enableCuriosity,
+             py::arg("enable"), "Enable/disable curiosity")
+        .def("enablePrediction", &Brain::enablePrediction,
+             py::arg("enable"), "Enable/disable prediction system")
+        .def("enablePlanning", &Brain::enablePlanning,
+             py::arg("enable"), "Enable/disable planning system")
+        .def("enableConceptFormation", &Brain::enableConceptFormation,
+             py::arg("enable"), "Enable/disable concept formation")
+        .def("enableAttention", &Brain::enableAttention,
+             py::arg("enable"), "Enable/disable attention system")
+        .def("isDevelopmentEnabled", &Brain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isStructuralPlasticityEnabled", &Brain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isRewardModulationEnabled", &Brain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isCuriosityEnabled", &Brain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        .def("isPredictionEnabled", &Brain::isPredictionEnabled,
+             "Check if prediction is enabled")
+        .def("isPlanningEnabled", &Brain::isPlanningEnabled,
+             "Check if planning is enabled")
+        .def("isConceptFormationEnabled", &Brain::isConceptFormationEnabled,
+             "Check if concept formation is enabled")
+        .def("isAttentionEnabled", &Brain::isAttentionEnabled,
+             "Check if attention is enabled");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Performance and Benchmarking Functions
+    m.def("benchmark_performance", [](std::shared_ptr<Brain> brain, size_t steps) {
+        // Record initial state
+        size_t initial_spikes = brain->getTotalSpikeCount();
+        double start_time = py::chrono::high_resolution_clock::now();
+        
+        // Run simulation
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        // Record results
+        double end_time = py::chrono::high_resolution_clock::now();
+        double elapsed = py::chrono::duration<double>(end_time - start_time).count();
+        
+        size_t final_spikes = brain->getTotalSpikeCount();
+        size_t spikes_generated = final_spikes - initial_spikes;
+        double time_per_step = elapsed / steps;
+        
+        return py::dict(
+            "total_time", elapsed,
+            "steps", steps,
+            "time_per_step_ms", time_per_step * 1000,
+            "spikes_generated", spikes_generated,
+            "spikes_per_second", spikes_generated / elapsed,
+            "firing_rate", brain->getAverageFiringRate()
+        );
+    }, py::arg("brain"), py::arg("steps"),
+       "Run performance benchmark on brain simulation");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("compare_configurations", [](const std::vector<std::shared_ptr<Config>>& configs,
+                                       const std::vector<std::string>& names,
+                                       size_t steps) {
+        py::list results;
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            double start_time = py::chrono::high_resolution_clock::now();
+            for (size_t j = 0; j < steps; ++j) {
+                brain->step(j);
+            }
+            double end_time = py::chrono::high_resolution_clock::now();
+            
+            auto result = py::dict(
+                "name", names[i],
+                "neuron_count", configs[i]->getOr<size_t>("neuron_count", 1000),
+                "region_count", configs[i]->getOr<size_t>("region_count", 1),
+                "connection_probability", configs[i]->getOr<float>("connection_probability", 0.1),
+                "total_time", py::chrono::duration<double>(end_time - start_time).count(),
+                "total_spikes", brain->getTotalSpikeCount(),
+                "firing_rate", brain->getAverageFiringRate(),
+                "e_i_ratio", brain->getExcitationInhibitionRatio()
+            );
+            results.append(result);
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("names"), py::arg("steps"),
+       "Compare performance across different configurations");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced Configuration Functions
+    m.def("create_advanced_config", [](size_t neuron_count, size_t region_count,
+                                      float connection_probability,
+                                      bool enable_plasticity,
+                                      bool enable_development,
+                                      bool enable_curiosity) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuron_count);
+        config->set("region_count", region_count);
+        config->set("connection_probability", connection_probability);
+        
+        // Set advanced plasticity options
+        config->set("plasticity.stdp.enable", enable_plasticity);
+        config->set("plasticity.hebbian.enable", enable_plasticity);
+        config->set("plasticity.structural.enable", enable_plasticity);
+        
+        // Set development options
+        config->set("development.initial_plasticity", 1.0);
+        config->set("development.synaptogenesis_rate", 0.0001f * (enable_development ? 1.0f : 0.0f));
+        config->set("development.pruning_rate", 0.00001f * (enable_development ? 0.0f : 1.0f));
+        
+        // Set neuromodulation options
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", enable_curiosity);
+        config->set("neuromod.novelty.enable", enable_curiosity);
+        
+        return config;
+    }, py::arg("neuron_count") = 1000,
+       py::arg("region_count") = 2,
+       py::arg("connection_probability") = 0.1,
+       py::arg("enable_plasticity") = true,
+       py::arg("enable_development") = true,
+       py::arg("enable_curiosity") = true,
+       "Create advanced configuration with specified parameters");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Memory Management Functions
+    m.def("cleanup_memory", [](std::shared_ptr<Brain> brain) {
+        brain->reset();
+        return "Memory cleanup completed";
+    }, py::arg("brain"),
+          "Reset brain and clean up memory systems");
 
-} // namespace nlm
+    m.def("export_brain_state", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+       "Export brain state to file");
+
+    m.def("import_brain_state", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->load(filepath)) {
+            return brain;
+        } else {
+            throw std::runtime_error("Failed to load brain state from " + filepath);
+        }
+    }, py::arg("filepath"),
+       "Import brain state from file and return brain object");
+
+    // Example and Tutorial Functions
+    m.def("run_tutorial", []() {
+        py::list steps;
+        
+        // Tutorial step 1: Create brain
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        steps.append(py::dict("step", 1, "description", "Created brain", "neurons", brain->getTotalNeuronCount()));
+        
+        // Tutorial step 2: Run simulation
+        for (size_t i = 0; i < 100; ++i) {
+            brain->step(i);
+        }
+        steps.append(py::dict("step", 2, "description", "Ran simulation", "spikes", brain->getTotalSpikeCount()));
+        
+        // Tutorial step 3: Create agent
+        auto agent = std::make_shared<AgentBrain>(brain);
+        steps.append(py::dict("step", 3, "description", "Created agent brain interface"));
+        
+        // Tutorial step 4: Enable learning
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        steps.append(py::dict("step", 4, "description", "Enabled reward modulation and curiosity"));
+        
+        return steps;
+    }, "Run interactive tutorial and return steps");
+
+    m.def("create_brain_from_template", [](const std::string& template_name) {
+        auto config = std::make_shared<Config>();
+        
+        if (template_name == "beginner") {
+            // Simple configuration for beginners
+            config->set("neuron_count", 500);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.1);
+        } else if (template_name == "advanced") {
+            // Complex configuration for advanced users
+            config->set("neuron_count", 5000);
+            config->set("region_count", 4);
+            config->set("connection_probability", 0.15);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.005);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 2.0f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        } else if (template_name == "research") {
+            // Research-grade configuration
+            config->set("neuron_count", 10000);
+            config->set("region_count", 8);
+            config->set("connection_probability", 0.2);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.001);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.5f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("development.initial_plasticity", 1.2f);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("template_name"),
+       "Create brain from predefined template (beginner, advanced, research)");

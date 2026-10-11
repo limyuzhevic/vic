@@ -42,6 +42,95 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+### Example 1b: Enhanced Brain with Learning
+
+```python
+import pynlm
+
+# Step 1: Create a brain with learning enabled
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable advanced learning features
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Step 2: Run a learning simulation
+for i in range(500):
+    brain.step(i)
+    
+    # Print progress every 100 steps
+    if i % 100 == 0:
+        print(f"Step {i}:")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+
+print("Learning simulation complete!")
+```
+
+### Example 1c: Complete Agent in a World
+
+```python
+import pynlm
+
+# Step 1: Setup the brain and world
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Step 2: Enable learning and development
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Step 3: Run the complete agent simulation
+for step in range(1000):
+    # Update the world
+    world.update(0.1)
+    
+    # Get what the agent sees
+    percept = world.getSensoryPercept()
+    
+    # Tell the brain what it sees
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks/decides
+    brain.step(step)
+    
+    # Get action from brain
+    action = agent.decodeMotorCommand()
+    
+    # Do the action in the world
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print progress every 100 steps
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Agent position: ({world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f})")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+
+print("Agent simulation complete!")
+```
+
 ### Example 2: Brain in a Simple World
 
 ```python

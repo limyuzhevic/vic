@@ -68,6 +68,76 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
 
+# NLM (Neural Learning Machine) - HOW TO USE
+
+## Overview
+
+NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+
+This document covers:
+1. Building the C++ project from source
+2. Installing the Python library
+3. Using the NLM Python API
+
+---
+
+## Part 1: Building the C++ Project from Source
+
+### Prerequisites
+
+- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher
+- **Python**: 3.8+ (for Python bindings)
+- **pybind11**: Version 2.11.0+ (for Python bindings)
+
+### Build Steps
+
+```bash
+# Navigate to the project directory
+cd /path/to/nlm
+
+# Create a build directory
+mkdir -p build
+cd build
+
+# Configure with CMake (Release build for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_test` | Executable | Unit test suite |
+
+### Build Options
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Install to custom prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+```
+
 ---
 
 ## Part 2: Installing the Python Library
@@ -97,6 +167,20 @@ python -m build
 
 # Install specific build from wheel
 pip install dist/*.whl
+```
+
+### Verifying Installation
+
+```python
+import pynlm
+
+# Check version
+print(pynlm.__version__)
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
 
 ### Verifying Installation
@@ -276,20 +360,37 @@ brain.reset()                     # Reset brain state
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
 action = brain.produceAction()             # Get motor action
 
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
+# Advanced Brain Operations
+brain.injectCurrent(neuron_id, current)                    # Inject current to specific neuron
+brain.injectCurrentToNeurons(neuron_type, current)         # Inject current to neuron type
+brain.addRegion(name)                                      # Add new brain region
+brain.getRegion(region_id)                                 # Get region by ID
+brain.getTotalSpikeCount()                                 # Get total spike count
+brain.getAverageFiringRate()                              # Get average firing rate
+brain.getExcitationInhibitionRatio()                      # Get E/I balance
+brain.getDevelopmentalStage()                            # Get current development stage
+brain.setDevelopmentalStage(stage)                       # Set development stage
 
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+# Memory Systems Access
+brain.getWorkingMemory()           # Access working memory
+brain.getEpisodicMemory()          # Access episodic memory
+brain.getAssociativeMemory()       # Access associative memory
+brain.getPredictionSystem()        # Access prediction system
+brain.getPlanner()                 # Access neural planner
+brain.getConceptFormation()        # Access concept formation
+brain.getAttention()               # Access attention system
 
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+# Neuromodulation Systems
+brain.getDopamine()                # Access dopamine system
+brain.getCuriosity()               # Access curiosity system
+brain.getNovelty()                 # Access novelty detection
+brain.getPredictionErrorSignal()   # Access prediction error
+
+# State Management
+brain.save("checkpoint.bin")       # Save brain state
+brain.load("checkpoint.bin")       # Load brain state
+brain.logStatus()                  # Log brain status
+brain.develop()                    # Update development
 ```
 
 #### Config Class
@@ -309,6 +410,14 @@ config.set("learning.rate", 0.001)
 # File I/O
 config.loadFromFile("config.json")
 config.saveToFile("config.json")
+
+# Advanced Configuration Options
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("neuromod.dopamine.scale", 1.0)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+config.set("development.initial_plasticity", 1.0)
 ```
 
 #### AgentBrain Class
@@ -456,44 +565,207 @@ pynlm.WorldObjectType.Marker
 
 ## Part 5: Example Scripts
 
-### Minimal Example
+### Advanced Learning and Memory Example
 
 ```python
 import pynlm
+import time
 
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+def advanced_learning_example():
+    """Advanced example demonstrating memory systems and learning"""
+    
+    # 1. Create and initialize brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create agent and enable all subsystems
+    agent = pynlm.createAgentBrain(brain)
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    # 3. Configure memory systems
+    working_memory = brain.getWorkingMemory()
+    episodic_memory = brain.getEpisodicMemory()
+    
+    # 4. Run learning episodes
+    episodes_completed = 0
+    for episode in range(10):
+        print(f"=== Episode {episode + 1} ===")
+        
+        # Simulate with simple world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(7.5, 7.5)
+        agent.initialize(world)
+        
+        # Run episode steps
+        for step in range(200):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Apply reward
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            agent.updateDevelopment(0.1)
+            
+            if step % 50 == 0:
+                print(f"  Step {step}: Firing={brain.getFiringNeuronCount()}, "
+                      f"Curiosity={agent.getCuriosityLevel():.3f}, "
+                      f"Novelty={agent.getNoveltyLevel():.3f}")
+        
+        episodes_completed += 1
+        
+        # 5. Analyze learning progress
+        print(f"  Episode completed!")
+        print(f"  Memory traces: {working_memory.getActiveTraces() if working_memory else 'N/A'}")
+        print(f"  Episodes stored: {episodic_memory.getEpisodeCount() if episodic_memory else 'N/A'}")
+        print(f"  Development stage: {brain.getDevelopmentalStage()}")
+    
+    # 6. Save learned brain state
+    brain.save("advanced_learning_checkpoint.bin")
+    print("Advanced learning complete! Brain saved to advanced_learning_checkpoint.bin")
+    return episodes_completed
 
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
+# Run advanced example
+advanced_learning_example()
 ```
 
-### Environment Interaction
+### Development and Plasticity Example
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+def developmental_plasticity_example():
+    """Example showing developmental changes and plasticity effects"""
+    
+    # 1. Create brain with plasticity enabled
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create agent
+    agent = pynlm.createAgentBrain(brain)
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    
+    print("=== Developmental Plasticity Study ===")
+    print("Initial state:")
+    brain.logStatus()
+    
+    # 3. Simulate developmental progression
+    for day in range(10):  # Simulate 10 "days"
+        # Simulate one "day" of experience
+        for step in range(100):
+            brain.step(step)
+            
+            # Apply reward to drive plasticity
+            reward = 1.0 if step % 20 == 0 else 0.1
+            agent.applyRewardModulation(reward, 0.0)
+            agent.updateDevelopment(1.0)  # 1 "day"
+        
+        # Record developmental stage
+        stage = brain.getDevelopmentalStage()
+        plasticity_modifier = agent.getBrain().getDevelopmentSystem().getPlasticityModifier()
+        
+        print(f"Day {day + 1}: Stage={stage}, Plasticity={plasticity_modifier:.3f}")
+        
+        # Log structural plasticity effects
+        sp = brain.getStructuralPlasticity()
+        if sp:
+            print(f"  Synapses: {brain.getTotalSynapseCount()}, "
+                  f"Synaptogenesis rate: {sp.getSynaptogenesisRate():.6f}, "
+                  f"Pruning rate: {sp.getPruningRate():.6f}")
+    
+    # 4. Compare before/after development
+    print("\n=== Developmental Effects Analysis ===")
+    print("Final state:")
+    brain.logStatus()
+    
+    # Save developed brain
+    brain.save("developed_brain.bin")
+    print("Developmental study complete! Brain saved to developed_brain.bin")
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+developmental_plasticity_example()
+```
+
+### Performance and Benchmarking Example
+
+```python
+import pynlm
+import time
+import statistics
+
+def performance_benchmark(brain_size=1000, simulation_steps=1000, num_runs=5):
+    """Benchmark brain performance with different configurations"""
+    
+    print(f"=== Performance Benchmark ===")
+    print(f"Brain size: {brain_size} neurons, Steps: {simulation_steps}, Runs: {num_runs}")
+    print()
+    
+    times = []
+    firing_rates = []
+    spike_counts = []
+    
+    for run in range(num_runs):
+        # Create brain with specified size
+        config = pynlm.createDefaultConfig()
+        config.set("neuron_count", brain_size)
+        config.set("region_count", 2)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Time the simulation
+        start_time = time.time()
+        
+        for step in range(simulation_steps):
+            brain.step(step)
+        
+        end_time = time.time()
+        elapsed = end_time - start_time
+        times.append(elapsed)
+        firing_rates.append(brain.getAverageFiringRate())
+        spike_counts.append(brain.getTotalSpikeCount())
+        
+        print(f"Run {run + 1}: {elapsed:.3f}s, "
+              f"Firing rate: {brain.getAverageFiringRate():.3f}, "
+              f"Total spikes: {brain.getTotalSpikeCount()}")
+    
+    # Calculate statistics
+    print()
+    print("=== Performance Statistics ===")
+    print(f"Time per step (average): {statistics.mean(times)/simulation_steps:.6f}s")
+    print(f"Time per step (median): {statistics.median(times)/simulation_steps:.6f}s")
+    print(f"Time per step (min): {min(times)/simulation_steps:.6f}s")
+    print(f"Time per step (max): {max(times)/simulation_steps:.6f}s")
+    print(f"Time coefficient of variation: {statistics.stdev(times)/statistics.mean(times):.3f}")
+    print()
+    print(f"Average firing rate: {statistics.mean(firing_rates):.3f} ± {statistics.stdev(firing_rates):.3f}")
+    print(f"Average spike count: {statistics.mean(spike_counts):.0f} ± {statistics.stdev(spike_counts):.0f}")
+    
+    return {
+        'times': times,
+        'firing_rates': firing_rates,
+        'spike_counts': spike_counts,
+        'mean_time_per_step': statistics.mean(times)/simulation_steps,
+        'std_time_per_step': statistics.stdev(times)/(simulation_steps * statistics.mean(times))
+    }
+
+# Run benchmark with different brain sizes
+results_small = performance_benchmark(brain_size=500, simulation_steps=500, num_runs=3)
+results_medium = performance_benchmark(brain_size=1000, simulation_steps=1000, num_runs=3)
+results_large = performance_benchmark(brain_size=2000, simulation_steps=1000, num_runs=3)
+
+print("\n=== Scaling Analysis ===")
+print(f"Small brain (500 neurons): {results_small['mean_time_per_step']*1000:.3f}ms per step")
+print(f"Medium brain (1000 neurons): {results_medium['mean_time_per_step']*1000:.3f}ms per step")
+print(f"Large brain (2000 neurons): {results_large['mean_time_per_step']*1000:.3f}ms per step")
 ```
 
 ---
