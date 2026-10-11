@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstring> // For strcasecmp
 
 namespace nlm {
 
@@ -19,8 +20,128 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2 IMPROVEMENT: Enhanced file format detection and parsing
+    std::string ext = getFileExtension(filepath);
+    
+    if (ext == "json") {
+        return loadFromJSON(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Fallback to original simple key=value format
+        return loadFromSimple(filepath);
+    }
+}
+
+bool Config::loadFromSimple(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Convert JSON to Config entries
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value;
+            
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number_integer()) {
+                value = it->get<int64_t>();
+            } else if (it->is_number_unsigned()) {
+                value = it->get<uint64_t>();
+            } else if (it->is_number_float()) {
+                value = it->get<double>();
+            } else if (it->is_boolean()) {
+                value = it->get<bool>();
+            } else {
+                // Convert complex types to string representation
+                value = it->dump();
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // YAML parsing would require yaml-cpp library
+        // For now, fallback to simple format
+        NLM_LOG_WARN("YAML format not available, falling back to simple format");
+        return loadFromSimple(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("YAML parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+std::string Config::getFileExtension(const std::string& filename) {
+    size_t pos = filename.rfind('.');
+    if (pos == std::string::npos) return "";
+    
+    std::string ext = filename.substr(pos + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    // Remove possible compression extensions
+    if (ext == "gz") {
+        size_t gzp = filename.rfind('.', pos - 1);
+        if (gzp != std::string::npos) {
+            ext = filename.substr(gzp + 1, pos - gzp - 2);
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        }
+    }
+    
+    return ext;
+}
     
     std::ifstream file(filepath);
     if (!file.is_open()) {

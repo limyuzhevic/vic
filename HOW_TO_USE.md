@@ -1,533 +1,287 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM - How To Use
 
-## Overview
+# Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM (熙然, "serene flow") is an experimental artificial developmental brain project. This document covers how to build, run, and extend NLM.
 
-This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+# Building
 
----
+## Prerequisites
 
-## Part 1: Building the C++ Project from Source
+- CMake 3.16 or higher
+- C++20 compiler (g++ 11+, clang 14+, MSVC 2022)
+- Make or Ninja build system
 
-### Prerequisites
-
-- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
-- **CMake**: Version 3.16 or higher
-- **Python**: 3.8+ (for Python bindings)
-- **pybind11**: Version 2.11.0+ (for Python bindings)
-
-### Build Steps
+## Standard Build
 
 ```bash
-# Navigate to the project directory
-cd /path/to/nlm
-
-# Create a build directory
-mkdir -p build
+mkdir build
 cd build
-
-# Configure with CMake (Release build for best performance)
 cmake .. -DCMAKE_BUILD_TYPE=Release
-
-# Build all targets
-make -j$(nproc)
-
-# Run tests (if built)
-ctest --output-on-failure
+make -j4
 ```
 
-### Build Outputs
-
-After successful compilation, you will have:
-
-| Target | Type | Description |
-|--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
-| `nlm_core` | Static Library | Core brain components |
-| `nlm_agent` | Static Library | Agent system |
-| `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
-
-### Build Options
+## Debug Build
 
 ```bash
-# Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
-
-# Install to custom prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
+mkdir debug_build
+cd debug_build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_BUILD_TYPE=Debug
+make -j4
 ```
 
----
-
-## Part 2: Installing the Python Library
-
-### From Source (Recommended for Development)
+## Install (Optional)
 
 ```bash
-# Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
-
-# Build and install
-pip install .
-
-# Or install in development mode
-pip install -e .
+cd build
+sudo make install
 ```
 
-### Using pyproject.toml (Modern Python Packaging)
+# Running Examples
+
+## Phase 2: Basic Neural Computation
 
 ```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
-
-# Build only (without installing)
-pip install build
-python -m build
-
-# Install specific build from wheel
-pip install dist/*.whl
+cd build/./nlm
 ```
 
-### Verifying Installation
+This runs the Phase 2 demo showing real LIF neuron dynamics, synaptic plasticity, and learning experiments.
 
-```python
-import pynlm
+**Key Features Demonstrated:**
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays  
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+- Learning experiment with measurable synaptic changes
 
-# Check version
-print(pynlm.__version__)
+## Phase 3: World Interaction
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+```bash
+cd build/./nlm_phase3_demo
 ```
 
----
+This demo shows an agent learning to interact with a simple world through sensory input and motor output.
 
-## Part 3: Using the Python Library
+## Phase 4: Cognitive Development
 
-### Basic Usage
-
-#### Creating a Brain
-
-```python
-import pynlm
-
-# Create a default configuration
-config = pynlm.createDefaultConfig()
-
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```bash
+cd build/./nlm_phase4_demo
 ```
 
-#### Running a Simulation
+This demonstrates cognitive abilities including planning, concept formation, and social learning.
 
-```python
-import pynlm
+## Phase 6: Full Integration
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+```bash
+cd build/./nlm_phase6_demo
 ```
 
-#### Creating a Simple World
-
-```python
-import pynlm
-
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
-```
-
-### Complete Agent Example
-
-```python
-import pynlm
-
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
-```
-
-### Key Classes and Methods
-
-#### Brain Class
-
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
+**Most Comprehensive Test:**
+- Integration verification across all brain systems
+- Memory systems (working + episodic) integration
+- Neuromodulation (dopamine, curiosity, novelty) integration
+- Prediction system integration
+- Cognitive systems (planner, concept formation, attention) integration
+- Development system integration
+- Checkpoint save/load functionality
+- Replay and consolidation capabilities
 
 # Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
+## File-Based Configuration
 
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
+Use `configs/default.cfg` or create custom config files:
 
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
+```
+# NLM Configuration File
+# neuron_count: Number of neurons (default: 500)
+neuron_count = 1000
 
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
+# region_count: Number of brain regions (default: 1)
+region_count = 4
 
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+# connection_probability: Probability of synaptic connections (default: 0.15)
+connection_probability = 0.2
+
+# stdp_ltp_weight: STDP long-term potentiation weight (default: 0.02)
+stdp_ltp_weight = 0.015
+
+# stdp_ltd_weight: STDP long-term depression weight (default: 0.015)
+stdp_ltd_weight = 0.018
+
+# simulation_timestep: Simulation timestep in seconds (default: 0.001)
+simulation_timestep = 0.0005
+
+# random_seed: Random number generator seed (default: 42)
+random_seed = 12345
 ```
 
-### Enumerations
+## Command Line Override
 
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+```bash
+./nlm --neuron_count=2000 --region_count=8 --connection_probability=0.25 --random_seed=99999
 ```
 
----
+**Command Line Arguments:**
+- `--config=file.cfg` - Load specific config file
+- `--key=value` - Override specific config value
+- `-k value` - Alternative short format
 
-## Part 4: Configuration Options
+# Python Bindings
 
-### Brain Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
+NLM includes Python bindings for programmatic control:
 
 ```python
-import pynlm
+import nlm_py
 
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Create brain configuration
+config = nlm_py.Config()
+config.set("neuron_count", 1000)
+config.set("region_count", 4)
+
+# Create and initialize brain
+brain = nlm_py.Brain(config)
 brain.initialize()
 
-# Simulate
-for i in range(100):
-    brain.step(i)
+# Run simulation
+for step in range(1000):
+    brain.step(step, step * 0.001)
 
-print("Simulation complete!")
+# Get statistics
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing rate: {brain.getAverageFiringRate()}")
 ```
 
-### Environment Interaction
+# Development and Extension
 
-```python
-import pynlm
+## Adding New Brain Regions
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+1. Create new header file in `src/core/Regions/`
+2. Implement in corresponding `src/core/Regions/*.cpp`
+3. Register in `src/brain/Brain.hpp`/`Brain.cpp`
+4. Update CMakeLists.txt if needed
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
-```
+## Adding New Plasticity Rules
 
----
+1. Create rule class inheriting from `PlasticityRule`
+2. Implement `update()` method
+3. Register in `PlasticityRule.hpp` namespace
+4. Configure in brain initialization
 
-## Troubleshooting
+## Adding New Modulators
 
-### Build Issues
+1. Create new header in `src/neuromodulation/`
+2. Implement integration with brain system
+3. Update `Neuromodulator.hpp` factory pattern
 
-**CMake cannot find Python:**
+## Running Custom Experiments
+
+1. Create new experiment class inheriting from `Experiment`
+2. Implement required virtual methods
+3. Register in `ExperimentRunner.hpp`
+4. Run via `Phase6IntegratedExperiment` or custom main
+
+# Testing
+
+## Running Unit Tests
+
 ```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+cd tests
+./test_runner
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+Individual test binaries:
+- `./test_brain` - Brain system tests
+- `./test_neuron` - Neuron dynamics tests
+- `./test_synapse` - Synapse behavior tests
+- `./test_stdp` - Spike-timing dependent plasticity
+- `./test_clock` - Simulation timing
+- `./test_config` - Configuration loading
+- `./test_random` - Random number generation
+- `./test_types` - Type system tests
 
-### Runtime Issues
+## Running Integration Tests
 
-**ImportError: No module named 'pynlm':**
 ```bash
-pip install --force-reinstall .
+cd build
+./nlm_phase6_demo
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+This runs comprehensive integration tests verifying all systems work together.
 
----
+# Troubleshooting
 
-## Further Reading
+## Build Failures
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+**Missing CMake dependencies:**
+```bash
+sudo apt-get install build-essential cmake
+# or on macOS:
+brew install cmake
+```
+
+**Compiler errors:**
+- Ensure C++20 support: `-std=c++20` or equivalent
+- Check compiler version (g++ 11+, clang 14+)
+
+## Runtime Errors
+
+**"Failed to initialize brain!"**
+- Check configuration values
+- Verify system resources (memory, file descriptors)
+- Ensure all required .cpp files are compiled
+
+**Python bindings not found:**
+- Ensure pybind11 is installed: `pip install pybind11`
+- Build Python extensions: `python3 setup.py build_ext --inplace`
+
+# Performance Optimization
+
+## Large Networks
+
+For networks >10,000 neurons:
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_OPTIMIZATIONS=ON
+```
+
+## Debugging
+
+Use debug build with logging:
+```bash
+cd debug_build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j4
+cd ../build
+./nlm --verbose
+```
+
+# Advanced Topics
+
+## Custom Configuration Parsers
+
+Replace the simple INI parser in `Config.cpp` with:
+- JSON parser (nlohmann/json)
+- YAML parser (yaml-cpp) 
+- TOML parser (toml11)
+
+## Memory Management
+
+NLM uses custom memory pools:
+- `MemoryPool.hpp` - General purpose allocation
+- `EventQueue.hpp` - High-performance event handling
+- SIMD vectorization for neural computations
+
+## Parallel Processing
+
+Enable for multi-core systems:
+```bash
+cmake .. -DNLM_PARALLEL=ON -DNLM_THREADS=8
+```
+
+# License
+
+MIT License. See LICENSE file for details.
+
+# Authors
+
+Research project - See docs/ for scientific background and implementation details.
