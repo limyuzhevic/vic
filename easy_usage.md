@@ -104,53 +104,238 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## Quick Start (Copy & Paste)
 
-### Pattern 1: Run a Simulation
+### Example 1: Simplest Brain
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
+import pynlm
+
+# Step 1: Make a brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Step 2: Turn it on
+brain.initialize()
+
+# Step 3: Make it think for 100 steps
+for i in range(100):
+    brain.step(i)  # One step of thinking
+
+print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+```
+
+### Example 2: Brain in a Simple World (With Context Manager)
+
+```python
+import pynlm
+
+# Use context manager for automatic cleanup
+with pynlm.SimpleWorld() as world:
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+
+    # Run for 50 steps with enhanced error handling
+    for step in range(50):
+        try:
+            world.update(0.1)  # Update world
+            percept = world.getSensoryPercept()  # What does the agent see?
+            agent.processSensoryInput(percept)  # Brain sees it
+            brain.step(step)  # Brain thinks
+            action = agent.decodeMotorCommand()  # Brain decides action
+            world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+        except pynlm.NLMException as e:
+            print(f"Simulation error at step {step}: {e}")
+            break
+
+print("Simulation finished!")
+print("Firing neurons:", brain.firing_neurons)
+print("Total spikes:", brain.total_spikes)
+```
+
+### Example 3: Batch Operations for Performance
+
+```python
+import pynlm
+import numpy as np
+
+# Create brain and world
+config = pynlm.createDefaultConfig()
+brain = pynlm.Brain(config)
+world = pynlm.SimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Collect sensory percepts for batch processing
+percepts = []
+for step in range(100):
+    world.update(0.1)
+    percepts.append(world.getSensoryPercept())
+
+# Process all percepts at once using batch operations
+print("Processing percepts with batch operations...")
+actions = agent.processBatchPercepts(percepts)
+print(f"Processed {len(actions)} actions in batch")
+
+# Simulate all steps at once using batch processing
+print("Running batch simulation...")
+brain.batchStep(list(range(100)))
+
+# Access performance metrics
+metrics = brain.getPerformanceMetrics()
+print(f"Performance metrics: {metrics}")
+```
+
+### Example 4: NumPy Integration
+
+```python
+import pynlm
+import numpy as np
+
+# Create vision data using NumPy
+vision_data = np.random.randn(8, 8, 3).astype(np.float32)
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create vision sensory input
+vision = pynlm.Vision(8, 8, 3)
+vision.setData(vision_data)  # Direct NumPy array support
+
+print(f"Vision shape: {vision.getWidth()}x{vision.getHeight()}x{vision.getChannels()}")
+
+# Convert vision back to NumPy
+numpy_array = vision.getDataAsNumpy()
+print(f"Vision as NumPy array shape: {numpy_array.shape}")
+print(f"Vision array dtype: {numpy_array.dtype}")
+
+# NumPy mathematical operations
+normalized = np.apply_along_axis(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-8), axis=None, arr=numpy_array)
+print(f"Normalized range: [{normalized.min():.3f}, {normalized.max():.3f}]")
+```
+
+### Example 5: Performance Monitoring and Progress Tracking
+
+```python
+import pynlm
+
+# Create brain with configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.Brain(config)
+
+# Use context manager for automatic cleanup
+with pynlm.SimpleWorld() as world:
+    world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable advanced features
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agent.enableStructuralPlasticity(True)
+
+    # Run simulation with progress tracking
+    total_steps = 500
+    print(f"Starting simulation with {total_steps} steps...")
+    
+    for step in range(total_steps):
+        # Update world and get sensory input
         world.update(0.1)
-        
-        # 2. Get what the agent sees
         percept = world.getSensoryPercept()
         
-        # 3. Tell the brain
+        # Process sensory input
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # Brain step
         brain.step(step)
         
-        # 5. Get action from brain
+        # Decode action
         action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
         world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Print progress every 100 steps
+        if step % 100 == 0:
+            progress = brain.getProgressInfo(total_steps)
+            print(f"Step {step}: {progress['estimated_progress']:.1f}% complete")
+            print(f"  Active neurons: {brain.active_neurons}")
+            print(f"  Total spikes: {brain.total_spikes}")
+            print(f"  Curiosity level: {agent.curiosity_level:.3f}")
+            print(f"  Novelty level: {agent.novelty_level:.3f}")
+            print()
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+print("Simulation complete!")
+print("Final metrics:", brain.getPerformanceMetrics())
 ```
 
-### Pattern 2: Get Brain Stats
+### Example 6: Visualization and Reporting
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
+import pynlm
 
-### Pattern 3: Enable Brain Features
+# Create brain and run some simulation
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+world = pynlm.SimpleWorld()
 
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+# Add some objects to visualize
+for i in range(5):
+    obj = pynlm.WorldObject(i * 2.0, i * 2.0, pynlm.WorldObjectType.Resource, value=1.0)
+    world.addObject(obj)
+
+# Run simulation
+brain.initialize(world)
+for step in range(100):
+    world.update(0.1)
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+
+# Collect data for visualization
+brain_activity = []
+for step in range(50):
+    # In real implementation, you would collect actual brain activity data
+    firing_rate = brain.getFiringNeuronCount() / max(brain.getTotalNeuronCount(), 1)
+    brain_activity.append((step * 0.1, firing_rate))
+
+sensory_data = []
+for step in range(50):
+    vision = world.getSensoryPercept().getVision()
+    data = vision.getDataAsFlat()
+    sensory_data.append(data)
+
+connectivity = []
+for i in range(brain.getTotalNeuronCount()):
+    for j in range(i + 1, brain.getTotalNeuronCount()):
+        if np.random.random() < 0.01:  # Random connections
+            connectivity.append((i, j))
+
+# Generate visualizations
+brain.visualizeBrainActivity("brain_activity.csv", brain_activity)
+brain.visualizeSensoryInput("sensory_input.csv", sensory_data)
+brain.visualizeNeuralConnectivity("connectivity.csv", connectivity, brain.getTotalNeuronCount())
+
+# Generate comprehensive report
+sections = {
+    "Simulation Overview": f"Total steps: 50, Total neurons: {brain.getTotalNeuronCount()}, Total synapses: {brain.getTotalSynapseCount()}",
+    "Performance Metrics": f"Average firing rate: {brain.getAverageFiringRate():.3f}, E/I ratio: {brain.getExcitationInhibitionRatio():.3f}",
+    "Development Stage": f"Current stage: {brain.developmental_stage}",
+    "Neuromodulation": f"Dopamine: {agent.getNeuromodulationLevel():.3f}, Curiosity: {agent.getCuriosityLevel():.3f}, Novelty: {agent.getNoveltyLevel():.3f}"
+}
+
+brain.generateReport("simulation_report.md", "NLM Simulation Report", sections)
+
+print("Visualizations and report generated!")
 ```
 
 ---
