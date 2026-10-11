@@ -6,8 +6,15 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/ParallelProcessing.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/SparseConnectivity.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
+#include <atomic>
 
 namespace nlm {
 
@@ -29,20 +36,20 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
+// Performance infrastructure
+class VectorizedLIF;
+class ParallelNeuralProcessor;
+class MemoryPool<Neuron>;
+class MemoryPool<Synapse>;
+class SparseConnectivity;
+class SpikeRingBuffer;
+class DelayedSpikeQueue;
+
+// Phase 2: Real neural computation components
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/nlm_cli.dir/src/nlm_cli.cpp.o CMakeFiles/nlm_cli.dir/src/SimulationController.cpp.o CMakeFiles/nlm_cli.dir/src/NLMCLIApp.cpp.o CMakeFiles/nlm_cli.dir/src/nlm_cli_main.cpp.o -o nlm_cli  libnlm_core.a 

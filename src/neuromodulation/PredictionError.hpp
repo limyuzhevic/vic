@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -13,7 +14,7 @@ public:
     ~PredictionError();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
     // Get error value
     float getError() const;
