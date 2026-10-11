@@ -153,6 +153,7 @@ struct Brain::Impl {
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
+    // Development state
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };

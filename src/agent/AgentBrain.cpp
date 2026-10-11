@@ -218,7 +218,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int32_t choice = brain_->getRandomGenerator()->uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(7));
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -287,14 +287,14 @@ void AgentBrain::updateDevelopment(double timestep) {
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
     if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+plasticityModifier_ = 1.0f;  // High plasticity
+        brain_->setDevelopmentalStage(DevelopmentStage::Initial);
     } else if (developmentalAge_ < 300.0) {  // ~5 minutes
         plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+        brain_->setDevelopmentalStage(DevelopmentStage::CriticalPeriod);
     } else if (developmentalAge_ < 900.0) {  // ~15 minutes
         plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
+        brain_->setDevelopmentalStage(DevelopmentStage::Maturation);
     } else {
         plasticityModifier_ = 0.2f;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
