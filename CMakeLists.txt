@@ -11,6 +11,24 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Performance optimizations enabled by default
+add_compile_definitions(NLM_PERFORMANCE_ENABLED)
+
+# SIMD optimization level
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
+
+# Multithreading configuration
+set(NLM_THREAD_COUNT "auto" CACHE STRING "Number of threads to use (auto or specific number)")
+if(NLM_THREAD_COUNT STREQUAL "auto")
+    find_program(NPROC nproc)
+    if(NPROC)
+        execute_process(COMMAND ${NPROC} OUTPUT_VARIABLE CPU_COUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
+        add_compile_definitions(NLM_THREAD_COUNT=${CPU_COUNT})
+    endif()
+else()
+    add_compile_definitions(NLM_THREAD_COUNT=${NLM_THREAD_COUNT})
+endif()
+
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)

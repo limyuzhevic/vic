@@ -26,8 +26,8 @@ public:
     virtual const char* getName() const = 0;
     
     // Check if rule is enabled
-    bool isEnabled() const;
-    void setEnabled(bool enabled);
+    bool isEnabled() const { return enabled_; }
+    void setEnabled(bool enabled) { enabled_ = enabled; }
     
 protected:
     PlasticityRule() : enabled_(true) {}
