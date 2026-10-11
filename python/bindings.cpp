@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -416,10 +417,169 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Continue with existing bindings...
+
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(
+        Dopamine neuromodulator for reward-based learning
+        
+        Implements reward prediction error processing and modulates
+        neural excitability and plasticity. Key to reward-based learning
+        and curiosity-driven exploration.
+        )pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Dopamine::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get current dopamine level (normalized -1 to 1)")
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"),
+             "Set dopamine level (automatically clamped to [-1, 1])")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get plasticity modulation factor (1.0 = baseline)")
+        .def("update", &Dopamine::update, py::arg("dt"),
+             "Update dopamine state (evaporates over time)")
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"),
+             "Signal reward (positive) or prediction error")
+        .def("signalPredictionError", &Dopamine::signalPredictionError,
+             py::arg("error"), "Signal prediction error")
+        .def("getPredictionError", &Dopamine::getPredictionError,
+             "Get prediction error for internal computation")
+        .def("getReward", &Dopamine::getReward,
+             "Get recent reward value")
+        .def("reset", &Dopamine::reset,
+             "Reset dopamine state to initial values")
+        .def("getLevelHistory", &Dopamine::getLevelHistory,
+             "Get history of dopamine levels")
+        .def("getErrorHistory", &Dopamine::getErrorHistory,
+             "Get history of prediction errors")
+        .def("getRewardHistory", &Dopamine::getRewardHistory,
+             "Get history of reward signals")
+        .def("clearHistory", &Dopamine::clearHistory,
+             "Clear all history data")
+        .def("setLearningRate", &Dopamine::setLearningRate, py::arg("rate"),
+             "Set learning rate (0.0 to 1.0)")
+        .def("setEvaporationRate", &Dopamine::setEvaporationRate, py::arg("rate"),
+             "Set evaporation rate (0.5 to 0.999)")
+        .def("setResponseGain", &Dopamine::setResponseGain, py::arg("gain"),
+             "Set response gain (0.0 to 10.0)")
+        .def("getLearningRate", &Dopamine::getLearningRate,
+             "Get current learning rate")
+        .def("getEvaporationRate", &Dopamine::getEvaporationRate,
+             "Get current evaporation rate")
+        .def("getResponseGain", &Dopamine::getResponseGain,
+             "Get current response gain");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration with optimal Phase 6 settings");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create a new brain with configuration and initialize it");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world with default parameters");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("runPhase6Demo", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                            std::shared_ptr<AgentBrain> agent, int steps) {
+        world->reset();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getFiringNeuronCount(),
+            brain->getAverageFiringRate()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run Phase 6 integration demo with automatic initialization");
+
+    m.def("createLearningExperiment", [](std::shared_ptr<Brain> brain, uint64_t seed) {
+        auto experiment = std::make_shared<LearningExperiment>(brain, seed);
+        experiment->recordInitialState();
+        return experiment;
+    }, py::arg("brain"), py::arg("seed"),
+       "Create a learning experiment to measure synaptic changes");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Version and metadata
+    m.attr("__version__") = "0.1.0 (Phase 6 - Final Integration)";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__description__") = "An experimental artificial developmental brain system";
+
+    // Documentation
+    m.attr("__doc__") = R"pbdoc(
+    NLM (熙然) - Neural Learning Machine
+    ====================================
+    
+    Phase 6: Final Integration - A complete artificial brain simulation
+    
+    NLM implements a biologically-inspired computational brain capable of:
+    
+    • **Neural Computation**: Spiking neural dynamics with LIF neurons
+    • **Memory Systems**: Working, episodic, and associative memory
+    • **Learning**: STDP, Hebbian, and reward-modulated plasticity
+    • **Development**: Stage-based maturation and structural plasticity
+    • **Prediction**: Temporal sequence learning and forward modeling
+    • **Cognition**: Attention, planning, and self-awareness
+    • **Neuromodulation**: Dopamine, curiosity, and novelty signals
+    
+    Key Features:
+    - Event-driven spike processing for efficiency
+    - Multi-layered architecture (Phase 1-6)
+    - Python bindings for easy interaction
+    - Deterministic experiments with configurable seeds
+    - Checkpoint save/load for persistent brains
+    - Integrated learning and memory systems
+    
+    Getting Started:
+    ```python
+    import pynlm
+    
+    # Create brain with default config
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    # Run for some steps
+    for i in range(100):
+        brain.step(i)
+    
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Active neurons: {brain.getFiringNeuronCount()}")
+    ```
+    
+    For advanced usage, explore the AgentBrain interface for world interaction
+    and the experiment framework for systematic testing.
+    )pbdoc";
+
+    // Error handling setup
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "KeyError");
+
+    // Custom exceptions for NLM-specific errors
+    py::register_exception<std::runtime_error>(m, "NLMError", PyExc_RuntimeError);
+    py::register_exception<std::invalid_argument>(m, "InvalidArgument", PyExc_ValueError);
 }
 
 } // namespace nlm
+
