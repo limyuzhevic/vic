@@ -21,6 +21,9 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
+    // Update prediction error with new value
+    void updatePredictionError(float error);
+    
     // Get prediction error
     float getPredictionError() const;
     
@@ -31,7 +34,10 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model with pattern vector
+    void train(const std::vector<float>& pattern);
+    
+    // Train prediction model with sensory input
     void train(const SensoryInput& observation);
     
 private:

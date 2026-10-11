@@ -511,8 +511,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // For now, get prediction error from neuromodulation system
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            predictionError = pImpl->predictionError->getLevel();
+        }
+        
+        // Use prediction error to update prediction system
+        pImpl->predictionSystem->updatePredictionError(predictionError);
+        
+        // Process sensory patterns for prediction
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Create a simple sensory state vector for prediction
+            std::vector<float> sensoryPattern;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                sensoryPattern.push_back(state.membranePotential);
+            }
+            
+            // Train prediction system with current sensory patterns
+            pImpl->predictionSystem->train(sensoryPattern);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,17 +544,114 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply attention modulation to neural excitability
+        std::vector<NeuronId> attendedNeurons = pImpl->attention->getWinners();
+        for (const auto& neuronId : attendedNeurons) {
+            // Boost activity of attended neurons
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == neuronId) {
+                        // Apply attention boost as additional current
+                        neuron->injectCurrent(0.5f);
+                        break;
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Create concept formation input from working memory and attention
+        
+        std::vector<float> conceptInput;
+        
+        // Add working memory activations
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (const auto& neuronId : memoryNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                conceptInput.push_back(activation);
+            }
+        }
+        
+        // Add attention-weighted neural activity
+        if (pImpl->attention) {
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (pImpl->attention->isAttended(neuron->getId())) {
+                        const auto& state = neuron->getState();
+                        conceptInput.push_back(state.membranePotential * pImpl->attention->getInhibitionFor(neuron->getId()));
+                    }
+                }
+            }
+        }
+        
+        // Train concept formation with current patterns
+        if (!conceptInput.empty()) {
+            pImpl->conceptFormation->updateConcept(conceptInput);
+        }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // ========== STEP 10.5: Neural planning and action selection ==========
+    if (pImpl->planner) {
+        // Use NeuralPlanner to plan action based on current neural state and concepts
+        // This is the cognitive planning stage - not just reactive but predictive
+        
+        // Create current state vector for planning
+        // Include working memory, concept prototypes, and current goals
+        std::vector<float> currentState;
+        
+        // Add working memory activations
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (const auto& neuronId : memoryNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                currentState.push_back(activation);
+            }
+        }
+        
+        // Add concept information from concept formation
+        if (pImpl->conceptFormation) {
+            for (const auto& concept : pImpl->conceptFormation->getConcepts()) {
+                // Add concept stability as a feature for planning
+                currentState.push_back(concept.avgStability);
+                
+                // Add category hint as a feature
+                static const std::unordered_map<std::string, float> categoryValue = {
+                    {"rewarding", 1.0f},
+                    {"harmful", -1.0f},
+                    {"neutral", 0.0f}
+                };
+                
+                float categoryValue = 0.0f;
+                auto it = categoryValue.find(concept.categoryHint);
+                if (it != categoryValue.end()) {
+                    categoryValue = it->second;
+                }
+                currentState.push_back(categoryValue);
+            }
+        }
+        
+        // Set target reward for planning - could come from dopamine system
+        float targetReward = 0.5f;
+        if (pImpl->dopamine) {
+            targetReward = pImpl->dopamine->getLevel() * 0.5f + 0.25f;
+        }
+        
+        // Plan action using neural planner
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Store planned action for potential use
+        // Note: In a full implementation, this would integrate with motor system
+        if (plannedAction != ActionType::Wait) {
+            NLM_LOG_DEBUG("NeuralPlanner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========

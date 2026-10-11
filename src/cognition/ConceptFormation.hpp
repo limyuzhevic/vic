@@ -117,6 +117,10 @@ public:
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
                       const std::vector<float>& features, float reward);
 
+    // Update concept with pattern (simplified version for neural integration)
+    // This is a convenience method for brain integration - treats current pattern as an instance
+    void updateConcept(const std::vector<float>& pattern);
+
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
                           const std::vector<float>& b) const;

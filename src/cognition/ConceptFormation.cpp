@@ -296,6 +296,40 @@ void ConceptFormation::clear() {
     nextConceptId_ = 1;
 }
 
+void ConceptFormation::updateConcept(const std::vector<float>& pattern) {
+    // Convenience method for brain integration
+    // Creates an "instance" pattern from current neural activity
+    // This is used by the brain integration to train concepts on current neural states
+    
+    // Create dummy features for concept formation
+    std::vector<float> features;
+    
+    // Use a neutral reward value
+    float reward = 0.0f;
+    
+    // Check if this pattern belongs to any existing concept
+    size_t existingConcept = findConceptForPattern(pattern);
+    
+    if (existingConcept > 0) {
+        // Update existing concept with this instance
+        updateConcept(existingConcept, pattern, features, reward);
+    } else {
+        // Check if it's novel enough to create a new concept
+        if (isNovel(pattern)) {
+            // Create new concept from this pattern
+            size_t newConceptId = createConcept(pattern, features, reward);
+            
+            if (newConceptId > 0) {
+                NLM_LOG_INFO("ConceptFormation: Updated concept " + std::to_string(newConceptId) +
+                           " with neural activity pattern");
+            }
+        } else {
+            // Pattern is similar to an existing concept but below threshold
+            // Don't create new concept for this instance
+        }
+    }
+}
+
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {
     Brain* brain;

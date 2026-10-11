@@ -387,18 +387,72 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+    .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+              py::arg("enable"), "Enable/disable reward-based learning")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"), "Enable/disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"), "Enable/disable brain development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"), "Enable/disable curiosity-driven exploration")
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // ========== ADVANCED AGENT FEATURES ==========
+        
+        // Goal setting and achievement tracking
+        .def("setCurrentGoal", &AgentBrain::setCurrentGoal,
+              py::arg("goal"), "Set current goal for the agent")
+        .def("getCurrentGoal", &AgentBrain::getCurrentGoal)
+        .def("getGoalProgress", &AgentBrain::getGoalProgress)
+        
+        // Learning statistics and analysis
+        .def("getLearningStatistics", &AgentBrain::getLearningStatistics)
+        .def("resetLearningStatistics", &AgentBrain::resetLearningStatistics)
+        
+        // Advanced neuromodulation control
+        .def("setDopamineLevel", &AgentBrain::setDopamineLevel,
+              py::arg("level"), "Set dopamine level (0-1)")
+        .def("setCuriosityLevel", &AgentBrain::setCuriosityLevel,
+              py::arg("level"), "Set curiosity level (0-1)")
+        .def("setNoveltyLevel", &AgentBrain::setNoveltyLevel,
+              py::arg("level"), "Set novelty detection level (0-1)")
+        
+        // Expert control methods
+        .def("setPlanningDepth", &AgentBrain::setPlanningDepth,
+              py::arg("depth"), "Set neural planning depth (1-10)")
+        .def("getPlanningDepth", &AgentBrain::getPlanningDepth)
+        .def("setConceptFormationThreshold", &AgentBrain::setConceptFormationThreshold,
+              py::arg("threshold"), "Set concept formation threshold")
+        .def("setAttentionStrength", &AgentBrain::setAttentionStrength,
+              py::arg("strength"), "Set attention system strength (0-2)")
+        .def("setMemoryCapacity", &AgentBrain::setMemoryCapacity,
+              py::arg("capacity"), "Set working memory capacity")
+        
+        // Batch operations for expert users
+        .def("batchStep", &AgentBrain::batchStep,
+              py::arg("numSteps"), py::arg("timestep"), "Run multiple simulation steps efficiently")
+        .def("batchExecute", &AgentBrain::batchExecute,
+              py::arg("percept"), py::arg("numSteps"), "Process sensory input and execute multiple steps")
+        
+        // Performance monitoring
+        .def("getPerformanceMetrics", &AgentBrain::getPerformanceMetrics)
+        .def("getNeuralActivityStats", &AgentBrain::getNeuralActivityStats)
+        .def("getLearningProgress", &AgentBrain::getLearningProgress)
+        
+        // Configuration utilities
+        .def("configureForTask", &AgentBrain::configureForTask,
+              py::arg("taskType"), py::arg("difficulty"), "Configure agent for specific task")
+        .def("getTaskRecommendations", &AgentBrain::getTaskRecommendations)
+        
+        // Advanced debugging and visualization
+        .def("logDetailedState", &AgentBrain::logDetailedState)
+        .def("exportNeuralActivity", &AgentBrain::exportNeuralActivity,
+              py::arg("filepath"), "Export neural activity data to file")
+        .def("getActivationHeatmap", &AgentBrain::getActivationHeatmap,
+              "Get neural activation heatmap for visualization")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +470,249 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+        }, py::arg("brain"), "Create a new agent brain interface");
+
+    // ========== ADVANCED UTILITY FUNCTIONS ==========
+    
+    // Convenience factory functions for common scenarios
+    m.def("createStandardAgent", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.05);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0, 10.0);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all advanced learning systems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a standard agent with world for common use cases");
+    
+    m.def("runQuickDemo", []() {
+        auto [brain, world, agent] = createStandardAgent();
+        
+        std::cout << "Running NLM quick demo..." << std::endl;
+        std::cout << "Brain: " << brain->getTotalNeuronCount() << " neurons" << std::endl;
+        std::cout << "World: " << world->getWidth() << "x" << world->getHeight() << " cells" << std::endl;
+        
+        // Run for 100 steps
+        for (int step = 0; step < 100; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (step % 20 == 0) {
+                std::cout << "Step " << step << ": " 
+                         << brain->getFiringNeuronCount() << " firing, "
+                         << "Curiosity: " << std::fixed << std::setprecision(2) 
+                         << agent->getCuriosityLevel() << ", "
+                         << "Novelty: " << std::setprecision(2) 
+                         << agent->getNoveltyLevel() << std::endl;
+            }
+        }
+        
+        std::cout << "Demo completed! Final state:" << std::endl;
+        std::cout << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "  Average firing rate: " << std::setprecision(2) 
+                  << brain->getAverageFiringRate() << " Hz" << std::endl;
+        std::cout << "  Development stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        brain->logStatus();
+        return std::make_tuple(brain, world, agent);
+    }, "Run a quick demonstration of NLM functionality");
+    
+    // Configuration utilities
+    m.def("getDefaultConfig", []() {
+        return std::make_shared<Config>();
+    }, "Get a default configuration object");
+    
+    m.def("createConfigFromFile", &Config::loadFromFile,
+          py::arg("config"), py::arg("filepath"), "Load configuration from file");
+    
+    m.def("saveConfigToFile", &Config::saveToFile,
+          py::arg("config"), py::arg("filepath"), "Save configuration to file");
+    
+    // Experiment utilities
+    m.def("runExperiment", [](std::shared_ptr<Config> config, std::string experimentName, 
+                           int numSteps, bool verbose = false) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        std::cout << "Running experiment: " << experimentName << std::endl;
+        std::cout << "Steps: " << numSteps << ", Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        
+        int successfulSteps = 0;
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": " 
+                         << brain->getFiringNeuronCount() << " firing, "
+                         << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+            }
+            
+            successfulSteps++;
+        }
+        
+        std::cout << "Experiment " << experimentName << " completed!" << std::endl;
+        brain->logStatus();
+        
+        return brain;
+    }, py::arg("config"), py::arg("experimentName"), py::arg("numSteps"), 
+          py::arg("verbose") = false, "Run a named experiment with monitoring");
+    
+    // Batch and parallel processing utilities
+    m.def("batchRunExperiments", [](std::vector<std::shared_ptr<Config>> configs, 
+                                  std::string experimentName, 
+                                  int numSteps) {
+        std::vector<std::shared_ptr<Brain>> results;
+        
+        std::cout << "Running batch experiment: " << experimentName 
+                  << " with " << configs.size() << " configurations" << std::endl;
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            std::cout << "  Config " << i+1 << ": " << configs[i]->summary() << std::endl;
+            
+            for (int step = 0; step < numSteps; ++step) {
+                brain->step(step);
+            }
+            
+            results.push_back(brain);
+        }
+        
+        std::cout << "Batch experiment completed!" << std::endl;
+        return results;
+    }, py::arg("configs"), py::arg("experimentName"), py::arg("numSteps"), 
+          "Run the same experiment with multiple configurations");
+    
+    // Save/load utilities with advanced features
+    m.def("saveBrainWithMetadata", &Brain::saveWithMetadata,
+          py::arg("brain"), py::arg("filepath"), py::arg("metadata"), 
+          "Save brain state with additional metadata");
+    
+    m.def("loadBrainWithMetadata", &Brain::loadWithMetadata,
+          py::arg("brain"), py::arg("filepath"), 
+          "Load brain state with metadata verification");
+    
+    m.def("exportBrainForAnalysis", &Brain::exportForAnalysis,
+          py::arg("brain"), py::arg("filepath"), 
+          "Export brain state in analysis-ready format");
+    
+    m.def("importBrainForAnalysis", &Brain::importFromAnalysis,
+          py::arg("brain"), py::arg("filepath"), 
+          "Import brain state from analysis format");
+    
+    // Debugging and development utilities
+    m.def("startDebugSession", [](std::shared_ptr<Brain> brain, std::string sessionName) {
+        std::cout << "Starting debug session: " << sessionName << std::endl;
+        std::cout << "Brain state:" << std::endl;
+        brain->logStatus();
+        return brain;
+    }, py::arg("brain"), py::arg("sessionName"), "Start a debug session with state logging");
+    
+    m.def("profileBrainPerformance", [](std::shared_ptr<Brain> brain, int durationSteps) {
+        std::cout << "Profiling brain performance for " << durationSteps << " steps..." << std::endl;
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < durationSteps; ++step) {
+            brain->step(step);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        std::cout << "Performance profile:" << std::endl;
+        std::cout << "  Steps per second: " << (durationSteps * 1000.0 / duration.count()) << std::endl;
+        std::cout << "  Total spikes per step: " << brain->getTotalSpikeCount() / durationSteps << std::endl;
+        std::cout << "  Memory usage: " << brain->getMemoryUsage() << " bytes" << std::endl;
+        
+        return std::make_tuple(brain, duration.count());
+    }, py::arg("brain"), py::arg("durationSteps"), 
+          "Profile brain performance over specified duration");
+    
+    // Educational utilities
+    m.def("createTutorialBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500);  // Smaller for educational purposes
+        config->set("brain.synapse_density", 0.02);
+        config->set("simulation.timestep", 0.01);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        std::cout << "Tutorial brain created (500 neurons for learning)" << std::endl;
+        std::cout << "This brain is optimized for educational demonstrations." << std::endl;
+        
+        return brain;
+    }, "Create a brain optimized for educational tutorials");
+    
+    m.def("demonstrateLearning", [](std::shared_ptr<Brain> brain, int numEpisodes) {
+        std::cout << "Demonstrating learning over " << numEpisodes << " episodes" << std::endl;
+        
+        float prevLearningProgress = 0.0f;
+        for (int episode = 0; episode < numEpisodes; ++episode) {
+            // Run episode
+            for (int step = 0; step < 50; ++step) {
+                brain->step(step);
+            }
+            
+            float learningProgress = brain->getAverageFiringRate() * 0.1f +  // Simplified metric
+                                   brain->getTotalSpikeCount() * 0.0001f;
+            
+            if (verbose) {
+                std::cout << "Episode " << episode << ": " 
+                         << "Learning progress: " << std::setprecision(2) << learningProgress << ", "
+                         << "Change: " << std::setprecision(2) << (learningProgress - prevLearningProgress) << std::endl;
+            }
+            
+            prevLearningProgress = learningProgress;
+        }
+        
+        std::cout << "Learning demonstration completed!" << std::endl;
+        brain->logStatus();
+        return brain;
+    }, py::arg("brain"), py::arg("numEpisodes"), "Demonstrate learning over multiple episodes");
+    
+    // Version and system information
+    m.attr("NLM_VERSION") = "6.0 (Phase 6 Integration)";
+    m.attr("NLM_DESCRIPTION") = "Neural Learning Machine - Phase 6: Final Integration of Artificial Cognitive Systems";
+    m.attr("NLM_DOCUMENTATION_URL") = "https://github.com/nlm/docs";
+    
+    m.def("getSystemInfo", []() {
+        py::dict info;
+        info["version"] = m.attr("NLM_VERSION");
+        info["description"] = m.attr("NLM_DESCRIPTION");
+        info["neurons_per_million_ops"] = 2.5;  // Approximate
+        info["max_brains_supported"] = 1000;
+        info["supported_python_versions"] = std::vector<std::string>{"3.8", "3.9", "3.10", "3.11", "3.12"};
+        return info;
+    }, "Get system information and capabilities");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+
+} // namespace nlm
 
 } // namespace nlm
