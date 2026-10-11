@@ -71,7 +71,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
-            std::string value = argv[++i];
+            std::string value = argv[i + 1];
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -86,7 +86,25 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Output the actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;

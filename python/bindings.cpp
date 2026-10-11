@@ -400,6 +400,80 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Add memory system accessors for advanced analysis
+    m.def("getWorkingMemory", &AgentBrain::getWorkingMemory,
+          py::return_value_policy::reference_internal,
+          "Get the working memory system");
+
+    m.def("getEpisodicMemory", &AgentBrain::getEpisodicMemory,
+          py::return_value_policy::reference_internal,
+          "Get the episodic memory system");
+
+    m.def("getAssociativeMemory", &AgentBrain::getAssociativeMemory,
+          py::return_value_policy::reference_internal,
+          "Get the associative memory system");
+
+    m.def("getPredictionSystem", &AgentBrain::getPredictionSystem,
+          py::return_value_policy::reference_internal,
+          "Get the prediction system");
+
+    m.def("getAttention", &AgentBrain::getAttention,
+          py::return_value_policy::reference_internal,
+          "Get the attention system");
+
+    m.def("getConceptFormation", &AgentBrain::getConceptFormation,
+          py::return_value_policy::reference_internal,
+          "Get the concept formation system");
+
+    m.def("getPlanner", &AgentBrain::getPlanner,
+          py::return_value_policy::reference_internal,
+          "Get the planning system");
+
+    m.def("getDevelopmentSystem", &AgentBrain::getDevelopmentSystem,
+          py::return_value_policy::reference_internal,
+          "Get the development system");
+
+    m.def("getDopamine", &AgentBrain::getDopamine,
+          py::return_value_policy::reference_internal,
+          "Get the dopamine neuromodulation system");
+
+    m.def("getNovelty", &AgentBrain::getNovelty,
+          py::return_value_policy::reference_internal,
+          "Get the novelty detection system");
+
+    m.def("getCuriosity", &AgentBrain::getCuriosity,
+          py::return_value_policy::reference_internal,
+          "Get the curiosity system");
+
+    m.def("getPredictionErrorSignal", &AgentBrain::getPredictionErrorSignal,
+          py::return_value_policy::reference_internal,
+          "Get the prediction error signal system");
+
+    m.def("getSpikeSystem", &AgentBrain::getSpikeSystem,
+          py::return_value_policy::reference_internal,
+          "Get the spike processing system");
+
+    m.def("getSTDP", &AgentBrain::getSTDP,
+          py::return_value_policy::reference_internal,
+          "Get the STDP plasticity system");
+
+    m.def("getHebbian", &AgentBrain::getHebbian,
+          py::return_value_policy::reference_internal,
+          "Get the Hebbian plasticity system");
+
+    m.def("getStructuralPlasticity", &AgentBrain::getStructuralPlasticity,
+          py::return_value_policy::reference_internal,
+          "Get the structural plasticity system");
+
+    m.def("getRandomGenerator", &AgentBrain::getRandomGenerator,
+          py::return_value_policy::reference_internal,
+          "Get the random number generator");
+
+    m.def("getConfig", &AgentBrain::getConfig,
+          py::return_value_policy::reference_internal,
+          "Get the configuration");
+
+    // Advanced utilities for better Python integration
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +490,34 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Version and metadata
+    m.attr("__version__") = "0.1.0";
+
+    // Documentation
+    m.doc() = R"pbdoc(
+        NLM (Neural Learning Machine) Python API
+        
+        This module provides a Python interface to the NLM C++ neural simulation framework.
+        It enables creating and simulating artificial brains with spiking neurons,
+        learning mechanisms, memory systems, and cognitive capabilities.
+        
+        Key Features:
+        - Brain simulation with LIF neurons
+        - Memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Plasticity (STDP, Hebbian learning)
+        - Development and maturation
+        - Sensory processing and motor output
+        - Agent-brain interface for world interaction
+        
+        Quick Start:
+        1. Create a brain with default or custom configuration
+        2. Initialize the brain
+        3. Run simulation steps
+        4. Use agent brain for world interaction
+        
+        See HOW_TO_USE.md for detailed documentation and examples.
+    )pbdoc";
 }
 
 } // namespace nlm

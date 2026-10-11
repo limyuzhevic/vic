@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                configFile = argv[i + 1];
             }
         }
     }
