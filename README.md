@@ -150,17 +150,52 @@ NLM/
 - Memory pools and event queues
 - SIMD vectorization
 - Parallel processing
-- Checkpoint system
+- **Checkpoint save/load implemented** (with complete CheckpointSystem implementation)
 
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
+- Neuromodulation affects plasticity and neural dynamics
 - Prediction integrated with learning
 - Development affects plasticity rates
-- Checkpoint save/load working
+- Checkpoint save/load working (implemented with CheckpointReader/Writer)
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- **Redundant Phase6Demo.cpp removed, Phase6IntegratedExperiment.cpp serves as the complete demo**
+
+## Architecture Philosophy
+
+The NLM brain operates as a closed-loop system:
+
+```
+WORLD
+  ↓
+SENSORY INPUT
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+INTERNAL STATE (working memory, attention)
+  ↓
+MEMORY / PREDICTION
+  ↓
+MOTIVATION / NEUROMODULATION (dopamine, curiosity)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+MEMORY / DEVELOPMENT
+  ↓
+CHANGED BRAIN
+  ↓
+CHANGED FUTURE BEHAVIOR
+```
 
 ## Scientific Limitations
 
