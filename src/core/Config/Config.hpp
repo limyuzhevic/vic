@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
+#include <filesystem>
+#include <system_error>
 
 namespace nlm {
 
@@ -41,6 +44,32 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration exception hierarchy
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class ConfigFileException : public ConfigException {
+public:
+    explicit ConfigFileException(const std::string& msg) : ConfigException(msg) {}
+};
+
+class ConfigParseException : public ConfigException {
+public:
+    explicit ConfigParseException(const std::string& msg) : ConfigException(msg) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    explicit ConfigValidationException(const std::string& msg) : ConfigException(msg) {}
+};
+
+class ConfigSaveException : public ConfigException {
+public:
+    explicit ConfigSaveException(const std::string& msg) : ConfigException(msg) {}
 };
 
 // Main configuration class
@@ -93,6 +122,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Exception safety and cleanup
+    void validateConfig() const;
+    static bool validateKeyPattern(const std::string& key);
+    static bool validateValueRange(const std::string& key, const ConfigValue& value);
+    
+    // Error information
+    static std::string getLastError();
+    static void clearLastError();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +138,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Error handling
+    static std::string lastError;
 };
 
 } // namespace nlm

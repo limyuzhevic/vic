@@ -21,11 +21,22 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Enhanced configuration library
+add_library(nlm_enhanced_config STATIC
+    src/core/Config/EnhancedConfig.cpp
+)
+
+target_include_directories(nlm_enhanced_config PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Config>
+    $<INSTALL_INTERFACE:include/core/Config>
+)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/EnhancedConfig.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -76,6 +87,20 @@ add_library(nlm_core STATIC
     # Motor
     src/motor/MotorSystem.cpp
     # Environment
+# Enhanced configuration library
+add_library(nlm_enhanced_config STATIC
+    src/core/Config/EnhancedConfig.cpp
+)
+
+target_include_directories(nlm_enhanced_config PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Config>
+    $<INSTALL_INTERFACE:include/core/Config>
+)
+
+# Link enhanced config to core
+target_link_libraries(nlm_core PUBLIC nlm_enhanced_config)
+
+
     src/environment/Environment.cpp
     src/environment/Observation.cpp
     src/environment/Action.cpp
@@ -121,27 +146,33 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Benchmarking targets
+add_executable(nlm_benchmark
+    src/benchmark.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+add_executable(benchmark_demo
+    benchmark_demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(benchmark_demo PUBLIC nlm_core)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+add_executable(benchmark_suite
+    src/benchmarks/Benchmark.cpp
+    src/benchmarks/core/CoreBenchmarks.cpp
+    src/benchmarks/infrastructure/InfrastructureBenchmarks.cpp
+    src/benchmarks/scalability/ScalabilityBenchmarks.cpp
+    src/benchmarks/BenchmarkSuite.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(benchmark_suite PUBLIC nlm_core)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+add_executable(performance_analyzer
+    src/performance/PerformanceAnalysis.cpp
+)
+target_link_libraries(performance_analyzer PUBLIC nlm_core)
+
+# Add benchmarks directory to source listing
+add_subdirectory(src/benchmarks)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

@@ -29,56 +29,243 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
-// Inter-regional connection (long-range connectivity)
+/**
+ * @struct InterRegionConnection
+ * @brief Represents a long-range connection between two neural regions.
+ * 
+ * Inter-region connections provide structural connectivity between neural regions,
+ * enabling coordinated activity across distributed brain regions. These connections
+ * are characterized by their source and target regions, connection strength (weight),
+ * transmission delay, and plasticity properties.
+ * 
+ * @note Used for modeling inter-regional communication in brain simulation.
+ */
 struct InterRegionConnection {
+    /** @brief Source neural region of this connection */
     RegionId sourceRegion;
+    
+    /** @brief Target neural region of this connection */
     RegionId targetRegion;
+    
+    /** @brief Connection strength (0.0 to 1.0 range)
+     *  
+     * Represents the synaptic weight or coupling strength between
+     * source and target regions. Higher values indicate stronger coupling.
+     */
     float weight;
+    
+    /** @brief Transmission delay in simulation time steps */
     Delay delay;
+    
+    /** @brief Plasticity flags controlling connection modification rules */
     PlasticityFlags plasticityFlags;
     
+    /** @brief Default constructor
+     * 
+     * Creates a zero-initialized connection with default parameters:
+     * weight=0.0f, delay=1, plasticityFlags=0.
+     */
     InterRegionConnection()
         : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
     
+    /** @brief Parameterized constructor
+     * 
+     * @param src Source neural region ID
+     * @param tgt Target neural region ID  
+     * @param w Initial connection strength (default: 0.0f)
+     * @param d Transmission delay in simulation steps (default: 1)
+     */
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+/**
+ * @class Brain
+ * @brief Central coordinator of the neural system implementing comprehensive brain simulation.
+ * 
+ * The Brain class serves as the main simulation engine for spiking neural networks,
+ * integrating multiple specialized subsystems to create a biologically plausible
+ * model of brain function. It coordinates real-time neural computation with
+ * event-driven dynamics while providing unified interfaces to memory systems,
+ * prediction mechanisms, cognitive processes, and neuromodulatory signals.
+ * 
+ * Key features:
+ * - Real-time spiking neural dynamics with refractory periods
+ * - Event-driven spike propagation and synaptic integration
+ * - Multi-region connectivity and long-range interactions
+ * - Integrated memory systems (working, episodic, associative)
+ * - Prediction and error computation mechanisms
+ * - Cognitive functions (planning, attention, concept formation)
+ * - Neuromodulation systems (dopamine, curiosity, novelty)
+ * - Developmental processes and plasticity mechanisms
+ * - State management and persistence (checkpointing/load/save)
+ * 
+ * The simulation operates in discrete time steps where:
+ * 1. Neural dynamics evolve (spiking, synaptic integration)
+ * 2. Plasticity rules are applied
+ * 3. Cognitive processes are computed
+ * 4. Neuromodulatory signals are integrated
+ * 5. Action outputs are generated based on motor activity
+ * 
+ * @note This class follows the PIMPL pattern for implementation hiding.
+ * @note Thread safety: The Brain class is not thread-safe for concurrent modifications.
+ * @note All methods are either const-correct or marked noexcept appropriately.
+ */
 
-class Brain {
-public:
-    // Create brain with configuration
-    explicit Brain(std::shared_ptr<Config> config);
+// ============= CONSTRUCTION AND LIFECYCLE =============
+
+/**
+ * @brief Constructs a brain simulation with the given configuration.
+ * 
+ * Creates a new Brain instance and initializes its internal subsystems
+ * based on the provided configuration object. The configuration contains
+ * all parameters needed to define the brain architecture, neural properties,
+ * and simulation parameters.
+ * 
+ * @param config Shared pointer to configuration object containing:
+ * - Brain architecture parameters (region count, neuron properties)
+ * - Simulation parameters (time step, duration)
+ * - Neural connectivity patterns
+ * - Memory system parameters
+ * - Plasticity rule parameters
+ * - Neuromodulation system settings
+ * @throw std::invalid_argument If config is nullptr
+ * @note This constructor does not initialize the brain - call initialize()
+ * @see initialize()
+ */
+explicit Brain(std::shared_ptr<Config> config);
+
+/**
+ * @brief Destructor for the Brain.
+ * 
+ * Cleans up all allocated resources and performs graceful shutdown of
+ * all subsystems. All allocated memory is properly deallocated and all
+ * open file handles are closed.
+ * 
+ * @note Exception safe - guaranteed not to throw exceptions.
+ */
+
+/**
+ * @brief Move constructor - transfers ownership of resources.
+ * 
+ * Efficiently transfers ownership of the Brain's internal implementation
+ * from another Brain instance to this one. The source Brain becomes in a
+ * valid but unspecified state after the move operation.
+ * 
+ * @param other Source Brain instance to move from
+ * @post *this contains the resources previously owned by other
+ * @note Leaves other in a valid state but unspecified.
+ */
+
+/**
+ * @brief Move assignment operator - transfers ownership of resources.
+ * 
+ * Efficiently transfers ownership of the Brain's internal implementation
+ * from another Brain instance to this one. Performs proper resource cleanup
+ * if *this already owns resources before the assignment.
+ * 
+ * @param other Source Brain instance to move from
+ * @return Reference to *this for chaining
+ * @post Previous resources of *this are released, *this receives other's resources
+ * @note Exception safe - if resources cannot be transferred, *this remains unchanged.
+ */
+
+/**
+ * @brief Initialize brain with configuration.
+ * 
+ * Sets up all neural subsystems and prepares the brain for simulation.
+ * This method must be called after construction before any simulation steps.
+ * It creates all neural regions, initializes neurons and synapses, and
+ * sets up internal data structures.
+ * 
+ * @return true if initialization succeeded, false otherwise
+ * @note Thread safe for the initialization phase only
+ * @throws std::runtime_error If initialization fails (invalid config, memory error, etc.)
+ * @see Brain(std::shared_ptr<Config> config)
+ */
+bool initialize();
+
+/**
+ * @brief Main simulation step with step count only.
+ * 
+ * Advances the brain simulation by one time step using the provided step number.
+ * This is the primary simulation entry point for time-driven simulations.
+ * The method computes all neural dynamics, plasticity updates, and cognitive
+ * processes for the current time step.
+ * 
+ * @param currentStep Current simulation step number (0-based)
+ * @pre Brain must be initialized and ready for simulation
+ * @pre initialize() must have been called successfully
+ * @note Thread unsafe - use only one thread per Brain instance for simulation
+ * @see step(SimulationStep currentStep, Timestamp currentTime)
+ */
+void step(SimulationStep currentStep);
+
+/**
+ * @brief Main simulation step with time stamp.
+ * 
+ * Advances the brain simulation by one time step with explicit timing information.
+ * This provides more detailed temporal control for synchronized simulations
+ * or when multiple Brains need to advance in lockstep with real time.
+ * 
+ * @param currentStep Current simulation step number (0-based)
+ * @param currentTime Current simulation time in milliseconds
+ * @pre Brain must be initialized and ready for simulation
+ * @pre initialize() must have been called successfully
+ * @note Thread unsafe - use only one thread per Brain instance for simulation
+ * @see step(SimulationStep currentStep)
+ */
+void step(SimulationStep currentStep, Timestamp currentTime);
     
-    ~Brain();
-    
-    // Disable copying, enable moving
-    Brain(const Brain&) = delete;
-    Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
-    
-    // Initialize brain with configuration
-    bool initialize();
-    
-    // Main simulation step
-    void step(SimulationStep currentStep);
-    
-    // Simulation time step
-    void step(SimulationStep currentStep, Timestamp currentTime);
-    
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
-    
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+// ============= SENSORY AND MOTOR INTERFACES =============
+
+/**
+ * @brief Receive sensory input from environment.
+ * 
+ * Processes sensory information and injects appropriate currents into
+ * sensory neurons based on the input pattern. This represents the brain's
+ * perception of external stimuli and is the first step in the cognitive
+ * processing pipeline.
+ * 
+ * @param input Sensory input containing:
+ * - Neural activation patterns for sensory neurons
+ * - Input timing information
+ * - Modulatory signals associated with the stimulus
+ * @pre Brain must be initialized
+ * @note This method typically triggers cascading activation through
+ *       the cortical hierarchy via inter-regional connections
+ */
+void receiveSensoryInput(const class SensoryInput& input);
+
+/**
+ * @brief Inject current directly into a specific neuron.
+ * 
+ * Directly injects synaptic current into a specific neuron, bypassing
+ * normal synaptic integration. Useful for targeted stimulation or
+ * implementing external control signals.
+ * 
+ * @param neuron ID of the target neuron
+ * @param current Membrane potential to inject (in nA or equivalent units)
+ * @pre neuron ID must be valid and correspond to an existing neuron
+ * @pre Brain must be initialized
+ * @note Can override neuron's normal firing behavior
+ * @note Current injection is additive to existing membrane potential
+ */
+void injectCurrent(NeuronId neuron, MembranePotential current);
+
+/**
+ * @brief Inject current into all neurons of a specific type.
+ * 
+ * Batch-injects current into all neurons of the specified type,
+ * enabling population-level stimulation or modulatory effects.
+ * 
+ * @param type Neuron type to target (e.g., excitatory, inhibitory, motor)
+ * @param current Membrane potential to inject into each neuron (in nA)
+ * @pre Brain must be initialized
+ * @note Useful for implementing global modulatory signals
+ * @note Affects all neurons of the specified type across all regions
+ */
+void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
     SpikeSystem* getSpikeSystem();
