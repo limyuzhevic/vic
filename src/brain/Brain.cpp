@@ -1112,6 +1112,104 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+void Brain::configureNeurons(const NeuronConfig& config) {
+    // Configure neurons in all regions
+    for (auto& region : pImpl->regions) {
+        configureRegionNeurons(region->getId(), config);
+    }
 }
 
-} // namespace nlm
+void Brain::configureRegionNeurons(RegionId regionId, const NeuronConfig& config) {
+    auto* region = getRegion(regionId);
+    if (!region) return;
+    
+    auto neurons = region->getAllNeurons();
+    std::vector<Neuron*> neuronPtrs;
+    neuronPtrs.reserve(neurons.size());
+    
+    for (auto& neuron : neurons) {
+        neuronPtrs.push_back(neuron.get());
+    }
+    
+    Neuron::configurePopulation(neuronPtrs, config);
+}
+
+void Brain::configurePopulation(const NeuronConfig& config) {
+    configureNeurons(config);
+}
+
+Brain::NeuronPopulationStats Brain::getNeuronPopulationStats() const {
+    NeuronPopulationStats stats;
+    stats.totalNeurons = getTotalNeuronCount();
+    
+    for (const auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        for (const auto& neuron : neurons) {
+            switch (neuron->getType()) {
+                case NeuronType::Excitatory:
+                    stats.excitatoryNeurons++;
+                    break;
+                case NeuronType::Inhibitory:
+                    stats.inhibitoryNeurons++;
+                    break;
+                case NeuronType::Sensory:
+                    stats.sensoryNeurons++;
+                    break;
+                case NeuronType::Motor:
+                    stats.motorNeurons++;
+                    break;
+                case NeuronType::Internal:
+                    stats.internalNeurons++;
+                    break;
+                case NeuronType::Modulatory:
+                    // Modulatory neurons are not counted in basic stats
+                    break;
+            }
+        }
+    }
+    
+    return stats;
+}
+
+void Brain::logStatus() const {
+    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
+    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
+    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Memory system status
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    }
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    
+    // Neuromodulation status
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    
+    // Development status
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
+    for (const auto& region : pImpl->regions) {
+        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
+                    " neurons: " + std::to_string(region->getAllNeurons().size()));
+    }
+    
+    // Get population statistics
+    auto stats = getNeuronPopulationStats();
+    NLM_LOG_INFO("Neuron population distribution:");
+    NLM_LOG_INFO("  Excitatory: " + std::to_string(stats.excitatoryNeurons));
+    NLM_LOG_INFO("  Inhibitory: " + std::to_string(stats.inhibitoryNeurons));
+    NLM_LOG_INFO("  Sensory: " + std::to_string(stats.sensoryNeurons));
+    NLM_LOG_INFO("  Motor: " + std::to_string(stats.motorNeurons));
+    NLM_LOG_INFO("  Internal: " + std::to_string(stats.internalNeurons));
+}

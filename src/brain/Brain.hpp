@@ -125,17 +125,26 @@ public:
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
+    // Configure neuron populations with specific parameters
+    void configureNeurons(const NeuronConfig& config);
     
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    // Configure neurons for a specific region
+    void configureRegionNeurons(RegionId regionId, const NeuronConfig& config);
+    
+    // Configure all neurons in brain with population parameters
+    void configurePopulation(const NeuronConfig& config);
+    
+    // Get neuron population statistics
+    struct NeuronPopulationStats {
+        size_t totalNeurons;
+        size_t excitatoryNeurons;
+        size_t inhibitoryNeurons;
+        size_t sensoryNeurons;
+        size_t motorNeurons;
+        size_t internalNeurons;
+    };
+    
+    NeuronPopulationStats getNeuronPopulationStats() const;
     
     // ========== MEMORY SYSTEMS ==========
     

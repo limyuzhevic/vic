@@ -136,16 +136,27 @@ public:
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
+
+    // Configure neuron parameters
+    void configureParameters(float restingPotential, float threshold, float leakConductance,
+                           uint32_t refractoryPeriod, float resetPotential = -70.0f);
     
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
-    
+    // Batch configuration for multiple neurons
+    static void configurePopulation(std::vector<Neuron*>& neurons, const NeuronConfig& config);
+
 private:
     struct Impl;
     Impl* pImpl;
+};
+
+// Configuration for neuron population
+struct NeuronConfig {
+    float restingPotential = -70.0f;
+    float threshold = -55.0f;
+    float leakConductance = 10.0f;
+    uint32_t refractoryPeriod = 5;
+    float resetPotential = -70.0f;
+    NeuronType type = NeuronType::Internal;
 };
 
 } // namespace nlm

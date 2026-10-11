@@ -416,10 +416,160 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience functions for common patterns
+    m.def("runPhase3Demo", [](int numEpisodes, int stepsPerEpisode) {
+        Phase3Demo demo;
+        demo.run(numEpisodes, stepsPerEpisode);
+    }, py::arg("numEpisodes") = 5, py::arg("stepsPerEpisode") = 200,
+       "Run the Phase 3 world interaction demonstration");
+
+    m.def("runPhase3DemoWithConfig", [](const Phase6Config& config, int numEpisodes, int stepsPerEpisode) {
+        Phase6Demo demo;
+        demo.run(config, numEpisodes, stepsPerEpisode);
+    }, py::arg("config"), py::arg("numEpisodes") = 5, py::arg("stepsPerEpisode") = 200,
+       "Run Phase 3 demonstration with custom configuration");
+
+    // High-level training function for learning behavior
+    m.def("trainAgent", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world,
+                          int numEpisodes, int stepsPerEpisode, bool enableDevelopment = true) {
+        Phase3Demo demo;
+        demo.runWithAgent(agent, world, numEpisodes, stepsPerEpisode, enableDevelopment);
+    }, py::arg("agent"), py::arg("world"), py::arg("numEpisodes") = 10, py::arg("stepsPerEpisode") = 200,
+       py::arg("enableDevelopment") = true,
+       "Train an agent in the world using the Phase 3 paradigm");
+
+    // Simulation utilities
+    m.def("createSimulationConfig", [](size_t neuronCount, size_t steps) {
+        Phase6Config config;
+        config.neuronCount = neuronCount;
+        config.maxSteps = steps;
+        return config;
+    }, py::arg("neuronCount") = 500, py::arg("steps") = 2000,
+       "Create a Phase 6 simulation configuration");
+
+    m.def("createCustomConfig", [](std::map<std::string, double> settings) {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : settings) {
+            config->set(pair.first, pair.second);
+        }
+        return config;
+    }, py::arg("settings"),
+       "Create a configuration from a map of key-value pairs");
+
+    // Utility functions
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& path) {
+        return brain->save(path);
+    }, py::arg("brain"), py::arg("path"),
+       "Save brain state to a checkpoint file");
+
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& path) {
+        return brain->load(path);
+    }, py::arg("brain"), py::arg("path"),
+       "Load brain state from a checkpoint file");
+
+    // Statistical analysis functions
+    m.def("analyzeBrainPerformance", [](std::shared_ptr<Brain> brain) {
+        auto stats = brain->getNeuronPopulationStats();
+        std::map<std::string, double> result;
+        result["total_neurons"] = stats.totalNeurons;
+        result["excitatory_neurons"] = stats.excitatoryNeurons;
+        result["inhibitory_neurons"] = stats.inhibitoryNeurons;
+        result["sensory_neurons"] = stats.sensoryNeurons;
+        result["motor_neurons"] = stats.motorNeurons;
+        result["internal_neurons"] = stats.internalNeurons;
+        result["excitatory_ratio"] = stats.totalNeurons > 0 ? 
+            static_cast<double>(stats.excitatoryNeurons) / stats.totalNeurons : 0.0;
+        return result;
+    }, py::arg("brain"),
+       "Analyze brain neuron population statistics");
+
+    // Neural network visualization data
+    m.def("getBrainConnectivityMatrix", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::vector<double>> matrix;
+        // This is a simplified example - a real implementation would create a proper adjacency matrix
+        return matrix;
+    }, py::arg("brain"),
+       "Get connectivity matrix for brain visualization (placeholder)");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience functions for Phase 3 demo
+    m.def("runPhase3Demo", [](int numEpisodes, int stepsPerEpisode) {
+        Phase3Demo demo;
+        demo.run(numEpisodes, stepsPerEpisode);
+    }, py::arg("numEpisodes") = 5, py::arg("stepsPerEpisode") = 200,
+       "Run the Phase 3 world interaction demonstration");
+
+    // Convenience functions for agent training
+    m.def("trainAgent", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world,
+                          int numEpisodes, int stepsPerEpisode, bool enableDevelopment) {
+        Phase3Demo demo;
+        demo.runWithAgent(agent, world, numEpisodes, stepsPerEpisode, enableDevelopment);
+    }, py::arg("agent"), py::arg("world"), py::arg("numEpisodes") = 10, py::arg("stepsPerEpisode") = 200,
+       py::arg("enableDevelopment") = true,
+       "Train an agent in the world using the Phase 3 paradigm");
+
+    // Simulation utilities
+    m.def("createSimulationConfig", [](size_t neuronCount, size_t steps) {
+        Phase6Config config;
+        config.neuronCount = neuronCount;
+        config.maxSteps = steps;
+        return config;
+    }, py::arg("neuronCount") = 500, py::arg("steps") = 2000,
+       "Create a Phase 6 simulation configuration");
+
+    m.def("createCustomConfig", [](std::map<std::string, double> settings) {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : settings) {
+            config->set(pair.first, pair.second);
+        }
+        return config;
+    }, py::arg("settings"),
+       "Create a configuration from a map of key-value pairs");
+
+    // Utility functions
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& path) {
+        return brain->save(path);
+    }, py::arg("brain"), py::arg("path"),
+       "Save brain state to a checkpoint file");
+
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& path) {
+        return brain->load(path);
+    }, py::arg("brain"), py::arg("path"),
+       "Load brain state from a checkpoint file");
+
+    // Statistical analysis functions
+    m.def("analyzeBrainPerformance", [](std::shared_ptr<Brain> brain) {
+        auto stats = brain->getNeuronPopulationStats();
+        std::map<std::string, double> result;
+        result["total_neurons"] = stats.totalNeurons;
+        result["excitatory_neurons"] = stats.excitatoryNeurons;
+        result["inhibitory_neurons"] = stats.inhibitoryNeurons;
+        result["sensory_neurons"] = stats.sensoryNeurons;
+        result["motor_neurons"] = stats.motorNeurons;
+        result["internal_neurons"] = stats.internalNeurons;
+        result["excitatory_ratio"] = stats.totalNeurons > 0 ? 
+            static_cast<double>(stats.excitatoryNeurons) / stats.totalNeurons : 0.0;
+        return result;
+    }, py::arg("brain"),
+       "Analyze brain neuron population statistics");
+
+    // Neural network visualization data
+    m.def("getBrainConnectivityMatrix", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::vector<double>> matrix;
+        // This is a simplified example - a real implementation would create a proper adjacency matrix
+        return matrix;
+    }, py::arg("brain"),
+       "Get connectivity matrix for brain visualization (placeholder)");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm
