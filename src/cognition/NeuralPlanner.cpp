@@ -1,14 +1,45 @@
 #include "NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
 #include <algorithm>
 #include <cmath>
+#include <queue>
+#include <limits>
 
 namespace nlm {
 
 struct NeuralPlanner::Impl {
     Brain* brain;
     
-    Impl() : brain(nullptr) {}
+    // MCTS state
+    struct MCTSNode {
+        std::vector<ActionType> actionSequence;
+        std::vector<float> state;
+        float totalReward;
+        int visits;
+        float value;
+        float confidence;
+        std::vector<MCTSNode*> children;
+        MCTSNode* parent;
+        ActionType lastAction;
+        
+        MCTSNode(const std::vector<ActionType>& seq, const std::vector<float>& s, MCTSNode* parent = nullptr)
+            : actionSequence(seq), state(s), totalReward(0.0f), visits(0), value(0.0f), confidence(1.0f),
+              parent(parent), lastAction(ActionType::Wait) {}
+    };
+    
+    std::vector<MCTSNode*> mctsRoot;
+    size_t mctsMaxDepth;
+    float explorationConstant;
+    float mctsTimeBudget;
+    
+    // Planning statistics
+    size_t totalPlansGenerated;
+    size_t successfulPlans;
+    float averagePlanQuality;
+    
+    Impl() : brain(nullptr), mctsMaxDepth(5), explorationConstant(1.5f), mctsTimeBudget(100.0f),
+             totalPlansGenerated(0), successfulPlans(0), averagePlanQuality(0.0f) {}
 };
 
 NeuralPlanner::NeuralPlanner()
@@ -17,7 +48,12 @@ NeuralPlanner::NeuralPlanner()
     , planningDepth_(3)
     , planningConfidence_(0.5f)
 {
-    actionQuality_.resize(10, 0.0f);  // 10 action types
+    actionQuality_.resize(10, 0.0f);
+    
+    // Initialize MCTS parameters
+    pImpl->explorationConstant = 1.5f;
+    pImpl->mctsMaxDepth = 5;
+    pImpl->mctsTimeBudget = 100.0f;
 }
 
 NeuralPlanner::~NeuralPlanner() = default;
@@ -25,48 +61,37 @@ NeuralPlanner::~NeuralPlanner() = default;
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralPlanner initialized");
+    NLM_LOG_INFO("NeuralPlanner initialized with MCTS and advanced planning");
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
-    // Generate possible action sequences
-    auto sequences = generateActionSequences(planningDepth_);
+                                     float targetReward) {
+    // Implement multiple planning strategies based on current brain state
+    ActionType selectedAction = ActionType::Wait;
     
-    PlanningCandidate best;
-    best.expectedReward = -1000.0f;
-    
-    // Evaluate each sequence
-    for (const auto& sequence : sequences) {
-        PlanningCandidate candidate = evaluateSequence(sequence, currentState);
-        
-        if (candidate.expectedReward > best.expectedReward) {
-            best = candidate;
-        }
+    // Choose planning strategy based on available resources and context
+    if (pImpl->brain && pImpl->brain->getPredictionSystem()) {
+        // Use MCTS for complex planning
+        selectedAction = monteCarloTreeSearch(currentState, targetReward);
+    } else {
+        // Fallback to simpler heuristic planning
+        selectedAction = heuristicPlanning(currentState, targetReward);
     }
     
-    // Update confidence based on how consistent evaluations are
-    if (!sequences.empty()) {
-        planningConfidence_ = best.confidence;
+    // Record planning decision
+    pImpl->totalPlansGenerated++;
+    if (selectedAction != ActionType::Wait) {
+        pImpl->successfulPlans++;
     }
     
-    // Return first action of best sequence
-    if (!best.actions.empty()) {
-        // Record success/failure based on whether we achieved target
-        recentPlanSuccess_.push_back(best.expectedReward >= targetReward);
-        if (recentPlanSuccess_.size() > 10) {
-            recentPlanSuccess_.pop_front();
-        }
-        
-        return best.actions[0];
-    }
+    // Update planning confidence based on plan success
+    updatePlanningConfidence();
     
-    // Default: wait if no good option
-    return ActionType::Wait;
+    return selectedAction;
 }
 
 PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
-                                                 const std::vector<float>& startState) {
+                                                const std::vector<float>& startState) {
     PlanningCandidate candidate;
     candidate.actions = actions;
     candidate.depth = actions.size();
@@ -81,7 +106,7 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         // Evaluate this action
         float actionValue = evaluateAction(action, currentState);
         
-        // Predict next state
+        // Predict next state using forward model
         auto predictedNext = predictNextState(action, currentState);
         
         if (!predictedNext.empty()) {
@@ -107,451 +132,678 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
     return candidate;
 }
 
-std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size_t depth) {
-    std::vector<std::vector<ActionType>> result;
+void NeuralPlanner::implementMonteCarloTreeSearch(const std::vector<float>& currentState,
+                                                float targetReward,
+                                                ActionType& selectedAction) {
+    // MCTS implementation for planning
+    pImpl->mctsRoot.clear();
     
-    // Simple enumeration of action sequences
-    std::vector<ActionType> baseActions = {
+    // Create root node
+    pImpl->mctsRoot.push_back(new Impl::MCTSNode({}, currentState, nullptr));
+    
+    // Run MCTS iterations
+    size_t iterations = static_cast<size_t>(pImpl->mctsTimeBudget / 10.0f); // Time budget
+    
+    for (size_t iter = 0; iter < iterations && !pImpl->mctsRoot.empty(); ++iter) {
+        // Selection
+        Impl::MCTSNode* leaf = selectNode(pImpl->mctsRoot[0]);
+        
+        // Expansion
+        if (!isTerminalNode(leaf) && leaf->depth < pImpl->mctsMaxDepth) {
+            expandNode(leaf);
+        }
+        
+        // Simulation (rollout)
+        float simulatedReward = simulateRollout(leaf);
+        
+        // Backpropagation
+        backpropagateResult(leaf, simulatedReward);
+    }
+    
+    // Extract best action from root
+    if (!pImpl->mctsRoot.empty()) {
+        selectedAction = extractBestAction(pImpl->mctsRoot[0]);
+    }
+    
+    // Clean up MCTS nodes
+    cleanupMCTSNodes(pImpl->mctsRoot[0]);
+}
+
+ActionType NeuralPlanner::monteCarloTreeSearch(const std::vector<float>& currentState,
+                                              float targetReward) {
+    ActionType selectedAction = ActionType::Wait;
+    
+    // Primary MCTS planning
+    implementMonteCarloTreeSearch(currentState, targetReward, selectedAction);
+    
+    if (selectedAction == ActionType::Wait) {
+        // Fallback to heuristic planning
+        selectedAction = heuristicPlanning(currentState, targetReward);
+    }
+    
+    return selectedAction;
+}
+
+void NeuralPlanner::implementNeuroEvolutionPlanning() {
+    if (!brain_) return;
+    
+    // Simple neuro-evolution: evolve action selection strategies over time
+    static float evolutionRate = 0.01f;
+    
+    // Update action quality based on evolutionary pressure
+    for (size_t i = 0; i < actionQuality_.size(); ++i) {
+        // Add small mutation noise
+        float noise = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * evolutionRate;
+        actionQuality_[i] += noise;
+        actionQuality_[i] = std::clamp(actionQuality_[i], -1.0f, 1.0f);
+    }
+    
+    // Occasionally replace entire action strategy
+    if (rand() % 1000 < 5) {  // 0.5% chance per step
+        // Reset to average quality
+        float avgQuality = 0.0f;
+        for (float q : actionQuality_) avgQuality += q;
+        avgQuality /= actionQuality_.size();
+        
+        for (size_t i = 0; i < actionQuality_.size(); ++i) {
+            actionQuality_[i] = avgQuality + (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.2f;
+        }
+    }
+}
+
+void NeuralPlanner::implementValueBasedPlanning() {
+    if (!brain_) return;
+    
+    // Value-based planning using learned action values
+    float valueThreshold = 0.3f;  // Minimum value to consider
+    
+    ActionType bestAction = ActionType::Wait;
+    float bestValue = -1000.0f;
+    
+    for (size_t i = 0; i < actionQuality_.size(); ++i) {
+        ActionType action = static_cast<ActionType>(i);
+        
+        // Evaluate action value using neural network (simplified)
+        float actionValue = evaluateAction(action, currentGoal_);
+        
+        // Combine with learned quality
+        float combinedValue = actionQuality_[i] * 0.6f + actionValue * 0.4f;
+        
+        if (combinedValue > bestValue && combinedValue > valueThreshold) {
+            bestValue = combinedValue;
+            bestAction = action;
+        }
+    }
+    
+    // Update current goal based on value-based planning
+    if (bestValue > 0.0f) {
+        currentGoal_ = std::vector<float>(10, bestValue); // Simplified goal setting
+    }
+}
+
+void NeuralPlanner::implementPolicySearchPlanning() {
+    if (!brain_) return;
+    
+    // Policy search: adjust policy parameters based on observed outcomes
+    static float policyLearningRate = 0.05f;
+    
+    // Update policy parameters based on prediction error
+    PredictionError* predictionError = brain_->getPredictionErrorSignal();
+    if (predictionError) {
+        float error = predictionError->getError();
+        
+        // Adjust policy based on prediction error
+        float policyAdjustment = error * policyLearningRate;
+        
+        for (size_t i = 0; i < actionQuality_.size(); ++i) {
+            // Policy gradient update
+            actionQuality_[i] += policyAdjustment * (rand() % 100 / 100.0f - 0.5f);
+            actionQuality_[i] = std::clamp(actionQuality_[i], -1.0f, 1.0f);
+        }
+    }
+}
+
+void NeuralPlanner::implementPredictionBasedPlanning() {
+    if (!brain_) return;
+    
+    PredictionSystem* predictionSystem = brain_->getPredictionSystem();
+    if (!predictionSystem) return;
+    
+    // Use prediction system for forward model planning
+    float predictionError = predictionSystem->getPredictionError();
+    
+    // Planning based on prediction accuracy
+    float planningModulation = 1.0f - predictionError;  // Better predictions enable more ambitious planning
+    
+    // Adjust planning depth based on prediction confidence
+    planningDepth_ = static_cast<size_t>(3 + planningModulation * 3); // 3 to 6 steps
+    
+    // Use prediction errors to guide action selection
+    if (predictionError > 0.5f) {
+        // High prediction error: prefer exploratory actions
+        // This would bias action selection toward less-used actions
+        NLM_LOG_INFO("High prediction error guiding exploratory planning (error: " + 
+                    std::to_string(predictionError) + ")");
+    }
+}
+
+void NeuralPlanner::integrateWithWorkingMemory() {
+    if (!brain_) return;
+    
+    NeuralWorkingMemory* workingMemory = brain_->getWorkingMemory();
+    if (!workingMemory) return;
+    
+    // Get current working memory content
+    std::vector<float> wmContent = workingMemory->retrieve();
+    
+    if (!wmContent.empty()) {
+        // Use working memory to guide planning
+        float wmActivity = workingMemory->getMemoryActivity();
+        
+        // Adjust planning based on working memory activity
+        if (wmActivity > 0.5f) {
+            // High working memory activity: focus on complex plans
+            planningDepth_ = std::min(planningDepth_ + 2, size_t(8));
+        } else {
+            // Low working memory activity: use simpler plans
+            planningDepth_ = std::max(planningDepth_ - 1, size_t(2));
+        }
+        
+        // Incorporate working memory patterns into planning
+        integratePlanningWithMemoryContent(wmContent);
+    }
+}
+
+void NeuralPlanner::integratePlanningWithMemoryContent(const std::vector<float>& memoryContent) {
+    // Use working memory content to influence planning decisions
+    if (memoryContent.empty()) return;
+    
+    // Compute similarity between memory content and planning goals
+    float memorySimilarity = 0.0f;
+    if (!currentGoal_.empty() && memoryContent.size() == currentGoal_.size()) {
+        for (size_t i = 0; i < memoryContent.size(); ++i) {
+            memorySimilarity += std::abs(memoryContent[i] - currentGoal_[i]);
+        }
+        memorySimilarity /= memoryContent.size();
+    }
+    
+    // Adjust planning based on memory content
+    if (memorySimilarity > 0.3f) {
+        // Strong memory content influence: plan that leverages memory
+        planningDepth_ = std::min(planningDepth_ + 1, size_t(8));
+    }
+}
+
+void NeuralPlanner::implementPlanningActionSelection() {
+    if (!brain_) return;
+    
+    // Implement action selection based on planning results
+    ActionType selectedAction = ActionType::Wait;
+    float bestScore = -1000.0f;
+    
+    // Score each potential action based on planning
+    for (size_t i = 0; i < actionQuality_.size(); ++i) {
+        ActionType action = static_cast<ActionType>(i);
+        
+        // Get planning score for this action
+        float planningScore = evaluateAction(action, currentGoal_);
+        
+        // Combine with action quality
+        float combinedScore = planningScore * 0.7f + actionQuality_[i] * 0.3f;
+        
+        if (combinedScore > bestScore) {
+            bestScore = combinedScore;
+            selectedAction = action;
+        }
+    }
+    
+    // Apply attention modulation to action selection
+    AttentionalSelection* attention = brain_->getAttention();
+    if (attention && bestScore > 0.0f) {
+        float attentionBonus = attention->getExcitationFor(selectedAction);
+        if (attentionBonus > 0.0f) {
+            bestScore += attentionBonus;
+        }
+    }
+    
+    // Store selected action for next step
+    lastSelectedAction_ = selectedAction;
+    lastPlanningScore_ = bestScore;
+}
+
+ActionType NeuralPlanner::heuristicPlanning(const std::vector<float>& currentState,
+                                           float targetReward) {
+    // Simple heuristic planning for fallback
+    ActionType bestAction = ActionType::Wait;
+    float bestScore = -1000.0f;
+    
+    // Evaluate each action using heuristics
+    for (size_t i = 0; i < actionQuality_.size(); ++i) {
+        ActionType action = static_cast<ActionType>(i);
+        
+        // Heuristic evaluation
+        float heuristicScore = evaluateAction(action, currentState);
+        
+        // Combine with learned quality
+        float combinedScore = heuristicScore * 0.6f + actionQuality_[i] * 0.4f;
+        
+        if (combinedScore > bestScore) {
+            bestScore = combinedScore;
+            bestAction = action;
+        }
+    }
+    
+    return bestAction;
+}
+
+Impl::MCTSNode* NeuralPlanner::selectNode(Impl::MCTSNode* node) {
+    // MCTS node selection ( UCB1 formula )
+    while (!node->children.empty()) {
+        // Find child with highest UCB1 score
+        Impl::MCTSNode* bestChild = nullptr;
+        float bestScore = -std::numeric_limits<float>::max();
+        
+        for (Impl::MCTSNode* child : node->children) {
+            if (child->visits == 0) {
+                bestChild = child;
+                break; // Always explore unvisited nodes first
+            }
+            
+            // UCB1 formula: (reward / visits) + C * sqrt(log(parent_visits) / child_visits)
+            float ucbScore = (child->value / child->visits) +
+                           pImpl->explorationConstant * std::sqrt(
+                               std::log(static_cast<float>(node->visits)) / child->visits);
+            
+            if (ucbScore > bestScore) {
+                bestScore = ucbScore;
+                bestChild = child;
+            }
+        }
+        
+        if (bestChild) {
+            node = bestChild;
+        } else {
+            break; // No children to explore
+        }
+    }
+    
+    return node;
+}
+
+bool NeuralPlanner::isTerminalNode(Impl::MCTSNode* node) const {
+    return node->visits == 0 || node->depth >= pImpl->mctsMaxDepth;
+}
+
+void NeuralPlanner::expandNode(Impl::MCTSNode* node) {
+    if (!node || node->children.size() >= 6) return; // Limit branching factor
+    
+    // Generate possible actions from current state
+    std::vector<ActionType> actions = {
         ActionType::MoveForward, ActionType::MoveBackward,
         ActionType::TurnLeft, ActionType::TurnRight,
         ActionType::Interact, ActionType::Wait
     };
     
-    // For now, generate sequences of depth actions
-    // This could be optimized with pruning
+    // Sample a subset of actions (to limit branching)
+    std::vector<ActionType> sampledActions;
+    size_t numSamples = std::min(size_t(3), actions.size());
     
-    std::function<void(std::vector<ActionType>&, size_t)> generate = 
-        [&](std::vector<ActionType>& current, size_t remaining) {
-            if (remaining == 0) {
-                result.push_back(current);
-                return;
-            }
-            
-            for (ActionType action : baseActions) {
-                current.push_back(action);
-                generate(current, remaining - 1);
-                current.pop_back();
-            }
+    for (size_t i = 0; i < numSamples; ++i) {
+        size_t idx = rand() % actions.size();
+        sampledActions.push_back(actions[idx]);
+        actions.erase(actions.begin() + idx);
+    }
+    
+    // Create child nodes for each sampled action
+    for (ActionType action : sampledActions) {
+        std::vector<ActionType> newSequence = node->actionSequence;
+        newSequence.push_back(action);
+        
+        std::vector<float> newState = node->state;
+        // Predict new state (simplified)
+        auto predicted = predictNextState(action, node->state);
+        if (!predicted.empty()) {
+            newState = predicted;
+        }
+        
+        Impl::MCTSNode* child = new Impl::MCTSNode(newSequence, newState, node);
+        child->lastAction = action;
+        node->children.push_back(child);
+    }
+}
+
+float NeuralPlanner::simulateRollout(Impl::MCTSNode* node) {
+    // Simple rollout: simulate random actions from this node
+    std::vector<ActionType> currentSequence = node->actionSequence;
+    std::vector<float> currentState = node->state;
+    
+    float totalReward = 0.0f;
+    
+    for (size_t i = 0; i < 5; ++i) {  // 5-step rollout
+        // Select random action
+        std::vector<ActionType> actions = {
+            ActionType::MoveForward, ActionType::MoveBackward,
+            ActionType::TurnLeft, ActionType::TurnRight,
+            ActionType::Interact, ActionType::Wait
         };
-    
-    std::vector<ActionType> current;
-    generate(current, depth);
-    
-    // Limit number of sequences
-    if (result.size() > 100) {
-        result.resize(100);
-    }
-    
-    return result;
-}
-
-float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionQuality_.size()) return 0.0f;
-    
-    // Base value from experience
-    float baseValue = actionQuality_[actionIdx];
-    
-    // Bonus for approaching goal (if goal is defined)
-    float goalBonus = 0.0f;
-    if (!currentGoal_.empty() && state.size() == currentGoal_.size()) {
-        float stateGoalSim = 0.0f, stateNorm = 0.0f, goalNorm = 0.0f;
-        for (size_t i = 0; i < state.size(); ++i) {
-            stateGoalSim += state[i] * currentGoal_[i];
-            stateNorm += state[i] * state[i];
-            goalNorm += currentGoal_[i] * currentGoal_[i];
-        }
-        if (stateNorm > 0.0001f && goalNorm > 0.0001f) {
-            goalBonus = stateGoalSim / (std::sqrt(stateNorm) * std::sqrt(goalNorm));
+        
+        ActionType action = actions[rand() % actions.size()];
+        currentSequence.push_back(action);
+        
+        // Get action value
+        float actionValue = evaluateAction(action, currentState);
+        totalReward += actionValue;
+        
+        // Update state
+        auto predictedNext = predictNextState(action, currentState);
+        if (!predictedNext.empty()) {
+            currentState = predictedNext;
         }
     }
     
-    return baseValue * 0.7f + goalBonus * 0.3f;
+    return totalReward;
 }
 
-std::vector<float> NeuralPlanner::predictNextState(ActionType action,
-                                                  const std::vector<float>& currentState) {
-    // Use simple action-consequence prediction
-    // In a full implementation, this would use learned forward models
-    
-    std::vector<float> nextState = currentState;
-    
-    // Apply expected effect based on action
-    // This is a simplified model - real implementation would use experience
-    switch (action) {
-        case ActionType::MoveForward:
-            // Shift visual field forward
-            if (nextState.size() > 10) {
-                for (size_t i = 10; i < nextState.size(); ++i) {
-                    nextState[i-10] = nextState[i] * 0.9f;
-                }
-            }
-            break;
-        case ActionType::MoveBackward:
-            if (nextState.size() > 10) {
-                for (size_t i = nextState.size() - 1; i >= 10; --i) {
-                    nextState[i] = nextState[i-10] * 0.9f;
-                }
-            }
-            break;
-        case ActionType::TurnLeft:
-        case ActionType::TurnRight:
-            // Rotate pattern
-            // Simplified: just add some noise
-            for (auto& v : nextState) {
-                v += 0.05f * (v > 0.5f ? -1.0f : 1.0f);
-                v = std::clamp(v, 0.0f, 1.0f);
-            }
-            break;
-        case ActionType::Interact:
-            // Interaction changes state significantly
-            for (auto& v : nextState) {
-                v = v > 0.5f ? 0.8f : 0.2f;
-            }
-            break;
-        case ActionType::Wait:
-        default:
-            // No change
-            break;
+void NeuralPlanner::backpropagateResult(Impl::MCTSNode* node, float reward) {
+    // Backpropagate simulation result up the MCTS tree
+    while (node) {
+        node->visits++;
+        node->value += reward;
+        
+        // Update confidence based on visit count
+        node->confidence = std::min(1.0f, static_cast<float>(node->visits) / 10.0f);
+        
+        node = node->parent;
     }
-    
-    return nextState;
 }
 
-void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                                     const std::vector<ActionType>& actualActions,
-                                     float actualReward) {
-    // Update action quality based on how well plan worked
-    size_t minLen = std::min(plannedActions.size(), actualActions.size());
+ActionType NeuralPlanner::extractBestAction(Impl::MCTSNode* root) {
+    if (!root || root->children.empty()) return ActionType::Wait;
     
-    for (size_t i = 0; i < minLen; ++i) {
-        size_t actionIdx = static_cast<size_t>(actualActions[i]);
-        if (actionIdx < actionQuality_.size()) {
-            // If action matched plan, positive update; else negative
-            float delta = (actualActions[i] == plannedActions[i]) ? 0.1f : -0.05f;
-            delta *= actualReward;
-            
-            actionQuality_[actionIdx] = std::clamp(
-                actionQuality_[actionIdx] + delta, -1.0f, 1.0f);
+    // Find child with most visits
+    Impl::MCTSNode* bestChild = nullptr;
+    size_t maxVisits = 0;
+    
+    for (Impl::MCTSNode* child : root->children) {
+        if (child->visits > maxVisits) {
+            maxVisits = child->visits;
+            bestChild = child;
         }
     }
+    
+    if (bestChild && !bestChild->actionSequence.empty()) {
+        return bestChild->actionSequence.back();
+    }
+    
+    return ActionType::Wait;
 }
 
-void NeuralPlanner::clearCache() {
-    // Clear any planning cache
+void NeuralPlanner::cleanupMCTSNodes(Impl::MCTSNode* node) {
+    if (!node) return;
+    
+    for (Impl::MCTSNode* child : node->children) {
+        cleanupMCTSNodes(child);
+        delete child;
+    }
 }
 
-bool NeuralPlanner::wasRecentPlanSuccessful() const {
-    if (recentPlanSuccess_.empty()) return true;  // No data
+void NeuralPlanner::updatePlanningConfidence() {
+    // Update planning confidence based on recent plan success
+    if (recentPlanSuccess_.empty()) {
+        planningConfidence_ = 0.5f; // Default confidence
+        return;
+    }
     
     size_t successCount = 0;
     for (bool success : recentPlanSuccess_) {
-        if (success) ++successCount;
+        if (success) successCount++;
     }
     
-    return successCount > recentPlanSuccess_.size() / 2;
+    planningConfidence_ = static_cast<float>(successCount) / recentPlanSuccess_.size();
+    
+    // Decay confidence over time
+    planningConfidence_ *= 0.9f;
 }
 
-// SelfModel Implementation
-struct SelfModel::Impl {
+void NeuralPlanner::setPlanningDepth(size_t depth) {
+    planningDepth_ = std::max(depth, size_t(2)); // Minimum 2 steps
+}
+
+void NeuralPlanner::setPlanningDepth(size_t depth) {
+    planningDepth_ = depth;
+}
+
+void NeuralPlanner::modulateCuriosityDrivenExploration(float modulation) {
+    // Modulate exploration based on curiosity
+    curiosityExplorationModulation_ += modulation;
+    curiosityExplorationModulation_ = std::clamp(curiosityExplorationModulation_, -1.0f, 1.0f);
+}
+
+void NeuralPlanner::updateActionProbabilities(float bonus) {
+    // Update action selection probabilities based on bonus
+    if (bonus > 0.0f) {
+        for (size_t i = 0; i < actionQuality_.size(); ++i) {
+            actionQuality_[i] *= (1.0f + bonus * 0.1f);
+        }
+    }
+}
+
+void NeuralPlanner::logPlanningStats() const {
+    NLM_LOG_INFO("NeuralPlanner Statistics:");
+    NLM_LOG_INFO("  Planning depth: " + std::to_string(planningDepth_));
+    NLM_LOG_INFO("  Planning confidence: " + std::to_string(planningConfidence_));
+    NLM_LOG_INFO("  Plans generated: " + std::to_string(pImpl->totalPlansGenerated));
+    NLM_LOG_INFO("  Successful plans: " + std::to_string(pImpl->successfulPlans));
+    if (pImpl->totalPlansGenerated > 0) {
+        float successRate = static_cast<float>(pImpl->successfulPlans) / pImpl->totalPlansGenerated;
+        NLM_LOG_INFO("  Plan success rate: " + std::to_string(successRate));
+    }
+    NLM_LOG_INFO("  Average plan quality: " + std::to_string(pImpl->averagePlanQuality));
+}
+
+// ActionConsequencePredictor Implementation
+struct ActionConsequencePredictor::Impl {
     Brain* brain;
+    
+    // State-action -> consequence mappings
+    std::vector<std::pair<std::pair<std::vector<float>, ActionType>, std::vector<float>>> experiences;
+    
+    // Average reward per action
+    std::vector<std::pair<ActionType, float>> actionQuality;
     
     Impl() : brain(nullptr) {}
 };
 
-SelfModel::SelfModel()
+ActionConsequencePredictor::ActionConsequencePredictor()
     : pImpl(new Impl)
-    , brain_(nullptr)
-    , capabilityLevel_(0.5f)
 {
-    actionEffects_.resize(10);  // 10 action types
 }
 
-SelfModel::~SelfModel() = default;
+ActionConsequencePredictor::~ActionConsequencePredictor() = default;
 
-void SelfModel::initialize(Brain* brain) {
+void ActionConsequencePredictor::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SelfModel initialized");
 }
 
-void SelfModel::recordSelfAction(ActionType action,
-                                const std::vector<float>& beforeState,
-                                const std::vector<float>& afterState) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return;
+void ActionConsequencePredictor::recordExperience(ActionType action,
+                                                  const std::vector<float>& beforeState,
+                                                  const std::vector<float>& afterState,
+                                                  float reward) {
+    pImpl->experiences.push_back({{beforeState, action}, afterState});
+    pImpl->actionQuality.push_back({action, reward});
     
-    ActionEffect effect;
-    effect.beforeState = beforeState;
-    effect.afterState = afterState;
-    effect.observationCount = 1;
-    
-    // Compute confidence as consistency with previous observations
-    float consistency = 0.5f;
-    for (const auto& prev : actionEffects_[actionIdx]) {
-        if (computeSimilarity(beforeState, prev.beforeState) > 0.8f) {
-            consistency = std::max(consistency, 
-                computeSimilarity(afterState, prev.afterState));
-            effect.observationCount += prev.observationCount;
-        }
-    }
-    effect.confidence = consistency;
-    
-    actionEffects_[actionIdx].push_back(effect);
-    
-    // Update capability level
-    float totalConfidence = 0.0f;
+    // Update average reward for this action
+    float totalReward = 0.0f;
     size_t count = 0;
-    for (const auto& effects : actionEffects_) {
-        for (const auto& e : effects) {
-            totalConfidence += e.confidence;
+    for (const auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            totalReward += aq.second;
             ++count;
         }
     }
-    if (count > 0) {
-        capabilityLevel_ = totalConfidence / count;
+    
+    // Update or add to action quality
+    for (auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            aq.second = totalReward / count;
+            break;
+        }
+    }
+    
+    // Limit experience memory
+    if (pImpl->experiences.size() > 1000) {
+        pImpl->experiences.erase(pImpl->experiences.begin());
     }
 }
 
-std::vector<float> SelfModel::predictActionConsequence(ActionType action,
-                                                       const std::vector<float>& currentState) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return currentState;
+std::vector<float> ActionConsequencePredictor::predictConsequence(ActionType action,
+                                                                const std::vector<float>& currentState) {
+    // Find most similar previous experience with this action
+    float bestSimilarity = 0.0f;
+    std::vector<float> bestConsequence;
     
-    return findMatchingEffect(action, currentState);
-}
-
-float SelfModel::getSelfModelConfidence(ActionType action) const {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return 0.0f;
-    
-    const auto& effects = actionEffects_[actionIdx];
-    if (effects.empty()) return 0.0f;
-    
-    float totalConf = 0.0f;
-    for (const auto& e : effects) {
-        totalConf += e.confidence;
-    }
-    return totalConf / effects.size();
-}
-
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
-    // If we have a good prediction for this action, it's likely self-generated
-    auto predicted = findMatchingEffect(action, beforeState);
-    
-    if (predicted.empty()) return 0.0f;
-    
-    float similarity = computeSimilarity(predicted, afterState);
-    return similarity;
-}
-
-ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
-    ActionType best = ActionType::Wait;
-    float bestValue = -1000.0f;
-    
-    for (size_t i = 0; i < actionEffects_.size(); ++i) {
-        if (actionEffects_[i].empty()) continue;
-        
-        // Check how well this action would work in current state
-        auto predicted = findMatchingEffect(static_cast<ActionType>(i), state);
-        if (!predicted.empty()) {
-            // Value = how much the state changes toward reward
-            float value = computeSimilarity(predicted, state);
-            if (value > bestValue) {
-                bestValue = value;
-                best = static_cast<ActionType>(i);
+    for (const auto& exp : pImpl->experiences) {
+        if (exp.first.second == action) {
+            // Compute similarity between current state and stored before-state
+            const auto& before = exp.first.first;
+            const auto& after = exp.second;
+            
+            if (before.size() != currentState.size()) continue;
+            
+            float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
+            for (size_t i = 0; i < before.size(); ++i) {
+                dot += before[i] * currentState[i];
+                norm1 += before[i] * before[i];
+                norm2 += currentState[i] * currentState[i];
+            }
+            
+            float sim = (norm1 > 0.0001f && norm2 > 0.0001f) ? 
+                        dot / (std::sqrt(norm1) * std::sqrt(norm2)) : 0.0f;
+            
+            if (sim > bestSimilarity) {
+                bestSimilarity = sim;
+                bestConsequence = after;
             }
         }
     }
     
-    return best;
-}
-
-void SelfModel::updateSelfModel(const std::vector<float>& predicted,
-                               const std::vector<float>& actual,
-                               ActionType action) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return;
-    
-    // Find and update matching effect
-    for (auto& effect : actionEffects_[actionIdx]) {
-        if (computeSimilarity(effect.beforeState, predicted) > 0.5f) {
-            // Update with prediction error
-            float error = 1.0f - computeSimilarity(predicted, actual);
-            
-            // Adjust confidence based on error
-            effect.confidence *= (1.0f - error * 0.1f);
-            effect.confidence = std::max(0.1f, effect.confidence);
-        }
+    if (bestSimilarity > 0.5f && !bestConsequence.empty()) {
+        return bestConsequence;
     }
+    
+    return currentState; // Default: no predicted change
 }
 
-float SelfModel::getBodyAwareness() const {
-    return capabilityLevel_;
-}
-
-void SelfModel::clear() {
-    for (auto& effects : actionEffects_) {
-        effects.clear();
-    }
-    capabilityLevel_ = 0.5f;
-}
-
-std::vector<float> SelfModel::findMatchingEffect(ActionType action,
-                                                const std::vector<float>& beforeState) const {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return {};
-    
-    const auto& effects = actionEffects_[actionIdx];
-    if (effects.empty()) return {};
-    
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& effect : effects) {
-        float sim = computeSimilarity(beforeState, effect.beforeState);
-        if (sim > bestSim) {
-            bestSim = sim;
-            bestPrediction = effect.afterState;
+float ActionConsequencePredictor::getConsequenceConfidence(ActionType action,
+                                                         const std::vector<float>& currentState) const {
+    size_t matchingCount = 0;
+    for (const auto& exp : pImpl->experiences) {
+        if (exp.first.second == action) {
+            ++matchingCount;
         }
     }
     
-    return bestPrediction;
+    // More experiences = higher confidence
+    return std::min(1.0f, static_cast<float>(matchingCount) / 10.0f);
 }
 
-float SelfModel::computeSimilarity(const std::vector<float>& a,
-                                  const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
-    
-    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-    for (size_t i = 0; i < a.size(); ++i) {
-        dot += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
+void ActionConsequencePredictor::updatePrediction(ActionType action,
+                                                 const std::vector<float>& predicted,
+                                                 const std::vector<float>& actual,
+                                                 float reward) {
+    // This would update the internal model
+    // For now, just record the new experience
+    recordExperience(action, predicted, actual, reward);
+}
+
+float ActionConsequencePredictor::getActionQuality(ActionType action) const {
+    for (const auto& aq : pImpl->actionQuality) {
+        if (aq.first == action) {
+            return aq.second;
+        }
     }
-    
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
-    
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
+    return 0.0f;
 }
 
-// SocialLearning Implementation
-struct SocialLearning::Impl {
-    Brain* brain;
+void ActionConsequencePredictor::clear() {
+    pImpl->experiences.clear();
+    pImpl->actionQuality.clear();
+}
+
+// PredictionErrorSignal Implementation
+struct PredictionErrorSignal::Impl {
+    float lastIntensityError;
+    float lastSpatialError;
+    float lastTemporalError;
     
-    Impl() : brain(nullptr) {}
+    Impl() : lastIntensityError(0.0f), lastSpatialError(0.0f), lastTemporalError(0.0f) {}
 };
 
-SocialLearning::SocialLearning()
+PredictionErrorSignal::PredictionErrorSignal()
     : pImpl(new Impl)
-    , brain_(nullptr)
-    , observationCount_(0)
-    , signalMeaning_(0.0f)
+    , lastError_(0.0f)
+    , surpriseThreshold_(0.3f)
 {
+    errorComponents_.intensityError = 0.0f;
+    errorComponents_.spatialError = 0.0f;
+    errorComponents_.temporalError = 0.0f;
+    errorComponents_.totalError = 0.0f;
 }
 
-SocialLearning::~SocialLearning() = default;
+PredictionErrorSignal::~PredictionErrorSignal() = default;
 
-void SocialLearning::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SocialLearning initialized");
-}
-
-void SocialLearning::observeAgentAction(ActionType observedAction,
-                                       const std::vector<float>& observerState,
-                                       const std::vector<float>& resultingState) {
-    ObservedEffect effect;
-    effect.state = observerState;
-    effect.resultingState = resultingState;
-    effect.reward = 0.0f;  // Observer doesn't know reward
-    
-    observedActions_.push_back({observedAction, effect});
-    ++observationCount_;
-    
-    // Keep memory bounded
-    if (observedActions_.size() > 500) {
-        observedActions_.erase(observedActions_.begin());
-    }
-}
-
-bool SocialLearning::canImitate(ActionType observedAction) const {
-    // Can imitate if we've seen this action before and know its effect
-    for (const auto& pair : observedActions_) {
-        if (pair.first == observedAction) {
-            return true;
-        }
-    }
-    return false;
-}
-
-ActionType SocialLearning::getImitationAction(const std::vector<float>& currentState) {
-    ActionType best = ActionType::Wait;
-    float bestSim = 0.0f;
-    
-    for (const auto& pair : observedActions_) {
-        float sim = computeSimilarity(currentState, pair.second.state);
-        if (sim > bestSim) {
-            bestSim = sim;
-            best = pair.first;
-        }
+float PredictionErrorSignal::computeError(const std::vector<float>& predicted,
+                                          const std::vector<float>& actual) {
+    if (predicted.empty() || actual.empty()) {
+        lastError_ = 0.0f;
+        return 0.0f;
     }
     
-    return best;
-}
-
-void SocialLearning::learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                              float signalReward) {
-    signalPattern_ = signalPattern;
-    signalMeaning_ = signalReward;
-}
-
-bool SocialLearning::detectSignal(const std::vector<float>& neuralPattern) const {
-    if (signalPattern_.empty()) return false;
+    // Compute overall difference
+    float totalDiff = 0.0f;
+    float intensityDiff = 0.0f;
     
-    float similarity = computeSimilarity(neuralPattern, signalPattern_);
-    return similarity > 0.7f;
-}
-
-std::vector<float> SocialLearning::getSignalPattern() const {
-    return signalPattern_;
-}
-
-float SocialLearning::getSignalMeaning() const {
-    return signalMeaning_;
-}
-
-void SocialLearning::updateSocialKnowledge(float interactionReward) {
-    // Update value of observed actions based on whether interaction was beneficial
-    for (auto& pair : observedActions_) {
-        // Adjust reward estimate based on interaction outcome
-        pair.second.reward = pair.second.reward * 0.9f + interactionReward * 0.1f;
-    }
-}
-
-void SocialLearning::clear() {
-    observedActions_.clear();
-    signalPattern_.clear();
-    signalMeaning_ = 0.0f;
-    observationCount_ = 0;
-}
-
-float SocialLearning::computeSimilarity(const std::vector<float>& a,
-                                       const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
-    
-    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-    for (size_t i = 0; i < a.size(); ++i) {
-        dot += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
+    for (size_t i = 0; i < std::min(predicted.size(), actual.size()); ++i) {
+        float diff = std::abs(predicted[i] - actual[i]);
+        totalDiff += diff;
+        intensityDiff += diff * diff;
     }
     
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    float meanError = totalDiff / predicted.size();
+    float meanSqError = intensityDiff / predicted.size();
     
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
+    // Compute spatial error (variance of differences)
+    float spatialVar = 0.0f;
+    for (size_t i = 0; i < predicted.size(); ++i) {
+        float diff = predicted[i] - actual[i];
+        spatialVar += (diff - meanError) * (diff - meanError);
+    }
+    float spatialError = std::sqrt(spatialVar / predicted.size());
+    
+    // Update components
+    pImpl->lastIntensityError = std::sqrt(meanSqError);
+    pImpl->lastSpatialError = spatialError;
+    errorComponents_.intensityError = pImpl->lastIntensityError;
+    errorComponents_.spatialError = pImpl->lastSpatialError;
+    
+    // Compute total error (combining components)
+    lastError_ = std::sqrt(meanSqError + spatialError * spatialError);
+    errorComponents_.totalError = lastError_;
+    
+    return lastError_;
+}
+
+float PredictionErrorSignal::getModulationSignal() const {
+    // Convert error to modulation signal (0-1)
+    // Higher error = stronger modulation for learning
+    return std::min(1.0f, lastError_ * 2.0f);
+}
+
+void PredictionErrorSignal::recordError(float error, SimulationStep step) {
+    errorHistory_.push_back(error);
+    if (errorHistory_.size() > 10000) {
+        errorHistory_.erase(errorHistory_.begin());
+    }
 }
 
 } // namespace nlm

@@ -290,6 +290,8 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             if (Synapse* syn = getSynapse(synId)) {
                 syn->setType(synType);
                 syn->initializeRandom(rng);
+                // Enable plasticity - STDP for all synapses
+                syn->enablePlasticity(true, true, true);  // hebbian=true, stdp=true, rewardModulated=true
             }
         }
     }

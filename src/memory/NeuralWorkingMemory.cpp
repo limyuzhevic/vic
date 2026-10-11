@@ -40,6 +40,10 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
+        // Safety check: prevent division by zero
+        if (memoryNeurons_.empty()) {
+            continue;  // Skip if no neurons available
+        }
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         

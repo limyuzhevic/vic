@@ -29,12 +29,13 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
+    # Brain - modular system managers
     src/brain/Brain.cpp
+    src/brain/NeuralNetworkManager.cpp
+    src/brain/NeuromodulationManager.cpp
+    src/brain/MemorySystemManager.cpp
+    src/brain/NeuralAccessor.cpp
+    src/brain/Action.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp

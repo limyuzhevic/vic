@@ -29,6 +29,11 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// System managers
+class NeuralNetworkManager;
+class NeuromodulationManager;
+class MemorySystemManager;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;

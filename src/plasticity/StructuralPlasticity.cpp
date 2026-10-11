@@ -69,6 +69,12 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
         // Create the synapse
         SynapseId synId = region->addSynapse(source, destination, weight, 1);
         if (synId != INVALID_SYNAPSE_ID) {
+            // Get the created synapse and enable plasticity
+            Synapse* syn = region->getSynapse(synId);
+            if (syn) {
+                // Enable STDP and Hebbian plasticity for new synapses
+                syn->enablePlasticity(true, true, true);  // hebbian=true, stdp=true, rewardModulated=true
+            }
             ++pImpl->totalSynapsesCreated;
             return synId;
         }
