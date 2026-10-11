@@ -3,11 +3,19 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
+
+// Forward declarations for cognitive systems
+class NeuralPlanner;
+class ConceptFormation;
+class SelfModel;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -69,6 +77,21 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== COGNITIVE SYSTEM INTEGRATION ==========
+    
+    // Enable/disable cognitive systems
+    void enableNeuralPlanner(bool enable) { neuralPlannerEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    void enableSelfModel(bool enable) { selfModelEnabled_ = enable; }
+    
+    bool isNeuralPlannerEnabled() const { return neuralPlannerEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    bool isSelfModelEnabled() const { return selfModelEnabled_; }
+    
+    // Get cognitive system outputs
+    std::vector<float> getCognitiveState() const;
+    MotorCommand getPlannedAction(const std::vector<float>& currentState, float goalReward = 0.5f);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -108,6 +131,16 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    
+    // Cognitive system flags
+    bool neuralPlannerEnabled_;
+    bool conceptFormationEnabled_;
+    bool selfModelEnabled_;
+    
+    // Cognitive system integration
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<SelfModel> selfModel_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
