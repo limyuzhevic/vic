@@ -190,12 +190,26 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
-    
+     // Logging
+     void logStatus() const;
+     
+     // Helper methods for system integration
+     
+     // Create sensory input from current neural state
+     std::unique_ptr<class SensoryInput> createSensoryInputFromCurrentState();
+     
+     // Extract neural pattern from current brain state
+     std::vector<float> extractNeuralPattern();
+     
+     // Extract features from neural pattern
+     std::vector<float> extractFeatures(const std::vector<float>& pattern);
+     
+     // Update attention based on concept formation
+     void updateConceptAttentionSelection();
+     
 private:
-    struct Impl;
-    Impl* pImpl;
-};
+     struct Impl;
+     Impl* pImpl;
+ };
 
 } // namespace nlm

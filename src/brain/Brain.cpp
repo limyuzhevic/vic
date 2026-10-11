@@ -511,8 +511,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state from working memory
+        // Create a sensory input representing current neural state
+        auto sensoryInput = createSensoryInputFromCurrentState();
+        
+        // If we have previous prediction, update it
+        if (pImpl->lastPrediction_) {
+            // Compare prediction with actual state to compute error
+            pImpl->predictionSystem->updatePredictions(pImpl->lastPrediction_, sensoryInput);
+            
+            // Feed prediction error to neuromodulation systems
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setLevel(predictionError);
+            }
+            
+            // Update curiosity based on prediction error
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(pImpl->timestep, predictionError);
+            }
+            
+            // Update confidence and learning rate based on prediction error
+            float confidence = pImpl->predictionSystem->getConfidence();
+            float learningRate = 0.1f * (1.0f - confidence);
+            pImpl->stdp->configure(
+                pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f),
+                pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f),
+                pImpl->config->getOr<float>("stdp_tau", 20.0f)
+            );
+        }
+        
+        // Make new prediction for next timestep
+        pImpl->lastPrediction_ = pImpl->predictionSystem->predictNextState(sensoryInput);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +558,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form concepts
+        std::vector<float> neuralPattern = extractNeuralPattern();
+        std::vector<float> features = extractFeatures(neuralPattern);
+        
+        // Get reward from neuromodulation
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Update concept formation
+        pImpl->conceptFormation->presentExperience(neuralPattern, features, reward, currentStep);
+        
+        // Connect concepts to attention and working memory
+        if (pImpl->conceptFormation->getConceptCount() > 0) {
+            updateConceptAttentionSelection();
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1114,4 +1156,354 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// Helper method to create sensory input from current neural state
+std::unique_ptr<SensoryInput> Brain::createSensoryInputFromCurrentState() {
+    // Create a sensory input representing current neural activity patterns
+    auto sensoryInput = std::make_unique<Vision>(16, 16);  // Standard vision grid size
+    
+    // Sample neural activity to create a sensory-like representation
+    // This simulates how neural activity could be interpreted as sensory input
+    float totalActivity = 0.0f;
+    size_t neuronCount = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                // Normalize activity to 0-1 range
+                float normalizedActivity = 
+                    (state.membranePotential - state.restingPotential) / 
+                    std::max(1.0f, std::abs(state.threshold - state.restingPotential));
+                
+                // Clamp to valid range
+                normalizedActivity = std::max(0.0f, std::min(1.0f, normalizedActivity));
+                
+                totalActivity += normalizedActivity;
+                neuronCount++;
+                
+                // Sample activity for vision input (16x16 = 256 pixels)
+                if (neuronCount <= 256) {
+                    size_t visionIndex = (neuronCount - 1) % 256;
+                    int x = visionIndex % 16;
+                    int y = visionIndex / 16;
+                    // Simple spatial mapping of neural activity
+                    float intensity = normalizedActivity * (1.0f + neuron->getFiringFrequency() * 0.5f);
+                    sensoryInput->setData(x, y, 0, intensity);  // Red channel only for simplicity
+                }
+            }
+        }
+    }
+    
+    // Add some structured activity patterns based on working memory
+    if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        for (size_t i = 0; i < std::min(pImpl->workingMemory->getActiveTraces(), size_t(16)); ++i) {
+            float enhancedActivity = 0.5f + pImpl->workingMemory->getMemoryNeurons()[i] % 10 / 10.0f;
+            int x = i % 16;
+            int y = i / 16;
+            // Add working memory influence
+            float currentIntensity = sensoryInput->getData(x, y, 0);
+            sensoryInput->setData(x, y, 0, currentIntensity + enhancedActivity * 0.3f);
+        }
+    }
+    
+    return sensoryInput;
+}
+
+// Helper method to extract neural pattern from current brain state
+std::vector<float> Brain::extractNeuralPattern() {
+    std::vector<float> neuralPattern;
+    
+    // Sample neural activity across the brain to create a pattern vector
+    // This represents the current "thought" or "state" of the brain
+    neuralPattern.reserve(256);  // Standard pattern size
+    
+    float maxPotential = 0.0f;
+    float minPotential = 1000.0f;
+    
+    // First pass: find range of membrane potentials
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                maxPotential = std::max(maxPotential, state.membranePotential);
+                minPotential = std::min(minPotential, state.membranePotential);
+            }
+        }
+    }
+    
+    float range = maxPotential - minPotential;
+    if (range < 0.001f) range = 1.0f;
+    
+    // Second pass: normalize and sample to create pattern
+    size_t sampleCount = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                
+                // Include firing neurons more strongly
+                float activity = (state.membranePotential - minPotential) / range;
+                if (neuron->isFiring()) {
+                    activity = std::min(1.0f, activity * 1.5f);  // Boost firing neurons
+                }
+                
+                neuralPattern.push_back(activity);
+                sampleCount++;
+                
+                if (sampleCount >= 256) break;  // Limit pattern size
+            }
+            if (sampleCount >= 256) break;
+        }
+        if (sampleCount >= 256) break;
+    }
+    
+    // Pad if needed
+    while (neuralPattern.size() < 256) {
+        neuralPattern.push_back(0.0f);
+    }
+    neuralPattern.resize(256);
+    
+    // Add temporal component (how long neuron has been firing)
+    float temporalSum = 0.0f;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                if (state.lastSpikeTime > 0.0f) {
+                    float age = pImpl->currentTime - state.lastSpikeTime;
+                    float temporalFactor = std::min(1.0f, age * 0.1f);  // Decay over time
+                    if (!neuralPattern.empty()) {
+                        neuralPattern.back() = neuralPattern.back() * (1.0f - temporalFactor) + temporalFactor * 0.5f;
+                    }
+                }
+                temporalSum += temporalFactor;
+            }
+        }
+    }
+    
+    return neuralPattern;
+}
+
+// Helper method to extract features from neural pattern
+std::vector<float> Brain::extractFeatures(const std::vector<float>& pattern) {
+    std::vector<float> features;
+    
+    if (pattern.empty()) {
+        return features;
+    }
+    
+    // Compute various feature vectors from the neural pattern
+    features.reserve(16);  // Extract 16 features from 256-dimensional pattern
+    
+    // Feature 1: Overall activity level (mean)
+    float sum = std::accumulate(pattern.begin(), pattern.end(), 0.0f);
+    float mean = sum / pattern.size();
+    features.push_back(mean);
+    
+    // Feature 2: Activity variance
+    float varianceSum = 0.0f;
+    for (float val : pattern) {
+        float diff = val - mean;
+        varianceSum += diff * diff;
+    }
+    float variance = varianceSum / pattern.size();
+    features.push_back(variance);
+    
+    // Feature 3: Sharpness (ratio of high to low activity)
+    float highActivity = 0.0f, lowActivity = 0.0f;
+    for (float val : pattern) {
+        if (val > 0.7f) highActivity++;
+        if (val < 0.3f) lowActivity++;
+    }
+    float sharpness = highActivity / pattern.size();
+    features.push_back(sharpness);
+    
+    // Feature 4: Cohesion (how clustered the activity is)
+    // Simple measure: average distance between active neurons
+    std::vector<size_t> activeIndices;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if (pattern[i] > 0.5f) {
+            activeIndices.push_back(i);
+        }
+    }
+    
+    float cohesion = 0.0f;
+    if (activeIndices.size() > 1) {
+        float totalDistance = 0.0f;
+        for (size_t i = 0; i < activeIndices.size(); ++i) {
+            for (size_t j = i + 1; j < activeIndices.size(); ++j) {
+                float dist = std::abs(static_cast<float>(activeIndices[i] - activeIndices[j]));
+                totalDistance += dist;
+            }
+        }
+        float maxPossibleDist = (activeIndices.size() * (activeIndices.size() - 1)) / 2.0f * pattern.size();
+        cohesion = 1.0f - (totalDistance / std::max(1.0f, maxPossibleDist));
+    }
+    features.push_back(cohesion);
+    
+    // Feature 5: Temporal dynamics (rate of change)
+    float temporalChange = 0.0f;
+    if (pImpl->currentStep > 0) {
+        // This would ideally compare with previous pattern, simplified here
+        temporalChange = std::abs(mean - 0.5f);  // Approximation based on current activity
+    }
+    features.push_back(temporalChange);
+    
+    // Feature 6: Prediction confidence (based on working memory stability)
+    float predictionConfidence = 0.0f;
+    if (pImpl->workingMemory) {
+        predictionConfidence = pImpl->workingMemory->getWorkingMemoryStability();
+    }
+    features.push_back(predictionConfidence);
+    
+    // Feature 7: Neuromodulation level (dopamine influence)
+    float neuromodulationLevel = 0.0f;
+    if (pImpl->dopamine) {
+        neuromodulationLevel = pImpl->dopamine->getLevel();
+    }
+    features.push_back(neuromodulationLevel);
+    
+    // Feature 8: Development stage influence
+    float developmentFactor = static_cast<float>(pImpl->developmentalStage) / 4.0f;
+    features.push_back(developmentFactor);
+    
+    // Feature 9: Novelty level (from novelty detector)
+    float noveltyLevel = 0.0f;
+    if (pImpl->novelty) {
+        noveltyLevel = pImpl->novelty->getLevel();
+    }
+    features.push_back(noveltyLevel);
+    
+    // Feature 10: Attention focus (from attention system)
+    float attentionFocus = 0.0f;
+    if (pImpl->attention) {
+        attentionFocus = pImpl->attention->getAttentionStrength();
+    }
+    features.push_back(attentionFocus);
+    
+    // Feature 11: Memory load (working memory capacity usage)
+    float memoryLoad = 0.0f;
+    if (pImpl->workingMemory) {
+        memoryLoad = pImpl->workingMemory->getActiveTraces() / 
+                     static_cast<float>(pImpl->config->getOr<size_t>("neuron_count", 1000) / 10);
+    }
+    features.push_back(memoryLoad);
+    
+    // Feature 12: Stress level (from development system)
+    float stressLevel = 0.0f;
+    if (pImpl->developmentSystem) {
+        stressLevel = pImpl->developmentSystem->getStressLevel();
+    }
+    features.push_back(stressLevel);
+    
+    // Feature 13: Integration score (measure of system coherence)
+    float integrationScore = 0.0f;
+    int systemCount = 0;
+    
+    if (pImpl->workingMemory) systemCount++;
+    if (pImpl->episodicMemory) systemCount++;
+    if (pImpl->predictionSystem) systemCount++;
+    if (pImpl->conceptFormation) systemCount++;
+    if (pImpl->attention) systemCount++;
+    
+    if (systemCount > 0) {
+        float activitySum = 0.0f;
+        int activityCount = 0;
+        
+        if (pImpl->workingMemory) {
+            activitySum += pImpl->workingMemory->getActiveTraces();
+            activityCount++;
+        }
+        if (pImpl->predictionSystem) {
+            activitySum += pImpl->predictionSystem->getPredictionError();
+            activityCount++;
+        }
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            activitySum += pImpl->conceptFormation->getConceptCount();
+            activityCount++;
+        }
+        
+        integrationScore = activitySum / std::max(1.0f, static_cast<float>(activityCount));
+    }
+    features.push_back(integrationScore);
+    
+    // Feature 14: Temporal prediction (based on prediction system)
+    float temporalPrediction = 0.0f;
+    if (pImpl->predictionSystem) {
+        temporalPrediction = pImpl->predictionSystem->getConfidence();
+    }
+    features.push_back(temporalPrediction);
+    
+    // Feature 15: Current action potential (motor readiness)
+    float actionPotential = 0.0f;
+    if (!pImpl->motorNeurons.empty()) {
+        float totalMotorActivity = 0.0f;
+        int motorCount = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            const auto& state = neuron->getState();
+            totalMotorActivity += state.membranePotential;
+            motorCount++;
+        }
+        if (motorCount > 0) {
+            actionPotential = totalMotorActivity / motorCount;
+        }
+    }
+    features.push_back(actionPotential);
+    
+    // Feature 16: System energy/physiology (homeostatic regulation)
+    float physiologicalState = 0.0f;
+    if (pImpl->developmentSystem) {
+        physiologicalState = pImpl->developmentSystem->getPhysiologicalState();
+    }
+    features.push_back(physiologicalState);
+    
+    return features;
+}
+
+// Helper method to update attention based on concepts
+void Brain::updateConceptAttentionSelection() {
+    if (!pImpl->conceptFormation || !pImpl->attention) {
+        return;
+    }
+    
+    // Get all concepts and their stability
+    const auto& concepts = pImpl->conceptFormation->getConcepts();
+    
+    // Find most stable concept
+    size_t mostStableConcept = 0;
+    float highestStability = 0.0f;
+    
+    for (const auto& concept : concepts) {
+        if (concept.avgStability > highestStability) {
+            highestStability = concept.avgStability;
+            mostStableConcept = concept.id;
+        }
+    }
+    
+    if (highestStability > 0.5f && mostStableConcept > 0) {
+        // Get the concept prototype
+        std::vector<float> prototype = pImpl->conceptFormation->getConceptPrototype(mostStableConcept);
+        
+        // Extract key features from prototype for attention selection
+        float conceptEnergy = 0.0f;
+        for (float val : prototype) {
+            conceptEnergy += val;
+        }
+        conceptEnergy /= prototype.size();
+        
+        // Apply concept influence to attention system
+        // Higher concept stability = stronger attentional bias
+        pImpl->attention->setAttentionBias(mostStableConcept, highestStability * conceptEnergy);
+        
+        // Also update working memory priorities based on concept
+        if (pImpl->workingMemory) {
+            // Boost traces related to this concept
+            for (size_t i = 0; i < pImpl->workingMemory->getActiveTraces(); ++i) {
+                // This is a simplified approach - in reality would need concept-trace mapping
+                if (i % 7 == mostStableConcept % 7) {  // Simple heuristic mapping
+                    pImpl->workingMemory->enhanceTrace(i, highestStability * 0.5f);
+                }
+            }
+        }
+    }
+}
