@@ -1,8 +1,14 @@
 #include "Config.hpp"
+#include "ConfigSchema.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <memory>
+#include <rapidjson/document.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -19,41 +25,263 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+        // Check file extension to determine format
+        std::string ext = "." + std::string(std::filesystem::path(filepath).extension().string());
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        
+        // Try JSON first
+        if (ext == ".json" || ext == ".cfg") {
+            return loadFromJSON(filepath);
+        }
+        // Try YAML
+        else if (ext == ".yaml" || ext == ".yml") {
+            return loadFromYAML(filepath);
+        }
+        // Default to simple key=value format
+        else {
+            return loadFromSimpleFormat(filepath);
+        }
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+
+    bool Config::loadFromJSON(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        std::string jsonContent((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        
+        rapidjson::Document document;
+        document.Parse(jsonContent.c_str());
+        
+        if (document.HasParseError()) {
+            NLM_LOG_WARNING("Failed to parse JSON file: " + filepath);
+            return false;
+        }
+        
+        if (!document.IsObject()) {
+            NLM_LOG_WARNING("JSON file is not an object: " + filepath);
+            return false;
+        }
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON object
+        for (rapidjson::Value::ConstMemberIterator itr = document.MemberBegin(); 
+             itr != document.MemberEnd(); ++itr) {
+            std::string key = itr->name.GetString();
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (itr->value.IsString()) {
+                set(key, itr->value.GetString(), ConfigSource::File);
+            } else if (itr->value.IsInt()) {
+                set(key, itr->value.GetInt(), ConfigSource::File);
+            } else if (itr->value.IsInt64()) {
+                set(key, itr->value.GetInt64(), ConfigSource::File);
+            } else if (itr->value.IsUint()) {
+                set(key, static_cast<int64_t>(itr->value.GetUint()), ConfigSource::File);
+            } else if (itr->value.IsDouble()) {
+                set(key, itr->value.GetDouble(), ConfigSource::File);
+            } else if (itr->value.IsBool()) {
+                set(key, itr->value.GetBool(), ConfigSource::File);
+            } else if (itr->value.IsArray()) {
+                // Parse array - for now as vector<string>
+                std::vector<std::string> vec;
+                for (rapidjson::SizeType i = 0; i < itr->value.Size(); ++i) {
+                    if (itr->value[i].IsString()) {
+                        vec.push_back(itr->value[i].GetString());
+                    } else if (itr->value[i].IsInt()) {
+                        vec.push_back(std::to_string(itr->value[i].GetInt()));
+                    } else if (itr->value[i].IsDouble()) {
+                        vec.push_back(std::to_string(itr->value[i].GetDouble()));
+                    } else {
+                        vec.push_back("");
+                    }
+                }
+                // Convert to appropriate type based on content
+                bool allInts = true;
+                bool allDoubles = true;
+                bool allStrings = true;
+                
+                for (const auto& v : vec) {
+                    try {
+                        std::stoi(v);
+                    } catch (...) {
+                        allInts = false;
+                    }
+                    try {
+                        std::stod(v);
+                    } catch (...) {
+                        allDoubles = false;
+                    }
+                    allStrings = allStrings && (v.empty() || std::isalpha(v[0]));
+                }
+                
+                if (allInts) {
+                    std::vector<int> intVec;
+                    for (const auto& v : vec) {
+                        intVec.push_back(std::stoi(v));
+                    }
+                    set(key, intVec, ConfigSource::File);
+                } else if (allDoubles) {
+                    std::vector<double> doubleVec;
+                    for (const auto& v : vec) {
+                        doubleVec.push_back(std::stod(v));
+                    }
+                    set(key, doubleVec, ConfigSource::File);
+                } else {
+                    set(key, vec, ConfigSource::File);
+                }
+            } else {
+                // Unknown type, skip
+                NLM_LOG_WARNING("Skipping JSON field " + key + " with unsupported type");
+            }
+        }
+        
+        return true;
+    }
+
+    bool Config::loadFromYAML(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        try {
+            YAML::Node doc = YAML::LoadFile(filepath);
+            
+            // Clear existing entries
+            clear();
+            
+            // Parse YAML document
+            if (doc.IsMap()) {
+                for (const auto& it : doc) {
+                    std::string key = it.first.as<std::string>();
+                    
+                    // Determine type and parse accordingly
+                    if (it.second.IsScalar()) {
+                        std::string value = it.second.as<std::string>();
+                        set(key, value, ConfigSource::File);
+                    } else if (it.second.IsSequence()) {
+                        // Parse sequence - determine element type
+                        std::vector<std::string> vec;
+                        for (const auto& item : it.second) {
+                            if (item.IsScalar()) {
+                                vec.push_back(item.as<std::string>());
+                            } else {
+                                // Try to get as other types
+                                try {
+                                    if (item.IsInt()) {
+                                        vec.push_back(std::to_string(item.as<int>()));
+                                    } else if (item.IsDouble()) {
+                                        vec.push_back(std::to_string(item.as<double>()));
+                                    } else {
+                                        vec.push_back("?");
+                                    }
+                                } catch (...) {
+                                    vec.push_back("?");
+                                }
+                            }
+                        }
+                        
+                        // Convert to appropriate type
+                        bool allInts = true;
+                        bool allDoubles = true;
+                        
+                        for (const auto& v : vec) {
+                            if (v == "?") {
+                                allInts = false;
+                                allDoubles = false;
+                                continue;
+                            }
+                            try {
+                                std::stoi(v);
+                            } catch (...) {
+                                allInts = false;
+                            }
+                            try {
+                                std::stod(v);
+                            } catch (...) {
+                                allDoubles = false;
+                            }
+                        }
+                        
+                        if (allInts) {
+                            std::vector<int> intVec;
+                            for (const auto& v : vec) {
+                                if (v != "?") {
+                                    intVec.push_back(std::stoi(v));
+                                } else {
+                                    intVec.push_back(0);
+                                }
+                            }
+                            set(key, intVec, ConfigSource::File);
+                        } else if (allDoubles) {
+                            std::vector<double> doubleVec;
+                            for (const auto& v : vec) {
+                                if (v != "?") {
+                                    doubleVec.push_back(std::stod(v));
+                                } else {
+                                    doubleVec.push_back(0.0);
+                                }
+                            }
+                            set(key, doubleVec, ConfigSource::File);
+                        } else {
+                            set(key, vec, ConfigSource::File);
+                        }
+                    } else if (it.second.IsMap()) {
+                        // Nested object - for now skip
+                        NLM_LOG_WARNING("Skipping nested YAML object for key: " + key);
+                    } else {
+                        NLM_LOG_WARNING("Skipping YAML field " + key + " with unsupported type");
+                    }
+                }
+            } else {
+                NLM_LOG_WARNING("YAML file is not a map: " + filepath);
+                return false;
+            }
+        } catch (const YAML::Exception& e) {
+            NLM_LOG_ERROR("YAML parsing error in " + filepath + ": " + std::string(e.what()));
+            return false;
+        }
+        
+        return true;
+    }
+
+    bool Config::loadFromSimpleFormat(const std::string& filepath) {
+        // Original simple key=value format implementation
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
