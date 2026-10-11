@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <limits>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,6 +17,29 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+
+// Custom exception classes for Python bindings
+class PyException : public std::exception {
+public:
+    std::string message;
+    PyException(const std::string& msg) : message(msg) {}
+    const char* what() const noexcept override { return message.c_str(); }
+};
+
+class PyValueError : public PyException {
+public:
+    PyValueError(const std::string& msg) : PyException(msg) {}
+};
+
+class PyTypeError : public PyException {
+public:
+    PyTypeError(const std::string& msg) : PyException(msg) {}
+};
+
+class PyRuntimeError : public PyException {
+public:
+    PyRuntimeError(const std::string& msg) : PyException(msg) {}
+};
 
 namespace py = pybind11;
 namespace nlm {
@@ -160,6 +185,43 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Add validation method
+        .def("validate", &Config::validate,
+             "Validate configuration and return list of errors")
+        // Add safe get methods with type checking
+        .def("getInt", [](const Config& self, const std::string& key, int64_t default = 0) -> int64_t {
+            auto value = self.get<int64_t>(key);
+            return value ? value.value() : default;
+        }, py::arg("key"), py::arg("default") = 0,
+           "Get integer value with default")
+        .def("getFloat", [](const Config& self, const std::string& key, float default = 0.0f) -> float {
+            auto value = self.get<double>(key);
+            return value ? static_cast<float>(value.value()) : default;
+        }, py::arg("key"), py::arg("default") = 0.0f,
+           "Get float value with default")
+        .def("getBool", [](const Config& self, const std::string& key, bool default = false) -> bool {
+            auto value = self.get<bool>(key);
+            return value ? value.value() : default;
+        }, py::arg("key"), py::arg("default") = false,
+           "Get boolean value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& default = "") -> std::string {
+            auto value = self.get<std::string>(key);
+            return value ? value.value() : default;
+        }, py::arg("key"), py::arg("default") = "",
+           "Get string value with default")
+        // Add set methods with validation
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer value with validation")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, static_cast<double>(value));
+        }, py::arg("key"), py::arg("value"),
+           "Set float value with validation")
+        .def("setBool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set boolean value with validation")
+        .def("setString", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set string value with validation")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -245,49 +307,37 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+    // Add plasticity classes with advanced customization options
+    py::class_<Hebbian, STDP>(m, "Hebbian", R"pbdoc(Hebbian plasticity rule)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setLearningRate", &Hebbian::setLearningRate, py::arg("rate"),
+             "Set Hebbian learning rate")
+        .def("getLearningRate", &Hebbian::getLearningRate,
+             "Get Hebbian learning rate")
+        .def("getName", &Hebbian::getName,
+             "Get rule name (for type identification)");
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    py::class_<STDP>(m, "STDP", R"pbdoc(Spike-Timing-Dependent Plasticity rule)pbdoc")
         .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"),
+             "Set STDP LTP (long-term potentiation) weight")
+        .def("getLTPWeight", &STDP::getLTPWeight,
+             "Get STDP LTP weight")
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"),
+             "Set STDP LTD (long-term depression) weight")
+        .def("getLTDWeight", &STDP::getLTDWeight,
+             "Get STDP LTD weight")
+        .def("setTimeConstant", &STDP::setTimeConstant, py::arg("tau"),
+             "Set STDP time constant (tau)")
+        .def("getTimeConstant", &STDP::getTimeConstant,
+             "Get STDP time constant (tau)")
+        .def("configure", &STDP::configure,
+             py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"),
+             "Configure all STDP parameters at once")
+        .def("getName", &STDP::getName,
+             "Get rule name (for type identification)")
+        .def("getType", &STDP::getName,  // Alias for getName
+             "Get rule type (alias for getName)");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))

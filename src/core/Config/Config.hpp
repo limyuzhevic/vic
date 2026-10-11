@@ -93,6 +93,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration and return list of errors
+    std::vector<std::string> validate() const;
+    
+    // Check if configuration is valid
+    bool isValid() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -212,4 +212,49 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Add validation method implementations after the existing methods
+
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    // Check for basic consistency issues
+    for (const auto& entry : pImpl->entries) {
+        // Check key format
+        if (entry.key.empty()) {
+            errors.push_back("Empty configuration key");
+            continue;
+        }
+        
+        // Check value based on key type
+        if (entry.key.find("neuron_count") != std::string::npos) {
+            auto value = get<int64_t>(entry.key);
+            if (value && *value <= 0) {
+                errors.push_back("neuron_count must be positive");
+            } else if (value && *value > 100000) {
+                errors.push_back("neuron_count very large may impact performance");
+            }
+        }
+        
+        // Check plasticity settings
+        if (entry.key.find("plasticity") != std::string::npos) {
+            // Add specific validation for plasticity settings
+        }
+        
+        // Check development settings
+        if (entry.key.find("development") != std::string::npos && 
+            entry.key.find("stage") != std::string::npos) {
+            // Add development stage validation
+        }
+        
+        // Check world settings
+        if (entry.key.find("world") != std::string::npos) {
+            // Add world validation
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::isValid() const {
+    return validate().empty();
+}
