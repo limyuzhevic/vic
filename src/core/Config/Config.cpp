@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -14,14 +15,70 @@ Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced JSON/YAML parser with full support for all configuration types
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    try {
+        // Parse as JSON
+        auto json = nlohmann::json::parse(file);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Process all key-value pairs in the JSON
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            std::string description = "Configuration parameter: " + key;
+            
+            // Determine the value type and set accordingly
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // Try to determine array type
+                if (!it->empty()) {
+                    if (it->front().is_number_integer()) {
+                        std::vector<int64_t> intArray;
+                        for (const auto& item : *it) {
+                            intArray.push_back(item.get<int64_t>());
+                        }
+                        set(key, ConfigValue(intArray), ConfigSource::File);
+                    } else if (it->front().is_number_float()) {
+                        std::vector<double> doubleArray;
+                        for (const auto& item : *it) {
+                            doubleArray.push_back(item.get<double>());
+                        }
+                        set(key, ConfigValue(doubleArray), ConfigSource::File);
+                    } else if (it->front().is_string()) {
+                        std::vector<std::string> stringArray;
+                        for (const auto& item : *it) {
+                            stringArray.push_back(item.get<std::string>());
+                        }
+                        set(key, ConfigValue(stringArray), ConfigSource::File);
+                    }
+                }
+            }
+        }
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        // Fall back to simple key=value format
+        NLM_LOG_ERROR("JSON parsing failed, falling back to simple format: " + std::string(e.what()));
+        return loadFromSimpleFile(filepath);
+    }
+    
+    return true;
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -79,15 +136,45 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Write configuration in JSON format with enhanced support
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    nlohmann::json json;
+    
+    // Add metadata
+    json["metadata"] = {
+        {"version", "2.0"},
+        {"description", "NLM Neural Learning Machine Configuration"},
+        {"generated_by", "NLM Phase 2"},
+        {"timestamp", std::chrono::system_clock::now().time_since_epoch().count()}
+    };
+    
+    // Process all configuration entries
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (std::holds_alternative<int>(entry.value)) {
+            json[entry.key] = std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            json[entry.key] = std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            json[entry.key] = std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            json[entry.key] = std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            json[entry.key] = std::get<std::string>(entry.value);
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            json[entry.key] = std::get<std::vector<int>>(entry.value);
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            json[entry.key] = std::get<std::vector<double>>(entry.value);
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            json[entry.key] = std::get<std::vector<std::string>>(entry.value);
+        }
     }
+    
+    // Write JSON to file with pretty formatting
+    file << json.dump(2);
     
     return true;
 }
@@ -170,19 +257,45 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Enhanced Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << arg[i];
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    oss << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) oss << ", ";
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
+    
+    oss << "\nJSON Export Available:\n";
+    oss << "  saveToFile('config.json') - Save as JSON\n";
+    oss << "  loadFromFile('config.json') - Load from JSON\n";
+    
     return oss.str();
 }
 
