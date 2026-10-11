@@ -1,0 +1,179 @@
+# NLM CMake Build Presets
+# This file defines build configurations for different use cases
+# It helps standardize build processes across different platforms and environments
+
+# ----------------------------------------------------------------------------
+# Build Presets Configuration
+# ----------------------------------------------------------------------------
+
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16
+  },
+  "configurePresets": [
+    {
+      "name": "nlm-debug",
+      "displayName": "NLM Debug Build",
+      "description": "Debug build with all components enabled",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NLM_BUILD_TESTS": "ON",
+        "NLM_BUILD_PYTHON_BINDINGS": "ON",
+        "NLM_BUILD_CLI": "ON",
+        "NLM_BUILD_DEMOS": "ON",
+        "NLM_BUILD_FULL": "ON",
+        "NLM_ENABLE_CONAN": "OFF",
+        "NLM_ENABLE_VCPKG": "OFF",
+        "NLM_ENABLE_CPACK": "OFF"
+      },
+      "binaryDir": "${sourceDir}/build/debug"
+    },
+    {
+      "name": "nlm-release",
+      "displayName": "NLM Release Build",
+      "description": "Optimized release build with all components",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NLM_BUILD_TESTS": "ON",
+        "NLM_BUILD_PYTHON_BINDINGS": "ON",
+        "NLM_BUILD_CLI": "ON",
+        "NLM_BUILD_DEMOS": "ON",
+        "NLM_BUILD_FULL": "ON",
+        "NLM_ENABLE_CONAN": "OFF",
+        "NLM_ENABLE_VCPKG": "OFF",
+        "NLM_ENABLE_CPACK": "OFF"
+      },
+      "binaryDir": "${sourceDir}/build/release"
+    },
+    {
+      "name": "nlm-minimal",
+      "displayName": "NLM Minimal Build",
+      "description": "Minimal build with only core libraries",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NLM_BUILD_TESTS": "OFF",
+        "NLM_BUILD_PYTHON_BINDINGS": "OFF",
+        "NLM_BUILD_CLI": "OFF",
+        "NLM_BUILD_DEMOS": "OFF",
+        "NLM_BUILD_FULL": "OFF",
+        "NLM_BUILD_MINIMAL": "ON",
+        "NLM_ENABLE_CONAN": "OFF",
+        "NLM_ENABLE_VCPKG": "OFF",
+        "NLM_ENABLE_CPACK": "OFF"
+      },
+      "binaryDir": "${sourceDir}/build/minimal"
+    },
+    {
+      "name": "nlm-dev",
+      "displayName": "NLM Development Build",
+      "description": "Development build with all features and debugging",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NLM_BUILD_TESTS": "ON",
+        "NLM_BUILD_PYTHON_BINDINGS": "ON",
+        "NLM_BUILD_CLI": "ON",
+        "NLM_BUILD_DEMOS": "ON",
+        "NLM_BUILD_FULL": "ON",
+        "NLM_BUILD_DEV": "ON",
+        "NLM_ENABLE_CONAN": "OFF",
+        "NLM_ENABLE_VCPKG": "OFF",
+        "NLM_ENABLE_CPACK": "OFF"
+      },
+      "binaryDir": "${sourceDir}/build/dev"
+    },
+    {
+      "name": "nlm-conan-debug",
+      "displayName": "NLM Conan Debug Build",
+      "description": "Debug build using Conan for dependency management",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NLM_BUILD_TESTS": "ON",
+        "NLM_BUILD_PYTHON_BINDINGS": "ON",
+        "NLM_BUILD_CLI": "ON",
+        "NLM_BUILD_DEMOS": "ON",
+        "NLM_ENABLE_CONAN": "ON",
+        "NLM_ENABLE_VCPKG": "OFF",
+        "NLM_ENABLE_CPACK": "OFF"
+      },
+      "binaryDir": "${sourceDir}/build/conan-debug"
+    },
+    {
+      "name": "nlm-vcpkg-release",
+      "displayName": "NLM Vcpkg Release Build",
+      "description": "Release build using vcpkg for Windows development",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NLM_BUILD_TESTS": "ON",
+        "NLM_BUILD_PYTHON_BINDINGS": "ON",
+        "NLM_BUILD_CLI": "ON",
+        "NLM_BUILD_DEMOS": "ON",
+        "NLM_ENABLE_CONAN": "OFF",
+        "NLM_ENABLE_VCPKG": "ON",
+        "NLM_ENABLE_CPACK": "OFF"
+      },
+      "binaryDir": "${sourceDir}/build/vcpkg-release"
+    },
+    {
+      "name": "nlm-cpack",
+      "displayName": "NLM CPack Build",
+      "description": "Build configuration for packaging with CPack",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NLM_BUILD_TESTS": "ON",
+        "NLM_BUILD_PYTHON_BINDINGS": "ON",
+        "NLM_BUILD_CLI": "ON",
+        "NLM_BUILD_DEMOS": "ON",
+        "NLM_ENABLE_CONAN": "OFF",
+        "NLM_ENABLE_VCPKG": "OFF",
+        "NLM_ENABLE_CPACK": "ON"
+      },
+      "binaryDir": "${sourceDir}/build/package"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "nlm-debug-build",
+      "configurePreset": "nlm-debug",
+      "displayName": "Build NLM Debug"
+    },
+    {
+      "name": "nlm-release-build",
+      "configurePreset": "nlm-release",
+      "displayName": "Build NLM Release"
+    },
+    {
+      "name": "nlm-minimal-build",
+      "configurePreset": "nlm-minimal",
+      "displayName": "Build NLM Minimal"
+    },
+    {
+      "name": "nlm-dev-build",
+      "configurePreset": "nlm-dev",
+      "displayName": "Build NLM Dev"
+    },
+    {
+      "name": "nlm-conan-build",
+      "configurePreset": "nlm-conan-debug",
+      "displayName": "Build NLM Conan Debug"
+    },
+    {
+      "name": "nlm-vcpkg-build",
+      "configurePreset": "nlm-vcpkg-release",
+      "displayName": "Build NLM Vcpkg Release"
+    },
+    {
+      "name": "nlm-cpack-build",
+      "configurePreset": "nlm-cpack",
+      "displayName": "Build NLM Package"
+    }
+  ]
+}

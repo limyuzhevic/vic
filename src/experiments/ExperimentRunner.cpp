@@ -113,7 +113,101 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
+    // Implement results saving using JSON format
+    #ifdef __has_include
+    #if __has_include(<nlohmann/json.hpp>)
+    #include <nlohmann/json.hpp>
+    #include <fstream>
+    #include <iomanip>
+    
+    try {
+        nlohmann::json resultsJson;
+        
+        // Add metadata
+        resultsJson["metadata"]["format"] = "NLM Experiment Results";
+        resultsJson["metadata"]["version"] = "Phase 2";
+        resultsJson["metadata"]["timestamp"] = std::chrono::system_clock::now().time_since_epoch().count();
+        
+        // Add experiment data
+        resultsJson["experiments"] = nlohmann::json::array();
+        for (const auto& experiment : pImpl->experiments) {
+            nlohmann::json expJson;
+            expJson["name"] = experiment->getName();
+            expJson["seed"] = experiment->getSeed();
+            expJson["startStep"] = experiment->getStartStep();
+            expJson["endStep"] = experiment->getEndStep();
+            
+            // Add step data
+            expJson["stepData"] = nlohmann::json::array();
+            for (const auto& step : experiment->getStepData()) {
+                nlohmann::json stepJson;
+                stepJson["step"] = step.step;
+                stepJson["neuronCount"] = step.neuronCount;
+                stepJson["synapseCount"] = step.synapseCount;
+                stepJson["firingCount"] = step.firingCount;
+                stepJson["avgFiringRate"] = step.avgFiringRate;
+                expJson["stepData"].push_back(stepJson);
+            }
+            
+            // Add metrics
+            expJson["metrics"] = nlohmann::json::array();
+            for (const auto& metric : experiment->getMetrics()) {
+                nlohmann::json metricJson;
+                metricJson["name"] = metric.first;
+                metricJson["value"] = metric.second;
+                expJson["metrics"].push_back(metricJson);
+            }
+            
+            // Add notes
+            expJson["notes"] = experiment->getNotes();
+            
+            resultsJson["experiments"].push_back(expJson);
+        }
+        
+        // Write to file with pretty formatting
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << std::setw(2) << resultsJson << std::endl;
+        file.close();
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // TODO: Add proper logging for error
+        return false;
+    }
+    
+    #else
+    // nlohmann/json not available, create simple text format
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "NLM Experiment Results (Phase 2)\n";
+    file << "=============================\n\n";
+    
+    for (const auto& experiment : pImpl->experiments) {
+        file << "Experiment: " << experiment->getName() << "\n";
+        file << "Seed: " << experiment->getSeed() << "\n";
+        file << "Duration: " << (experiment->getEndStep() - experiment->getStartStep()) << " steps\n";
+        file << "Metrics:\n";
+        
+        for (const auto& metric : experiment->getMetrics()) {
+            file << "  " << metric.first << ": " << metric.second << "\n";
+        }
+        
+        file << "\n";
+    }
+    
+    file.close();
+    return true;
+    
+    #endif
+    
     return false;
 }
 

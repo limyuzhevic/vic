@@ -1,0 +1,70 @@
+# vcpkg.json Configuration for NLM
+# This file configures vcpkg package manager for Windows development
+# Provides dependency management on Windows with automatic package installation
+
+{
+    "name": "nlm",
+    "version-string": "0.1.0",
+    "description": "Neural Learning Machine - Advanced brain simulation framework for C++",
+    "dependencies": [
+        {
+            "name": "nlohmann-json",
+            "version>=": "3.11.2"
+        },
+        {
+            "name": "yaml-cpp",
+            "version>=": "0.8.0"
+        },
+        {
+            "name": "pybind11",
+            "version>=": "2.11.1"
+        }
+    ],
+    "features": {
+        "conan": {
+            "description": "Enable Conan package manager support",
+            "requires": [],
+            "platform": ["Windows", "Linux", "Macos"]
+        },
+        "vcpkg": {
+            "description": "Enable vcpkg package manager (native for Windows)",
+            "requires": [],
+            "platform": ["Windows"]
+        },
+        "python-bindings": {
+            "description": "Build Python bindings",
+            "requires": ["pybind11"],
+            "platform": ["Windows", "Linux", "Macos"]
+        },
+        "cli": {
+            "description": "Build advanced CLI and plugin system",
+            "requires": [],
+            "platform": ["Windows", "Linux", "Macos"]
+        },
+        "tests": {
+            "description": "Build test executables",
+            "requires": ["nlohmann-json", "yaml-cpp"],
+            "platform": ["Windows", "Linux", "Macos"]
+        },
+        "docs": {
+            "description": "Build documentation",
+            "requires": [],
+            "platform": ["Windows", "Linux", "Macos"]
+        }
+    },
+    "builtin-dependencies": false,
+    "msbuild-executable": "msbuild",
+    "port-version": 0,
+    "default-features": ["conan", "python-bindings"],
+    "install-root-relative": true,
+    "overlay-ports": [
+        {
+            "path": "vcpkg/ports"
+        }
+    ],
+    "overlay-triplets": [
+        {
+            "path": "vcpkg/triplets"
+        }
+    ]
+}

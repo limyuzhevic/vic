@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -42,6 +43,21 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Helper functions for file parsing
+namespace detail {
+    // Detect file format based on extension and content
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLFile(const std::string& filepath);
+    static bool isSimpleFormatFile(const std::string& filepath);
+    
+    // Simple key=value parser (for backward compatibility)
+    static bool parseSimpleFormat(const std::string& content, Config* config);
+    
+    // Convert ConfigValue to JSON/YAML compatible string
+    static std::string configValueToString(const ConfigValue& value);
+    static std::string configValueToYAML(const ConfigValue& value);
+}
 
 // Main configuration class
 class Config {

@@ -1,4 +1,12 @@
 #include "DevelopmentSystem.hpp"
+#include "../brain/Brain.hpp"
+#include "../development/Synaptogenesis.hpp"
+#include "../development/Maturation.hpp"
+#include "../development/Pruning.hpp"
+#include "../memory/Memory.hpp"
+#include "../core/Random/RandomGenerator.hpp"
+#include <algorithm>
+#include <cmath>
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 
