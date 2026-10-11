@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -93,6 +98,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Load from specific format
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromKeyValue(const std::string& filepath);
+    
+    // Save to specific format
+    bool saveToJSON(const std::string& filepath) const;
+    void saveToJSON(std::ostream& os) const;
+    void saveToYAML(std::ostream& os) const;
+    void saveToKeyValue(std::ostream& os) const;
+    
+    // Set values with ConfigSource (template)
+    template<typename T>
+    void set(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +120,23 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers (declared in header for template linkage)
+    static nlohmann::json configValueToJson(const ConfigValue& value);
+    static std::optional<ConfigValue> jsonToConfigValue(const nlohmann::json& j);
 };
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

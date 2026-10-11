@@ -1,0 +1,39 @@
+Compilation Errors Report for Config System
+
+1. RandomGenerator::pickRandomIndex() ambiguity:
+   - Issue: uniformInt(0, n-1) causes ambiguous overload resolution
+   - Location: src/core/Random/Random.cpp line 116
+   - Fix: Change to uniformInt(0, static_cast<uint64_t>(n-1))
+
+2. Config::jsonToConfigValue() const qualifier issue:
+   - Issue: The function should not be const qualified
+   - Location: src/core/Config/Config.cpp line 236
+   - Note: This is in the header file (Config.hpp)
+
+3. Missing template instantiations:
+   - Issue: Explicit template instantiations are in the source file instead of header
+   - Location: src/core/Config/Config.cpp lines 255-256
+   - Fix: Move to header file (Config.hpp)
+
+4. Config::set() overload resolution:
+   - Issue: Ambiguous overload when calling set() with different types
+   - Location: src/core/Config/Config.cpp line 59
+   - Fix: Ensure correct type conversion
+
+5. Config::summary() output issues:
+   - Issue: Cannot output vectors to std::ostringstream
+   - Location: src/core/Config/Config.cpp line 181
+   - Fix: Use << operator for vector types
+
+Summary:
+The Config system has been modified to add JSON support, but there are compilation errors that need to be fixed:
+
+1. Fix the RandomGenerator::pickRandomIndex() overload resolution
+2. Move explicit template instantiations to the header file
+3. Fix the set() function overload resolution
+4. Fix the summary() function to properly handle vector types
+
+Once these compilation errors are fixed, the Config system should be able to:
+- Load JSON configuration files
+- Save configuration to JSON files
+- Test JSON loadFromFile and saveToFile functionality

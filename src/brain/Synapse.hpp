@@ -1,6 +1,11 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
+#include <algorithm>
+#include <numeric>
+#include <memory>
+#include "../core/Random/Random.hpp"
 
 namespace nlm {
 

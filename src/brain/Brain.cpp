@@ -71,6 +71,7 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    bool sleepPhase;  // Sleep phase (true = sleep, false = active)
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -89,6 +90,7 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , sleepPhase(false)  // Start in active phase
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -511,8 +513,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use prediction system to learn temporal sequences from sensory activity
+        // Track neural activity patterns for prediction learning
+        
+        // Get current neural activity pattern
+        std::vector<float> activityPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    // Use normalized firing rate as activity indicator
+                    float firingRate = neuron->getFiringRate();
+                    activityPattern.push_back(firingRate);
+                }
+            }
+        }
+        
+        if (!activityPattern.empty()) {
+            // Update prediction system with current activity pattern
+            // The prediction system learns temporal sequences and predicts next states
+            pImpl->predictionSystem->update(activityPattern, currentStep, currentTime);
+            
+            // Get prediction confidence and adjust neuromodulation
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Apply prediction-based neuromodulation
+            if (predictionError > 0.5f) {
+                // High prediction error -> increase exploration/curation
+                if (pImpl->curiosity) {
+                    pImpl->curiosity->increaseExploration(0.1f * predictionError);
+                }
+            } else if (predictionConfidence > 0.8f) {
+                // High confidence -> increase exploitation
+                if (pImpl->dopamine) {
+                    pImpl->dopamine->increaseReinforcement(0.05f * predictionConfidence);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +561,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply attention to episodic memory encoding
+        if (pImpl->episodicMemory && !pImpl->episodicMemory->getRecentEpisodes().empty()) {
+            // Attention modulates memory encoding strength
+            pImpl->attention->modulateMemoryEncoding(pImpl->episodicMemory->getRecentEpisodes().size() * 0.1f);
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes current neural activity to discover patterns
+        // It builds abstract representations from concrete experiences
+        
+        // Get current neural activity pattern for concept learning
+        std::vector<float> neuralActivity;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    // Get average firing rate over recent time
+                    float firingRate = neuron->getFiringRate();
+                    neuralActivity.push_back(firingRate);
+                }
+            }
+        }
+        
+        if (!neuralActivity.empty()) {
+            // Form concepts from neural activity patterns
+            pImpl->conceptFormation->processNeuralActivity(neuralActivity, currentStep);
+            
+            // Get concept stability and use for action selection
+            float conceptStability = pImpl->conceptFormation->getConceptStability();
+            
+            // Apply concept stability to decision making
+            if (conceptStability > 0.7f && pImpl->planner) {
+                // Stable concepts -> more systematic planning
+                pImpl->planner->setPlanningStrategy(NeuralPlanner::PlanningStrategy::Systematic);
+            } else {
+                // Unstable concepts -> more exploratory planning
+                pImpl->planner->setPlanningStrategy(NeuralPlanner::PlanningStrategy::Exploratory);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -546,43 +618,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 14: Sleep/rest cycle with memory consolidation ==========
+    // Sleep phase alternates with active phase (sleep every 5000 steps)
+    pImpl->sleepPhase = (currentStep % 5000) < 2500;
+    
+    if (pImpl->sleepPhase) {
+        // Active phase - normal processing
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Working memory maintenance during active phase
+            pImpl->workingMemory->maintainActiveTraces(pImpl->timestep);
+        }
+    } else {
+        // Sleep phase - memory consolidation and replay
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+        // Reduce neuromodulation during sleep
+        if (pImpl->dopamine) {
+            pImpl->dopamine->reduceLevel(0.5f);  // Dopamine reduction during sleep
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->reduceLevel(0.8f);  // Curiosity reduction during sleep
+        }
+        
+        // Enhanced synchronized memory replay during sleep
+        if (pImpl->episodicMemory && currentStep % 100 == 0) {
+            // Get more episodes for synchronized replay during sleep
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisodeSynchronized(episode, pImpl->timestep);
             }
+        }
+        
+        // Strong memory consolidation during sleep
+        if (pImpl->episodicMemory && currentStep % 200 == 0) {
+            pImpl->episodicMemory->consolidate(0.5f);  // Stronger consolidation during sleep
+        }
+        
+        // Development effects during sleep
+        if (pImpl->developmentSystem) {
+            // Sleep accelerates development
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 10);
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Sleep enhances plasticity in developing systems
+            if (pImpl->structuralPlasticity) {
+                float plasticityMod = pImpl->developmentSystem->getPlasticityModifier();
+                pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * plasticityMod * 1.5f);
+                pImpl->structuralPlasticity->setPruningRate(0.00001f * (2.0f - plasticityMod) * 1.5f);
+            }
+        }
+        
+        // Enhanced working memory consolidation during sleep
+        if (pImpl->workingMemory && currentStep % 150 == 0) {
+            pImpl->workingMemory->consolidateMemory(pImpl->timestep * 2);
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
+        // Final consolidation after sleep
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }

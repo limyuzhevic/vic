@@ -48,15 +48,32 @@ public:
     void advanceBy(SimulationStep steps);
     
     // Get time at a future step from now
-    Timestamp timeAtFutureStep(SimulationStep stepsAhead) const;
+    Timestamp timeAtStep(SimulationStep targetStep) const;
     
-    // Real-time wall clock comparison (for real-time mode)
-    double getRealTimeElapsed() const;
-    void setRealTimeStart();
+    // Real time tracking
+    void startRealTime();
+    double getRealTime() const;
+    void pauseRealTime();
+    bool isRealTimeStarted() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Time since last real time operation
+    double timeSinceRealStart() const;
+    
+    // Time since last real time operation with explicit timestamp
+    double timeSinceRealStart(Timestamp timestamp) const;
+    
+    // Real time elapsed since clock start
+    double getRealElapsed() const;
+    
+    // Calculate wall-time equivalent for a given simulation step
+    double stepToWallTime(SimulationStep step, TimestepDuration dt) const;
+    
+    // Get number of wall-time seconds for simulation step
+    double stepToWallSeconds(SimulationStep step, TimestepDuration dt) const;
+    
+    // Set real time mode
+    void setRealTimeMode(bool enabled);
+    bool isRealTimeMode() const;
 };
 
 } // namespace nlm
