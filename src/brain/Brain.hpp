@@ -11,6 +11,35 @@
 
 namespace nlm {
 
+// Neuromodulator: Abstract base for neuromodulatory signals
+class Neuromodulator {
+public:
+    virtual ~Neuromodulator() = default;
+    
+    // Get modulator name
+    virtual const char* getName() const = 0;
+    
+    // Get current concentration/level
+    virtual float getLevel() const = 0;
+    virtual void setLevel(float level) = 0;
+    
+    // Apply neuromodulatory effect to plasticity
+    // TODO PHASE 2: Implement real modulation
+    virtual float getPlasticityFactor() const = 0;
+    
+    // Update neuromodulator state
+    virtual void update(TimestepDuration dt) = 0;
+    
+    // Initialize with brain reference
+    virtual void initialize(class Brain* brain) {}
+    
+    // Reset neuromodulator state
+    virtual void reset() {}
+    
+protected:
+    Neuromodulator() = default;
+};
+
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -25,9 +54,13 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Novelty;
+class Curiosity;
 class PredictionError;
+class Reward;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,14 +208,26 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Novelty - novelty detection
     Novelty* getNovelty();
     
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Reward signal for reinforcement learning
+    Reward* getReward();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

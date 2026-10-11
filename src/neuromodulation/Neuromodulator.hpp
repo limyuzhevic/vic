@@ -7,8 +7,6 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
-
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
@@ -27,13 +25,20 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Initialize with brain reference
+    virtual void initialize(class Brain* brain) {}
+    
+    // Reset neuromodulator state
+    virtual void reset() {}
+    
 protected:
     Neuromodulator() = default;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
 public:
     Dopamine();
     ~Dopamine() override;
@@ -43,47 +48,180 @@ public:
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
     
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
+    
+    // Enhance attention and memory encoding
+    void enhanceAttention(float enhancement);
+    void enhanceMemoryEncoding(float strength);
+    void setMemoryReverie(bool reverie);
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
+    
+    // Increase arousal and alertness
+    void increaseArousal(float level);
+    void enhanceSensoryProcessing(float enhancement);
+    void setFocusLevel(float level);
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
+    
+    // Modulate mood and social behavior
+    void modulateMood(float level);
+    void reduceImpulsivity(float reduction);
+    void enhanceSocialBehavior(float strength);
+    void setSocialBonding(float bonding);
+};
+
+// Novelty: Novelty detection and memory updating
+class Novelty : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
+public:
+    Novelty();
+    ~Novelty() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
+};
+
+// Curiosity: Exploration motivation
+class Curiosity : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
+public:
+    Curiosity();
+    ~Curiosity() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
+    
+    // Get exploration drive
+    float getExplorationDrive() const;
+    
+    // Configure curiosity weights
+    void setNoveltyWeight(float weight);
+    void setPredictionErrorWeight(float weight);
+};
+
+// Prediction Error: Prediction error signaling
+class PredictionError : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
+public:
+    PredictionError();
+    ~PredictionError() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void initialize(class Brain* brain) override;
+    void reset() override;
+    
+    // Compute prediction error
+    void computeError(float predicted, float actual);
+    
+    // Update prediction
+    void updatePrediction(float newPrediction);
+    
+    // Get error magnitude
+    float getMagnitude() const;
+    
+    // Get history
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+};
+
+// Reward signal for reinforcement learning
+class Reward : public Neuromodulator {
+    struct Impl;
+    Impl* pImpl;
+public:
+    Reward();
+    ~Reward() override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain) override;
+    
+    // Get current reward value
+    float getValue() const;
+    void setValue(float value);
+    
+    // Accumulate reward
+    void add(float delta);
+    
+    // Reset accumulated reward
+    void reset() override;
+    
+    // Compute reward from environment state
+    // TODO PHASE 2: Implement real reward computation
+    float computeReward(const class Observation& observation) const;
+    
+    // Reward history
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
 };
 
 } // namespace nlm

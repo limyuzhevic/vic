@@ -8,9 +8,14 @@ namespace nlm {
 // PLACEHOLDER - Phase 2 will implement real reward computation
 
 class Reward {
+    struct Impl;
+    Impl* pImpl;
 public:
     Reward();
     ~Reward();
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
     
     // Get current reward value
     float getValue() const;

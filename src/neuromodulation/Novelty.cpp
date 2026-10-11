@@ -20,9 +20,8 @@ Novelty::Novelty() : pImpl(new Impl) {}
 
 Novelty::~Novelty() = default;
 
-void Novelty::initialize(Brain* brain) {
+void Novelty::initialize(class Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
 }
 
 float Novelty::getLevel() const {
@@ -79,6 +78,12 @@ const std::vector<float>& Novelty::getHistory() const {
 
 void Novelty::clearHistory() {
     pImpl->history.clear();
+}
+
+void Novelty::reset() {
+    pImpl->level = 0.0f;
+    pImpl->history.clear();
+    pImpl->lastPattern.clear();
 }
 
 } // namespace nlm

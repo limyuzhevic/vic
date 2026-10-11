@@ -7,8 +7,13 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -46,6 +51,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +134,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -511,8 +522,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Get current sensory state from sensory neurons
+        std::vector<float> sensoryState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            sensoryState.push_back(neuron->getState().membranePotential);
+        }
+        
+        // Update prediction system
+        pImpl->predictionSystem->update(sensoryState, pImpl->timestep);
+        
+        // Use prediction error for neuromodulation
+        if (pImpl->predictionError) {
+            float error = pImpl->predictionError->computeError();
+            pImpl->predictionError->update(pImpl->timestep);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +552,81 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract pattern features from working memory and current neural state
+        std::vector<float> currentActivity;
+        
+        // Include working memory traces
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                // Find neuron and get its activation
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            currentActivity.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Include active neuron activations
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    currentActivity.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential));
+                }
+            }
+        }
+        
+        // Update concept formation with current activity patterns
+        pImpl->conceptFormation->update(currentActivity, pImpl->timestep);
+    }
+    
+    // ========== STEP 11: Neural planning ==========
+    if (pImpl->planner) {
+        // Use working memory contents and current neural state for planning
+        std::vector<float> planningContext;
+        
+        // Include current working memory contents
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            planningContext.push_back(pImpl->workingMemory->retrieve(neuronId));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Include current motor neuron activity
+        float motorActivity = 0.0f;
+        for (auto* neuron : pImpl->motorNeurons) {
+            motorActivity += neuron->getState().membranePotential;
+        }
+        planningContext.push_back(motorActivity);
+        
+        // Update planner with current context
+        pImpl->planner->update(planningContext, pImpl->timestep);
+        
+        // Apply planned action to motor system if available
+        auto plannedAction = pImpl->planner->getPlannedAction();
+        if (plannedAction.type != ActionType::Wait) {
+            // Scale action strength based on planning confidence
+            float actionStrength = pImpl->planner->getPlanningConfidence();
+            
+            // Inject current into motor neurons based on planned action
+            injectCurrentToNeurons(NeuronType::Motor, plannedAction.strength * actionStrength);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1065,11 +1162,17 @@ Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
 }
 
-PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
     return pImpl->config;
 }
 

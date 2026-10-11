@@ -22,7 +22,7 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 
 Curiosity::~Curiosity() = default;
 
-void Curiosity::initialize(Brain* brain) {
+void Curiosity::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
