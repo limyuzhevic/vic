@@ -1,12 +1,33 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+// Forward declaration for error handling
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error("NLM Error: " + msg) {}
+};
 
-namespace nlm {
+class ConfigurationError : public NLMError {
+public:
+    explicit ConfigurationError(const std::string& msg) : NLMError("Configuration: " + msg) {}
+};
 
-struct Config::Impl {
+class InitializationError : public NLMError {
+public:
+    explicit InitializationError(const std::string& msg) : NLMError("Initialization: " + msg) {}
+};
+
+class SimulationError : public NLMError {
+public:
+    explicit SimulationError(const std::string& msg) : NLMError("Simulation: " + msg) {}
+};
+
+class SimulationError : public NLMError {
+public:
+    explicit SimulationError(const std::string& msg) : NLMError("Simulation: " + msg) {}
+};
+
+class MemoryError : public NLMError {
+public:
+    explicit MemoryError(const std::string& msg) : NLMError("Memory: " + msg) {}
+};
     std::vector<ConfigEntry> entries;
 };
 
@@ -27,19 +48,34 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+    // Store current state for rollback on error
+    std::vector<ConfigEntry> originalEntries = pImpl->entries;
+    bool success = true;
+    
+    try {
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(file, line)) {
+            ++lineNum;
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos == std::string::npos) {
+                // Invalid line format, skip with warning
+                continue;
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty()) {
+                continue; // Skip lines without key
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -50,9 +86,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    } catch (...) {
+        // Rollback on error
+        pImpl->entries = std::move(originalEntries);
+        success = false;
     }
     
-    return true;
+    return success;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +124,44 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Ensure directory exists
+    std::filesystem::path filePath(filepath);
+    std::filesystem::path parentDir = filePath.parent_path();
+    if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+        try {
+            std::filesystem::create_directories(parentDir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            return false;
+        }
+    }
+    
+    // Write configuration entries with improved serialization
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Serialize based on value type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << value << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << std::setprecision(10) << value << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        
+        file << "# Source: " << static_cast<int>(entry.source) << "\n";
+        file << "\n";
+    }
+    
+    // Verify file was written successfully
+    if (file.bad() || file.fail()) {
+        return false;
     }
     
     return true;
@@ -111,10 +186,18 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return val.value();
+    }
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key before proceeding
+    if (key.empty()) {
+        return; // Skip empty keys
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
