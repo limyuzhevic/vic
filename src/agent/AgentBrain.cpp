@@ -63,15 +63,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+float AgentBrain::calculateMotorGroupActivity(const std::vector<Neuron*>& neurons) const {
+    if (neurons.empty()) return 0.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    float totalActivity = 0.0f;
+    for (const Neuron* n : neurons) {
+        float activity = std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        totalActivity += activity;
+    }
+    
+    return totalActivity / neurons.size();
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -162,26 +163,10 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
+MotorCommand AgentBrain::selectHighestActivityCommand(
+    float forwardAct, float backwardAct, float leftAct, float rightAct,
+    float interactAct, float waitAct) {
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -192,16 +177,15 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     };
     
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    float bestActivity = waitAct;
     
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+    for (const auto& cmd : commands) {
+        if (cmd.activity > bestActivity) {
+            bestActivity = cmd.activity;
+            best = cmd.cmd;
         }
     }
     
-    // Only act if there's meaningful activity
     if (bestActivity < 0.5f) {
         return MotorCommand::Wait;
     }
@@ -209,69 +193,58 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
-    }
+bool AgentBrain::shouldExploreWithCuriosity() const {
+    if (!curiosityEnabled_) return false;
+    if (curiosityLevel_ <= 0.5f) return false;
     
-    return defaultCmd;
+    float exploreChance = curiosityLevel_ * 0.3f;
+    float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+    
+    return r < exploreChance;
 }
 
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
-    
-    // Compute prediction error
+MotorCommand AgentBrain::selectRandomMotorCommand() {
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::LookLeft;
+        case 5: return MotorCommand::LookRight;
+        case 6: return MotorCommand::Interact;
+        default: return MotorCommand::Wait;
+    }
+}
+
+void AgentBrain::computeRewardPredictionError(float reward, float predictedReward) {
     predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
-    // Dopamine-like signal (based on prediction error)
+}
+
+void AgentBrain::updateDopamineLevel() {
     dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
+}
+
+void AgentBrain::applyRewardToSynapses() {
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
                 syn->addToWeight(delta);
-                
-                // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
             }
         }
     }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
+}
+
+void AgentBrain::updatePlasticityBasedOnDopamine() {
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);

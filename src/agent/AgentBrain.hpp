@@ -76,6 +76,16 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for refactoring
+    float calculateMotorGroupActivity(const std::vector<Neuron*>& neurons) const;
+    MotorCommand selectHighestActivityCommand(float forwardAct, float backwardAct, float leftAct, float rightAct, float interactAct, float waitAct);
+    bool shouldExploreWithCuriosity() const;
+    MotorCommand selectRandomMotorCommand();
+    void computeRewardPredictionError(float reward, float predictedReward);
+    void updateDopamineLevel();
+    void applyRewardToSynapses();
+    void updatePlasticityBasedOnDopamine();
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

@@ -93,6 +93,32 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced configuration commands
+    
+    // Config file management commands
+    std::vector<std::string> listFiles(const std::string& directory = ".") const;
+    bool validateFile(const std::string& filepath) const;
+    bool convertFile(const std::string& inputPath, const std::string& outputPath) const;
+    bool mergeFiles(const std::vector<std::string>& filePaths, const std::string& outputPath) const;
+    std::string diffFiles(const std::string& path1, const std::string& path2) const;
+    std::string backupFile(const std::string& filepath) const;
+    
+    // Advanced config operations
+    nlm::Config extractKeys(const std::vector<std::string>& keys) const;
+    nlm::Config generateTemplate(const std::string& templateType) const;
+    std::string getStatistics() const;
+    std::vector<std::string> searchKeys(const std::string& pattern) const;
+    bool migrateFromVersion(const std::string& oldFormat, const std::string& targetVersion) const;
+    
+    // Export/import utilities
+    bool exportToJSON(const std::string& filepath) const;
+    bool exportToYAML(const std::string& filepath) const;
+    bool importFromJSON(const std::string& filepath);
+    bool importFromYAML(const std::string& filepath);
+    
+    // Validation and schema
+    bool validateAgainstSchema(const std::string& schemaFile) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +126,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    std::string getFileExtension(const std::string& filepath) const;
+    bool isValidFormat(const std::string& filepath) const;
 };
 
 } // namespace nlm

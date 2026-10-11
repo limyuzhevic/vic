@@ -321,6 +321,161 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+#include "core/Config/Config.hpp"
+#include "core/Random/Random.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/SimulationClock/SimulationClock.hpp"
+#include "brain/Brain.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
+#include "environment/Environment.hpp"
+#include "experiments/ExperimentRunner.hpp"
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <numeric>
+#include <ctime>
+#include <filesystem>
+#include <algorithm>
+#include <map>
+
+using namespace nlm;
+
+// Command line help
+void printHelp() {
+    std::cout << R"(
+NLM - Neural Learning Machine - Advanced Commands
+===================================================
+
+CONFIG COMMANDS:
+  config list [directory]        - List available config files in directory
+  config validate [file]          - Validate config file format (JSON/YAML)
+  config convert [in] [out]        - Convert between JSON and YAML formats
+  config merge [files...] [out]    - Merge multiple config files
+  config diff [file1] [file2]      - Show differences between config files
+  config backup [file]             - Create backup of config with timestamp
+  config extract [file] [keys...]  - Extract specific keys to new config
+  config template [type] [file]    - Generate template configs with examples
+  config statistics [file]         - Show config statistics (types, sources, etc.)
+  config search [file] [pattern]    - Search for config keys with patterns
+  config migrate [file] [version]   - Migrate old config format to new format
+
+BRAIN SYSTEM COMMANDS:
+  brain status                    - Show brain system status and metrics
+  brain reset [steps]             - Reset brain and optionally run steps
+
+MEMORY SYSTEM COMMANDS:
+  memory stats                    - Show memory system statistics
+
+NEURON SYSTEM COMMANDS:
+  neuron info [region]            - Show neuron population information
+
+PLASTICITY SYSTEM COMMANDS:
+  plasticity report               - Show plasticity rule status and parameters
+
+NEUROMODULATION SYSTEM COMMANDS:
+  neuromodulation status           - Show neuromodulation system state
+
+AGENT COMMANDS:
+  agent learn [params]            - Start learning session with custom parameters
+  agent evaluate [file]            - Evaluate agent performance
+  agent save [file] [metadata]     - Save agent state with metadata
+  agent load [file]               - Load saved agent state
+  agent profile                    - Show agent capabilities and limitations
+
+ENVIRONMENT COMMANDS:
+  env create [type] [name] [params] - Create new environment with specified parameters
+  env list                         - List available environments
+  env info [name]                  - Show environment details
+
+WORLD COMMANDS:
+  world reset                     - Reset world state
+  world pause [enable]            - Pause/unpause world simulation
+  world step [count]              - Step world simulation forward
+
+MISCELLANEOUS:
+  help                            - Show this help message
+  version                         - Show NLM version information
+  run [steps]                     - Run default test suite for specified steps
+
+Examples:
+  config list ./configs
+  config validate ./configs/neural.json
+  config convert ./configs/neural.json ./configs/neural.yaml
+  brain status
+  memory stats
+  agent save ./agent_state.json "learning completed"
+  world reset
+  help
+
+===================================================
+NLM Phase 2: Real Neural Computation
+Running on: $(date)
+===================================================
+
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM - Neural Learning Machine v2.0 (Phase 2)" << std::endl;
+    std::cout << "Real Neural Computation with LIF neurons, STDP, and structural plasticity" << std::endl;
+    std::cout << "Compiled: " << __DATE__ << " " << __TIME__ << std::endl;
+}
+
+// Command line parsing and execution functions
+bool parseConfigCommand(int argc, char** argv, std::shared_ptr<Config> config);
+bool parseBrainCommand(int argc, char** argv, std::shared_ptr<Brain> brain);
+bool parseMemoryCommand(int argc, char** argv, std::shared_ptr<Brain> brain);
+bool parseNeuronCommand(int argc, char** argv, std::shared_ptr<Brain> brain);
+bool parsePlasticityCommand(int argc, char** argv, std::shared_ptr<Brain> brain);
+bool parseNeuromodulationCommand(int argc, char** argv, std::shared_ptr<Brain> brain);
+bool parseAgentCommand(int argc, char** argv, std::shared_ptr<Brain> brain);
+bool parseEnvCommand(int argc, char** argv);
+bool parseWorldCommand(int argc, char** argv);
+
+// Implementation of command handlers
+void cmdConfigList(const std::vector<std::string>& args);
+void cmdConfigValidate(const std::vector<std::string>& args);
+void cmdConfigConvert(const std::vector<std::string>& args);
+void cmdConfigMerge(const std::vector<std::string>& args);
+void cmdConfigDiff(const std::vector<std::string>& args);
+void cmdConfigBackup(const std::vector<std::string>& args);
+void cmdConfigExtract(const std::vector<std::string>& args);
+void cmdConfigTemplate(const std::vector<std::string>& args);
+void cmdConfigStatistics(const std::vector<std::string>& args);
+void cmdConfigSearch(const std::vector<std::string>& args);
+void cmdConfigMigrate(const std::vector<std::string>& args);
+void cmdBrainStatus(const std::vector<std::string>& args);
+void cmdBrainReset(const std::vector<std::string>& args);
+void cmdMemoryStats(const std::vector<std::string>& args);
+void cmdNeuronInfo(const std::vector<std::string>& args);
+void cmdPlasticityReport(const std::vector<std::string>& args);
+void cmdNeuromodulationStatus(const std::vector<std::string>& args);
+void cmdAgentLearn(const std::vector<std::string>& args);
+void cmdAgentEvaluate(const std::vector<std::string>& args);
+void cmdAgentSave(const std::vector<std::string>& args);
+void cmdAgentLoad(const std::vector<std::string>& args);
+void cmdAgentProfile(const std::vector<std::string>& args);
+void cmdEnvCreate(const std::vector<std::string>& args);
+void cmdEnvList(const std::vector<std::string>& args);
+void cmdEnvInfo(const std::vector<std::string>& args);
+void cmdWorldReset(const std::vector<std::string>& args);
+void cmdWorldPause(const std::vector<std::string>& args);
+void cmdWorldStep(const std::vector<std::string>& args);
+
+// Global command dispatcher
+declare type
+dispatcher for commands
+
+// Helper functions
+declare time utils
+declare file utils
+declare string utils
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -340,110 +495,356 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Check for help/version commands
+    if (argc <= 1) {
+        printHelp();
+        return 0;
+    }
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+    std::string command = argv[1];
+    std::transform(command.begin(), command.end(), command.begin(), ::tolower);
+    
+    if (command == "help") {
+        printHelp();
+        return 0;
+    }
+    
+    if (command == "version") {
+        printVersion();
+        return 0;
+    }
+    
+    if (command == "run") {
+        // Convert argv to argument vector for original main logic
+        std::vector<std::string> args(argv + 2, argv + argc);
+        int steps = 100;
+        if (!args.empty()) {
+            try {
+                steps = std::stoi(args[0]);
+            } catch (...) {
+                steps = 100;
             }
         }
+        
+        // Create default config
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        
+        // STDP parameters
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        double timestep = config->getOr<double>("simulation_timestep", 0.001);
+        SimulationClock clock(timestep);
+        NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Default NLM Test Suite ===");
+        NLM_LOG_INFO("Steps: " + std::to_string(steps));
+        NLM_LOG_INFO("");
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        // Run basic connectivity test
+        runBasicConnectivityTest(brain);
+        
+        // Reset for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run plasticity experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        // Final brain status
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Final Brain Status ===");
+        brain->logStatus();
+        
+        return 0;
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Check for config commands
+    if (command == "config") {
+        if (argc <= 2) {
+            std::cout << "Error: Config command requires subcommand.\n";
+            std::cout << "Use 'config help' or 'help' for available commands.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        if (subCommand == "list") {
+            cmdConfigList(args);
+        } else if (subCommand == "validate") {
+            cmdConfigValidate(args);
+        } else if (subCommand == "convert") {
+            cmdConfigConvert(args);
+        } else if (subCommand == "merge") {
+            cmdConfigMerge(args);
+        } else if (subCommand == "diff") {
+            cmdConfigDiff(args);
+        } else if (subCommand == "backup") {
+            cmdConfigBackup(args);
+        } else if (subCommand == "extract") {
+            cmdConfigExtract(args);
+        } else if (subCommand == "template") {
+            cmdConfigTemplate(args);
+        } else if (subCommand == "statistics") {
+            cmdConfigStatistics(args);
+        } else if (subCommand == "search") {
+            cmdConfigSearch(args);
+        } else if (subCommand == "migrate") {
+            cmdConfigMigrate(args);
+        } else {
+            std::cout << "Error: Unknown config subcommand: " << subCommand << std::endl;
+            std::cout << "Use 'config help' or 'help' for available commands.\n";
+            return 1;
+        }
+        return 0;
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Check for brain commands
+    if (command == "brain") {
+        if (argc <= 2) {
+            std::cout << "Error: Brain command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        if (subCommand == "status") {
+            cmdBrainStatus(args);
+        } else if (subCommand == "reset") {
+            cmdBrainReset(args);
+        } else {
+            std::cout << "Error: Unknown brain subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
     }
     
-    brain->logStatus();
+    // Check for memory commands
+    if (command == "memory") {
+        if (argc <= 2) {
+            std::cout << "Error: Memory command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        if (subCommand == "stats") {
+            cmdMemoryStats(args);
+        } else {
+            std::cout << "Error: Unknown memory subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Check for neuron commands
+    if (command == "neuron") {
+        if (argc <= 2) {
+            std::cout << "Error: Neuron command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        if (subCommand == "info") {
+            cmdNeuronInfo(args);
+        } else {
+            std::cout << "Error: Unknown neuron subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Check for plasticity commands
+    if (command == "plasticity") {
+        if (argc <= 2) {
+            std::cout << "Error: Plasticity command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        if (subCommand == "report") {
+            cmdPlasticityReport(args);
+        } else {
+            std::cout << "Error: Unknown plasticity subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Check for neuromodulation commands
+    if (command == "neuromodulation") {
+        if (argc <= 2) {
+            std::cout << "Error: Neuromodulation command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        if (subCommand == "status") {
+            cmdNeuromodulationStatus(args);
+        } else {
+            std::cout << "Error: Unknown neuromodulation subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Check for agent commands
+    if (command == "agent") {
+        if (argc <= 2) {
+            std::cout << "Error: Agent command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+        
+        if (subCommand == "learn") {
+            cmdAgentLearn(args);
+        } else if (subCommand == "evaluate") {
+            cmdAgentEvaluate(args);
+        } else if (subCommand == "save") {
+            cmdAgentSave(args);
+        } else if (subCommand == "load") {
+            cmdAgentLoad(args);
+        } else if (subCommand == "profile") {
+            cmdAgentProfile(args);
+        } else {
+            std::cout << "Error: Unknown agent subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    // Check for environment commands
+    if (command == "env") {
+        if (argc <= 2) {
+            std::cout << "Error: Env command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        if (subCommand == "create") {
+            cmdEnvCreate(args);
+        } else if (subCommand == "list") {
+            cmdEnvList(args);
+        } else if (subCommand == "info") {
+            cmdEnvInfo(args);
+        } else {
+            std::cout << "Error: Unknown env subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    // Check for world commands
+    if (command == "world") {
+        if (argc <= 2) {
+            std::cout << "Error: World command requires subcommand.\n";
+            return 1;
+        }
+        std::string subCommand = argv[2];
+        std::transform(subCommand.begin(), subCommand.end(), subCommand.begin(), ::tolower);
+        
+        std::vector<std::string> args(argv + 3, argv + argc);
+        
+        if (subCommand == "reset") {
+            cmdWorldReset(args);
+        } else if (subCommand == "pause") {
+            cmdWorldPause(args);
+        } else if (subCommand == "step") {
+            cmdWorldStep(args);
+        } else {
+            std::cout << "Error: Unknown world subcommand: " << subCommand << std::endl;
+            return 1;
+        }
+        return 0;
+    }
     
-    return 0;
+    // If we got here, the command is not recognized
+    std::cout << "Error: Unknown command: " << command << std::endl;
+    std::cout << "Use 'help' for available commands.\n";
+    return 1;
 }
