@@ -2,10 +2,11 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/AntiHebbian.hpp"
+#include "../plasticity/BCMRule.hpp"
 #include <memory>
 #include <string>
 
@@ -87,6 +88,8 @@ public:
     // Plasticity system access
     STDP* getSTDP();
     Hebbian* getHebbian();
+    AntiHebbianRule* getAntiHebbian();
+    BCMRule* getBCM();
     StructuralPlasticity* getStructuralPlasticity();
     
     // Statistics

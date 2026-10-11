@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format preferred)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments

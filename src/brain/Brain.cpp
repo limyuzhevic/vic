@@ -54,6 +54,8 @@ struct Brain::Impl {
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<AntiHebbianRule> antiHebbian;
+    std::unique_ptr<BCMRule> bcm;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
     // Simulation parameters
@@ -104,6 +106,8 @@ struct Brain::Impl {
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
+        antiHebbian = std::make_unique<AntiHebbianRule>();
+        bcm = std::make_unique<BCMRule>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
@@ -648,17 +652,25 @@ const SpikeSystem* Brain::getSpikeSystem() const {
     return pImpl->spikeSystem.get();
 }
 
-STDP* Brain::getSTDP() {
-    return pImpl->stdp.get();
-}
+    STDP* Brain::getSTDP() {
+        return pImpl->stdp.get();
+    }
 
-Hebbian* Brain::getHebbian() {
-    return pImpl->hebbian.get();
-}
+    Hebbian* Brain::getHebbian() {
+        return pImpl->hebbian.get();
+    }
 
-StructuralPlasticity* Brain::getStructuralPlasticity() {
-    return pImpl->structuralPlasticity.get();
-}
+    AntiHebbianRule* Brain::getAntiHebbian() {
+        return pImpl->antiHebbian.get();
+    }
+
+    BCMRule* Brain::getBCM() {
+        return pImpl->bcm.get();
+    }
+
+    StructuralPlasticity* Brain::getStructuralPlasticity() {
+        return pImpl->structuralPlasticity.get();
+    }
 
 float Brain::getExcitationInhibitionRatio() const {
     float totalExcitatory = 0.0f;

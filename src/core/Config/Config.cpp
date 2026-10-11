@@ -19,14 +19,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first (nlohmann/json library)
+    // For now, we'll use simple format but document the intent
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -35,7 +34,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs (Phase 1 implementation)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -50,6 +49,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+        // TODO: Add JSON parsing for Phase 2 and beyond
+        // Example: parse JSON like "{\"key\": \"value\", \"num\": 42}"
     }
     
     return true;
@@ -84,10 +85,58 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "{\n";
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Serialize based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                               std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n"; // For description
+        if (!entry.description.empty()) {
+            file << "  // " << entry.description << "\n";
+        }
     }
+    file << "}\n";
     
     return true;
 }

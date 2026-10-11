@@ -397,8 +397,40 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+                .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Add AntiHebbian and BCM rule classes to Python bindings
+    py::class_<AntiHebbianRule>(m, "AntiHebbianRule", R"pbdoc(Anti-Hebbian learning rule)pbdoc")
+        .def(py::init<>())
+        .def("setLearningRate", &AntiHebbianRule::setLearningRate, py::arg("rate"),
+             "Set learning rate")
+        .def("getLearningRate", &AntiHebbianRule::getLearningRate,
+             "Get learning rate")
+        .def("setMaxDepression", &AntiHebbianRule::setMaxDepression, py::arg("max"),
+             "Set maximum depression")
+        .def("getMaxDepression", &AntiHebbianRule::getMaxDepression,
+             "Get maximum depression")
+        .def("getName", &AntiHebbianRule::getName,
+             "Get rule name");
+
+    py::class_<BCMRule>(m, "BCMRule", R"pbdoc(Bienenstock-Cooper-Munro (BCM) learning rule)pbdoc")
+        .def(py::init<>())
+        .def("setLearningRate", &BCMRule::setLearningRate, py::arg("rate"),
+             "Set learning rate")
+        .def("getLearningRate", &BCMRule::getLearningRate,
+             "Get learning rate")
+        .def("setThreshold", &BCMRule::setThreshold, py::arg("threshold"),
+             "Set threshold")
+        .def("getThreshold", &BCMRule::getThreshold,
+             "Get threshold")
+        .def("setModulationStrength", &BCMRule::setModulationStrength, py::arg("strength"),
+             "Set modulation strength")
+        .def("getModulationStrength", &BCMRule::getModulationStrength,
+             "Get modulation strength")
+        .def("getName", &BCMRule::getName,
+             "Get rule name");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
