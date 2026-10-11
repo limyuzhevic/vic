@@ -186,6 +186,55 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+bool Config::validate() const {
+    // Basic validation - check for required fields
+    bool hasNeuronCount = has("brain.neuron_count");
+    bool hasSynapseDensity = has("brain.synapse_density");
+    
+    if (hasNeuronCount) {
+        auto neuronCount = get<int>("brain.neuron_count");
+        if (neuronCount.has_value() && neuronCount.value() <= 0) {
+            return false;
+        }
+    }
+    
+    if (hasSynapseDensity) {
+        auto synapseDensity = get<double>("brain.synapse_density");
+        if (synapseDensity.has_value() && (synapseDensity.value() < 0.0 || synapseDensity.value() > 1.0)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+std::string Config::getSummaryWithValidation() const {
+    std::ostringstream oss;
+    oss << "Configuration Validation Report:\n";
+    oss << summary() << "\n";
+    oss << "Validation Status: " << (validate() ? "PASS" : "FAIL") << "\n";
+    
+    if (!validate()) {
+        oss << "Issues found:\n";
+        auto keys = getKeys();
+        for (const auto& key : keys) {
+            if (key == "brain.neuron_count") {
+                auto val = get<int>(key);
+                if (val.has_value() && val.value() <= 0) {
+                    oss << "  - Invalid neuron_count: must be positive\n";
+                }
+            } else if (key == "brain.synapse_density") {
+                auto val = get<double>(key);
+                if (val.has_value() && (val.value() < 0.0 || val.value() > 1.0)) {
+                    oss << "  - Invalid synapse_density: must be between 0.0 and 1.0\n";
+                }
+            }
+        }
+    }
+    
+    return oss.str();
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";

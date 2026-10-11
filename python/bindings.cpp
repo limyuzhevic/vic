@@ -25,9 +25,37 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+
+        Version: 0.1.0
+        Author: NLM Authors
+        License: MIT
+        Homepage: https://github.com/nlm-project/nlm
     )pbdoc";
 
+    // Version attribute
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__license__") = "MIT";
+    m.attr("__homepage__") = "https://github.com/nlm-project/nlm";
+
+    // Custom exception types for better error handling
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgumentError");
+    py::register_exception<std::out_of_range>(m, "OutOfRangeError");
+    py::register_exception<std::logic_error>(m, "LogicError");
+
+    // Create a custom NLM-specific exception hierarchy
+    class_<std::runtime_error>(m, "NLMError")
+        .def(py::init<const std::string&>());
+
+    class_<std::invalid_argument>(m, "InvalidConfigurationError")
+        .def(py::init<const std::string&>());
+
+    class_<std::out_of_range>(m, "IndexError")
+        .def(py::init<const std::string&>());
+
+    class_<std::logic_error>(m, "LogicError")
+        .def(py::init<const std::string&>());
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -400,21 +428,166 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Enhanced configuration validation with Pythonic interface
+    m.def("validateConfigPython", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
+        return config->validate();
+    }, py::arg("config"), "Validate configuration and return boolean result");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("getConfigValidationReport", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
+        return config->getSummaryWithValidation();
+    }, py::arg("config"), "Get detailed configuration validation report");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Enhanced debugging and logging utilities
+    m.def("logBrainState", [](std::shared_ptr<Brain> brain, const std::string& context) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        std::ostringstream oss;
+        oss << "[BRAIN DEBUG] " << context << "\n";
+        oss << "Total Neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "Total Synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "Active Neurons: " << brain->getActiveNeuronCount() << "\n";
+        oss << "Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+        oss << "Average Firing Rate: " << brain->getAverageFiringRate() << "\n";
+        oss << "Total Spike Count: " << brain->getTotalSpikeCount() << "\n";
+        oss << "Development Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        oss << "Excitation/Inhibition Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        return oss.str();
+    }, py::arg("brain"), py::arg("context") = "default", "Get detailed brain state as string");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("benchmarkBrainOperation", [](std::shared_ptr<Brain> brain, std::function<void()> operation, 
+                                       const std::string& operationName, int warmupSteps) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        if (warmupSteps < 0) {
+            throw std::invalid_argument("Warmup steps cannot be negative");
+        }
+
+        // Warmup
+        brain->reset();
+        brain->initialize();
+        for (int i = 0; i < warmupSteps; ++i) {
+            brain->step(i);
+        }
+
+        auto results = std::make_shared<std::map<std::string, double>>();
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        operation();
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration<double>(endTime - startTime).count();
+        
+        results->insert({"operation_name", operationName});
+        results->insert({"duration_seconds", duration});
+        results->insert({"steps_per_second", 1.0 / duration});
+        
+        return results;
+    }, py::arg("brain"), py::arg("operation"), py::arg("operationName"), py::arg("warmupSteps") = 10,
+        "Benchmark brain operations with timing");
+
+    // Enhanced error recovery utilities
+    m.def("safeResetBrain", [](std::shared_ptr<Brain> brain, const std::string& operationName) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        try {
+            brain->reset();
+            return std::make_pair(true, std::string("Brain reset successfully for " + operationName));
+        } catch (const std::exception& e) {
+            return std::make_pair(false, std::string("Brain reset failed: " + std::string(e.what())));
+        }
+    }, py::arg("brain"), py::arg("operationName") = "unknown", "Safely reset brain with error handling");
+
+    m.def("validateBrainConfig", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
+        
+        auto errors = std::make_shared<std::vector<std::string>>();
+        
+        // Check required fields
+        if (!config->has("brain.neuron_count")) {
+            errors->push_back("Missing required field: brain.neuron_count");
+        } else {
+            auto val = config->get<int>("brain.neuron_count");
+            if (val.has_value() && val.value() <= 0) {
+                errors->push_back("Invalid brain.neuron_count: must be positive");
+            }
+        }
+        
+        if (!config->has("brain.synapse_density")) {
+            errors->push_back("Missing required field: brain.synapse_density");
+        } else {
+            auto val = config->get<double>("brain.synapse_density");
+            if (val.has_value() && (val.value() < 0.0 || val.value() > 1.0)) {
+                errors->push_back("Invalid brain.synapse_density: must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (!config->has("brain.v_thresh")) {
+            errors->push_back("Missing optional field: brain.v_thresh, using default");
+        }
+        
+        if (!config->has("brain.tau_mem")) {
+            errors->push_back("Missing optional field: brain.tau_mem, using default");
+        }
+        
+        return std::make_pair(errors->empty(), *errors);
+    }, py::arg("config"), "Validate brain configuration and return (is_valid, errors)");
+
+    // Performance monitoring utilities
+    m.def("monitorBrainPerformance", [](std::shared_ptr<Brain> brain, int numSteps, 
+                                        std::function<void(int)> progressCallback) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        size_t maxSpikeCount = 0;
+        float minFiringRate = std::numeric_limits<float>::max();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            
+            if (progressCallback) {
+                progressCallback(step);
+            }
+            
+            size_t spikeCount = brain->getTotalSpikeCount();
+            if (spikeCount > maxSpikeCount) {
+                maxSpikeCount = spikeCount;
+            }
+            
+            float firingRate = brain->getAverageFiringRate();
+            if (firingRate < minFiringRate) {
+                minFiringRate = firingRate;
+            }
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(endTime - startTime).count();
+        
+        auto results = std::make_shared<std::map<std::string, double>>();
+        results->insert({"total_duration_seconds", duration});
+        results->insert({"steps_per_second", numSteps / duration});
+        results->insert({"max_spike_count", maxSpikeCount});
+        results->insert({"min_firing_rate", minFiringRate});
+        results->insert({"average_firing_rate", brain->getAverageFiringRate()});
+        
+        return results;
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("progressCallback") = nullptr,
+        "Monitor and benchmark brain performance over time");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

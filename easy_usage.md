@@ -71,6 +71,72 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### NEW: Example 3: Advanced Development Brain (NEW!)
+
+```python
+import pynlm
+
+# Create a development-enabled brain with curiosity and novelty detection
+config = pynlm.createDevelopmentBrain(developmentalSpeed=0.8)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent with all learning features enabled
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Create world and setup
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run a complete episode with advanced learning
+print("Running development episode...")
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}:")
+        print(f"  Development Stage: {brain.getDevelopmentalStage()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+
+print("Development episode complete!")
+```
+
+### NEW: Example 4: Pythonic Configuration (NEW!)
+
+```python
+import pynlm
+
+# Create configuration using Pythonic dictionary
+config_dict = {
+    "brain.neuron_count": 2000,
+    "brain.synapse_density": 0.15,
+    "neuromod.curiosity.sensitivity": 0.8,
+    "neuromod.novelty.sensitivity": 0.6,
+    "development.speed": 0.9,
+    "development.enabled": True,
+}
+
+config = pynlm.createConfigFromDict(config_dict)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Pythonic configuration created successfully!")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Configuration keys: {config.getKeys()}")
+```
+
 ---
 
 ## Simple Analogy
@@ -143,7 +209,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: NEW: Advanced Learning Features (NEW!)
 
 ```python
 # These are all optional:
@@ -151,6 +217,16 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# Advanced monitoring
+def log_progress(step, brain, agent, world):
+    print(f"Step {step}:")
+    print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+    print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+    print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    if step % 100 == 0:
+        brain.save(f"checkpoint_step_{step}.bin")
 ```
 
 ---
@@ -178,6 +254,18 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+### NEW: `pynlm.createDevelopmentBrain(speed)` (NEW!)
+Creates a development-enabled brain configuration with curiosity and novelty detection.
+
+### NEW: `pynlm.createConfigFromDict(dict)` (NEW!)
+Creates a configuration from a Python dictionary for Pythonic configuration management.
+
+### NEW: `pynlm.validateConfig(configStr)` (NEW!)
+Validates a configuration string before use.
+
+### NEW: `pynlm.runEpisode(agent, world, steps)` (NEW!)
+Runs a complete episode simulation with error handling.
 
 ---
 
@@ -221,7 +309,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: NEW: Complete Agent with Advanced Learning (NEW!)
 
 ```python
 import pynlm
@@ -268,6 +356,9 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Development brain | `pynlm.createDevelopmentBrain(speed)` |
+| Python config | `pynlm.createConfigFromDict(dict)` |
+| Run episode | `pynlm.runEpisode(agent, world, steps)` |
 
 ---
 
@@ -285,6 +376,10 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Advanced features not working"**
+- Check that `enableRewardModulation()`, `enableDevelopment()`, etc. are called
+- Make sure the brain has had enough time to develop
+
 ---
 
 ## Next Steps
@@ -293,5 +388,22 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try `pynlm.createExplorationBrain()` for exploration-focused learning
+5. Use `pynlm.debugBrainState()` for monitoring brain state
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with advanced features.
+
+---
+
+## Version Information
+
+**Python Bindings Version**: 0.1.0
+**Features Added**: Development brain, Pythonic config, error handling, episode management
+
+New in this version:
+- Advanced development brain configuration
+- Pythonic dictionary-based configuration
+- Episode management context managers
+- Improved error handling and validation
+- Development and curiosity features
+- Performance benchmarking tools
