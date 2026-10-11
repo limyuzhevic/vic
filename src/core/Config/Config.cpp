@@ -3,14 +3,31 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <thread>
+#include <regex>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Advanced configuration objects
+    LearningRateConfig learningRates;
+    NetworkArchitectureConfig networkArchitecture;
+    NeuromodulationConfig neuromodulation;
+    DevelopmentConfig development;
+    MemoryConfig memory;
+    PredictionConfig prediction;
+    CognitionConfig cognition;
+    PerformanceConfig performance;
+    
+    // Validation errors
+    std::vector<std::string> validationErrors;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default values for all advanced configurations
+    initializeDefaults();
+}
 
 Config::~Config() = default;
 
@@ -18,9 +35,22 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+void Config::initializeDefaults() {
+    // Set default configuration entries for basic settings
+    set("neuron_count", 100, ConfigSource::Default);
+    set("region_count", 1, ConfigSource::Default);
+    set("connection_probability", 0.1, ConfigSource::Default);
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Advanced configuration defaults are initialized in the struct
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO: Implement proper JSON/YAML parser
+    // For now, use simple key=value format with enhanced parsing
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -52,7 +82,125 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    // Update advanced configuration from file
+    updateAdvancedConfigFromFile(filepath);
+    
     return true;
+}
+
+void Config::updateAdvancedConfigFromFile(const std::string& filepath) {
+    // Create a backup config for comparison
+    auto backupConfig = *this;
+    
+    // Try to parse advanced configuration from file
+    // This is a simplified implementation - real implementation would use JSON/YAML
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Look for advanced configuration keys
+        if (line.find("learning_rate") != std::string::npos && line.find("=" ) != std::string::npos) {
+            // Extract learning rate settings
+            parseLearningRateFromLine(line);
+        } else if (line.find("network_architecture") != std::string::npos && line.find("=" ) != std::string::npos) {
+            // Extract network architecture settings
+            parseNetworkArchitectureFromLine(line);
+        } else if (line.find("neuromodulation") != std::string::npos && line.find("=" ) != std::string::npos) {
+            // Extract neuromodulation settings
+            parseNeuromodulationFromLine(line);
+        }
+    }
+}
+
+void Config::parseLearningRateFromLine(const std::string& line) {
+    // Simplified parsing - in practice, use JSON/YAML parser
+    size_t pos = line.find("=");
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        try {
+            if (key == "learning_rate.basal") {
+                pImpl->learningRates.basalRate = std::stod(value);
+            } else if (key == "learning_rate.stdp_ltp") {
+                pImpl->learningRates.stdpLTP = std::stod(value);
+            } else if (key == "learning_rate.stdp_ltd") {
+                pImpl->learningRates.stdpLTD = std::stod(value);
+            } else if (key == "learning_rate.hebbian") {
+                pImpl->learningRates.hebbianStrength = std::stod(value);
+            } else if (key == "learning_rate.homeostatic") {
+                pImpl->learningRates.homeostatic = std::stod(value);
+            } else if (key == "learning_rate.neuromodulation") {
+                pImpl->learningRates.neuromodulation = std::stod(value);
+            }
+        } catch (...) {
+            // Ignore parsing errors
+        }
+    }
+}
+
+void Config::parseNetworkArchitectureFromLine(const std::string& line) {
+    size_t pos = line.find("=");
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        try {
+            if (key == "network_architecture.neuron_count") {
+                pImpl->networkArchitecture.neuronCount = std::stoull(value);
+            } else if (key == "network_architecture.region_count") {
+                pImpl->networkArchitecture.regionCount = std::stoull(value);
+            } else if (key == "network_architecture.connection_prob") {
+                pImpl->networkArchitecture.connectionProbability = std::stod(value);
+            } else if (key == "network_architecture.architecture") {
+                pImpl->networkArchitecture.architecture = value;
+            } else if (key == "network_architecture.structural_plasticity") {
+                pImpl->networkArchitecture.structuralPlasticity = std::stod(value);
+            } else if (key == "network_architecture.pruning_rate") {
+                pImpl->networkArchitecture.pruningRate = std::stod(value);
+            }
+        } catch (...) {
+            // Ignore parsing errors
+        }
+    }
+}
+
+void Config::parseNeuromodulationFromLine(const std::string& line) {
+    size_t pos = line.find("=");
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        try {
+            if (key == "neuromodulation.dopamine_enabled") {
+                pImpl->neuromodulation.dopamineEnabled = (value == "true" || value == "1");
+            } else if (key == "neuromodulation.serotonin_enabled") {
+                pImpl->neuromodulation.serotoninEnabled = (value == "true" || value == "1");
+            } else if (key == "neuromodulation.acetylcholine_enabled") {
+                pImpl->neuromodulation.acetylcholineEnabled = (value == "true" || value == "1");
+            } else if (key == "neuromodulation.noradrenaline_enabled") {
+                pImpl->neuromodulation.noradrenalineEnabled = (value == "true" || value == "1");
+            } else if (key == "neuromodulation.dopamine_baseline") {
+                pImpl->neuromodulation.dopamineBaseline = std::stod(value);
+            } else if (key == "neuromodulation.dopamine_max") {
+                pImpl->neuromodulation.dopamineMax = std::stod(value);
+            } else if (key == "neuromodulation.novelty_sensitivity") {
+                pImpl->neuromodulation.noveltySensitivity = std::stod(value);
+            } else if (key == "neuromodulation.reward_prediction_gain") {
+                pImpl->neuromodulation.rewardPredictionGain = std::stod(value);
+            }
+        } catch (...) {
+            // Ignore parsing errors
+        }
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -124,6 +272,168 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Update advanced configuration when relevant keys are set
+    updateAdvancedConfigFromKey(key, value);
+}
+
+bool Config::setLearningRates(const LearningRateConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid learning rate configuration");
+        return false;
+    }
+    
+    pImpl->learningRates = config;
+    
+    // Update basic configuration
+    set("learning_rate.basal", config.basalRate, ConfigSource::Runtime);
+    set("learning_rate.stdp_ltp", config.stdpLTP, ConfigSource::Runtime);
+    set("learning_rate.stdp_ltd", config.stdpLTD, ConfigSource::Runtime);
+    set("learning_rate.hebbian", config.hebbianStrength, ConfigSource::Runtime);
+    set("learning_rate.homeostatic", config.homeostatic, ConfigSource::Runtime);
+    set("learning_rate.neuromodulation", config.neuromodulation, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setNetworkArchitecture(const NetworkArchitectureConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid network architecture configuration");
+        return false;
+    }
+    
+    pImpl->networkArchitecture = config;
+    
+    // Update basic configuration
+    set("network_architecture.neuron_count", static_cast<int64_t>(config.neuronCount), ConfigSource::Runtime);
+    set("network_architecture.region_count", static_cast<int64_t>(config.regionCount), ConfigSource::Runtime);
+    set("network_architecture.connection_prob", config.connectionProbability, ConfigSource::Runtime);
+    set("network_architecture.architecture", config.architecture, ConfigSource::Runtime);
+    set("network_architecture.structural_plasticity", config.structuralPlasticity, ConfigSource::Runtime);
+    set("network_architecture.pruning_rate", config.pruningRate, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setNeuromodulation(const NeuromodulationConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid neuromodulation configuration");
+        return false;
+    }
+    
+    pImpl->neuromodulation = config;
+    
+    // Update basic configuration
+    set("neuromodulation.dopamine_enabled", config.dopamineEnabled, ConfigSource::Runtime);
+    set("neuromodulation.serotonin_enabled", config.serotoninEnabled, ConfigSource::Runtime);
+    set("neuromodulation.acetylcholine_enabled", config.acetylcholineEnabled, ConfigSource::Runtime);
+    set("neuromodulation.noradrenaline_enabled", config.noradrenalineEnabled, ConfigSource::Runtime);
+    set("neuromodulation.dopamine_baseline", config.dopamineBaseline, ConfigSource::Runtime);
+    set("neuromodulation.dopamine_max", config.dopamineMax, ConfigSource::Runtime);
+    set("neuromodulation.novelty_sensitivity", config.noveltySensitivity, ConfigSource::Runtime);
+    set("neuromodulation.reward_prediction_gain", config.rewardPredictionGain, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setDevelopment(const DevelopmentConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid development configuration");
+        return false;
+    }
+    
+    pImpl->development = config;
+    
+    // Update basic configuration
+    set("development.enabled", config.developmentEnabled, ConfigSource::Runtime);
+    set("development.maturation_rate", config.maturationRate, ConfigSource::Runtime);
+    set("development.critical_period", config.criticalPeriod, ConfigSource::Runtime);
+    set("development.plasticity_decay", config.plasticityDecay, ConfigSource::Runtime);
+    set("development.structural", config.structuralDevelopment, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setMemory(const MemoryConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid memory configuration");
+        return false;
+    }
+    
+    pImpl->memory = config;
+    
+    // Update basic configuration
+    set("memory.working_enabled", config.workingMemoryEnabled, ConfigSource::Runtime);
+    set("memory.episodic_enabled", config.episodicMemoryEnabled, ConfigSource::Runtime);
+    set("memory.semantic_enabled", config.semanticMemoryEnabled, ConfigSource::Runtime);
+    set("memory.procedural_enabled", config.proceduralMemoryEnabled, ConfigSource::Runtime);
+    set("memory.consolidation_rate", config.consolidationRate, ConfigSource::Runtime);
+    set("memory.decay_rate", config.decayRate, ConfigSource::Runtime);
+    set("memory.capacity", config.capacity, ConfigSource::Runtime);
+    set("memory.replay_enabled", config.replayEnabled, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setPrediction(const PredictionConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid prediction configuration");
+        return false;
+    }
+    
+    pImpl->prediction = config;
+    
+    // Update basic configuration
+    set("prediction.enabled", config.predictionEnabled, ConfigSource::Runtime);
+    set("prediction.gain", config.predictionGain, ConfigSource::Runtime);
+    set("prediction.error_gain", config.predictionErrorGain, ConfigSource::Runtime);
+    set("prediction.forward_model", config.forwardModelEnabled, ConfigSource::Runtime);
+    set("prediction.inverse_model", config.inverseModelEnabled, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setCognition(const CognitionConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid cognition configuration");
+        return false;
+    }
+    
+    pImpl->cognition = config;
+    
+    // Update basic configuration
+    set("cognition.planning_enabled", config.planningEnabled, ConfigSource::Runtime);
+    set("cognition.attention_enabled", config.attentionEnabled, ConfigSource::Runtime);
+    set("cognition.concept_formation_enabled", config.conceptFormationEnabled, ConfigSource::Runtime);
+    set("cognition.social_learning_enabled", config.socialLearningEnabled, ConfigSource::Runtime);
+    set("cognition.planning_horizon", config.planningHorizon, ConfigSource::Runtime);
+    set("cognition.attention_threshold", config.attentionThreshold, ConfigSource::Runtime);
+    set("cognition.concept_formation_rate", config.conceptFormationRate, ConfigSource::Runtime);
+    set("cognition.social_learning_rate", config.socialLearningRate, ConfigSource::Runtime);
+    
+    return true;
+}
+
+bool Config::setPerformance(const PerformanceConfig& config) {
+    if (!config.validate()) {
+        pImpl->validationErrors.push_back("Invalid performance configuration");
+        return false;
+    }
+    
+    pImpl->performance = config;
+    
+    // Update basic configuration
+    set("performance.vectorization", config.vectorizationEnabled, ConfigSource::Runtime);
+    set("performance.parallelization", config.parallelizationEnabled, ConfigSource::Runtime);
+    set("performance.memory_pool", config.memoryPoolEnabled, ConfigSource::Runtime);
+    set("performance.event_driven", config.eventDrivenEnabled, ConfigSource::Runtime);
+    set("performance.thread_count", static_cast<int64_t>(config.threadCount), ConfigSource::Runtime);
+    set("performance.memory_pool_size", static_cast<int64_t>(config.memoryPoolSize), ConfigSource::Runtime);
+    set("performance.simulation_speed", config.simulationSpeed, ConfigSource::Runtime);
+    set("performance.checkpointing", config.checkpointingEnabled, ConfigSource::Runtime);
+    set("performance.checkpoint_path", config.checkpointPath, ConfigSource::Runtime);
+    
+    return true;
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -193,23 +503,117 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validate() const {
+    pImpl->validationErrors.clear();
+    
+    if (!validateLearningRates()) return false;
+    if (!validateNetworkArchitecture()) return false;
+    if (!validateNeuromodulation()) return false;
+    if (!validateDevelopment()) return false;
+    if (!validateMemory()) return false;
+    if (!validatePrediction()) return false;
+    if (!validateCognition()) return false;
+    if (!validatePerformance()) return false;
+    
+    return true;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::vector<std::string> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::validateLearningRates() const {
+    if (!pImpl->learningRates.validate()) {
+        pImpl->validationErrors.push_back("Invalid learning rates: basal rate, STDP weights, Hebbian strength, homeostatic rate, or neuromodulation influence out of valid range");
+        return false;
+    }
+    return true;
+}
 
-} // namespace nlm
+bool Config::validateNetworkArchitecture() const {
+    if (!pImpl->networkArchitecture.validate()) {
+        pImpl->validationErrors.push_back("Invalid network architecture: neuron count, region count, connection probability, architecture type, structural plasticity, or pruning rate out of valid range");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateNeuromodulation() const {
+    if (!pImpl->neuromodulation.validate()) {
+        pImpl->validationErrors.push_back("Invalid neuromodulation: dopamine baseline/max, novelty sensitivity, or reward prediction gain out of valid range");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateDevelopment() const {
+    if (!pImpl->development.validate()) {
+        pImpl->validationErrors.push_back("Invalid development: maturation rate, critical period, or plasticity decay out of valid range");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateMemory() const {
+    if (!pImpl->memory.validate()) {
+        pImpl->validationErrors.push_back("Invalid memory: consolidation rate, decay rate, or capacity out of valid range");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validatePrediction() const {
+    if (!pImpl->prediction.validate()) {
+        pImpl->validationErrors.push_back("Invalid prediction: prediction gain or prediction error gain out of valid range");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validateCognition() const {
+    if (!pImpl->cognition.validate()) {
+        pImpl->validationErrors.push_back("Invalid cognition: planning horizon, attention threshold, concept formation rate, or social learning rate out of valid range");
+        return false;
+    }
+    return true;
+}
+
+bool Config::validatePerformance() const {
+    if (!pImpl->performance.validate()) {
+        pImpl->validationErrors.push_back("Invalid performance: thread count, memory pool size, or simulation speed out of valid range");
+        return false;
+    }
+    return true;
+}
+
+LearningRateConfig Config::getLearningRates() const {
+    return pImpl->learningRates;
+}
+
+NetworkArchitectureConfig Config::getNetworkArchitecture() const {
+    return pImpl->networkArchitecture;
+}
+
+NeuromodulationConfig Config::getNeuromodulation() const {
+    return pImpl->neuromodulation;
+}
+
+DevelopmentConfig Config::getDevelopment() const {
+    return pImpl->development;
+}
+
+MemoryConfig Config::getMemory() const {
+    return pImpl->memory;
+}
+
+PredictionConfig Config::getPrediction() const {
+    return pImpl->prediction;
+}
+
+CognitionConfig Config::getCognition() const {
+    return pImpl->cognition;
+}
+
+PerformanceConfig Config::getPerformance() const {
+    return pImpl->performance;
+}
