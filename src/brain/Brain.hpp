@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <functional>
 
 namespace nlm {
 
@@ -28,6 +29,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Forward declaration for episodic memory item
+struct EpisodicMemoryItem;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -145,8 +149,28 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Store last sensory input for episodic memory integration
+    void storeSensoryInput(const std::vector<float>& input);
+    
+    // Get last sensory input
+    std::vector<float> getLastSensoryInput() const;
+    
+    // Update predictions from episodic memory
+    void updatePredictionsFromEpisodicMemory(
+        const std::vector<float>& currentInput,
+        const std::vector<const EpisodicMemoryItem*>& episodes);
+    
+    // Extract concepts from episodic memory
+    void extractConceptsFromEpisodicMemory(
+        const std::vector<float>& currentInput,
+        const std::vector<const EpisodicMemoryItem*>& episodes);
+    
+    // Integrate episodic memory into neural processing
+    void integrateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Get episodic memory statistics
+    size_t getEpisodicMemoryEpisodeCount() const;
+    float getEpisodicMemorySimilarityScore() const;
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -193,9 +217,27 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== WORKING MEMORY INTEGRATION ==========
+    
+    // Apply working memory influence to neural dynamics
+    void applyWorkingMemoryInfluence();
+    
+    // Register callback for working memory updates
+    void registerWorkingMemoryUpdateCallback(std::function<void(NeuronId, float)> callback);
+    
+    // Notify brain about working memory changes
+    void notifyWorkingMemoryUpdate(NeuronId neuronId, float activation);
+    
+    // Get working memory neurons and activity
+    std::vector<NeuronId> getWorkingMemoryNeurons() const;
+    float getWorkingMemoryActivity() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Working memory integration callback
+    std::function<void(NeuronId, float)> workingMemoryUpdateCallback_;
 };
 
 } // namespace nlm

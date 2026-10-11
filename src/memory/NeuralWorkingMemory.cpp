@@ -1,7 +1,6 @@
-#include "NeuralWorkingMemory.hpp"
-#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -125,6 +124,11 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
+            // NEW: Notify brain about working memory state change
+            if (pImpl->brain) {
+                pImpl->brain->notifyWorkingMemoryUpdate(neuron, activation);
+            }
+            
             // Age the trace
             memoryTimestamps_[i]++;
             
@@ -142,6 +146,13 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // NEW: After competition, provide final winners to brain
+    for (const auto& winner : winners_) {
+        if (brain_) {
+            brain_->notifyWorkingMemoryUpdate(winner, 1.0f);
+        }
+    }
 }
 
 void NeuralWorkingMemory::clear() {
@@ -271,7 +282,7 @@ void AttentionalSelection::initialize(Brain* brain) {
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
+                                                               float globalInhibition) {
     winners_.clear();
     
     if (competitors.empty()) return winners_;

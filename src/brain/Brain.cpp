@@ -78,6 +78,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Working memory integration
+    std::function<void(NeuronId, float)> workingMemoryUpdateCallback;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,6 +95,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , workingMemoryUpdateCallback(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -404,6 +408,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // NEW: Apply working memory influence to neural dynamics
+        applyWorkingMemoryInfluence();
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -1004,18 +1011,93 @@ float Brain::getAverageFiringRate() const {
 }
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
-
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
-
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
-
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
+    
+    NeuralWorkingMemory* Brain::getWorkingMemory() {
+        return pImpl->workingMemory.get();
+    }
+    
+    NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
+    }
+    
+    NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
+    }
+    
+    // ========== WORKING MEMORY INTEGRATION ==========
+    
+    // Apply working memory influence to neural dynamics
+    void Brain::applyWorkingMemoryInfluence() {
+        if (!pImpl->workingMemory) return;
+        
+        // Get working memory winners
+        auto winners = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Excites corresponding neural populations based on winner activity
+        for (const auto& neuronId : winners) {
+            // Get winner's activation strength
+            float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+            
+            // Apply stronger excitation based on activation
+            injectCurrent(neuronId, activation * 2.0f);
+            
+            // Also excite related neurons in same population for pattern completion
+            // This helps spread the working memory trace through the network
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    // If winner neuron is in this population, excite similar neurons
+                    auto neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            // Find and excite neurons with similar activation history
+                            for (auto* similarNeuron : neurons) {
+                                if (similarNeuron != neuron && 
+                                    std::abs(similarNeuron->getState().membranePotential - 
+                                            neuron->getState().membranePotential) < 2.0f) {
+                                    // Similarity-based excitation for pattern completion
+                                    similarNeuron->injectCurrent(activation * 0.5f);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // NEW: Working memory influence on attention system
+        if (pImpl->attention && !winners.empty()) {
+            pImpl->attention->processCompetition(winners, 0.5f);
+        }
+    }
+    
+    // Register callback for working memory updates
+    void Brain::registerWorkingMemoryUpdateCallback(std::function<void(NeuronId, float)> callback) {
+        pImpl->workingMemoryUpdateCallback = callback;
+    }
+    
+    // Notify brain about working memory changes
+    void Brain::notifyWorkingMemoryUpdate(NeuronId neuronId, float activation) {
+        if (pImpl->workingMemoryUpdateCallback) {
+            pImpl->workingMemoryUpdateCallback(neuronId, activation);
+        }
+    }
+    
+    // Get working memory neurons and activity
+    std::vector<NeuronId> Brain::getWorkingMemoryNeurons() const {
+        std::vector<NeuronId> neurons;
+        if (pImpl->workingMemory) {
+            neurons = pImpl->workingMemory->getMemoryNeurons();
+        }
+        return neurons;
+    }
+    
+    float Brain::getWorkingMemoryActivity() const {
+        if (pImpl->workingMemory) {
+            return pImpl->workingMemory->getMemoryActivity();
+        }
+        return 0.0f;
+    }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
