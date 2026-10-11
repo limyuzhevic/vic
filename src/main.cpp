@@ -340,25 +340,83 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line arguments
     std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool help = false;
+    bool version = false;
+    std::string savePath;
+    std::string loadPath;
+    int experimentType = 0;  // 0 = all tests, 1 = connectivity, 2 = plasticity, 3 = stdp
+    
+    // Parse arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            help = true;
+        } else if (arg == "--version" || arg == "-v") {
+            version = true;
+        } else if (arg == "--verbose" || arg == "-V") {
+            verbose = true;
+            consoleLogger->setLevel(LogLevel::Debug);
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--save" && i + 1 < argc) {
+            savePath = argv[++i];
+        } else if (arg == "--load" && i + 1 < argc) {
+            loadPath = argv[++i];
+        } else if (arg == "--experiment" && i + 1 < argc) {
+            try {
+                experimentType = std::stoi(argv[++i]);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid experiment number, using default (all tests)");
+            }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Show help if requested
+    if (help) {
+        printBanner();
+        std::cout << "\nUsage: nlm [OPTIONS]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  -h, --help              Show this help message\n";
+        std::cout << "  -v, --version           Show version information\n";
+        std::cout << "  -V, --verbose           Enable verbose logging\n";
+        std::cout << "      --config=file       Load configuration from file\n";
+        std::cout << "      --config file       Load configuration from file (alternative format)\n";
+        std::cout << "      --save=file         Save brain state to file after execution\n";
+        std::cout << "      --load=file         Load brain state from file before execution\n";
+        std::cout << "      --experiment=n       Run specific experiment (0=all, 1=connectivity, 2=plasticity, 3=stdp)\n";
+        std::cout << "\nExamples:\n";
+        std::cout << "  nlm --verbose --save=brain.nlm --experiment=2\n";
+        std::cout << "  nlm --config=myconfig.cfg --experiment=1\n";
+        std::cout << "  nlm --load=saved_brain.nlm\n";
+        return 0;
+    }
+    
+    // Show version if requested
+    if (version) {
+        std::cout << "NLM Neural Learning Machine v2.0.0" << std::endl;
+        std::cout << "Phase 2: Real Neural Computation" << std::endl;
+        return 0;
+    }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Load config from file (ignore if not found, unless explicitly specified)
+    bool configArgFound = false;
+    if (configFile != "configs/default.cfg") {
+        configArgFound = true;
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_WARNING("Failed to load specified config file: " + configFile);
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -407,22 +465,61 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Load brain from file if requested
+    if (!loadPath.empty()) {
+        NLM_LOG_INFO("Loading brain state from: " + loadPath);
+        if (!brain->load(loadPath)) {
+            NLM_LOG_ERROR("Failed to load brain state from: " + loadPath);
+            NLM_LOG_INFO("Starting with new brain instead.");
+        }
+    }
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run selected experiments
+    switch (experimentType) {
+        case 0: // Run all experiments
+            // Run Test 1: Basic connectivity
+            runBasicConnectivityTest(brain);
+            
+            // Reset brain for plasticity experiment
+            brain->reset();
+            brain->initialize();
+            
+            // Run Test 2: Plasticity learning experiment
+            runPlasticityExperiment(brain);
+            
+            // Reset and run Test 3: STDP verification
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+            break;
+            
+        case 1: // Only connectivity test
+            runBasicConnectivityTest(brain);
+            break;
+            
+        case 2: // Only plasticity test
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            break;
+            
+        case 3: // Only STDP verification
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+            break;
+            
+        default:
+            NLM_LOG_WARNING("Invalid experiment type " + std::to_string(experimentType) + ", running all experiments");
+            // Run all tests
+            runBasicConnectivityTest(brain);
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -444,6 +541,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Save brain state if requested
+    if (!savePath.empty()) {
+        NLM_LOG_INFO("Saving brain state to: " + savePath);
+        if (brain->save(savePath)) {
+            NLM_LOG_INFO("Brain state saved successfully");
+        } else {
+            NLM_LOG_ERROR("Failed to save brain state to: " + savePath);
+        }
+    }
     
     return 0;
 }

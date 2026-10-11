@@ -192,33 +192,34 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
-    for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                for (size_t i = 0; i < regionCount; ++i) {
+                    auto* region = getRegion(RegionId(i + 1));
+                    if (region) {
+                        // Add populations with better allocation
+                        auto neuronsThisRegion = std::min(neuronsPerRegion, neuronCount - (i * neuronsPerRegion));
+                        auto sensoryPopId = region->addPopulation(neuronsThisRegion / 4, NeuronType::Sensory);
+                        auto internalPopId = region->addPopulation(neuronsThisRegion / 2, NeuronType::Internal);
+                        auto motorPopId = region->addPopulation(neuronsThisRegion / 4, NeuronType::Motor);
+                        
+                        // Collect sensory and motor neurons for I/O
+                        auto* sensoryPop = region->getPopulation(sensoryPopId);
+                        auto* motorPop = region->getPopulation(motorPopId);
+                        if (sensoryPop) {
+                            for (auto* neuron : sensoryPop->getNeurons()) {
+                                pImpl->sensoryNeurons.push_back(neuron);
+                            }
+                        }
+                        if (motorPop) {
+                            for (auto* neuron : motorPop->getNeurons()) {
+                                pImpl->motorNeurons.push_back(neuron);
+                            }
+                        }
+                        
+                        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+                                    ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                                    std::to_string(region->getTotalNeuronCount()) + " neurons");
+                    }
                 }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
-        }
-    }
     
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
@@ -404,6 +405,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
+    // Log progress for long-running experiments (every 100 steps)
+    if (currentStep % 100 == 0 && currentStep > 0) {
+        NLM_LOG_INFO("Progress: Step " + std::to_string(currentStep) + 
+                    ", Spikes: " + std::to_string(pImpl->totalSpikesThisStep) +
+                    ", Active neurons: " + std::to_string(getActiveNeuronCount()));
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
