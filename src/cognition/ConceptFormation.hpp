@@ -108,6 +108,16 @@ public:
     float getConceptStability(size_t conceptId) const;
 
     // Get number of concepts discovered
+// Get concept for a given pattern
+    size_t findConceptForPattern(const std::vector<float>& pattern) const;
+
+    // Clear all concepts
+    void clear();
+
+    // Update concept formation system
+    void update(TimestepDuration dt);
+
+    // Get number of concepts discovered
     size_t getConceptCount() const { return concepts_.size(); }
 
     // Merge two concepts (when discovered they are actually the same)
@@ -115,11 +125,44 @@ public:
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
+                       const std::vector<float>& features, float reward);
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
+
+    // Check if pattern is novel (doesn't belong to any existing concept)
+    bool isNovel(const std::vector<float>& pattern,
+                 float similarityThreshold = 0.7f) const;
+
+    // Get concept for a given pattern
+    size_t findConceptForPattern(const std::vector<float>& pattern) const;
+
+    // Clear all concepts
+    void clear();
+
+// Get concept for a given pattern
+    size_t findConceptForPattern(const std::vector<float>& pattern) const;
+
+    // Clear all concepts
+    void clear();
+
+    // Update concept formation system
+    void update(TimestepDuration dt);
+
+    // Get number of concepts discovered
+    size_t getConceptCount() const { return concepts_.size(); }
+
+    // Merge two concepts (when discovered they are actually the same)
+    void mergeConcepts(size_t conceptA, size_t conceptB);
+
+    // Update concept with new instance
+    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
+                       const std::vector<float>& features, float reward);
+
+    // Compute similarity between two patterns
+    float computeSimilarity(const std::vector<float>& a,
+                           const std::vector<float>& b) const;
 
     // Check if pattern is novel (doesn't belong to any existing concept)
     bool isNovel(const std::vector<float>& pattern,
@@ -235,8 +278,8 @@ public:
 
     // Record that event A was followed by event B
     void recordSequence(const std::vector<float>& eventA,
-                      const std::vector<float>& eventB,
-                      float reward);
+                       const std::vector<float>& eventB,
+                       float reward);
 
     // Given event A, predict what comes next
     std::vector<float> predictNext(const std::vector<float>& eventA) const;

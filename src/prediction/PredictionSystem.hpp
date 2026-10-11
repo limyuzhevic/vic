@@ -34,6 +34,12 @@ public:
     // Train prediction model
     void train(const SensoryInput& observation);
     
+    // Update prediction system
+    void update(TimestepDuration dt);
+    
+    // Get prediction error signal for neuromodulation
+    float getPredictionErrorSignal() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

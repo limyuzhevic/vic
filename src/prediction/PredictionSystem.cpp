@@ -57,4 +57,15 @@ void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
 
-} // namespace nlm
+void PredictionSystem::update(TimestepDuration dt) {
+    // Update prediction system state
+    // Simple decay of prediction error over time
+    if (pImpl->predictionError > 0.0f) {
+        pImpl->predictionError = std::max(0.0f, pImpl->predictionError - 0.01f * static_cast<float>(dt));
+    }
+}
+
+float PredictionSystem::getPredictionErrorSignal() const {
+    // Return prediction error for neuromodulation
+    return pImpl->predictionError;
+}
