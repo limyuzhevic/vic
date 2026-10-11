@@ -8,6 +8,7 @@
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
+#include "../src/core/Config/DefaultConfig.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
@@ -15,6 +16,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "HelperFunctions.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -400,21 +402,24 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Helper function bindings
+    m.def("runSimulation", &PythonHelperFunctions::runSimulation,
+         py::arg("brain"), py::arg("steps"), py::arg("verbose") = false,
+         "Run simulation and return results as string");
+    
+    m.def("createPhase6Config", &PythonHelperFunctions::createPhase6Config,
+         "Create a Phase 6 (final integration) configuration");
+    
+    m.def("createLearningAgent", &PythonHelperFunctions::createLearningAgent,
+         py::arg("brain"), py::arg("world"), py::arg("enable_reward_modulation") = true,
+         py::arg("enable_structural_plasticity") = true, py::arg("enable_development") = true,
+         py::arg("enable_curiosity") = true,
+         "Create agent with learning capabilities enabled");
+    
+    m.def("simulateEpisode", &PythonHelperFunctions::simulateEpisode,
+         py::arg("agent"), py::arg("world"), py::arg("maxSteps") = 1000,
+         py::arg("recordMetrics") = true,
+         "Run complete episode and return metrics");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
