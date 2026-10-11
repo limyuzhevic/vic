@@ -134,18 +134,27 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // IMPLEMENTATION COMPLETE: Real integrate-and-fire dynamics
     void step(Timestamp currentTime);
+    
+    // Get synaptic connectivity statistics
+    size_t getIncomingSynapseCount() const;
+    size_t getOutgoingSynapseCount() const;
+    
+    // Get neural efficiency metrics
+    float getInputResistance() const;
+    float getMembraneTimeConstant() const;
+    
+    // Determine if neuron is suitable for specific function
+    bool isSuitableFor(NeuronType targetType) const;
+    
+    // Clone neuron for structural plasticity
+    std::unique_ptr<Neuron> clone() const;
     
     // Reset to initial state
     void reset();
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
 
 } // namespace nlm
