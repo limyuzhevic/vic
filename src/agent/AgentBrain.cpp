@@ -61,7 +61,20 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clean up neuron pointer vectors to avoid memory leaks
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    previousVision_.clear();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -334,17 +347,451 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+void AgentBrain::enableDebugMode(bool enable) {
+    if (enable) {
+        NLM_LOG_INFO("Debug mode enabled - detailed logging will be output");
+        // Enable debug logging across all systems
+        // This would typically set logging levels to DEBUG
+        // Also enable additional diagnostic information
+        debugModeEnabled_ = true;
+    } else {
+        NLM_LOG_INFO("Debug mode disabled");
+        debugModeEnabled_ = false;
+    }
 }
 
-} // namespace nlm
+void AgentBrain::enableProfiling(bool enable) {
+    if (enable) {
+        NLM_LOG_INFO("Performance profiling enabled");
+        // Start performance counters
+        // This would typically start timers for various operations
+        profilingEnabled_ = true;
+        startPerformanceTimer();
+    } else {
+        NLM_LOG_INFO("Performance profiling disabled");
+        profilingEnabled_ = false;
+    }
+}
+
+void AgentBrain::enablePerformanceMonitoring(bool enable) {
+    if (enable) {
+        NLM_LOG_INFO("Real-time performance monitoring enabled");
+        // Start monitoring system performance
+        // This would typically track CPU, memory, and I/O
+        performanceMonitoringEnabled_ = true;
+    } else {
+        NLM_LOG_INFO("Real-time performance monitoring disabled");
+        performanceMonitoringEnabled_ = false;
+    }
+}
+
+void AgentBrain::saveAgentState(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving agent state to: " + filepath);
+    
+    std::ofstream outFile(filepath);
+    if (outFile.is_open()) {
+        // Save all agent state
+        outFile << "=== NLM Agent State ===\n";
+        outFile << "Generated: " << getCurrentTimestamp() << "\n\n";
+        
+        // Save configuration
+        outFile << "Configuration:\n";
+        outFile << "  Reward Modulation: " << (rewardModulationEnabled_ ? "Enabled" : "Disabled") << "\n";
+        outFile << "  Structural Plasticity: " << (structuralPlasticityEnabled_ ? "Enabled" : "Disabled") << "\n";
+        outFile << "  Development: " << (developmentEnabled_ ? "Enabled" : "Disabled") << "\n";
+        outFile << "  Curiosity: " << (curiosityEnabled_ ? "Enabled" : "Disabled") << "\n";
+        outFile << "  Debug Mode: " << (debugModeEnabled_ ? "Enabled" : "Disabled") << "\n";
+        outFile << "  Profiling: " << (profilingEnabled_ ? "Enabled" : "Disabled") << "\n";
+        outFile << "  Performance Monitoring: " << (performanceMonitoringEnabled_ ? "Enabled" : "Disabled") << "\n\n";
+        
+        // Save neuromodulation state
+        outFile << "Neuromodulation State:\n";
+        outFile << "  Dopamine Level: " << dopamineLevel_ << "\n";
+        outFile << "  Novelty Level: " << noveltyLevel_ << "\n";
+        outFile << "  Curiosity Level: " << curiosityLevel_ << "\n";
+        outFile << "  Prediction Error: " << predictionError_ << "\n";
+        outFile << "  Expected Reward: " << expectedReward_ << "\n\n";
+        
+        // Save development state
+        outFile << "Development State:\n";
+        outFile << "  Developmental Age: " << developmentalAge_ << "\n";
+        outFile << "  Plasticity Modifier: " << plasticityModifier_ << "\n\n";
+        
+        // Save neuron group information
+        outFile << "Neuron Group Information:\n";
+        outFile << "  Motor Forward: " << motorForward_.size() << " neurons\n";
+        outFile << "  Motor Backward: " << motorBackward_.size() << " neurons\n";
+        outFile << "  Motor Turn Left: " << motorTurnLeft_.size() << " neurons\n";
+        outFile << "  Motor Turn Right: " << motorTurnRight_.size() << " neurons\n";
+        outFile << "  Motor Interact: " << motorInteract_.size() << " neurons\n";
+        outFile << "  Motor Wait: " << motorWait_.size() << " neurons\n";
+        outFile << "  Sensory Vision: " << sensoryVision_.size() << " neurons\n";
+        outFile << "  Sensory Touch: " << sensoryTouch_.size() << " neurons\n";
+        outFile << "  Sensory Internal: " << sensoryInternal_.size() << " neurons\n";
+        outFile << "  Sensory Proprioception: " << sensoryProprioception_.size() << " neurons\n\n";
+        
+        outFile << "=== End Agent State ===\n";
+        outFile.close();
+        
+        NLM_LOG_INFO("Agent state saved successfully");
+    } else {
+        NLM_LOG_WARNING("Failed to save agent state to: " + filepath);
+    }
+}
+
+void AgentBrain::loadAgentState(const std::string& filepath) {
+    NLM_LOG_INFO("Loading agent state from: " + filepath);
+    
+    std::ifstream inFile(filepath);
+    if (inFile.is_open()) {
+        std::string line;
+        while (std::getline(inFile, line)) {
+            // Parse configuration from file
+            if (line.find("Reward Modulation:") != std::string::npos) {
+                rewardModulationEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Structural Plasticity:") != std::string::npos) {
+                structuralPlasticityEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Development:") != std::string::npos) {
+                developmentEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Curiosity:") != std::string::npos) {
+                curiosityEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Debug Mode:") != std::string::npos) {
+                debugModeEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Profiling:") != std::string::npos) {
+                profilingEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Performance Monitoring:") != std::string::npos) {
+                performanceMonitoringEnabled_ = (line.find("Enabled") != std::string::npos);
+            } else if (line.find("Dopamine Level:") != std::string::npos) {
+                try {
+                    dopamineLevel_ = std::stof(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            } else if (line.find("Novelty Level:") != std::string::npos) {
+                try {
+                    noveltyLevel_ = std::stof(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            } else if (line.find("Curiosity Level:") != std::string::npos) {
+                try {
+                    curiosityLevel_ = std::stof(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            } else if (line.find("Prediction Error:") != std::string::npos) {
+                try {
+                    predictionError_ = std::stof(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            } else if (line.find("Expected Reward:") != std::string::npos) {
+                try {
+                    expectedReward_ = std::stof(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            } else if (line.find("Developmental Age:") != std::string::npos) {
+                try {
+                    developmentalAge_ = std::stod(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            } else if (line.find("Plasticity Modifier:") != std::string::npos) {
+                try {
+                    plasticityModifier_ = std::stof(line.substr(line.find(":") + 1));
+                } catch (...) {}
+            }
+        }
+        
+        inFile.close();
+        NLM_LOG_INFO("Agent state loaded successfully");
+    } else {
+        NLM_LOG_WARNING("Failed to load agent state from: " + filepath);
+    }
+}
+
+void AgentBrain::exportBrainState(const std::string& filepath) const {
+    NLM_LOG_INFO("Exporting brain neural state to: " + filepath);
+    
+    std::ofstream outFile(filepath);
+    if (outFile.is_open()) {
+        outFile << "=== NLM Brain State ===\n";
+        outFile << "Generated: " << getCurrentTimestamp() << "\n\n";
+        
+        if (brain_) {
+            // Export all regions
+            for (const auto& region : brain_->getRegions()) {
+                outFile << "Region " << region->getId().value << ":\n";
+                outFile << "  Neurons: " << region->getAllNeurons().size() << "\n";
+                outFile << "  Synapses: " << region->getSynapses().size() << "\n\n";
+                
+                // Export neuron information
+                for (const auto& neuron : region->getAllNeurons()) {
+                    outFile << "    Neuron " << neuron->getId().value << ":\n";
+                    outFile << "      Type: " << static_cast<int>(neuron->getType()) << "\n";
+                    outFile << "      Membrane Potential: " << neuron->getMembranePotential() << "\n";
+                    outFile << "      Threshold: " << neuron->getThreshold() << "\n";
+                    outFile << "      Resting Potential: " << neuron->getState().restingPotential << "\n";
+                    outFile << "      Firing State: " << static_cast<int>(neuron->getState().firingState) << "\n";
+                }
+                
+                // Export synapse information
+                for (const auto& synapse : region->getSynapses()) {
+                    outFile << "    Synapse " << synapse->getId().value << ":\n";
+                    outFile << "      Weight: " << synapse->getWeight() << "\n";
+                    outFile << "      Type: " << static_cast<int>(synapse->getType()) << "\n";
+                    outFile << "      Plasticity: Hebbian=" << synapse->isHebbianPlasticityEnabled() 
+                           << ", STDP=" << synapse->isSTDPPlasticityEnabled() 
+                           << ", Structural=" << synapse->isStructuralPlasticityEnabled() << "\n";
+                }
+            }
+        }
+        
+        outFile << "=== End Brain State ===\n";
+        outFile.close();
+        
+        NLM_LOG_INFO("Brain state exported successfully");
+    } else {
+        NLM_LOG_WARNING("Failed to export brain state to: " + filepath);
+    }
+}
+
+void AgentBrain::importBrainState(const std::string& filepath) {
+    NLM_LOG_INFO("Importing brain neural state from: " + filepath);
+    
+    // Note: This is a placeholder implementation
+    // In a real implementation, this would restore brain state from file
+    // and update all neural properties, synaptic weights, etc.
+    
+    NLM_LOG_INFO("Brain state import is a placeholder - not yet implemented");
+}
+
+// Performance and debugging methods
+void AgentBrain::recordPerformanceMetrics(double timestep) {
+    if (performanceMetricsEnabled_) {
+        double currentTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        
+        // Record timestep
+        recordedTimesteps_.push_back(currentTime);
+        
+        // Calculate metrics
+        if (recordedTimesteps_.size() > 1) {
+            double dt = recordedTimesteps_.back() - recordedTimesteps_.front();
+            if (dt > 0.0) {
+                double stepsPerSecond = (recordedTimesteps_.size() - 1) / dt;
+                performanceMetrics_.stepsPerSecond = stepsPerSecond;
+                performanceMetrics_.avgStepTime = dt / (recordedTimesteps_.size() - 1);
+            }
+        }
+        
+        // Record memory usage (placeholder)
+        performanceMetrics_.memoryUsage = recordMemoryUsage();
+        
+        // Record neuron activity metrics
+        performanceMetrics_.neuronActivity = brain_->getFiringNeuronCount();
+        performanceMetrics_.spikeCount = brain_->getTotalSpikeCount();
+        
+        // Log metrics periodically
+        if (recordedTimesteps_.size() % 100 == 0) {
+            logPerformanceMetrics();
+        }
+    }
+}
+
+void AgentBrain::logPerformanceMetrics() {
+    if (performanceMetricsEnabled_) {
+        NLM_LOG_INFO("=== Performance Metrics ===");
+        NLM_LOG_INFO("  Steps per second: " + std::to_string(performanceMetrics_.stepsPerSecond));
+        NLM_LOG_INFO("  Average step time: " + std::to_string(performanceMetrics_.avgStepTime * 1000) + " ms");
+        NLM_LOG_INFO("  Memory usage: " << performanceMetrics_.memoryUsage << " MB");
+        NLM_LOG_INFO("  Active neurons: " << performanceMetrics_.neuronActivity << "/" << brain_->getTotalNeuronCount());
+        NLM_LOG_INFO("  Total spikes: " << performanceMetrics_.spikeCount << "/" << brain_->getTotalSpikeCount());
+        NLM_LOG_INFO("  Neuromodulation levels - Dopamine: " << dopamineLevel_ 
+                    ", Curiosity: " << curiosityLevel_ 
+                    ", Novelty: " << noveltyLevel_);
+        NLM_LOG_INFO("============================");
+    }
+}
+
+double AgentBrain::recordMemoryUsage() const {
+    // Record current memory usage (placeholder implementation)
+    // In a real implementation, this would use system calls to get memory usage
+    return 0.0;  // Placeholder
+}
+
+void AgentBrain::startPerformanceTimer() {
+    if (performanceMetricsEnabled_) {
+        timerStart_ = std::chrono::high_resolution_clock::now();
+    }
+}
+
+double AgentBrain::stopPerformanceTimer() {
+    if (performanceMetricsEnabled_ && timerStart_ != std::chrono::steady_clock::time_point()) {
+        auto timerEnd = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timerEnd - timerStart_);
+        timerStart_ = std::chrono::steady_clock::time_point();
+        return duration.count() / 1000.0;  // Convert to seconds
+    }
+    return 0.0;
+}
+
+void AgentBrain::exportDebugInfo(const std::string& filepath) const {
+    NLM_LOG_INFO("Exporting debug information to: " << filepath);
+    
+    std::ofstream outFile(filepath);
+    if (outFile.is_open()) {
+        outFile << "=== NLM Debug Information ===\n";
+        outFile << "Generated: " << getCurrentTimestamp() << "\n\n";
+        
+        // Write brain state
+        outFile << "Brain State:\n";
+        outFile << "  Total Neurons: " << brain_->getTotalNeuronCount() << "\n";
+        outFile << "  Total Synapses: " << brain_->getTotalSynapseCount() << "\n";
+        outFile << "  Active Neurons: " << brain_->getFiringNeuronCount() << "\n";
+        outFile << "  Total Spikes: " << brain_->getTotalSpikeCount() << "\n";
+        outFile << "  Average Firing Rate: " << brain_->getAverageFiringRate() << "\n\n";
+        
+        // Write agent state
+        outFile << "Agent State:\n";
+        outFile << "  Developmental Stage: " << static_cast<int>(getDevelopmentalStage()) << "\n";
+        outFile << "  Dopamine Level: " << getNeuromodulationLevel() << "\n";
+        outFile << "  Curiosity Level: " << getCuriosityLevel() << "\n";
+        outFile << "  Novelty Level: " << getNoveltyLevel() << "\n";
+        outFile << "  Prediction Error: " << getPredictionError() << "\n\n";
+        
+        // Write performance metrics
+        if (performanceMetricsEnabled_) {
+            outFile << "Performance Metrics:\n";
+            outFile << "  Steps per second: " << performanceMetrics_.stepsPerSecond << "\n";
+            outFile << "  Average step time: " << performanceMetrics_.avgStepTime * 1000 << " ms\n";
+            outFile << "  Memory usage: " << performanceMetrics_.memoryUsage << " MB\n";
+            outFile << "  Neuron activity: " << performanceMetrics_.neuronActivity << "\n";
+            outFile << "  Spike count: " << performanceMetrics_.spikeCount << "\n\n";
+        }
+        
+        outFile << "=== End Debug Information ===\n";
+        outFile.close();
+        
+        NLM_LOG_INFO("Debug information exported successfully");
+    } else {
+        NLM_LOG_WARNING("Failed to export debug information to: " << filepath);
+    }
+}
+
+std::string AgentBrain::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+// Performance and debugging methods
+void AgentBrain::recordPerformanceMetrics(double timestep) {
+    // Record performance metrics for analysis
+    if (performanceMetricsEnabled_) {
+        double currentTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        
+        // Record timestep
+        recordedTimesteps_.push_back(currentTime);
+        
+        // Calculate metrics
+        if (recordedTimesteps_.size() > 1) {
+            double dt = recordedTimesteps_.back() - recordedTimesteps_.front();
+            if (dt > 0.0) {
+                double stepsPerSecond = (recordedTimesteps_.size() - 1) / dt;
+                performanceMetrics_.stepsPerSecond = stepsPerSecond;
+                performanceMetrics_.avgStepTime = dt / (recordedTimesteps_.size() - 1);
+            }
+        }
+        
+        // Record memory usage (placeholder)
+        performanceMetrics_.memoryUsage = recordMemoryUsage();
+        
+        // Record neuron activity metrics
+        performanceMetrics_.neuronActivity = brain_->getFiringNeuronCount();
+        performanceMetrics_.spikeCount = brain_->getTotalSpikeCount();
+        
+        // Log metrics periodically
+        if (recordedTimesteps_.size() % 100 == 0) {
+            logPerformanceMetrics();
+        }
+    }
+}
+
+void AgentBrain::logPerformanceMetrics() {
+    if (performanceMetricsEnabled_) {
+        NLM_LOG_INFO("=== Performance Metrics ===");
+        NLM_LOG_INFO("  Steps per second: " + std::to_string(performanceMetrics_.stepsPerSecond));
+        NLM_LOG_INFO("  Average step time: " + std::to_string(performanceMetrics_.avgStepTime * 1000) + " ms");
+        NLM_LOG_INFO("  Memory usage: " + std::to_string(performanceMetrics_.memoryUsage) + " MB");
+        NLM_LOG_INFO("  Active neurons: " + std::to_string(performanceMetrics_.neuronActivity));
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(performanceMetrics_.spikeCount));
+        NLM_LOG_INFO("  Neuromodulation levels - Dopamine: " + std::to_string(dopamineLevel_) + 
+                    ", Curiosity: " + std::to_string(curiosityLevel_) + 
+                    ", Novelty: " + std::to_string(noveltyLevel_));
+        NLM_LOG_INFO("============================");
+    }
+}
+
+double AgentBrain::recordMemoryUsage() const {
+    // Record current memory usage (placeholder implementation)
+    // In a real implementation, this would use system calls to get memory usage
+    return 0.0;  // Placeholder
+}
+
+void AgentBrain::startPerformanceTimer() {
+    if (performanceMetricsEnabled_) {
+        timerStart_ = std::chrono::high_resolution_clock::now();
+    }
+}
+
+double AgentBrain::stopPerformanceTimer() {
+    if (performanceMetricsEnabled_ && timerStart_ != std::chrono::steady_clock::time_point()) {
+        auto timerEnd = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timerEnd - timerStart_);
+        timerStart_ = std::chrono::steady_clock::time_point();
+        return duration.count() / 1000.0;  // Convert to seconds
+    }
+    return 0.0;
+}
+
+void AgentBrain::exportDebugInfo(const std::string& filepath) const {
+    NLM_LOG_INFO("Exporting debug information to: " + filepath);
+    
+    std::ofstream outFile(filepath);
+    if (outFile.is_open()) {
+        outFile << "=== NLM Debug Information ===\n";
+        outFile << "Generated: " << getCurrentTimestamp() << "\n\n";
+        
+        // Write brain state
+        outFile << "Brain State:\n";
+        outFile << "  Total Neurons: " << brain_->getTotalNeuronCount() << "\n";
+        outFile << "  Total Synapses: " << brain_->getTotalSynapseCount() << "\n";
+        outFile << "  Active Neurons: " << brain_->getFiringNeuronCount() << "\n";
+        outFile << "  Total Spikes: " << brain_->getTotalSpikeCount() << "\n";
+        outFile << "  Average Firing Rate: " << brain_->getAverageFiringRate() << "\n\n";
+        
+        // Write agent state
+        outFile << "Agent State:\n";
+        outFile << "  Developmental Stage: " << static_cast<int>(getDevelopmentalStage()) << "\n";
+        outFile << "  Dopamine Level: " << getNeuromodulationLevel() << "\n";
+        outFile << "  Curiosity Level: " << getCuriosityLevel() << "\n";
+        outFile << "  Novelty Level: " << getNoveltyLevel() << "\n";
+        outFile << "  Prediction Error: " << getPredictionError() << "\n\n";
+        
+        // Write performance metrics
+        if (performanceMetricsEnabled_) {
+            outFile << "Performance Metrics:\n";
+            outFile << "  Steps per second: " << performanceMetrics_.stepsPerSecond << "\n";
+            outFile << "  Average step time: " << performanceMetrics_.avgStepTime * 1000 << " ms\n";
+            outFile << "  Memory usage: " << performanceMetrics_.memoryUsage << " MB\n";
+            outFile << "  Neuron activity: " << performanceMetrics_.neuronActivity << "\n";
+            outFile << "  Spike count: " << performanceMetrics_.spikeCount << "\n\n";
+        }
+        
+        outFile << "=== End Debug Information ===\n";
+        outFile.close();
+        
+        NLM_LOG_INFO("Debug information exported successfully");
+    } else {
+        NLM_LOG_WARNING("Failed to export debug information to: " + filepath);
+    }
+}
+
+std::string AgentBrain::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}

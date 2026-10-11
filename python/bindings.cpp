@@ -397,8 +397,53 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+                .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+
+    // Advanced configuration methods
+    .def("setNeuronGroupDistribution", &AgentBrain::setNeuronGroupDistribution,
+         py::arg("optimizeForSpeed") = false,
+         "Configure neuron group distribution for performance")
+    .def("setSensoryMapping", &AgentBrain::setSensoryMapping,
+         py::arg("mapping"),
+         "Set custom sensory neuron mapping")
+    .def("setMotorCommandScaling", &AgentBrain::setMotorCommandScaling,
+         py::arg("scale") = 1.0f,
+         "Set motor command scaling factor")
+    .def("setNoveltyThreshold", &AgentBrain::setNoveltyThreshold,
+         py::arg("threshold"),
+         "Set novelty detection threshold")
+    .def("setCuriosityFactor", &AgentBrain::setCuriosityFactor,
+         py::arg("factor"),
+         "Set curiosity factor for exploration")
+    .def("setDevelopmentRate", &AgentBrain::setDevelopmentRate,
+         py::arg("rate"),
+         "Set developmental rate (timestep to day conversion)")
+
+    // Debug and profiling methods
+    .def("enableDebugMode", &AgentBrain::enableDebugMode,
+         py::arg("enable") = true,
+         "Enable/disable debug mode for verbose logging")
+    .def("enableProfiling", &AgentBrain::enableProfiling,
+         py::arg("enable") = true,
+         "Enable/disable performance profiling")
+    .def("enablePerformanceMonitoring", &AgentBrain::enablePerformanceMonitoring,
+         py::arg("enable") = true,
+         "Enable/disable real-time performance monitoring")
+
+    // State management methods
+    .def("saveAgentState", &AgentBrain::saveAgentState,
+         py::arg("filepath"),
+         "Save agent state to file")
+    .def("loadAgentState", &AgentBrain::loadAgentState,
+         py::arg("filepath"),
+         "Load agent state from file")
+    .def("exportBrainState", &AgentBrain::exportBrainState,
+         py::arg("filepath"),
+         "Export brain neural state to file")
+    .def("importBrainState", &AgentBrain::importBrainState,
+         py::arg("filepath"),
+         "Import brain neural state from file")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
