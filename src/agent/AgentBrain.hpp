@@ -6,14 +6,45 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
+#include <unordered_map>
 
 namespace nlm {
+
+// Agent configuration structure
+struct AgentConfig {
+    // Neuromodulation settings
+    bool enableRewardModulation = true;
+    bool enableStructuralPlasticity = true;
+    bool enableDevelopment = true;
+    bool enableCuriosity = true;
+    
+    // Novelty detection
+    float noveltyDecayRate = 0.99f;
+    
+    // Curiosity parameters
+    float curiosityThreshold = 0.3f;
+    float explorationRate = 0.3f;
+    
+    // Reward prediction
+    float rewardPredictionDecay = 0.95f;
+    
+    // Development
+    double developmentalTimestep = 0.1;  // Simulation time per developmental step
+    
+    // Performance
+    size_t maxWorkingMemorySize = 1000;
+    size_t maxEpisodicMemorySize = 1000;
+    
+    // Custom action mappings (for advanced users)
+    std::unordered_map<MotorCommand, std::string> actionLabels;
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, const AgentConfig& config = AgentConfig());
     ~AgentBrain();
     
     // Initialize with world
@@ -69,12 +100,25 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced configuration access
+    const AgentConfig& getConfig() const { return config_; }
+    void setConfig(const AgentConfig& config) { config_ = config; }
+    
+    // Action label utilities
+    std::string getActionLabel(MotorCommand cmd) const;
+    void setActionLabel(MotorCommand cmd, const std::string& label);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Utility functions
+    void distributeNeuronsToGroups();
+    void updateNovelty(const std::vector<float>& vision);
+    float computeCuriosity() const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +156,12 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configuration
+    AgentConfig config_;
+    
+    // Action label mapping
+    std::unordered_map<MotorCommand, std::string> actionLabels_;
 };
 
 } // namespace nlm
