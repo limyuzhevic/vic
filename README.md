@@ -76,6 +76,7 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
@@ -88,7 +89,11 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── python/                     # Enhanced Python bindings
+│   ├── enhanced_bindings.cpp   # Enhanced Python API with improved error handling
+│   ├── CMakeLists.txt          # Python bindings build system
+│   └── ENHANCED_API.md         # Comprehensive documentation
+├── docs/                       # Scientific documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
@@ -110,8 +115,99 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── tests/               # Test suite
+└── configs/             # Configuration examples
+```
+
+## Python Interface
+
+NLM provides a Python interface through **enhanced bindings** with improved error handling, more intuitive APIs, and comprehensive utilities for both beginners and advanced users.
+
+### Quick Start with Enhanced Python API
+
+```python
+import pynlm
+
+# 1. Create enhanced configuration
+config = pynlm.createDevelopmentConfig()  # Specialized for learning
+
+# 2. Create enhanced brain interface
+brain = pynlm.PythonBrain(config)
+
+# 3. Initialize with error handling
+if not brain.initialize():
+    raise pynlm.SimulationError("Brain initialization failed")
+
+# 4. Create agent and world
+world = pynlm.PythonWorld()
+agent = pynlm.PythonAgentBrain(brain)
+
+world.configure(20, 20, 8, 8)
+world.reset()
+agent.initialize(world)
+
+# 5. Enable learning subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# 6. Run enhanced simulation
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply learning
+    reward = calculate_reward()
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+
+# 7. Get comprehensive analysis
+print(brain.getStats())
+```
+
+### Key Features of Enhanced Python API
+
+1. **Better Error Handling**: Custom exception types (`NLMException`, `SimulationError`, `InvalidConfigException`)
+
+2. **Enhanced Configuration**: `PythonConfig` class with source control and better API
+
+3. **Advanced Brain Interface**: `PythonBrain` with enhanced statistics and development control
+
+4. **Power User Tools**: Batch processing (`runMultipleEpisodes`), analysis utilities, configuration factories
+
+5. **Comprehensive Documentation**: `ENHANCED_API.md` with detailed examples
+
+6. **Backward Compatibility**: Original API preserved for existing code
+
+### Enhanced Configuration Options
+
+```python
+# Specialized configurations for different use cases
+config = pynlm.createMinimalConfig()        # Fast startup
+config = pynlm.createHighPerformanceConfig() # Maximum capabilities
+config = pynlm.createDevelopmentConfig()    # Focus on learning
+config = pynlm.createDefaultConfig()        # General purpose
+```
+
+### Advanced Simulation Utilities
+
+```python
+# Batch processing for research and testing
+pynlm.runMultipleEpisodes(
+    numEpisodes=100,
+    config=pynlm.createHighPerformanceConfig(),
+    stepsPerEpisode=1000,
+    enableLearning=True,
+    verbose=True
+)
+
+# Analysis and debugging
+print(brain.getStats())
+print(world.getWorldStats())
 ```
 
 ## Phase Summary
@@ -228,3 +324,42 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Python Package Information
+
+### Enhanced API Benefits
+
+1. **Improved Developer Experience**: Better error messages, more intuitive APIs
+2. **Enhanced Debugging**: Comprehensive statistics and monitoring tools
+3. **Research Support**: Batch processing utilities for reproducible experiments
+4. **Learning Tools**: Specialized configurations for different use cases
+5. **Documentation**: Complete API reference with examples
+
+### Migration Guide
+
+The enhanced API maintains full backward compatibility:
+
+- Original classes (`Brain`, `Config`, `AgentBrain`, `SimpleWorld`) still available
+- Original constructors preserved
+- Original methods maintained
+- Enhanced versions available with improved functionality
+
+### Usage Examples
+
+Beginner examples can be found in:
+- `easy_usage.md` - Simple, beginner-friendly examples
+- `HOW_TO_USE.md` - Comprehensive API documentation
+
+Advanced examples and research utilities can be found in:
+- `python/ENHANCED_API.md` - Complete enhanced API documentation
+- `docs/` - Scientific and architectural documentation
+
+## Support and Community
+
+For questions about the enhanced Python API:
+- Check `python/ENHANCED_API.md` for detailed documentation
+- Refer to `easy_usage.md` and `HOW_TO_USE.md` for basic usage
+- Scientific questions: See `docs/` directory
+- Technical questions: Check project architecture documentation
+
+The enhanced Python API is designed to support both beginners learning neural networks and researchers conducting advanced experiments with artificial developmental systems.
