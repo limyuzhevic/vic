@@ -1,16 +1,27 @@
-# NLM - Easy Usage Guide for Beginners
+## Python Module Structure
 
-## What is NLM?
+### Improved Modularity
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+The NLM Python bindings have been refactored from a monolithic `bindings.cpp` (425 lines) into a modular structure for better maintainability and organization:
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+**New Structure:**
+- `python/bindings.cpp` (45 lines) - Main orchestrator
+- `python/bindings/binding_headers.h` (22 lines) - Header file
+- `python/bindings/` directory - 8 focused binding files
 
-That's it! NLM simulates all of this.
+**Benefits for Users:**
+- **Improved reliability**: Smaller, focused files reduce the risk of bugs
+- **Better maintainability**: Easier to debug and modify specific functionality
+- **Enhanced testability**: Individual components can be tested separately
+- **Clear organization**: Each binding type is in its own dedicated file
+
+**What this means for you:**
+- All existing Python API functionality remains unchanged
+- The improved structure provides a more solid foundation for future development
+- No changes to your usage patterns - everything works the same way externally
+- Only internal code organization improvements
+
+The refactoring maintains 100% backward compatibility while significantly improving the code quality and maintainability of the Python bindings.
 
 ---
 

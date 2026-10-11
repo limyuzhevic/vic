@@ -11,7 +11,7 @@ This document covers:
 
 ---
 
-## Part 1: Building the C++ Project from Source
+## Building the C++ Project from Source
 
 ### Prerequisites
 
@@ -67,6 +67,26 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
+
+### Build Notes
+
+The project has been refactored with improved code organization:
+
+**Modular Source Structure:**
+- **Python bindings**: Split from monolithic `python/bindings.cpp` into focused files
+  - `python/bindings.cpp` (45 lines) - Main orchestrator
+  - `python/bindings/binding_headers.h` (22 lines) - Header file
+  - `python/bindings/` directory - 8 focused binding files
+
+- **C++ main**: Split from monolithic `src/main.cpp` into focused files
+  - `src/main.cpp` (160 lines) - Clean main coordination
+  - `src/banner.*` files for banner functionality
+  - `src/learning_experiment.h` - LearningExperiment struct
+  - `src/connectivity_test.*` files for basic connectivity test
+  - `src/plasticity_test.*` files for plasticity experiment
+  - `src/stdp_test.*` files for STDP verification
+
+This refactoring significantly improves maintainability and allows for easier testing and modification of individual components while maintaining full backward compatibility.
 
 ---
 

@@ -73,6 +73,26 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Build Notes
+
+The project has been refactored with improved code organization:
+
+**Modular Source Structure:**
+- **Python bindings**: Split from monolithic `python/bindings.cpp` into focused files
+  - `python/bindings.cpp` (45 lines) - Main orchestrator
+  - `python/bindings/binding_headers.h` (22 lines) - Header file
+  - `python/bindings/` directory - 8 focused binding files
+
+- **C++ main**: Split from monolithic `src/main.cpp` into focused files
+  - `src/main.cpp` (160 lines) - Clean main coordination
+  - `src/banner.*` files for banner functionality
+  - `src/learning_experiment.h` - LearningExperiment struct
+  - `src/connectivity_test.*` files for basic connectivity test
+  - `src/plasticity_test.*` files for plasticity experiment
+  - `src/stdp_test.*` files for STDP verification
+
+This refactoring significantly improves maintainability and allows for easier testing and modification of individual components while maintaining full backward compatibility.
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
@@ -82,7 +102,49 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+## Code Organization Improvements
+
+### Python Bindings Refactoring
+The monolithic `python/bindings.cpp` (425 lines) has been refactored into a modular structure:
+
+- **`python/bindings.cpp`** (45 lines) - Main orchestrator file
+- **`python/bindings/binding_headers.h`** (22 lines) - Centralized header file
+- **`python/bindings/` directory** - 8 focused binding files:
+  - `action.cpp` - Action-related Python bindings
+  - `action_result.cpp` - Action result bindings
+  - `brain.cpp` - Brain interface bindings
+  - `config.cpp` - Configuration bindings
+  - `enums.cpp` - Enum type bindings
+  - `module_functions.cpp` - Module initialization functions
+  - `neuron_types.cpp` - Neuron type bindings
+  - `perception.cpp` - Perception-related bindings
+  - `sensory_input.cpp` - Sensory input bindings
+  - `simple_world.cpp` - Simple world bindings
+  - `world_objects.cpp` - World object bindings
+
+**Benefits:**
+- Improved maintainability with smaller, focused files
+- Easier debugging and testing of individual bindings
+- Better code organization and readability
+- Separation of concerns
+
+### C++ Main.cpp Refactoring
+The monolithic `src/main.cpp` (449 lines) has been refactored into a modular structure:
+
+- **`src/main.cpp`** (160 lines) - Clean main coordination
+- **`src/banner.*`** - Banner functionality files
+- **`src/learning_experiment.h`** - LearningExperiment struct
+- **`src/connectivity_test.*`** - Basic connectivity test
+- **`src/plasticity_test.*`** - Plasticity experiment
+- **`src/stdp_test.*`** - STDP verification
+
+**Benefits:**
+- Reduced complexity in main entry point
+- Isolated functionality in dedicated files
+- Easier testing and modification of individual experiments
+- Better code organization and reusability
+
+This refactoring significantly improves code maintainability, testability, and developer productivity by breaking down large, monolithic files into smaller, focused components that can be easily understood, modified, and tested independently.
 
 ```
 NLM/
@@ -95,22 +157,46 @@ NLM/
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── python/
+│   ├── bindings.cpp               # Main Python bindings orchestrator (45 lines)
+│   ├── bindings/                  # Modular Python bindings (8 files)
+│   │   ├── binding_headers.h       # Headers for Python bindings
+│   │   ├── action.cpp
+│   │   ├── action_result.cpp
+│   │   ├── brain.cpp
+│   │   ├── config.cpp
+│   │   ├── enums.cpp
+│   │   ├── module_functions.cpp
+│   │   ├── neuron_types.cpp
+│   │   ├── perception.cpp
+│   │   ├── sensory_input.cpp
+│   │   ├── simple_world.cpp
+│   │   └── world_objects.cpp
+│   └── ... (more Python files)
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   ├── main.cpp                    # Clean main orchestration (160 lines)
+│   ├── banner.*                    # Banner functionality
+│   ├── connectivity_test.*          # Basic connectivity test
+│   ├── learning_experiment.h        # LearningExperiment struct
+│   ├── plasticity_test.*            # Plasticity experiment
+│   ├── stdp_test.*                  # STDP verification
+│   ├── core/                       # Core utilities
+│   ├── brain/                      # Neural components (integrated)
+│   ├── dynamics/                   # Neural dynamics
+│   ├── plasticity/                 # Plasticity rules
+│   ├── development/                # Developmental system
+│   ├── neuromodulation/             # Neuromodulators (integrated)
+│   ├── memory/                     # Memory systems (integrated)
+│   ├── prediction/                  # Prediction systems (integrated)
+│   ├── cognition/                  # Cognitive mechanisms (integrated)
+│   ├── sensory/                    # Sensory processing
+│   ├── motor/                      # Motor system
+│   ├── environment/                # Environment interface
+│   ├── experiments/                # Experiment framework (Phase 6)
+│   └── visualization/               # Visualization
 ├── tests/
+│   ├── test_*.cpp                   # Unit tests (split from monolithic tests)
+│   └── ...
 └── configs/
 ```
 
