@@ -62,13 +62,18 @@ enum class CheckpointSection : uint32_t {
     Plasticity = 5,
     Development = 6,
     Neuromodulation = 7,
-    Memory = 8,
-    SpikeHistory = 9,
-    RandomState = 10,
-    SimulationState = 11,
-    Environment = 12,
-    Checksum = 13,
-    End = 14
+    WorkingMemory = 8,
+    EpisodicMemory = 9,
+    AssociativeMemory = 10,
+    Prediction = 11,
+    Cognition = 12,
+    SpikeHistory = 13,
+    RandomState = 14,
+    SimulationState = 15,
+    Replay = 16,
+    Environment = 17,
+    Checksum = 18,
+    End = 19
 };
 
 /**
@@ -110,6 +115,105 @@ struct CheckpointHeader {
         return magic == CHECKPOINT_MAGIC &&
                majorVersion == CHECKPOINT_VERSION_MAJOR;
     }
+};
+
+/**
+ * Working memory state for checkpointing
+ */
+struct WorkingMemoryCheckpointData {
+    std::vector<float> patterns;
+    std::vector<float> strengths;
+    std::vector<uint32_t> neuronIds;
+    std::vector<float> timestamps;
+    std::vector<uint32_t> traces;
+    size_t capacity;
+    float decayRate;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    std::vector<uint64_t> episodeIds;
+    std::vector<uint64_t> timestamps;
+    std::vector<float> rewards;
+    std::vector<std::vector<uint64_t>> activeNeurons;
+    std::vector<std::vector<float>> activations;
+    std::vector<NeuromodulatorType> neuromodulators;
+    std::vector<ReplayType> replayTypes;
+    size_t maxEpisodes;
+    size_t consolidationThreshold;
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionCheckpointData {
+    std::vector<float> forwardModelWeights;
+    std::vector<float> inverseModelWeights;
+    std::vector<float> predictionErrors;
+    std::vector<float> predictionConfidences;
+    std::vector<float> temporalMemory;
+    size_t predictionHorizon;
+    size_t temporalMemorySize;
+    bool enablePredictiveCoding;
+    bool enableForwardModel;
+    bool enableInverseModel;
+};
+
+/**
+ * Neuromodulation system state for checkpointing
+ */
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float acetylcholineLevel;
+    float norepinephrineLevel;
+    float serotoninLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorSignal;
+    float rewardSignal;
+    float arousalLevel;
+    float motivationLevel;
+    float attentionLevel;
+    bool isAttentionModulated;
+    bool isMemoryModulated;
+};
+
+/**
+ * Cognitive systems state for checkpointing
+ */
+struct CognitiveCheckpointData {
+    // Neural planner
+    std::vector<float> plannerWeights;
+    std::vector<float> goalVectors;
+    std::vector<uint32_t> actionHistory;
+    std::vector<float> planningDepths;
+    
+    // Concept formation
+    std::vector<float> conceptPrototypes;
+    std::vector<std::vector<uint32_t>> conceptAssociations;
+    std::vector<float> conceptActivations;
+    
+    // Attentional selection
+    std::vector<float> attentionalWeights;
+    std::vector<float> excitationStrengths;
+    std::vector<float> inhibitionStrengths;
+    std::vector<uint32_t> winnerNeurons;
+    std::vector<float> attentionMaps;
+};
+
+/**
+ * Replay mechanisms state for checkpointing
+ */
+struct ReplayCheckpointData {
+    std::vector<uint64_t> replayTargets;
+    std::vector<float> replayProbabilities;
+    std::vector<ReplayType> replayModes;
+    std::vector<uint64_t> lastReplaySteps;
+    std::vector<float> consolidationStates;
+    float replayStrength;
+    bool isConsolidating;
 };
 
 /**
@@ -208,20 +312,64 @@ public:
     const CheckpointHeader& getHeader() const { return header_; }
     
     /**
-     * Read checkpoint data
+     * Read working memory data
      */
-    bool readNeurons(NeuronCheckpointData& data);
-    bool readSynapses(SynapseCheckpointData& data);
+    bool readWorkingMemory(WorkingMemoryCheckpointData& data);
     
     /**
-     * Read raw section data
+     * Read episodic memory data
      */
-    std::vector<uint8_t> readSection(CheckpointSection sectionType);
+    bool readEpisodicMemory(EpisodicMemoryCheckpointData& data);
     
     /**
-     * Validate checkpoint integrity
+     * Read prediction system data
      */
-    bool validate() const;
+    bool readPrediction(PredictionCheckpointData& data);
+    
+    /**
+     * Read neuromodulation data
+     */
+    bool readNeuromodulation(NeuromodulationCheckpointData& data);
+    
+    /**
+     * Read cognitive systems data
+     */
+    bool readCognitive(CognitiveCheckpointData& data);
+    
+    /**
+     * Read replay mechanisms data
+     */
+    bool readReplay(ReplayCheckpointData& data);
+    
+    /**
+     * Write working memory data
+     */
+    bool writeWorkingMemory(const WorkingMemoryCheckpointData& data);
+    
+    /**
+     * Write episodic memory data
+     */
+    bool writeEpisodicMemory(const EpisodicMemoryCheckpointData& data);
+    
+    /**
+     * Write prediction system data
+     */
+    bool writePrediction(const PredictionCheckpointData& data);
+    
+    /**
+     * Write neuromodulation data
+     */
+    bool writeNeuromodulation(const NeuromodulationCheckpointData& data);
+    
+    /**
+     * Write cognitive systems data
+     */
+    bool writeCognitive(const CognitiveCheckpointData& data);
+    
+    /**
+     * Write replay mechanisms data
+     */
+    bool writeReplay(const ReplayCheckpointData& data);
     
     /**
      * Get validation error message
@@ -232,7 +380,7 @@ public:
      * Get reader progress (0.0 - 1.0)
      */
     double getProgress() const;
-
+    
 private:
     std::ifstream stream_;
     CheckpointHeader header_;
@@ -321,90 +469,64 @@ private:
 /**
  * Checkpoint manager for automated checkpointing
  */
-class CheckpointManager {
-public:
-    CheckpointManager();
-    ~CheckpointManager();
+    /**
+     * Write working memory data
+     */
+    bool writeWorkingMemory(const WorkingMemoryCheckpointData& data);
     
     /**
-     * Configure checkpoint manager
+     * Write episodic memory data
      */
-    void configure(const std::string& checkpointDir, 
-                   uint64_t saveIntervalSteps = 10000,
-                   size_t maxCheckpoints = 10,
-                   bool compress = true);
+    bool writeEpisodicMemory(const EpisodicMemoryCheckpointData& data);
     
     /**
-     * Set checkpoint data providers
+     * Write prediction system data
      */
-    void setNeuronProvider(std::function<bool(NeuronCheckpointData&)> provider) {
-        neuronProvider_ = provider;
-    }
-    
-    void setSynapseProvider(std::function<bool(SynapseCheckpointData&)> provider) {
-        synapseProvider_ = provider;
-    }
+    bool writePrediction(const PredictionCheckpointData& data);
     
     /**
-     * Update checkpoint state (call each simulation step)
+     * Write neuromodulation data
      */
-    bool update(uint64_t currentStep, double currentTime);
+    bool writeNeuromodulation(const NeuromodulationCheckpointData& data);
     
     /**
-     * Save checkpoint immediately
+     * Write cognitive systems data
      */
-    bool saveImmediately(const std::string& name = "");
+    bool writeCognitive(const CognitiveCheckpointData& data);
     
     /**
-     * Load checkpoint
+     * Write replay mechanisms data
      */
-    bool load(const std::string& name);
+    bool writeReplay(const ReplayCheckpointData& data);
     
     /**
-     * List available checkpoints
+     * Finalize and write footer
+     * @return true if successful
      */
-    struct CheckpointInfo {
-        std::string name;
-        uint64_t step;
-        double simulationTime;
-        uint64_t neuronCount;
-        uint64_t synapseCount;
-        uint64_t fileSize;
-        time_t timestamp;
-    };
-    
-    std::vector<CheckpointInfo> listCheckpoints() const;
+    bool finalize();
     
     /**
-     * Delete old checkpoints (keep most recent N)
+     * Abort checkpoint (cleanup partial file)
      */
-    void pruneOldCheckpoints(size_t keepCount);
+    void abort();
     
     /**
-     * Get checkpoint directory
+     * Get total bytes written
      */
-    const std::string& getCheckpointDir() const { return checkpointDir_; }
-    
-    /**
-     * Get last checkpoint path
-     */
-    std::string getLastCheckpointPath() const;
-    
-    /**
-     * Check if checkpoint should be saved
-     */
-    bool shouldSave(uint64_t currentStep) const;
+    uint64_t getBytesWritten() const { return bytesWritten_; }
     
 private:
-    std::string checkpointDir_;
-    uint64_t saveIntervalSteps_;
-    size_t maxCheckpoints_;
-    bool compress_;
-    uint64_t lastSaveStep_;
-    std::string lastCheckpointPath_;
+    bool writeHeader();
+    bool writeSectionHeader(const SectionHeader& header);
+    bool padToAlignment(size_t alignment);
     
-    std::function<bool(NeuronCheckpointData&)> neuronProvider_;
-    std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::ofstream stream_;
+    std::string filepath_;
+    CompressionLevel compression_;
+    CheckpointHeader header_;
+    std::vector<SectionHeader> sections_;
+    uint64_t bytesWritten_;
+    std::vector<uint8_t> compressBuffer_;
 };
 
 // Checksum implementation

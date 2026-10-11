@@ -69,6 +69,91 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     }
 }
 
+void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength,
+                               const AttentionalSelection& attention) {
+    // Store pattern with attention guidance - enhanced version
+    if (pattern.empty() || !brain_) return;
+    
+    // Use attention to guide which patterns to store
+    std::vector<size_t> patternIndices;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        // Get attention strength for this neuron if we have neuron IDs
+        float attentionWeight = 1.0f;
+        
+        // In a real implementation, we would map pattern indices to neuron IDs
+        // and use the attention system to get actual attention weights
+        
+        // Store based on attention-weighted importance
+        float weightedActivation = pattern[i] * strength * attentionWeight;
+        
+        if (weightedActivation > 0.01f) {  // Minimum threshold
+            patternIndices.push_back(i);
+        }
+    }
+    
+    // Store selected patterns with attention guidance
+    if (!patternIndices.empty()) {
+        // Create enhanced storage with attention-modulated strengths
+        for (size_t idx : patternIndices) {
+            float activation = pattern[idx] * strength * 1.5f;  // Attention boost
+            
+            // Store to working memory with enhanced attention integration
+            if (brain_) {
+                brain_->injectCurrent(memoryNeurons_[idx % memoryNeurons_.size()], 
+                    activation * 5.0f);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::storeWithPrediction(const std::vector<float>& pattern,
+                                              float strength,
+                                              const PredictionSystem& prediction,
+                                              Brain* brain) {
+    // Store pattern with prediction guidance - enhanced version
+    if (pattern.empty() || !brain) return;
+    
+    // Get prediction error
+    float predictionError = prediction.getPredictionError();
+    
+    // Use prediction error to select patterns to store
+    std::vector<size_t> patternIndices;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        // Store patterns with high prediction error more strongly
+        float predictionWeight = 1.0f + predictionError * 2.0f;
+        
+        // Store based on prediction-weighted importance
+        float weightedActivation = pattern[i] * strength * predictionWeight;
+        
+        // Check if this pattern is predicted well (low error) or poorly (high error)
+        if (weightedActivation > 0.01f) {
+            patternIndices.push_back(i);
+        }
+    }
+    
+    // Store selected patterns
+    if (!patternIndices.empty()) {
+        // Create temporary pattern with only selected indices
+        std::vector<float> selectedPattern;
+        for (size_t idx : patternIndices) {
+            selectedPattern.push_back(pattern[idx]);
+        }
+        
+        if (!selectedPattern.empty()) {
+            store(selectedPattern, strength);
+            
+            // Update working memory with prediction-based consolidation
+            for (size_t idx : patternIndices) {
+                if (idx < selectedPattern.size() && brain) {
+                    float predictionActivation = selectedPattern[idx] * strength * 1.2f;
+                    // Store to working memory with prediction error influence
+                    storeToNeuron(memoryNeurons_[idx % memoryNeurons_.size()], predictionActivation);
+                }
+            }
+        }
+    }
+}
+
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
@@ -116,17 +201,81 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
+    // Check if brain is in sleep state
+    bool isSleeping = brain_->getSleepManager() && 
+                      brain_->getSleepManager()->isSleeping();
+    
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         
         if (activation > 0.1f) {
-            // Inject maintenance current
+            if (isSleeping) {
+                // Sleep-based memory consolidation - enhanced retention
+                // In deep sleep, working memory traces are strengthened
+                float sleepConsolidation = 1.0f + 0.3f * (isSleeping ? 1.0f : 0.0f);
+                activation *= sleepConsolidation;
+                
+                // Less decay during sleep
+                brain_->injectCurrent(neuron, activation * 1.5f);
+                memoryTimestamps_[i]++;
+                
+                // Check if trace is too old (slower decay during sleep)
+                if (memoryTimestamps_[i] > 2000) {
+                    activation *= (1.0f - decayRate_ * 0.5f);
+                }
+                
+                memoryActivations_[i] = activation;
+            } else {
+                // Normal wake state processing
+                // Inject maintenance current
+                brain_->injectCurrent(neuron, activation * 2.0f);
+                
+                // Age the trace
+                memoryTimestamps_[i]++;
+                
+                // Check if trace is too old
+                if (memoryTimestamps_[i] > 1000) {
+                    activation *= (1.0f - decayRate_);
+                }
+                
+                memoryActivations_[i] = activation;
+            }
+        }
+    }
+    
+    // Decay weak traces
+    decayWeakTraces();
+    
+    // Run competition to select winners
+    runCompetition();
+    
+    // Apply sleep-based consolidation
+    if (isSleeping) {
+        applySleepConsolidation();
+    }
+}
+
+void NeuralWorkingMemory::update(TimestepDuration dt, const AttentionalSelection& attention) {
+    // Enhanced working memory update with attentional modulation
+    if (!brain_) return;
+    
+    // Update maintenance - reinforce active memory neurons with attentional boost
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId neuron = memoryNeurons_[i];
+        float activation = memoryActivations_[i];
+        
+        if (activation > 0.1f) {
+            // Apply attentional modulation to memory maintenance
+            float attentionMod = attention.getAttentionStrength(neuron);
+            activation *= (1.0f + attentionMod * 0.5f);
+            
+            // Inject maintenance current with attentional boost
             brain_->injectCurrent(neuron, activation * 2.0f);
             
-            // Age the trace
-            memoryTimestamps_[i]++;
+            // Age the trace with attentional weighting
+            memoryTimestamps_[i] += (attentionMod > 0.5f ? 2 : 1);
             
             // Check if trace is too old
             if (memoryTimestamps_[i] > 1000) {
@@ -140,8 +289,126 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     // Decay weak traces
     decayWeakTraces();
     
-    // Run competition to select winners
+    // Run competition with attentional guidance
     runCompetition();
+    
+    // Apply attention-based memory consolidation
+    auto winners = attention.getWinners();
+    for (const auto& winner : winners) {
+        // Consolidate attended memories
+        if (contains(winner)) {
+            float boostFactor = 1.5f + attention.getAttentionStrength(winner) * 0.5f;
+            float idx = findNeuronIndex(winner);
+            if (idx >= 0) {
+                memoryActivations_[idx] = std::min(1.0f, memoryActivations_[idx] * boostFactor);
+            }
+        }
+    }
+}
+
+void NeuralWorkingMemory::consolidateMemory(const AttentionalSelection& attention, 
+                                            const PredictionSystem& prediction) {
+    // Consolidate working memory based on attention and prediction
+    if (memoryNeurons_.empty()) return;
+    
+    // Use attention to identify important memories
+    auto winners = attention.getWinners();
+    
+    // Use prediction error to identify predictive memories
+    float predictionError = prediction.getPredictionError();
+    
+    // Apply consolidation: reinforce attended/predictively useful memories
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        NeuronId neuron = memoryNeurons_[i];
+        float& activation = memoryActivations_[i];
+        
+        bool isAttended = std::find(winners.begin(), winners.end(), neuron) != winners.end();
+        
+        if (isAttended) {
+            // Strengthen attended memories
+            activation = std::min(1.0f, activation * 1.3f);
+        }
+        
+        if (predictionError > 0.1f) {
+            // For high prediction error, store this pattern as predictive
+            activation = std::min(1.0f, activation * 1.2f);
+        }
+        
+        // Decay non-attended memories faster
+        if (!isAttended) {
+            activation *= (1.0f - decayRate_ * 1.5f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::matchPattern(const std::vector<float>& pattern,
+                                       float threshold,
+                                       std::vector<NeuronId>& matches) const {
+    // Pattern matching in working memory
+    if (pattern.empty() || memoryActivations_.empty()) return;
+    
+    matches.clear();
+    
+    // Simple pattern matching: compare patterns with current memory
+    for (size_t i = 0; i < pattern.size() && i < memoryActivations_.size(); ++i) {
+        float similarity = std::abs(pattern[i] - memoryActivations_[i]);
+        
+        if (similarity < threshold && !memoryNeurons_.empty()) {
+            matches.push_back(memoryNeurons_[i]);
+        }
+    }
+}
+
+void NeuralWorkingMemory::applyTopDownModulation(const AttentionalSelection& attention,
+                                                  const PredictionSystem& prediction) {
+    // Apply top-down modulation to working memory
+    if (!brain_) return;
+    
+    // Get attention winners and prediction guidance
+    auto winners = attention.getWinners();
+    float predictionError = prediction.getPredictionError();
+    
+    // Apply attention bias to working memory patterns
+    for (const auto& winner : winners) {
+        float attentionBias = attention.getAttentionStrength(winner);
+        
+        if (contains(winner)) {
+            float idx = findNeuronIndex(winner);
+            if (idx >= 0) {
+                // Apply top-down bias to attended memories
+                memoryActivations_[idx] = std::min(1.0f, 
+                    memoryActivations_[idx] + attentionBias * 0.2f);
+            }
+        }
+    }
+    
+    // Apply prediction error to working memory updates
+    if (predictionError > 0.2f) {
+        // High prediction error triggers memory reorganization
+        float reorganizationStrength = predictionError * 0.3f;
+        
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            // Reorganize memories based on prediction error
+            memoryActivations_[i] *= (1.0f + reorganizationStrength);
+            memoryActivations_[i] = std::min(1.0f, memoryActivations_[i]);
+        }
+    }
+}
+
+void NeuralWorkingMemory::update(TimestepDuration dt,
+                               const AttentionalSelection& attention,
+                               const PredictionSystem& prediction) {
+    // Comprehensive working memory update with attention and prediction integration
+    if (!brain_) return;
+    
+    // Apply attention-modulated maintenance
+    update(dt, attention);
+    
+    // Apply top-down modulation
+    applyTopDownModulation(attention, prediction);
+    
+    // Consolidate memory based on attention and prediction
+    consolidateMemory(attention, prediction);
 }
 
 void NeuralWorkingMemory::clear() {
@@ -187,14 +454,12 @@ bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }
 
-float NeuralWorkingMemory::getMemoryActivity() const {
-    if (memoryActivations_.empty()) return 0.0f;
-    
-    float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
+size_t NeuralWorkingMemory::findNeuronIndex(NeuronId neuron) const {
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        return std::distance(memoryNeurons_.begin(), it);
     }
-    return total / memoryActivations_.size();
+    return -1;
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {

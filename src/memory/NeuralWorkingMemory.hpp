@@ -1,11 +1,8 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
-#include <unordered_map>
+// Forward declarations
+class AttentionalSelection;
+class PredictionSystem;
 
 namespace nlm {
 
@@ -29,6 +26,18 @@ public:
     // Store information in working memory
     // The information is encoded as neural activity pattern
     void store(const std::vector<float>& pattern, float strength = 1.0f);
+    
+    // Store information in working memory with attention guidance
+    // Attention system selects which patterns to retain
+    void store(const std::vector<float>& pattern, float strength,
+               const AttentionalSelection& attention);
+    
+    // Store information in working memory with prediction guidance
+    // Prediction system provides error signals for predictive coding
+    void storeWithPrediction(const std::vector<float>& pattern,
+                             float strength,
+                             const PredictionSystem& prediction,
+                             Brain* brain);
 
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);

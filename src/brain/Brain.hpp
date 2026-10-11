@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -175,6 +178,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Acetylcholine - attention and memory encoding
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and salience
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and motivation
+    Serotonin* getSerotonin();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
@@ -182,16 +194,46 @@ public:
     Novelty* getNovelty();
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionError();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get current goal state for planning
+    std::vector<float> getCurrentGoal() const { return pImpl->currentGoal_; }
+    void setCurrentGoal(const std::vector<float>& goal) { pImpl->currentGoal_ = goal; }
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Sleep system for memory consolidation during rest
+    SleepManager* getSleepManager();
     
-    // Logging
-    void logStatus() const;
+    // ========== ENHANCED BRAIN METHODS ==========
+    
+    // Get learning history from all systems
+    std::vector<NeuronId> getLearningHistory() const;
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const;
+    
+    // Get replay targets from episodic memory
+    std::vector<NeuronId> getReplayTargets() const;
+    
+    // Update attention-based learning based on experience
+    void updateAttentionBasedLearning();
+    
+    // Enhance attention driven by prediction errors
+    void enhancePredictionDrivenAttention();
+    
+    // Enhance attention driven by working memory
+    void enhanceWorkingMemoryAttention();
+    
+    // Enhance attention driven by concepts
+    void enhanceConceptDrivenAttention();
+    
+    // Enhance attention driven by neuromodulation
+    void enhanceNeuromodulationDrivenAttention();
+    
+    // Enhance attention driven by development
+    void enhanceDevelopmentDrivenAttention();
+    
+    // Enhance attention driven by replay
+    void enhanceReplayDrivenAttention();
     
 private:
     struct Impl;

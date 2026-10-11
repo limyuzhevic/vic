@@ -1,12 +1,185 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Config/Config.hpp"
+#include "../visualization/IntegrationVisualizer.hpp"
+#include "../visualization/PerformanceVisualizer.hpp"
+#include "../visualization/DebugVisualizer.hpp"
+#include "../visualization/ConfigVisualizer.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+// Integration control helpers
+bool isIntegrationSystemEnabled(const std::string& name, std::shared_ptr<Config> config = nullptr) {
+    static std::unordered_set<std::string> enabledSystems;
+    
+    if (config) {
+        // Check if specific system is enabled in config
+        std::string key = "integration_system_" + name;
+        if (config->has(key)) {
+            std::string value = config->getOr<std::string>(key, "false");
+            return value == "true";
+        }
+    }
+    
+    return enabledSystems.find(name) != enabledSystems.end();
+}
+
+void enableIntegrationSystem(const std::string& name, std::shared_ptr<Config> config = nullptr) {
+    static std::unordered_set<std::string> enabledSystems;
+    
+    enabledSystems.insert(name);
+    
+    if (config) {
+        std::string key = "integration_system_" + name;
+        config->set(key, "true", ConfigSource::Runtime);
+    }
+    
+    NLM_LOG_INFO("Integration system enabled: " + name);
+}
+
+void disableIntegrationSystem(const std::string& name, std::shared_ptr<Config> config = nullptr) {
+    static std::unordered_set<std::string> enabledSystems;
+    
+    enabledSystems.erase(name);
+    
+    if (config) {
+        std::string key = "integration_system_" + name;
+        config->set(key, "false", ConfigSource::Runtime);
+    }
+    
+    NLM_LOG_INFO("Integration system disabled: " + name);
+}
+
+void AgentBrain::updateVisualizationWithCLIConfig() {
+    if (!brain_ || !config_) return;
+    
+    // Integration visualization updates
+    auto integrationConfig = std::make_shared<Config>("integration");
+    if (config_->has("monitor_integration")) {
+        integrationConfig->set("monitor_integration", 
+                             config_->getOr<bool>("monitor_integration", false));
+    }
+    if (config_->has("integration_features")) {
+        integrationConfig->set("integration_features", 
+                             config_->getOr<std::string>("integration_features", ""));
+    }
+    if (config_->has("integration_threshold_prediction_error")) {
+        integrationConfig->set("integration_threshold_prediction_error",
+                             config_->getOr<float>("integration_threshold_prediction_error", 0.5f));
+    }
+    
+    // Performance visualization updates
+    auto performanceConfig = std::make_shared<Config>("performance");
+    if (config_->has("metrics_interval")) {
+        performanceConfig->set("metrics_interval",
+                             config_->getOr<int>("metrics_interval", 100));
+    }
+    if (config_->has("performance_profiling")) {
+        performanceConfig->set("performance_profiling",
+                             config_->getOr<bool>("performance_profiling", false));
+    }
+    
+    // Debug visualization updates
+    auto debugConfig = std::make_shared<Config>("debug");
+    if (config_->has("debug_level")) {
+        debugConfig->set("debug_level",
+                       config_->getOr<int>("debug_level", 3));
+    }
+    if (config_->has("debug_build")) {
+        debugConfig->set("debug_build",
+                       config_->getOr<bool>("debug_build", false));
+    }
+    
+    // Configuration visualization updates
+    auto configConfig = std::make_shared<Config>("config");
+    if (config_->has("generate_reports")) {
+        configConfig->set("generate_reports",
+                        config_->getOr<bool>("generate_reports", false));
+    }
+    if (config_->has("analyze_performance")) {
+        configConfig->set("analyze_performance",
+                        config_->getOr<bool>("analyze_performance", false));
+    }
+    
+    NLM_LOG_INFO("Visualization configuration applied");
+}
+
+// Debug and monitoring helpers
+void updateDebugSettings(std::shared_ptr<Config> config) {
+    if (!config) return;
+    
+    int debugLevel = config->getOr<int>("debug_level", 3);
+    NLM_LOG_INFO("Set debug level: " + std::to_string(debugLevel));
+    
+    // Note: Debug levels may need to be implemented in Logger class
+    // For now, just log the setting
+    
+    // Update debug logging for specific systems
+    bool debugAll = config->getOr<bool>("debug_log_all", false);
+    bool debugBrain = config->getOr<bool>("debug_log_brain", false);
+    bool debugIntegration = config->getOr<bool>("debug_log_integration", false);
+    bool debugMemory = config->getOr<bool>("debug_log_memory", false);
+    bool debugPrediction = config->getOr<bool>("debug_log_prediction", false);
+    bool debugNeuromodulation = config->getOr<bool>("debug_log_neuromodulation", false);
+    bool debugCuriosity = config->getOr<bool>("debug_log_curiosity", false);
+    bool debugNovelty = config->getOr<bool>("debug_log_novelty", false);
+    
+    if (debugAll) {
+        NLM_LOG_INFO("Debug logging enabled for ALL systems");
+    }
+    if (debugBrain) NLM_LOG_INFO("Debug logging enabled for Brain");
+    if (debugIntegration) NLM_LOG_INFO("Debug logging enabled for Integration");
+    if (debugMemory) NLM_LOG_INFO("Debug logging enabled for Memory");
+    if (debugPrediction) NLM_LOG_INFO("Debug logging enabled for Prediction");
+    if (debugNeuromodulation) NLM_LOG_INFO("Debug logging enabled for Neuromodulation");
+    if (debugCuriosity) NLM_LOG_INFO("Debug logging enabled for Curiosity");
+    if (debugNovelty) NLM_LOG_INFO("Debug logging enabled for Novelty");
+}
+
+void updateMonitoringSettings(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config) {
+    if (!brain || !config) return;
+    
+    bool monitorStatus = config->getOr<bool>("monitor_status", false);
+    NLM_LOG_INFO("System status monitoring: " + std::string(monitorStatus ? "Enabled" : "Disabled"));
+    
+    int metricsInterval = config->getOr<int>("metrics_interval", 100);
+    NLM_LOG_INFO("Metrics recording interval: " + std::to_string(metricsInterval) + " steps");
+    
+    // If metrics interval is set, we could set up periodic metrics collection
+    // For now, just log the setting
+    if (monitorStatus) {
+        brain->logStatus();
+    }
+}
+
+void updateAdvancedFeatures(std::shared_ptr<Config> config) {
+    if (!config) return;
+    
+    bool experimentalFeatures = config->getOr<bool>("experimental_features", false);
+    NLM_LOG_INFO("Experimental features: " + std::string(experimentalFeatures ? "Enabled" : "Disabled"));
+    
+    bool debugBuild = config->getOr<bool>("debug_build", false);
+    NLM_LOG_INFO("Debug build: " + std::string(debugBuild ? "Enabled" : "Disabled"));
+    
+    bool performanceProfiling = config->getOr<bool>("performance_profiling", false);
+    NLM_LOG_INFO("Performance profiling: " + std::string(performanceProfiling ? "Enabled" : "Disabled"));
+    
+    bool developmentTools = config->getOr<bool>("development_tools", false);
+    NLM_LOG_INFO("Development tools: " + std::string(developmentTools ? "Enabled" : "Disabled"));
+    
+    bool enableReplay = config->getOr<bool>("enable_replay", false);
+    NLM_LOG_INFO("Replay system: " + std::string(enableReplay ? "Enabled" : "Disabled"));
+    
+    bool enableSleep = config->getOr<bool>("enable_sleep", false);
+    NLM_LOG_INFO("Sleep system: " + std::string(enableSleep ? "Enabled" : "Disabled"));
+}
+
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config)
     : brain_(brain)
+    , config_(config)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -20,7 +193,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Visualization integration
+    integrationVisualizer_ = std::make_shared<IntegrationVisualizer>();
+    performanceVisualizer_ = std::make_shared<PerformanceVisualizer>();
+    debugVisualizer_ = std::make_shared<DebugVisualizer>();
+    configVisualizer_ = std::make_shared<ConfigVisualizer>();
+    
+    // Set references to brain and config
+    integrationVisualizer_->setBrain(brain);
+    integrationVisualizer_->setConfig(config);
+    
+    performanceVisualizer_->setBrain(brain);
+    performanceVisualizer_->setPerformanceProfiler(brain->getPerformanceProfiler());
+    
+    debugVisualizer_->setBrain(brain);
+    debugVisualizer_->setConfig(config);
+    
+    configVisualizer_->setConfig(config);
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -30,8 +219,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
                             case 0: motorForward_.push_back(n); break;
@@ -46,7 +235,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
                             case 0: sensoryVision_.push_back(n); break;
@@ -68,10 +257,28 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Update integration control parameters
+    if (config_) {
+        updateIntegrationControlParameters(brain_, config_);
+    }
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+}
+
+void AgentBrain::updateWithCLIConfig() {
+    if (!brain_ || !config_) return;
+    
+    // Apply integration control parameters
+    updateIntegrationControlParameters(brain_, config_);
+    
+    // Update monitoring settings
+    updateMonitoringSettings(brain_, config_);
+    
+    // Update advanced features
+    updateAdvancedFeatures(config_);
 }
 
 size_t AgentBrain::getSensoryInputSize() const {

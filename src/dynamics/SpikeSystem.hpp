@@ -2,12 +2,14 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
+#include "../performance/EventQueue.hpp"
 #include <vector>
-#include <queue>
 #include <functional>
-#include <unordered_map>
 
 namespace nlm {
+
+// Forward declarations
+class Brain;
 
 // SpikeEvent with additional metadata
 struct DetailedSpikeEvent {
@@ -71,6 +73,10 @@ public:
     
     // Reset
     void reset();
+    
+    // Access to handlers (for EventQueue integration)
+    const std::vector<SpikeHandler>& getHandlers() const;
+    const std::vector<DelayedSpikeHandler>& getDelayedHandlers() const;
     
 private:
     struct Impl;

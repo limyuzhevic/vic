@@ -1,11 +1,7 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
+#include "../visualization/IntegrationVisualizer.hpp"
+#include "../visualization/PerformanceVisualizer.hpp"
+#include "../visualization/DebugVisualizer.hpp"
+#include "../visualization/ConfigVisualizer.hpp"
 
 namespace nlm {
 
@@ -13,7 +9,7 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config = nullptr);
     ~AgentBrain();
     
     // Initialize with world
@@ -55,19 +51,13 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Apply CLI configuration settings
+    void updateWithCLIConfig();
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Apply visualization configuration settings
+    void updateVisualizationWithCLIConfig();
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Integration control
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -77,6 +67,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<Config> config_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -113,5 +104,14 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
+
+// Integration control helpers
+bool isIntegrationSystemEnabled(const std::string& name, std::shared_ptr<Config> config = nullptr);
+void enableIntegrationSystem(const std::string& name, std::shared_ptr<Config> config = nullptr);
+void disableIntegrationSystem(const std::string& name, std::shared_ptr<Config> config = nullptr);
+void updateIntegrationControlParameters(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
+void updateDebugSettings(std::shared_ptr<Config> config);
+void updateMonitoringSettings(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config);
+void updateAdvancedFeatures(std::shared_ptr<Config> config);
 
 } // namespace nlm

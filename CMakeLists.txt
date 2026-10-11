@@ -23,12 +23,11 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
+        # Performance
+    src/performance/CheckpointSystem.cpp
+    src/performance/CheckpointManager.cpp
+    
     # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -54,6 +53,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -72,7 +74,6 @@ add_library(nlm_core STATIC
     src/sensory/InternalSignals.cpp
     # Prediction
     src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
     # Environment

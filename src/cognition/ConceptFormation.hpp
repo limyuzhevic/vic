@@ -2,10 +2,18 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../memory/AttentionalSelection.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
 #include <string>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -35,6 +43,19 @@ struct ConceptInstance {
 
 // DiscoveredConcept: A concept that emerged from repeated experience
 // NOT a predefined label - created through Hebbian clustering
+//
+// Key mechanisms:
+// - Pattern clustering through similarity
+// - Prototype formation through averaging
+// - Instance tracking for stability measurement
+// - Category discovery based on shared properties
+// - Association tracking for concept relationships
+// - Prediction error integration for concept refinement
+// - Attention weighting for concept priority
+// - Neuromodulation for concept strengthening
+// - Replay-based consolidation for concept stability
+// - Developmental stage-dependent learning rates
+
 struct DiscoveredConcept {
     // Unique identifier
     size_t id;
@@ -58,8 +79,45 @@ struct DiscoveredConcept {
     // Average stability of instances
     float avgStability;
     
+    // Enhanced concept attributes for system integration
+    
+    // Prediction-based attributes
+    float predictionAccuracy;
+    float predictionError;
+    size_t predictionsBasedOn;
+    
+    // Attention-based attributes
+    float attentionWeight;
+    std::vector<float> attentionScores;
+    
+    // Neuromodulation-based attributes
+    float dopamineInfluence;
+    float acetylcholineInfluence;
+    float norepinephrineInfluence;
+    float serotoninInfluence;
+    
+    // Replay and consolidation attributes
+    size_t replayCount;
+    float consolidationScore;
+    SimulationStep lastReplayTime;
+    bool isConsolidated;
+    
+    // Development-based attributes
+    DevelopmentalStage developmentalStage;
+    float developmentalPlasticity;
+    
+    // Working memory integration attributes
+    std::vector<size_t> workingMemorySourceIds;
+    float workingMemoryActivation;
+    
     DiscoveredConcept() 
-        : id(0), totalObservations(0), avgStability(0) {}
+        : id(0), totalObservations(0), avgStability(0)
+        , predictionAccuracy(0.5f), predictionError(0.0f), predictionsBasedOn(0)
+        , attentionWeight(1.0f), dopamineInfluence(0.0f), acetylcholineInfluence(0.0f)
+        , norepinephrineInfluence(0.0f), serotoninInfluence(0.0f)
+        , replayCount(0), consolidationScore(0.0f), lastReplayTime(0)
+        , isConsolidated(false), developmentalStage(DevelopmentalStage::Initial)
+        , developmentalPlasticity(1.0f), workingMemoryActivation(0.0f) {}
 };
 
 // ConceptFormation: Discovers recurring patterns from experience
@@ -84,9 +142,23 @@ public:
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel
     size_t presentExperience(const std::vector<float>& pattern,
-                            const std::vector<float>& features,
-                            float reward,
-                            SimulationStep currentTime);
+                             const std::vector<float>& features,
+                             float reward,
+                             SimulationStep currentTime);
+
+    // Enhanced presentExperience with system integration
+    size_t presentExperienceWithIntegration(
+        const std::vector<float>& pattern,
+        const std::vector<float>& features,
+        float reward,
+        SimulationStep currentTime,
+        float predictionError = 0.0f,
+        const std::vector<float>* workingMemoryPattern = nullptr,
+        const AttentionalSelection* attention = nullptr,
+        const PredictionSystem* prediction = nullptr,
+        const Neuromodulator* neuromodulator = nullptr,
+        const DevelopmentSystem* development = nullptr,
+        const PredictionError* predictionError = nullptr);
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
@@ -117,6 +189,20 @@ public:
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
                       const std::vector<float>& features, float reward);
 
+    // Update concept with system integration (prediction, attention, neuromodulation)
+    void updateConceptWithIntegration(
+        size_t conceptId,
+        const std::vector<float>& newPattern,
+        const std::vector<float>& features,
+        float reward,
+        SimulationStep currentTime,
+        float predictionError = 0.0f,
+        const std::vector<float>* workingMemoryPattern = nullptr,
+        const AttentionalSelection* attention = nullptr,
+        const PredictionSystem* prediction = nullptr,
+        const Neuromodulator* neuromodulator = nullptr,
+        const DevelopmentSystem* development = nullptr);
+
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
                           const std::vector<float>& b) const;
@@ -137,6 +223,74 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+
+    // System integration methods
+
+    // Apply prediction error to guide concept formation
+    void applyPredictionErrorToConcept(size_t conceptId, float predictionError,
+                                      const PredictionSystem* prediction);
+
+    // Apply attention weighting to concept stability
+    void applyAttentionToConcept(size_t conceptId, float attentionWeight,
+                               const AttentionalSelection* attention);
+
+    // Apply neuromodulation effects to concept learning
+    void applyNeuromodulationToConcept(size_t conceptId, const Neuromodulator* neuromodulator);
+
+    // Apply working memory patterns to concept formation
+    void applyWorkingMemoryToConcept(size_t conceptId,
+                                    const std::vector<float>& workingMemoryPattern);
+
+    // Apply developmental effects to concept stability
+    void applyDevelopmentalEffectsToConcept(size_t conceptId,
+                                           const DevelopmentSystem* development);
+
+    // Apply episodic memory replay to strengthen concepts
+    void applyReplayToConcept(size_t conceptId,
+                            const NeuralEpisodicMemory* episodicMemory,
+                            SimulationStep currentTime);
+
+    // Connect concept to prediction system for future predictions
+    void connectToPredictionSystem(size_t conceptId, const PredictionSystem* prediction);
+
+    // Use concepts to improve prediction accuracy
+    void useConceptForPrediction(const std::vector<float>& pattern,
+                                const PredictionSystem* prediction);
+
+    // Apply concept-based attention bias
+    void applyConceptBasedAttention(size_t conceptId, float biasStrength,
+                                   AttentionalSelection* attention);
+
+    // Update concept based on prediction error
+    void updateConceptWithPredictionError(size_t conceptId, float predictionError,
+                                         const PredictionError* predictionError);
+
+    // Rehearse concept through working memory
+    void rehearseConcept(size_t conceptId,
+                        const NeuralWorkingMemory* workingMemory);
+
+    // Consolidate concept with episodic memory
+    void consolidateConcept(size_t conceptId,
+                           const NeuralEpisodicMemory* episodicMemory,
+                           SimulationStep currentStep);
+
+    // Modify learning rates based on developmental stage
+    void adjustLearningRateForDevelopment(float& formationThreshold,
+                                         float& stabilityThreshold,
+                                         float& learningRate,
+                                         const DevelopmentSystem* development);
+
+    // Get concept score based on integration
+    float getConceptIntegrationScore(size_t conceptId) const;
+
+    // Check if concept should be reinforced through replay
+    bool shouldReplayConcept(size_t conceptId,
+                           const NeuralEpisodicMemory* episodicMemory,
+                           SimulationStep currentTime) const;
+
+    // Get concept's contribution to prediction
+    float getConceptPredictionContribution(size_t conceptId,
+                                         const PredictionSystem* prediction) const;
 
 private:
     // Create new concept from pattern
@@ -161,6 +315,15 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
+    
+    // Development and learning system references
+    std::vector<const Neuromodulator*> neuromodulators_;
+    std::vector<const PredictionSystem*> predictionSystems_;
+    std::vector<const AttentionalSelection*> attentionSystems_;
+    std::vector<const NeuralWorkingMemory*> workingMemories_;
+    std::vector<const NeuralEpisodicMemory*> episodicMemories_;
+    std::vector<const DevelopmentSystem*> developmentSystems_;
+    std::vector<const PredictionError*> predictionErrors_;
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience
