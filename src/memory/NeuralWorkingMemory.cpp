@@ -36,21 +36,17 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
+    // Find neurons to encode this pattern - use existing memoryNeurons_ for encoding
+    // The pattern is encoded directly into the neural activity of stored neurons
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+        // Set neuron activation by injecting current
+        if (brain_) {
+            brain_->injectCurrent(neuron, activation * 5.0f);
         }
         
         // Update stored activation
@@ -63,9 +59,28 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
     }
     
+    // Create maintenance connections if needed to reinforce this pattern
+    if (memoryNeurons_.size() >= 2) {
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            // Create recurrent connections between consecutive neurons
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        }
+    }
+}
+        if (i < memoryActivations_.size()) {
+            memoryActivations_[i] = activation;
+        } else {
+            memoryActivations_.push_back(activation);
+            memoryTimestamps_.push_back(0);
+            memoryNeurons_.push_back(neuron);
+        }
+    }
+    
     // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    if (memoryNeurons_.size() >= 2) {
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        }
     }
 }
 
@@ -142,6 +157,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
