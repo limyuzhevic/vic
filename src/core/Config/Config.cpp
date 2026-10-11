@@ -18,14 +18,55 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+// Enhanced configuration file parsing with multiple format support
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Try JSON format first
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.clear();
+    
+    if (isJsonFormat(content)) {
+        return loadFromJson(content);
+    } else {
+        // Fall back to original key=value format
+        file.clear();
+        file.seekg(0, std::ios::beg);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Enhanced parsing with better error handling
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+    }
+    
+    return true;
     
     std::string line;
     while (std::getline(file, line)) {
@@ -72,6 +113,18 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle boolean flags (--flag, -f)
+        else if (arg[0] == '-') {
+            std::string flag = arg.substr(1);
+            set(flag, true, ConfigSource::CommandLine);
+        }
+        // Handle JSON-like arguments (--key:value)
+        else if (arg.find(':') != std::string::npos && arg.substr(0, 2) == "--") {
+            size_t pos = arg.find(':');
+            std::string key = arg.substr(2, pos - 2);
+            std::string value = arg.substr(pos + 1);
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -212,4 +265,137 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+}
+
+// Helper function to detect JSON format
+bool Config::isJsonFormat(const std::string& content) {
+    // Simple JSON detection: if it starts with { or [ and contains quotes and key-value pairs
+    size_t braceCount = 0;
+    size_t bracketCount = 0;
+    bool hasQuotes = false;
+    bool hasColon = false;
+    
+    for (size_t i = 0; i < content.length(); ++i) {
+        char c = content[i];
+        
+        if (c == '{' || c == '[') {
+            if (i == 0) {
+                if (c == '{') braceCount++;
+                else bracketCount++;
+            }
+        } else if (c == '}' || c == ']') {
+            if (c == '}') braceCount++;
+            else bracketCount++;
+        } else if (c == '"') {
+            hasQuotes = true;
+        } else if (c == ':') {
+            hasColon = true;
+        }
+    }
+    
+    // Simple heuristic: starts with { or [ and has quotes and colons
+    return (content.find('{') == 0 || content.find('[') == 0) && 
+           hasQuotes && hasColon && braceCount > 0 && bracketCount > 0;
+}
+
+// Simple JSON parser (basic implementation)
+bool Config::loadFromJson(const std::string& jsonContent) {
+    // Simple JSON parsing for basic key-value pairs
+    // TODO: Implement full JSON parsing with nested objects and arrays
+    // For now, handle simple {"key": "value", "key2": 123} format
+    
+    // Remove whitespace and newlines
+    std::string content = jsonContent;
+    content.erase(std::remove_if(content.begin(), content.end(), 
+        [](char c) { return std::isspace(c); }), content.end());
+    
+    // Check if it's a valid object { ... }
+    if (content.find('{') != 0 || content.back() != '}') {
+        return false;
+    }
+    
+    // Extract content between braces
+    std::string inner = content.substr(1, content.length() - 2);
+    
+    // Parse key-value pairs
+    size_t pos = 0;
+    while (pos < inner.length()) {
+        // Find next key (starts with ")
+        size_t keyStart = inner.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = inner.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = inner.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find colon after key
+        size_t colonPos = inner.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Find value (skip whitespace)
+        size_t valueStart = inner.find_first_not_of(" \t\n\r", colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find end of value (next comma or closing brace)
+        size_t valueEnd = inner.find(',', valueStart);
+        if (valueEnd == std::string::npos) {
+            valueEnd = inner.find('}', valueStart);
+        }
+        if (valueEnd == std::string::npos) break;
+        
+        std::string value = inner.substr(valueStart, valueEnd - valueStart);
+        
+        // Clean up value (remove quotes)
+        if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                                  (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Try to parse value as different types
+        parseAndSetValue(key, value);
+        
+        pos = valueEnd + 1;
+        
+        // Skip whitespace and comma
+        while (pos < inner.length() && (inner[pos] == ' ' || inner[pos] == ',' || 
+                                        inner[pos] == '\t' || inner[pos] == '\n')) {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+void Config::parseAndSetValue(const std::string& key, const std::string& valueStr) {
+    // Try to parse value as different types
+    // First try boolean
+    if (valueStr == "true" || valueStr == "false") {
+        bool val = (valueStr == "true");
+        set(key, val, ConfigSource::File);
+        return;
+    }
+    
+    // Try integer
+    try {
+        size_t pos;
+        int intVal = std::stoi(valueStr, &pos);
+        if (pos == valueStr.length()) {
+            set(key, intVal, ConfigSource::File);
+            return;
+        }
+    } catch (...) {}
+    
+    // Try floating point
+    try {
+        size_t pos;
+        double doubleVal = std::stod(valueStr, &pos);
+        if (pos == valueStr.length()) {
+            set(key, doubleVal, ConfigSource::File);
+            return;
+        }
+    } catch (...) {}
+    
+    // Fall back to string
+    set(key, valueStr, ConfigSource::File);
+}

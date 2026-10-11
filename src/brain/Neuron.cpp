@@ -250,7 +250,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
@@ -300,3 +300,51 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
 }
 
 } // namespace nlm
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
