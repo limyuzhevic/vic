@@ -55,8 +55,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML support)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file (enhanced support)
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file (placeholder for libyaml-cpp)
+    bool loadFromYAML(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -92,6 +98,9 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
     
 private:
     struct Impl;

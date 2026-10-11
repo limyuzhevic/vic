@@ -1,2 +1,0 @@
-/usr/bin/ar qc libnlm_phase4.a CMakeFiles/nlm_phase4.dir/src/experiments/Phase4Experiment.cpp.o
-/usr/bin/ranlib libnlm_phase4.a

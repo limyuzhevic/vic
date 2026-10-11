@@ -188,6 +188,30 @@ nlm_test/fast:
 	cd /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_0d63fb85-e650-46c7-8ad9-557a4c98a8e3 && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/nlm_test.dir/build.make tests/CMakeFiles/nlm_test.dir/build
 .PHONY : nlm_test/fast
 
+test_agent_brain.o: test_agent_brain.cpp.o
+.PHONY : test_agent_brain.o
+
+# target to build an object file
+test_agent_brain.cpp.o:
+	cd /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_0d63fb85-e650-46c7-8ad9-557a4c98a8e3 && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/nlm_test.dir/build.make tests/CMakeFiles/nlm_test.dir/test_agent_brain.cpp.o
+.PHONY : test_agent_brain.cpp.o
+
+test_agent_brain.i: test_agent_brain.cpp.i
+.PHONY : test_agent_brain.i
+
+# target to preprocess a source file
+test_agent_brain.cpp.i:
+	cd /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_0d63fb85-e650-46c7-8ad9-557a4c98a8e3 && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/nlm_test.dir/build.make tests/CMakeFiles/nlm_test.dir/test_agent_brain.cpp.i
+.PHONY : test_agent_brain.cpp.i
+
+test_agent_brain.s: test_agent_brain.cpp.s
+.PHONY : test_agent_brain.s
+
+# target to generate assembly for a file
+test_agent_brain.cpp.s:
+	cd /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_0d63fb85-e650-46c7-8ad9-557a4c98a8e3 && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/nlm_test.dir/build.make tests/CMakeFiles/nlm_test.dir/test_agent_brain.cpp.s
+.PHONY : test_agent_brain.cpp.s
+
 test_brain.o: test_brain.cpp.o
 .PHONY : test_brain.o
 
@@ -418,6 +442,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... nlm_test"
+	@echo "... test_agent_brain.o"
+	@echo "... test_agent_brain.i"
+	@echo "... test_agent_brain.s"
 	@echo "... test_brain.o"
 	@echo "... test_brain.i"
 	@echo "... test_brain.s"

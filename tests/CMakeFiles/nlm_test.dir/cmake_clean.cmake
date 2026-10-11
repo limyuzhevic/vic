@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/nlm_test.dir/test_agent_brain.cpp.o"
+  "CMakeFiles/nlm_test.dir/test_agent_brain.cpp.o.d"
   "CMakeFiles/nlm_test.dir/test_brain.cpp.o"
   "CMakeFiles/nlm_test.dir/test_brain.cpp.o.d"
   "CMakeFiles/nlm_test.dir/test_clock.cpp.o"

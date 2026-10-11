@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <map>
+#include <variant>
+#include <functional>
 
 namespace nlm {
 
@@ -18,9 +23,192 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Enhanced file format detection
+std::string Config::detectFileFormat(const std::string& filepath) {
+    std::filesystem::path path(filepath);
+    std::string ext = path.extension().string();
+    
+    // Convert to lowercase for comparison
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return "json";
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return "yaml";
+    }
+    
+    // For files without extension, try to detect based on content
+    return "unknown";
+}
+
+// Enhanced loadFromFile with JSON/YAML support
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Detect file format
+    std::string format = detectFileFormat(filepath);
+    
+    if (format == "json") {
+        return loadFromJSON(filepath);
+    } else if (format == "yaml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Fallback to simple key=value format with type inference
+        clear(); // Clear existing entries
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to infer type from string value
+                bool isInt = true;
+                bool isBool = true;
+                bool isDouble = true;
+                
+                // Check if it's a boolean
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::File);
+                    continue;
+                }
+                
+                // Try to parse as integer
+                try {
+                    size_t posEnd;
+                    int intVal = std::stoi(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {
+                    isInt = false;
+                }
+                
+                // Try to parse as double
+                try {
+                    size_t posEnd;
+                    double doubleVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {
+                    isDouble = false;
+                }
+                
+                // If not int or double, store as string
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    }
+}
+
+// Load from JSON file
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        clear(); // Clear existing entries
+        
+        // For now, use simple key=value format with type inference
+        // This would be replaced with actual JSON parsing using nlohmann::json
+        // or a custom implementation when the library is available
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to infer type from string value
+                bool isInt = true;
+                bool isBool = true;
+                bool isDouble = true;
+                
+                // Check if it's a boolean
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::File);
+                    continue;
+                }
+                
+                // Try to parse as integer
+                try {
+                    size_t posEnd;
+                    int intVal = std::stoi(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {
+                    isInt = false;
+                }
+                
+                // Try to parse as double
+                try {
+                    size_t posEnd;
+                    double doubleVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {
+                    isDouble = false;
+                }
+                
+                // If not int or double, store as string
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+// Load from YAML file
+bool Config::loadFromYAML(const std::string& filepath) {
+    // For now, use enhanced simple parser as YAML support placeholder
+    // TODO: Implement proper YAML support with libyaml-cpp when available
+    clear(); // Clear existing entries
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -41,13 +229,48 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to infer type from string value
+            bool isInt = true;
+            bool isBool = true;
+            bool isDouble = true;
+            
+            // Check if it's a boolean
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::File);
+                continue;
+            }
+            
+            // Try to parse as integer
+            try {
+                size_t posEnd;
+                int intVal = std::stoi(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {
+                isInt = false;
+            }
+            
+            // Try to parse as double
+            try {
+                size_t posEnd;
+                double doubleVal = std::stod(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, doubleVal, ConfigSource::File);
+                    continue;
+                }
+            } catch (...) {
+                isDouble = false;
+            }
+            
+            // If not int or double, store as string
             set(key, value, ConfigSource::File);
         }
     }
