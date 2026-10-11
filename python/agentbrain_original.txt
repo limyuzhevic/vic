@@ -1,0 +1,84 @@
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(
+            Agent brain interface connecting NLM brain to world simulation.
+            
+            The AgentBrain class bridges the neural brain simulation with
+            the external world, handling sensory transduction and motor decoding,
+            reward modulation, and developmental updates. It provides a complete
+            interface for agent-environment interaction in simulated environments.
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+              py::keep_alive<0, 1>(),  // Keep brain reference alive while AgentBrain exists
+              "Create AgentBrain with brain reference. brain must be a valid shared pointer to a Brain object.")
+        .def(py::init<AgentBrain&&>(), py::arg("other"), "Move constructor")
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+              "Initialize with world. world must be a valid SimpleWorld reference.")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+              "Get expected sensory input size.")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+              "Get expected motor output size.")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput, py::arg("percept"),
+              "Process sensory percept and inject into brain. The agent brain processes sensory input from the environment and injects it into the neural brain. percept must be a valid SensoryPercept.")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+              "Decode brain motor activity into motor command. Translates neural activity into actionable motor commands for the agent.")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation, py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation. Modulates neural activity based on reward prediction errors and curiosity signals. reward and predictedReward must be valid floating-point numbers.")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment, py::arg("timestep"),
+              "Update development system. Manages neural development processes. This includes structural plasticity and functional maturation. timestep must be a valid double value.")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+              "Get current developmental stage.")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level.")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+              "Get curiosity level.")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+              "Get novelty level.")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error.")
+        .def("reset", &AgentBrain::reset,
+              "Reset agent for new episode.")
+        .def("getBrain", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain.")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation, py::arg("enable"),
+              "Enable/disable reward modulation. enable must be a boolean value.")
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity, py::arg("enable"),
+              "Enable/disable structural plasticity. enable must be a boolean value.")
+        .def("enableDevelopment", &AgentBrain::enableDevelopment, py::arg("enable"),
+              "Enable/disable development. enable must be a boolean value.")
+        .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"),
+              "Enable/disable curiosity. enable must be a boolean value.")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Enhanced factory functions with validation
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration. Returns a valid Config object.", py::return_value_policy::reference_internal);
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("config cannot be null");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration. config must be a valid shared pointer to a Config object.", py::return_value_policy::reference_internal);
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world. Returns a valid SimpleWorld object.", py::return_value_policy::reference_internal);
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::invalid_argument("brain cannot be null");
+        }
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface. brain must be a valid shared pointer to a Brain object.", py::return_value_policy::reference_internal);
+
+    // Expose invalid ID sentinels
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+

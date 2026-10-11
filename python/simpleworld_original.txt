@@ -1,0 +1,65 @@
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(
+            Simple 2D world for NLM simulation providing agent-environment
+            interaction capabilities.
+            
+            The SimpleWorld class represents a 2D environment where
+            agents can move, interact with objects, and process sensory
+            input. It supports configuration of world parameters,
+            agent spawning, object management, and physics simulation.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<SimpleWorld&&>(), py::arg("other"), "Move constructor")
+        .def("configure", [](SimpleWorld& self, float width, float height, size_t visionWidth, size_t visionHeight) {
+            nlm::validateFloatRange("width", width, 1.0f, 10000.0f);
+            nlm::validateFloatRange("height", height, 1.0f, 10000.0f);
+            nlm::validateSize("visionWidth", visionWidth);
+            nlm::validateSize("visionHeight", visionHeight);
+            self.configure(width, height, visionWidth, visionHeight);
+        }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure the world dimensions and vision settings. width and height must be in range [1.0, 10000.0]. visionWidth and visionHeight must be non-negative integers representing the agent's field of view.")
+        .def("reset", &SimpleWorld::reset)
+        .def("setAgentStart", [](SimpleWorld& self, float x, float height, float y) {
+            nlm::validateFloatRange("x", x, -10000.0f, 10000.0f);
+            nlm::validateFloatRange("y", y, -10000.0f, 10000.0f);
+            self.setAgentStart(x, y);
+        }, py::arg("x"), py::arg("y"),
+             "Set agent starting position. x and y must be in range [-10000.0, 10000.0].")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state (call each simulation step). timestep must be a valid double value representing simulation time in seconds.")
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand, py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to agent. cmd must be a valid MotorCommand enum value. currentTime must be a valid double representing simulation time in seconds.")
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+              py::return_value_policy::reference_internal,
+              "Get current sensory percept for the agent")
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+              py::return_value_policy::reference_internal,
+              "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             py::keep_alive<0, 1>(),  // Keep object reference alive while world exists
+             "Add object to world. obj must be a valid WorldObject.")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position. x and y must be valid floating-point coordinates.")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall). x and y must be valid floating-point coordinates.")
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             "Get object at position (if any). x and y must be valid floating-point coordinates.")
+        .def("getWidth", &SimpleWorld::getWidth,
+             "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight,
+             "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy,
+             "Get maximum agent energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum agent energy. e must be a valid floating-point number.")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate. r must be a valid floating-point number.")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducibility. seed must be a valid unsigned 64-bit integer.")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get random seed");
+
+    // Enhanced Brain class with validation

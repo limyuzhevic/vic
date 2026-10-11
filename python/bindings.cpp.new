@@ -1,0 +1,500 @@
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/functional.h>
+#include <pybind11/chrono.h>
+#include <memory>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <regex>
+#include <limits>
+
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include "../src/core/Types/Types.hpp"
+#include "../src/agent/AgentBrain.hpp"
+#include "../src/world/SimpleWorld.hpp"
+#include "../src/sensory/SensoryInput.hpp"
+#include "../src/motor/Action.hpp"
+#include "../src/agent/AgentBody.hpp"
+#include "../src/agent/SensoryPercept.hpp"
+
+// Validation helper functions
+namespace nlm {
+
+inline void validateNonNegative(const std::string& paramName, int64_t value, int64_t min = 0) {
+    if (value < min) {
+        throw std::invalid_argument(paramName + " must be >= " + std::to_string(min) + ", got " + std::to_string(value));
+    }
+}
+
+inline void validateNonNegative(const std::string& paramName, size_t value, size_t min = 0) {
+    if (value < min) {
+        throw std::invalid_argument(paramName + " must be >= " + std::to_string(min) + ", got " + std::to_string(value));
+    }
+}
+
+inline void validateFloatRange(const std::string& paramName, float value, float min, float max) {
+    if (value < min || value > max) {
+        throw std::invalid_argument(paramName + " must be in range [" + std::to_string(min) + ", " + std::to_string(max) + "], got " + std::to_string(value));
+    }
+}
+
+inline void validateDoubleRange(const std::string& paramName, double value, double min, double max) {
+    if (value < min || value > max) {
+        throw std::invalid_argument(paramName + " must be in range [" + std::to_string(min) + ", " + std::to_string(max) + "], got " + std::to_string(value));
+    }
+}
+
+inline void validateStringNotEmpty(const std::string& paramName, const std::string& value) {
+    if (value.empty()) {
+        throw std::invalid_argument(paramName + " cannot be empty");
+    }
+}
+
+inline void validateFilePath(const std::string& paramName, const std::string& filepath) {
+    validateStringNotEmpty(paramName, filepath);
+    
+    // Basic path validation (no directory traversal)
+    if (filepath.find("..") != std::string::npos || filepath.find("\\\\") != std::string::npos) {
+        throw std::invalid_argument(paramName + " cannot contain '..' or '\\\\' components");
+    }
+}
+
+inline bool isValidFileExtension(const std::string& filepath, const std::string& extension) {
+    if (filepath.length() < extension.length()) return false;
+    std::string filepathLower = filepath;
+    std::transform(filepathLower.begin(), filepathLower.end(), filepathLower.begin(), ::tolower);
+    return filepathLower.substr(filepathLower.length() - extension.length()) == extension;
+}
+
+inline void validateConfigKey(const std::string& paramName, const std::string& key) {
+    validateStringNotEmpty(paramName, key);
+    
+    // Config keys should be alphanumeric with underscores
+    static const std::regex keyPattern("^[a-zA-Z0-9_]+$");
+    if (!std::regex_match(key, keyPattern)) {
+        throw std::invalid_argument(paramName + " must contain only alphanumeric characters and underscores");
+    }
+}
+
+inline void validateActionType(const std::string& paramName, ActionType value) {
+    // ActionType validation - ensure valid enum value
+    switch (value) {
+        case ActionType::MoveForward:
+        case ActionType::MoveBackward:
+        case ActionType::MoveLeft:
+        case ActionType::MoveRight:
+        case ActionType::TurnLeft:
+        case ActionType::TurnRight:
+        case ActionType::Look:
+        case ActionType::LookUp:
+        case ActionType::LookDown:
+        case ActionType::Interact:
+        case ActionType::Eat:
+        case ActionType::Drink:
+        case ActionType::Rest:
+        case ActionType::Wait:
+        case ActionType::Custom:
+            break;
+        default:
+            throw std::invalid_argument(paramName + " contains invalid ActionType value");
+    }
+}
+
+inline void validateNeuronType(const std::string& paramName, NeuronType value) {
+    switch (value) {
+        case NeuronType::Excitatory:
+        case NeuronType::Inhibitory:
+        case NeuronType::Modulatory:
+        case NeuronType::Sensory:
+        case NeuronType::Motor:
+        case NeuronType::Internal:
+            break;
+        default:
+            throw std::invalid_argument(paramName + " contains invalid NeuronType value");
+    }
+}
+
+inline void validateSynapseType(const std::string& paramName, SynapseType value) {
+    switch (value) {
+        case SynapseType::Excitatory:
+        case SynapseType::Inhibitory:
+        case SynapseType::Modulatory:
+        case SynapseType::Electrical:
+        case SynapseType::GapJunction:
+            break;
+        default:
+            throw std::invalid_argument(paramName + " contains invalid SynapseType value");
+    }
+}
+
+inline void validateDevelopmentalStage(const std::string& paramName, DevelopmentalStage value) {
+    switch (value) {
+        case DevelopmentalStage::Initial:
+        case DevelopmentalStage::CriticalPeriod:
+        case DevelopmentalStage::Maturation:
+        case DevelopmentalStage::Adult:
+        case DevelopmentalStage::Aging:
+            break;
+        default:
+            throw std::invalid_argument(paramName + " contains invalid DevelopmentalStage value");
+    }
+}
+
+inline void validateWorldObjectType(const std::string& paramName, WorldObjectType value) {
+    switch (value) {
+        case WorldObjectType::Empty:
+        case WorldObjectType::Resource:
+        case WorldObjectType::Hazard:
+        case WorldObjectType::Wall:
+        case WorldObjectType::Marker:
+            break;
+        default:
+            throw std::invalid_argument(paramName + " contains invalid WorldObjectType value");
+    }
+}
+
+inline void validateActionParameters(const std::vector<float>& params) {
+    for (size_t i = 0; i < params.size(); ++i) {
+        if (std::isnan(params[i]) || std::isinf(params[i])) {
+            throw std::invalid_argument("Action parameter at index " + std::to_string(i) + " cannot be NaN or infinity");
+        }
+    }
+}
+
+inline void validateFloat(const std::string& paramName, float value) {
+    if (std::isnan(value) || std::isinf(value)) {
+        throw std::invalid_argument(paramName + " cannot be NaN or infinity");
+    }
+}
+
+inline void validateDouble(const std::string& paramName, double value) {
+    if (std::isnan(value) || std::isinf(value)) {
+        throw std::invalid_argument(paramName + " cannot be NaN or infinity");
+    }
+}
+
+inline void validateSize(const std::string& paramName, size_t value) {
+    if (value > std::numeric_limits<size_t>::max() / 2) {
+        throw std::invalid_argument(paramName + " value too large");
+    }
+}
+
+inline void validateMemorySafety(const std::string& paramName, size_t size, size_t elementSize = sizeof(float)) {
+    if (size > std::numeric_limits<size_t>::max() / elementSize) {
+        throw std::invalid_argument(paramName + " size would cause memory overflow");
+    }
+}
+
+inline std::string trim(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos) return "";
+    size_t last = str.find_last_not_of(" \t\n\r");
+    return str.substr(first, (last - first + 1));
+}
+
+} // namespace nlm
+
+namespace py = pybind11;
+namespace nlm {
+
+PYBIND11_MODULE(pynlm, m) {
+    m.doc() = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        ---------------------------------------------
+        A Python binding for the NLM C++ neural simulation framework.
+        
+        This module provides comprehensive bindings for the Neural Learning Machine
+        simulation framework, exposing C++ neural network classes to Python.
+        
+        Available classes include:
+        - Brain: Central neural simulation brain class
+        - Config: Configuration management for system settings
+        - AgentBrain: Interface connecting NLM brain to world simulation
+        - SimpleWorld: Simple 2D world for NLM simulation
+        - SensoryInput: Base classes for sensory input
+        - Vision: Visual sensory input processing
+        - Audio: Audio sensory input processing
+        - InternalSignals: Internal neural signals
+        - Action: Motor output action representations
+        - WorldObject: Objects in the simulated world
+        - AgentBody: Agent state and position tracking
+        - ActionResult: Results from actions taken in the world
+        - SensoryPercept: Combined sensory perception data
+        
+        The module provides comprehensive neural simulation capabilities
+        including sensory processing, motor control, learning, and development.
+    )pbdoc";
+
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+
+    // Enhanced NeuronId with validation
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(
+            Unique identifier for a neuron.
+            
+            This class represents a 64-bit unsigned integer used to uniquely identify
+            neurons within a brain simulation. Neuron IDs are used for referencing
+            specific neurons in regions and for efficient lookup operations.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value") = 0,
+             "Create NeuronId with specified value. value must be a valid 64-bit unsigned integer (0 to 18446744073709551615)")
+        .def_readwrite("value", &NeuronId::value)
+        .def("index", &NeuronId::index,
+             "Get neuron index. Returns the 64-bit value used for neuron identification")
+        .def("__eq__", &NeuronId::operator==)
+        .def("__ne__", &NeuronId::operator!=)
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const NeuronId& id) {
+            return "<NeuronId: " + std::to_string(id.value) + ">";
+        });
+
+    // Enhanced SynapseId with validation
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(
+            Unique identifier for a synapse.
+            
+            This class represents a 64-bit unsigned integer used to uniquely identify
+            synapses within a brain simulation. Synapse IDs are used for referencing
+            specific synaptic connections between neurons.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value") = 0,
+             "Create SynapseId with specified value. value must be a valid 64-bit unsigned integer (0 to 18446744073709551615)")
+        .def_readwrite("value", &SynapseId::value)
+        .def("index", &SynapseId::index,
+             "Get synapse index. Returns the 64-bit value used for synapse identification")
+        .def("__eq__", &SynapseId::operator==)
+        .def("__ne__", &SynapseId::operator!=)
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const SynapseId& id) {
+            return "<SynapseId: " + std::to_string(id.value) + ">";
+        });
+
+    // Enhanced RegionId with validation
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(
+            Unique identifier for a brain region.
+            
+            This class represents a 64-bit unsigned integer used to uniquely identify
+            neural regions within a brain. Region IDs are used for organizing neurons
+            and synapses into functional areas of the brain.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value") = 0,
+             "Create RegionId with specified value. value must be a valid 64-bit unsigned integer (0 to 18446744073709551615)")
+        .def_readwrite("value", &RegionId::value)
+        .def("index", &RegionId::index,
+             "Get region index. Returns the 64-bit value used for region identification")
+        .def("__eq__", &RegionId::operator==)
+        .def("__ne__", &RegionId::operator!=)
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const RegionId& id) {
+            return "<RegionId: " + std::to_string(id.value) + ">";
+        });
+
+    // Enhanced PopulationId with validation
+    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(
+            Unique identifier for a neuron population.
+            
+            This class represents a 64-bit unsigned integer used to identify groups
+            of neurons that share similar properties or functions within a brain region.
+            Populations are used to organize neurons by type or functional role.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value") = 0,
+             "Create PopulationId with specified value. value must be a valid 64-bit unsigned integer (0 to 18446744073709551615)")
+        .def_readwrite("value", &PopulationId::value)
+        .def("index", &PopulationId::index,
+             "Get population index. Returns the 64-bit value used for population identification")
+        .def("__eq__", &PopulationId::operator==)
+        .def("__ne__", &PopulationId::operator!=);
+
+    // Enhanced enum classes with validation
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .export_values();
+
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
+    // Enhanced Config class with validation
+    py::class_<Config>(m, "Config", R"pbdoc(
+            Configuration management class for NLM system.
+            
+            The Config class provides a centralized interface for managing
+            neural simulation parameters, settings, and state. It supports
+            loading/saving from JSON files, command line arguments, and
+            runtime manipulation of configuration values.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<Config&&>(), py::arg("other"), "Move constructor")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            validateFilePath("filepath", filepath);
+            if (!nlm::isValidFileExtension(filepath, ".json")) {
+                throw std::invalid_argument("filepath must have .json extension");
+            }
+            return self.loadFromFile(filepath);
+        }, py::arg("filepath"),
+             "Load configuration from a JSON file. The filepath should point to a valid JSON configuration file. The filepath must not be empty and must have .json extension. Examples: loadFromFile('configs/default.cfg') or loadFromFile('config.json')")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            validateNonNegative("argc", argc, 0);
+            if (argv == nullptr && argc > 0) {
+                throw std::invalid_argument("argv cannot be null when argc > 0");
+            }
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+             "Load configuration from command line arguments. The argc and argv parameters should follow standard command-line conventions. argc must be non-negative and argv must be a valid pointer array. Examples: loadFromArgs(2, ['program', '--config=configs/default.cfg']) or loadFromArgs(0, [])")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            validateFilePath("filepath", filepath);
+            if (!nlm::isValidFileExtension(filepath, ".json")) {
+                throw std::invalid_argument("filepath must have .json extension");
+            }
+            return self.saveToFile(filepath);
+        }, py::arg("filepath"),
+             "Save configuration to a JSON file. The saved configuration can be later loaded using loadFromFile() for reproducible simulations. The filepath must not be empty and must have .json extension. Example: saveToFile('output_config.json')")
+        .def("has", [](Config& self, const std::string& key) {
+            validateConfigKey("key", key);
+            return self.has(key);
+        }, py::arg("key"),
+             "Check if a configuration key exists. The key must contain only alphanumeric characters and underscores. Returns true if the key is present, false otherwise. Example: has('learning_rate')")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys currently set in this configuration. Returns a vector of strings representing all configuration keys.")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries. This removes all key-value pairs from the configuration.")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration. Returns a human-readable summary of all current configuration settings.")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
+
+    // Enhanced SensoryInput class with validation
+    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
+        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
+        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
+        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
+        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+             "Set the timestamp. timestamp must be a valid double value");
+
+    // Enhanced Vision class with validation
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+             "Create Vision sensory input. width and height must be non-negative integers representing image dimensions. channels must be a positive integer (typically 1 for grayscale, 3 for RGB). Examples: Vision() or Vision(640, 480) or Vision(640, 480, 3)")
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            nlm::validateMemorySafety("data", data.size(), sizeof(float));
+            for (size_t i = 0; i < data.size(); ++i) {
+                nlm::validateFloat("data[" + std::to_string(i) + "]", data[i]);
+            }
+            self.setData(data);
+        }, py::arg("data"),
+             "Set image data. data must be a vector of valid floating-point numbers (no NaN or infinity). The data should match the configured width x height x channels dimensions.")
+        .def("getWidth", &Vision::getWidth,
+             "Get image width in pixels")
+        .def("getHeight", &Vision::getHeight,
+             "Get image height in pixels")
+        .def("getChannels", &Vision::getChannels,
+             "Get number of color channels (typically 1 or 3)");
+
+    // Enhanced Audio class with validation
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"),
+             "Create Audio sensory input. sampleRate must be a non-negative integer representing samples per second (typically 8000, 16000, 44100, or 48000). numSamples must be a non-negative integer representing total audio samples.")
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            nlm::validateMemorySafety("data", data.size(), sizeof(float));
+            for (size_t i = 0; i < data.size(); ++i) {
+                nlm::validateFloat("data[" + std::to_string(i) + "]", data[i]);
+            }
+            self.setData(data);
+        }, py::arg("data"),
+             "Set audio samples. data must be a vector of valid floating-point numbers representing audio samples. numSamples must match the configured audio duration.")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+             "Set audio sample rate. sampleRate must be a non-negative integer (typically 8000, 16000, 44100, or 48000).")
+        .def("getSampleRate", &Audio::getSampleRate,
+             "Get audio sample rate")
+        .def("getNumSamples", &Audio::getNumSamples,
+             "Get number of audio samples");
+
+    // Enhanced InternalSignals class with validation
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def(py::init<>())
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"),
+             "Add a neural signal value. value must be a valid floating-point number (no NaN or infinity).")
+        .def("clearSignals", &InternalSignals::clearSignals);
+
+    // Enhanced Action class with validation
+    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"),
+             "Create Action with specified type. type must be a valid ActionType enum value.")
+        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"),
+             "Create Action with type and parameters. type must be a valid ActionType enum value. parameters must be a vector of valid floating-point numbers.")
+        .def("getType", &Action::getType,
+             "Get action type")
+        .def("setType", [](Action& self, ActionType type) {
+            nlm::validateActionType("type", type);
+            self.setType(type);

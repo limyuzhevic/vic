@@ -1,0 +1,250 @@
+             "Get action parameters as a vector of floats")
+        .def("setParameters", [](Action& self, const std::vector<float>& params) {
+            nlm::validateActionParameters(params);
+            self.setParameters(params);
+        }, py::arg("params"),
+             "Set action parameters. params must be a vector of valid floating-point numbers (no NaN or infinity).")
+        .def("getName", &Action::getName,
+             "Get action name as string")
+        .def("clone", &Action::clone,
+             "Create a deep copy of this action");
+
+    // Enhanced WorldObject class with validation
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f, py::arg("radius") = 0.5f,
+             "Create WorldObject. x and y must be valid floating-point coordinates. type must be a valid WorldObjectType enum value. value and radius must be valid floating-point numbers.")
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active);
+
+    // Enhanced AgentBody class with validation
+    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("x", &AgentBody::x)
+        .def_readwrite("y", &AgentBody::y)
+        .def_readwrite("orientation", &AgentBody::orientation)
+        .def_readwrite("velocityX", &AgentBody::velocityX)
+        .def_readwrite("velocityY", &AgentBody::velocityY)
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+        .def_readwrite("energy", &AgentBody::energy)
+        .def_readwrite("health", &AgentBody::health)
+        .def_readwrite("age", &AgentBody::age)
+        .def_readwrite("isMoving", &AgentBody::isMoving)
+        .def_readwrite("isTurning", &AgentBody::isTurning)
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
+        .def("reset", &AgentBody::reset);
+
+    // Enhanced ActionResult class with validation
+    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "",
+             "Create ActionResult. reward must be a valid floating-point number. success must be a boolean. message must be a valid string.")
+        .def_readwrite("reward", &ActionResult::reward)
+        .def_readwrite("success", &ActionResult::success)
+        .def_readwrite("message", &ActionResult::message);
+
+    // Enhanced SensoryPercept class with validation
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"),
+             "Set vision sensory input. vision must be a valid Vision object.")
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"),
+             "Set touch sensory input. touch must be a valid SensoryInput object.")
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"),
+             "Set internal signals. internal must be a valid SensoryInput object.")
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"),
+             "Set proprioception sensory input. proprioception must be a valid SensoryInput object.")
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"),
+             "Set audio sensory input. audio must be a valid SensoryInput object.")
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"),
+             "Set timestamp. timestamp must be a valid double value.");
+
+    // Enhanced SimpleWorld class with validation
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(
+            Simple 2D world for NLM simulation providing agent-environment
+            interaction capabilities.
+            
+            The SimpleWorld class represents a 2D environment where
+            agents can move, interact with objects, and process sensory
+            input. It supports configuration of world parameters,
+            agent spawning, object management, and physics simulation.
+        )pbdoc")
+        .def(py::init<>())
+        .def(py::init<SimpleWorld&&>(), py::arg("other"), "Move constructor")
+        .def("configure", [](SimpleWorld& self, float width, float height, size_t visionWidth, size_t visionHeight) {
+            nlm::validateFloatRange("width", width, 1.0f, 10000.0f);
+            nlm::validateFloatRange("height", height, 1.0f, 10000.0f);
+            nlm::validateSize("visionWidth", visionWidth);
+            nlm::validateSize("visionHeight", visionHeight);
+            self.configure(width, height, visionWidth, visionHeight);
+        }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure the world dimensions and vision settings. width and height must be in range [1.0, 10000.0]. visionWidth and visionHeight must be non-negative integers representing the agent's field of view.")
+        .def("reset", &SimpleWorld::reset)
+        .def("setAgentStart", [](SimpleWorld& self, float x, float height, float y) {
+            nlm::validateFloatRange("x", x, -10000.0f, 10000.0f);
+            nlm::validateFloatRange("y", y, -10000.0f, 10000.0f);
+            self.setAgentStart(x, y);
+        }, py::arg("x"), py::arg("y"),
+             "Set agent starting position. x and y must be in range [-10000.0, 10000.0].")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state (call each simulation step). timestep must be a valid double value representing simulation time in seconds.")
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand, py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to agent. cmd must be a valid MotorCommand enum value. currentTime must be a valid double representing simulation time in seconds.")
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+              py::return_value_policy::reference_internal,
+              "Get current sensory percept for the agent")
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+              py::return_value_policy::reference_internal,
+              "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             py::keep_alive<0, 1>(),  // Keep object reference alive while world exists
+             "Add object to world. obj must be a valid WorldObject.")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position. x and y must be valid floating-point coordinates.")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall). x and y must be valid floating-point coordinates.")
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             "Get object at position (if any). x and y must be valid floating-point coordinates.")
+        .def("getWidth", &SimpleWorld::getWidth,
+             "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight,
+             "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy,
+             "Get maximum agent energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum agent energy. e must be a valid floating-point number.")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate. r must be a valid floating-point number.")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducibility. seed must be a valid unsigned 64-bit integer.")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get random seed");
+
+    // Enhanced Brain class with validation
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+            Central neural simulation brain class for the NLM framework.
+            
+            The Brain class manages neural network simulation including
+            neuron populations, synaptic connections, neural activity,
+            sensory integration, motor output, and developmental processes.
+            It provides comprehensive control over neural simulation
+            including step-by-step execution, sensory input processing,
+            action generation, and state management.
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create Brain with configuration. config must be a valid shared pointer to a Config object.")
+        .def(py::init<Brain&&>(), py::arg("other"), "Move constructor")
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration. This sets up the neural network with the provided configuration parameters.")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+              py::arg("currentStep"),
+              "Perform a simulation step. Advances the neural simulation by one time step. currentStep must be a valid unsigned 64-bit integer.")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+              py::arg("currentStep"), py::arg("currentTime"),
+              "Perform a simulation step with timestamp. Advances the neural simulation by one time step with the specified current time. currentStep must be a valid unsigned 64-bit integer. currentTime must be a valid double value.")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+              "Inject sensory input into the brain. input must be a valid SensoryInput object.")
+        .def("injectCurrent", &Brain::injectCurrent, py::arg("neuron"), py::arg("current"),
+              "Inject current into a specific neuron. neuron must be a valid NeuronId. current must be a valid floating-point number.")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons, py::arg("type"), py::arg("current"),
+              "Inject current into all neurons of a specific type. type must be a valid NeuronType enum value. current must be a valid floating-point number.")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity. The brain analyzes current neural activity and generates an appropriate Action object.")
+        .def("reset", &Brain::reset,
+             "Reset brain state.")
+        .def("save", &Brain::save, py::arg("filepath"),
+              "Save brain state to file. Saves the entire brain state including neural connections, weights, and neuron states to a binary file. filepath must be a valid string.")
+        .def("load", &Brain::load, py::arg("filepath"),
+              "Load brain state from file. Restores a previously saved brain state from a binary file. filepath must be a valid string.")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+              "Add a new neural region. name must be a valid string (optional).")
+        .def("getRegion", &Brain::getRegion, py::arg("id"),
+              py::return_value_policy::reference_internal,
+              "Get a region by ID. id must be a valid RegionId.")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions.")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs.")
+        .def("getRegions", &Brain::getRegions,
+              py::return_value_policy::reference_internal,
+              "Get all regions.")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions.")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions.")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons.")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons.")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons.")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio.")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count.")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage.")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage, py::arg("stage"),
+             "Set developmental stage. stage must be a valid DevelopmentalStage enum value.")
+        .def("getConfig", &Brain::getConfig,
+              py::return_value_policy::reference_internal,
+              "Get the configuration.")
+        .def("logStatus", &Brain::logStatus,
+              "Log brain status.");
+
+    // Enhanced AgentBrain class with validation
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(
+            Agent brain interface connecting NLM brain to world simulation.
+            
+            The AgentBrain class bridges the neural brain simulation with
+            the external world, handling sensory transduction and motor decoding,
+            reward modulation, and developmental updates. It provides a complete
+            interface for agent-environment interaction in simulated environments.
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+              py::keep_alive<0, 1>(),  // Keep brain reference alive while AgentBrain exists
+              "Create AgentBrain with brain reference. brain must be a valid shared pointer to a Brain object.")
+        .def(py::init<AgentBrain&&>(), py::arg("other"), "Move constructor")
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+              "Initialize with world. world must be a valid SimpleWorld reference.")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+              "Get expected sensory input size.")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+              "Get expected motor output size.")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput, py::arg("percept"),
+              "Process sensory percept and inject into brain. The agent brain processes sensory input from the environment and injects it into the neural brain. percept must be a valid SensoryPercept.")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+              "Decode brain motor activity into motor command. Translates neural activity into actionable motor commands for the agent.")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation, py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation. Modulates neural activity based on reward prediction errors and curiosity signals. reward and predictedReward must be valid floating-point numbers.")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment, py::arg("timestep"),
+              "Update development system. Manages neural development processes. This includes structural plasticity and functional maturation. timestep must be a valid double value.")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+              "Get current developmental stage.")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level.")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+              "Get curiosity level.")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+              "Get novelty level.")
+        .def("getPredictionError", &AgentBrain::getPredictionError,

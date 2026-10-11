@@ -1,0 +1,73 @@
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+            Central neural simulation brain class for the NLM framework.
+            
+            The Brain class manages neural network simulation including
+            neuron populations, synaptic connections, neural activity,
+            sensory integration, motor output, and developmental processes.
+            It provides comprehensive control over neural simulation
+            including step-by-step execution, sensory input processing,
+            action generation, and state management.
+        )pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create Brain with configuration. config must be a valid shared pointer to a Config object.")
+        .def(py::init<Brain&&>(), py::arg("other"), "Move constructor")
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration. This sets up the neural network with the provided configuration parameters.")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+              py::arg("currentStep"),
+              "Perform a simulation step. Advances the neural simulation by one time step. currentStep must be a valid unsigned 64-bit integer.")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+              py::arg("currentStep"), py::arg("currentTime"),
+              "Perform a simulation step with timestamp. Advances the neural simulation by one time step with the specified current time. currentStep must be a valid unsigned 64-bit integer. currentTime must be a valid double value.")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+              "Inject sensory input into the brain. input must be a valid SensoryInput object.")
+        .def("injectCurrent", &Brain::injectCurrent, py::arg("neuron"), py::arg("current"),
+              "Inject current into a specific neuron. neuron must be a valid NeuronId. current must be a valid floating-point number.")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons, py::arg("type"), py::arg("current"),
+              "Inject current into all neurons of a specific type. type must be a valid NeuronType enum value. current must be a valid floating-point number.")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity. The brain analyzes current neural activity and generates an appropriate Action object.")
+        .def("reset", &Brain::reset,
+             "Reset brain state.")
+        .def("save", &Brain::save, py::arg("filepath"),
+              "Save brain state to file. Saves the entire brain state including neural connections, weights, and neuron states to a binary file. filepath must be a valid string.")
+        .def("load", &Brain::load, py::arg("filepath"),
+              "Load brain state from file. Restores a previously saved brain state from a binary file. filepath must be a valid string.")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+              "Add a new neural region. name must be a valid string (optional).")
+        .def("getRegion", &Brain::getRegion, py::arg("id"),
+              py::return_value_policy::reference_internal,
+              "Get a region by ID. id must be a valid RegionId.")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions.")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs.")
+        .def("getRegions", &Brain::getRegions,
+              py::return_value_policy::reference_internal,
+              "Get all regions.")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions.")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions.")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons.")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons.")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons.")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio.")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count.")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage.")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage, py::arg("stage"),
+             "Set developmental stage. stage must be a valid DevelopmentalStage enum value.")
+        .def("getConfig", &Brain::getConfig,
+              py::return_value_policy::reference_internal,
+              "Get the configuration.")
+        .def("logStatus", &Brain::logStatus,
+              "Log brain status.");
+
+    // Enhanced AgentBrain class with validation
