@@ -92,6 +92,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -159,14 +160,18 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
-
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Brain::~Brain() {
+    NLM_LOG_INFO("Destroying NLM Brain...");
+    
+    // Cleanup should be handled by Impl's destructor (unique_ptrs auto-cleanup)
+    // but we log the destruction for debugging
+    
+    NLM_LOG_INFO("NLM Brain destruction complete");
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        NLM_LOG_DEBUG("Moving Brain assignment");
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;

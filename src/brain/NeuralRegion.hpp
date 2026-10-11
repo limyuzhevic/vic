@@ -6,6 +6,8 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <chrono>
+#include <tmmintrin.h>  // For SIMD intrinsics (iOS ARM)
 
 namespace nlm {
 
@@ -49,9 +51,13 @@ public:
     size_t getSynapseCount() const;
     const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
     
-    // Connectivity queries
+    // Connectivity queries - optimized with adjacency maps
     std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
     std::vector<Synapse*> getSynapsesTo(NeuronId neuron);
+    
+    // Performance optimized connectivity queries
+    Synapse* getSynapseFrom(NeuronId source, NeuronId destination);
+    Synapse* getSynapseTo(NeuronId destination, NeuronId source);
     
     // Statistics
     size_t getTotalNeuronCount() const;
@@ -79,9 +85,43 @@ public:
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
     
+    // Performance monitoring
+    void enablePerformanceMonitoring(bool enable);
+    float getAverageStepTime() const;
+    float getMaxStepTime() const;
+    size_t getTotalSynapseUpdates() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+};
+
+// SIMD-optimized vector operations for neural computation
+class SimdUtils {
+public:
+    // SIMD vector addition for membrane potentials
+    static void addVectors(float* result, const float* a, const float* b, size_t count);
+    
+    // SIMD vector multiplication for synaptic inputs
+    static void multiplyVectors(float* result, const float* a, const float* b, size_t count);
+    
+    // SIMD threshold detection for spike generation
+    static void thresholdVectors(bool* spikes, const float* values, float threshold, size_t count);
+    
+    // SIMD reduction operations for statistics
+    static float reduceSum(const float* values, size_t count);
+    static float reduceMax(const float* values, size_t count);
+    
+    // SIMD sparse connectivity operations
+    static void processSparseConnections(
+        float* membranePotentials,
+        const std::unordered_map<NeuronId, std::vector<NeuronId>>& adjacencyMap,
+        const float* synapticWeights,
+        const float* reversalPotentials,
+        size_t neuronCount);
+    
+private:
+    SimdUtils() = default;
 };
 
 } // namespace nlm
