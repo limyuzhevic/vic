@@ -5,16 +5,11 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -511,8 +506,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // Store current neural activity pattern as prediction target
+        std::vector<float> currentPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentPattern.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Store as prediction target for next step
+            pImpl->predictionSystem->trainFromPattern(currentPattern);
+        }
+        
+        // Apply prediction to neural dynamics
+        pImpl->predictionSystem->applyPrediction(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
