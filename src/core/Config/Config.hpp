@@ -31,16 +31,52 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration key validation
+static bool isValidKey(const std::string& key);
+
+// Configuration value validation
+static bool isValidValue(const ConfigValue& value);
+
+// Configuration operation error types
+enum class ConfigError {
+    Success,
+    InvalidKey,
+    InvalidValue,
+    KeyNotFound,
+    ConversionError,
+    FileError,
+    MemoryError
+};
+
+// Configuration exception class
+class ConfigException {
+public:
+    ConfigException(ConfigError error, const std::string& message);
+    ConfigError getError() const;
+    const std::string& getMessage() const;
+    
+private:
+    ConfigError error_;
+    std::string message_;
+};
+
+// Configuration entry with error handling
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc) {
+        // Validate entry
+        if (!isValidKey(k)) {
+            throw ConfigException(ConfigError::InvalidKey, "Invalid configuration key: " + k);
+        }
+        if (!isValidValue(v)) {
+            throw ConfigException(ConfigError::InvalidValue, "Invalid configuration value for key: " + k);
+        }
+    }
 };
 
 // Main configuration class

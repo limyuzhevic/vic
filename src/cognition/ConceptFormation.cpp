@@ -19,6 +19,7 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , concepts_()  // Initialize empty concepts vector
 {
 }
 

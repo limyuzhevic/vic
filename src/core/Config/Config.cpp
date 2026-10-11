@@ -4,21 +4,140 @@
 #include <algorithm>
 #include <filesystem>
 
-namespace nlm {
+// Configuration validation implementation
+bool Config::isValidKey(const std::string& key) {
+    if (key.empty() || key.length() > 255) {
+        return false;
+    }
+    
+    // Check for invalid characters
+    static const std::regex invalidChars("[\\s\\p{Punct}]");
+    if (std::regex_search(key, invalidChars)) {
+        return false;
+    }
+    
+    // Should start with letter or underscore
+    if (!std::isalpha(static_cast<unsigned char>(key[0])) && key[0] != '_') {
+        return false;
+    }
+    
+    return true;
+}
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+bool Config::isValidValue(const ConfigValue& value) {
+    // A value is valid if it can be visited by std::visit
+    struct Validator {
+        bool operator()(const std::string&) const { return true; }
+        bool operator()(int) const { return true; }
+        bool operator()(int64_t) const { return true; }
+        bool operator()(double) const { return true; }
+        bool operator()(bool) const { return true; }
+        bool operator()(float) const { return true; }
+        bool operator()(uint64_t) const { return true; }
+        bool operator()(const std::vector<int>&) const { return true; }
+        bool operator()(const std::vector<double>&) const { return true; }
+        bool operator()(const std::vector<std::string>&) const { return true; }
+        bool operator()(const ConfigValue&) const { return false; } // Should never happen
+    };
+    
+    return std::visit(Validator{}, value);
+}
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Configuration exception implementation
+ConfigException::ConfigException(ConfigError error, const std::string& message)
+    : error_(error), message_(message) {}
 
-Config::~Config() = default;
+ConfigError ConfigException::getError() const {
+    return error_;
+}
 
-Config::Config(Config&&) noexcept = default;
+const std::string& ConfigException::getMessage() const {
+    return message_;
+}
 
-Config& Config::operator=(Config&&) noexcept = default;
+bool Config::has(const std::string& key) const {
+    // Validate key first
+    if (!isValidKey(key)) {
+        throw ConfigException(ConfigError::InvalidKey, "Invalid configuration key: " + key);
+    }
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    return it != pImpl->entries.end();
+}
 
-bool Config::loadFromFile(const std::string& filepath) {
+const ConfigValue& Config::get(const std::string& key) const {
+    // Validate key
+    if (!isValidKey(key)) {
+        throw ConfigException(ConfigError::InvalidKey, "Invalid configuration key: " + key);
+    }
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        throw ConfigException(ConfigError::KeyNotFound, "Configuration key not found: " + key);
+    }
+    
+    return it->value;
+}
+
+template<typename T>
+T Config::get(const std::string& key) const {
+    try {
+        const ConfigValue& value = get(key);
+        return std::get<T>(value);
+    } catch (const std::bad_variant_access&) {
+        throw ConfigException(ConfigError::ConversionError, 
+            "Type conversion failed for key: " + key + ". Expected " + typeid(T).name());
+    }
+}
+
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    try {
+        return get<T>(key);
+    } catch (const ConfigException&) {
+        // Key not found or type conversion failed - return default
+        return defaultValue;
+    } catch (...) {
+        // Other exception - return default
+        return defaultValue;
+    }
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate inputs
+    if (!isValidKey(key)) {
+        throw ConfigException(ConfigError::InvalidKey, "Invalid configuration key: " + key);
+    }
+    
+    if (!isValidValue(value)) {
+        throw ConfigException(ConfigError::InvalidValue, "Invalid configuration value for key: " + key);
+    }
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -48,7 +167,64 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to convert to different types based on content
+            bool converted = false;
+            
+            // Try integer
+            try {
+                size_t posEnd;
+                long long intVal = std::stoll(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    converted = true;
+                }
+            } catch (...) {}
+            
+            // Try unsigned integer if integer failed
+            if (!converted) {
+                try {
+                    size_t posEnd;
+                    unsigned long long uintVal = std::stoull(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, uint64_t(uintVal), ConfigSource::File);
+                        converted = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try float/double if integer failed
+            if (!converted) {
+                try {
+                    size_t posEnd;
+                    double doubleVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        // Check if it's actually an integer
+                        if (static_cast<long long>(doubleVal) == doubleVal) {
+                            set(key, static_cast<int>(doubleVal), ConfigSource::File);
+                        } else {
+                            set(key, doubleVal, ConfigSource::File);
+                        }
+                        converted = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try float if double failed
+            if (!converted) {
+                try {
+                    size_t posEnd;
+                    float floatVal = std::stof(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, floatVal, ConfigSource::File);
+                        converted = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Fall back to string if numeric conversion failed
+            if (!converted) {
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -86,7 +262,22 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the actual value based on its type
+        if (std::holds_alternative<std::string>(entry.value)) {
+            file << entry.key << " = \"" << std::get<std::string>(entry.value) << "\"\n";
+        } else if (std::holds_alternative<int>(entry.value)) {
+            file << entry.key << " = " << std::get<int>(entry.value) << "\n";
+        } else if (std::holds_alternative<double>(entry.value)) {
+            file << entry.key << " = " << std::get<double>(entry.value) << "\n";
+        } else if (std::holds_alternative<float>(entry.value)) {
+            file << entry.key << " = " << std::get<float>(entry.value) << "\n";
+        } else if (std::holds_alternative<uint64_t>(entry.value)) {
+            file << entry.key << " = " << std::get<uint64_t>(entry.value) << "\n";
+        } else {
+            // Fallback for unknown types
+            file << entry.key << " = \"UNKNOWN_TYPE\"\n";
+        }
     }
     
     return true;
