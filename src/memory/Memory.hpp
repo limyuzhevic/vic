@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Core working memory implementation
 
 class WorkingMemory {
 public:
@@ -15,7 +15,6 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -40,7 +39,7 @@ private:
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Neural episodic memory implementation
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -80,7 +79,7 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Neural semantic memory implementation
 
 class SemanticMemory {
 public:
@@ -108,7 +107,7 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Neural procedural memory implementation
 
 struct Skill {
     std::string name;
@@ -144,7 +143,7 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Neural associative memory implementation
 
 class AssociativeMemory {
 public:

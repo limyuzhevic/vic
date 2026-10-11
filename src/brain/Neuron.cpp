@@ -299,4 +299,18 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
+void Neuron::step(Timestamp currentTime) {
+    // Default LIF step with standard timestep (1ms)
+    TimestepDuration dt = 0.001;  // 1ms default
+    stepLIF(currentTime, dt);
+}
+
+void Neuron::setTotalCurrent(MembranePotential current) {
+    pImpl->state.totalCurrent = current;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->state.totalCurrent;
+}
+
 } // namespace nlm

@@ -139,6 +139,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Python bindings
+add_library(pynlm MODULE
+    src/python_bindings.cpp
+)
+
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX ".so"
+)
+
+target_link_libraries(pynlm PRIVATE nlm_core pybind11::module)
+
+target_include_directories(pynlm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+install(TARGETS pynlm DESTINATION lib)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

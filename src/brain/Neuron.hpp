@@ -108,6 +108,7 @@ public:
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
+    void setTotalCurrent(MembranePotential current);
     MembranePotential getTotalCurrent() const;
     void clearTotalCurrent();
     
