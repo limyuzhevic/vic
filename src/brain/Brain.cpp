@@ -896,8 +896,13 @@ bool Brain::load(const std::string& filepath) {
         }
         
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // For now, just log the count. In a future version, we could:
+        // 1. Create a synapse lookup map for efficient matching
+        // 2. Restore synapse weights and other state properties
+        // 3. Reconstruct eligibility traces if needed
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        NLM_LOG_INFO("Note: Synapse states are not fully restored in current version. "
+                    "Only synaptic count is preserved.");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
