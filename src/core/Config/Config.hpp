@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -28,7 +29,18 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Environment,
     Runtime
+};
+
+// Configuration validation result
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
+    std::string warningMessage;
+    
+    ValidationResult(bool v = true, const std::string& err = "", const std::string& warn = "")
+        : valid(v), errorMessage(err), warningMessage(warn) {}
 };
 
 // Configuration entry
@@ -43,7 +55,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Type-safe configuration getters with better error handling
 class Config {
 public:
     Config();
@@ -61,6 +73,9 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from environment variables (NLM_ prefix)
+    bool loadFromEnvironment();
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
@@ -71,7 +86,25 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Type-safe getters with convenience methods
+    std::optional<int> getInt(const std::string& key) const;
+    std::optional<double> getFloat(const std::string& key) const;
+    std::optional<bool> getBool(const std::string& key) const;
+    std::optional<std::string> getString(const std::string& key) const;
+    std::optional<std::vector<int>> getIntVector(const std::string& key) const;
+    std::optional<std::vector<double>> getFloatVector(const std::string& key) const;
+    std::optional<std::vector<std::string>> getStringVector(const std::string& key) const;
+    
+    // Type-safe setters
+    void setInt(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setFloat(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setBool(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void setIntVector(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void setFloatVector(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void setStringVector(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Original setters (backwards compatibility)
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -92,6 +125,17 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation and presets
+    ValidationResult validate() const;
+    bool setPreset(const std::string& presetName);
+    
+    // Environment variable helpers
+    static std::string getEnvironmentVariable(const std::string& key);
+    static bool hasEnvironmentVariable(const std::string& key);
+    
+    // Preset names
+    static const std::vector<std::string> getPresetNames();
     
 private:
     struct Impl;
