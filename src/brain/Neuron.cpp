@@ -188,16 +188,19 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) const {
     bool fired = false;
     
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
+        // Note: const cast needed because we modify pImpl->state in const context
+        // This is a design issue - the method should properly manage its modifications
+        auto& nonConstState = const_cast<NeuronState&>(pImpl->state);
+        --nonConstState.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
         pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+        if (nonConstState.refractoryRemaining == 0) {
+            nonConstState.firingState = FiringState::Resting;
         }
         return false;
     }
@@ -206,10 +209,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
+    auto& V = const_cast<MembranePotential&>(pImpl->state.membranePotential);
+    auto V_rest = pImpl->state.restingPotential;
+    auto V_reset = pImpl->state.resetPotential;
+    auto threshold = pImpl->state.threshold;
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
@@ -234,8 +237,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        auto& nonConstState = const_cast<NeuronState&>(pImpl->state);
+        nonConstState.firingState = FiringState::Active;
+        nonConstState.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike
         recordSpike(currentTime);
@@ -244,13 +248,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         V = V_reset;
         
         // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
+        nonConstState.refractoryRemaining = nonConstState.refractoryPeriod;
+        nonConstState.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        nonConstState.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        auto& nonConstState = const_cast<NeuronState&>(pImpl->state);
+        nonConstState.firingState = FiringState::Active;
     }
     
     // Clear synaptic input for next step

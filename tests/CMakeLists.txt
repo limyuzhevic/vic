@@ -14,6 +14,18 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    
+    # Test Framework
+    ../src/tests/TestConfiguration.cpp
+    ../src/tests/TestFramework.cpp
+    ../src/tests/TestReporting.cpp
+    ../src/tests/TestFixtures.cpp
+    ../src/tests/IntegrationTestRunner.cpp
+    ../src/tests/PerformanceTestSuite.cpp
+    ../src/tests/MemoryLeakDetector.cpp
+    ../src/tests/PhaseIntegrationTestRunner.cpp
+    ../src/tests/NLMComponentTestSuite.cpp
+    ../src/tests/AutomatedTestRunner.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

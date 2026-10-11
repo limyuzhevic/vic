@@ -1,0 +1,108 @@
+# Enhanced NLM Python Bindings
+# Version: @NLM_VERSION@
+# Generated: @NLM_VERSION_GEN_TIMESTAMP@
+
+"""
+Enhanced NLM (Neural Learning Machine) Python Bindings
+=======================================================
+
+A modern Python binding for the NLM C++ neural simulation framework.
+Provides enhanced classes with modern Python features:
+- Type hints and comprehensive docstrings
+- NumPy integration for array operations
+- Async/await support for non-blocking operations
+- Context managers for safe resource management
+- Configuration objects replacing string-based configs
+- Event system for simulation events
+- Callback system for event handling
+- High-level APIs for training, simulation, analysis, visualization
+- Full Phase 6 integration support
+
+This is an auto-generated file. Do not edit directly.
+The project version is: @NLM_VERSION@
+"""
+
+# Package metadata
+__version__ = "@NLM_VERSION@"
+__author__ = "NLM Project"
+__description__ = "Enhanced NLM Python bindings with modern Python features"
+
+# Import key components
+from .enhanced_bindings import (
+    ConfigObject,
+    EventSystem,
+    DecoratorSupport,
+    EnhancedBrain,
+    EnhancedWorld,
+    EnhancedAgent,
+    TrainingAPI,
+    SimulationAPI,
+    AnalysisAPI,
+    VisualizationAPI,
+    ExportImportAPI,
+)
+
+# Factory functions
+from .enhanced_bindings import (
+    createConfig,
+    loadConfig,
+    createBrain,
+    createWorld,
+    createAgent,
+    createAction,
+    createPercept,
+    createWorldObject,
+    createAgentBody,
+)
+
+# High-level convenience functions
+from .enhanced_bindings import (
+    runSimpleControl,
+    runTestEpisode,
+    runBenchmark,
+)
+
+# Standard library compatibility
+import sys
+if sys.version_info < (3, 8):
+    raise ImportError("Enhanced NLM Python bindings require Python 3.8 or later")
+
+# Optional dependencies
+import numpy as np
+
+# Version check
+required_version = (3, 8)
+current_version = sys.version_info[:2]
+if current_version < required_version:
+    raise ImportError(f"Python {required_version[0]}.{required_version[1]} or later is required, got {current_version[0]}.{current_version[1]}")
+
+print(f"Enhanced NLM Python bindings v{__version__} loaded successfully")
+print(f"Python version: {sys.version}")
+print(f"NumPy version: {np.__version__}")
+
+# API documentation
+__all__ = [
+    'ConfigObject',
+    'EventSystem',
+    'DecoratorSupport',
+    'EnhancedBrain',
+    'EnhancedWorld',
+    'EnhancedAgent',
+    'TrainingAPI',
+    'SimulationAPI',
+    'AnalysisAPI',
+    'VisualizationAPI',
+    'ExportImportAPI',
+    'createConfig',
+    'loadConfig',
+    'createBrain',
+    'createWorld',
+    'createAgent',
+    'createAction',
+    'createPercept',
+    'createWorldObject',
+    'createAgentBody',
+    'runSimpleControl',
+    'runTestEpisode',
+    'runBenchmark',
+]

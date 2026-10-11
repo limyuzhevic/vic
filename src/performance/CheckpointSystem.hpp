@@ -33,6 +33,19 @@
 #include <fstream>
 #include <functional>
 #include <variant>
+#include <unordered_map>
+#include <chrono>
+#include <stdexcept>
+#include <filesystem>
+#include <algorithm>
+#include <numeric>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <zlib.h>
+#include <zstd.h>
+#include <lz4.h>
+#include "CompressionEngine.hpp"
 
 namespace nlm {
 

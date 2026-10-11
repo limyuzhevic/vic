@@ -1,15 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+project(NLM Enhanced Python Bindings VERSION 2.0.0 LANGUAGES CXX)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
 
 # Enable warnings
 if(MSVC)
@@ -18,134 +13,150 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Find required packages
+find_package(nlohmann_json REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
+# Option to enable enhanced Python bindings
+option(ENHANCED_BINDINGS "Enable enhanced Python bindings with modern features" ON)
+option(PYTHON_EMBEDDED "Build Python bindings" ON)
+
+# Enhanced Python bindings include directory
+if(ENHANCED_BINDINGS)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core)
+endif()
+
+# Core Config library
+add_library(nlm_config STATIC
     src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
+target_include_directories(nlm_config PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    ${nlohmann_json_INCLUDE_DIRS}
+    ${YAML_CPP_INCLUDE_DIRS}
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+target_link_libraries(nlm_config PUBLIC
+    nlohmann_json::nlohmann_json
+    yaml-cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+# Install target
+install(TARGETS nlm_config
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+# Enhanced Python bindings library
+if(ENHANCED_BINDINGS AND PYTHON_EMBEDDED)
+    add_library(nlm_enhanced_python MODULE
+        python/bindings.cpp
+        src/core/EnhancedMain.cpp
+    )
+    
+    set_target_properties(nlm_enhanced_python PROPERTIES
+        OUTPUT_NAME "nlm_enhanced"
+        PREFIX ""
+        SUFFIX ".so"
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+    )
+    
+    target_include_directories(nlm_enhanced_python PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${nlohmann_json_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIRS}
+        pybind11/include
+    )
+    
+    target_link_libraries(nlm_enhanced_python PRIVATE
+        nlm_config
+        nlohmann_json::nlohmann_json
+        yaml-cpp
+    )
+    
+    # Python module compilation
+    target_compile_definitions(nlm_enhanced_python PRIVATE
+        PYBIND11_MODULE_NAME="pynlm_enhanced"
+    )
+    
+    # Install Python module
+    install(TARGETS nlm_enhanced_python
+        LIBRARY DESTINATION lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages
+    )
+endif()
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+# Original Python bindings
+if(PYTHON_EMBEDDED)
+    add_library(pynlm MODULE
+        python/bindings.cpp
+    )
+    
+    set_target_properties(pynlm PROPERTIES
+        OUTPUT_NAME "pynlm"
+        PREFIX ""
+        SUFFIX ".so"
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+    )
+    
+    target_include_directories(pynlm PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${nlohmann_json_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIRS}
+        pybind11/include
+    )
+    
+    target_link_libraries(pynlm PRIVATE
+        nlm_config
+        nlohmann_json::nlohmann_json
+        yaml-cpp
+    )
+    
+    # Install original Python module
+    install(TARGETS pynlm
+        LIBRARY DESTINATION lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages
+    )
+endif()
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+# Enhanced Python examples
+if(ENHANCED_BINDINGS AND PYTHON_EMBEDDED)
+    add_custom_target(run_examples COMMENT "Running enhanced Python examples")
+    
+    add_custom_command(
+        TARGET run_examples POST_BUILD
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/example1_basic.py
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/example2_events.py
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/example3_training.py
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/example4_simulation.py
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/example5_visualization.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Running enhanced Python examples"
+        VERBATIM
+    )
+endif()
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Python module installation
+if(PYTHON_EMBEDDED)
+    # Create Python package structure
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/python)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/python/bindings.cpp
+         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/python)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/python/CMakeLists.txt
+         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/python)
+    
+    # Generate Python package files
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/pynlm_enhanced/__init__.py
+        ${CMAKE_CURRENT_BINARY_DIR}/python/__init__.py
+        @ONLY
+    )
+endif()

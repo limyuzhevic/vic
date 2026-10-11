@@ -1,0 +1,104 @@
+{
+    "name": "basic_debug_config",
+    "description": "Basic debugging configuration for NLM",
+    "version": "1.0.0",
+    "created": "2026-10-11T14:30:30Z",
+    "author": "NLM Development Team",
+    "configuration": {
+        "console": {
+            "enabled": true,
+            "autoRefresh": true,
+            "refreshInterval": 0.1,
+            "enableHistory": true,
+            "commandHistorySize": 1000,
+            "enableBreakpoints": true,
+            "enableWatchVariables": true,
+            "enableMemoryProfiling": true,
+            "enablePerformanceProfiling": true,
+            "prompt": "nlm> ",
+            "title": "NLM Debug Console"
+        },
+        "visualization": {
+            "enabled": true,
+            "updateInterval": 0.016,
+            "enableNetworkView": true,
+            "enableSpikeView": true,
+            "enableWeightView": true,
+            "enableActivityView": true,
+            "enableMemoryView": true,
+            "enableNeuromodulationView": true,
+            "enableDevelopmentView": true,
+            "backend": "software",
+            "width": 1920,
+            "height": 1080,
+            "fullscreen": false,
+            "showGrid": true,
+            "showLabels": true,
+            "showTooltips": true,
+            "colorScheme": "default"
+        },
+        "dataExporter": {
+            "enabled": true,
+            "exportFormats": ["csv", "json", "binary"],
+            "defaultFormat": "csv",
+            "outputDirectory": "./exports",
+            "overwriteExisting": false,
+            "enableCompression": true,
+            "compressionAlgorithm": "gzip",
+            "compressionLevel": 6,
+            "enableStreaming": false,
+            "chunkSize": 1048576,
+            "enableValidation": true,
+            "enableIntegrityCheck": true,
+            "integrityAlgorithm": "sha256",
+            "enableVersionControl": false,
+            "backupExisting": true,
+            "backupExtension": ".bak"
+        },
+        "performanceProfiler": {
+            "enabled": true,
+            "autoProfile": true,
+            "profileInterval": 0.1,
+            "enableCPUProfiling": true,
+            "enableMemoryProfiling": true,
+            "enableNeuralProfiling": true,
+            "enableSystemProfiling": true,
+            "enableNetworkProfiling": false,
+            "profileSampleSize": 100,
+            "maxMemoryUsage": 1073741824,
+            "maxCpuUsage": 100.0,
+            "enableAnomalyDetection": true,
+            "anomalyThreshold": 2.0,
+            "enablePerformanceWarnings": true,
+            "warningThresholds": {
+                "memory": 0.9,
+                "cpu": 0.9,
+                "frameTime": 0.1
+            },
+            "errorThresholds": {
+                "memory": 0.95,
+                "cpu": 0.95,
+                "frameTime": 0.2
+            }
+        },
+        "breakpoints": [
+            {"step": 0, "description": "Start of simulation", "active": true},
+            {"step": 1000, "description": "Mid-simulation checkpoint", "active": false},
+            {"step": 5000, "description": "Near end of simulation", "active": false}
+        ],
+        "watchVariables": [
+            {"expression": "brain->getFiringNeurons()", "description": "Current firing neurons"},
+            {"expression": "brain->getActiveNeuronCount()", "description": "Active neuron count"},
+            {"expression": "brain->getAverageFiringRate()", "description": "Average firing rate"},
+            {"expression": "brain->getExcitationInhibitionRatio()", "description": "E/I ratio"}
+        ],
+        "simulationSettings": {
+            "stepSize": 0.001,
+            "maxSteps": 100000,
+            "maxTime": 100.0,
+            "enableLogging": true,
+            "logLevel": "info",
+            "logFile": "./logs/debug.log"
+        }
+    }
+}
