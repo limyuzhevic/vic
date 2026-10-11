@@ -1,4 +1,4 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Easy Usage Guide for Beginners (Simplified Interface)
 
 ## What is NLM?
 
@@ -11,6 +11,36 @@ Think of it like this:
 - **Memory** = The brain remembering patterns
 
 That's it! NLM simulates all of this.
+
+## New: Simplified PyNLM Interface
+
+Starting with version 0.1.0, NLM now includes a **simplified Python interface** (`pynlm`) that makes it much easier to use NLM for experimentation and research.
+
+### Key Improvements:
+
+1. **Simplified API**: Uses Pythonic `snake_case` instead of `camelCase`
+2. **Beginner-Friendly**: Provides sensible defaults and high-level convenience functions
+3. **Development Mode**: Includes mock implementation when C++ bindings aren't available
+4. **Advanced Features**: Still accessible for expert users with `create_advanced_config()`
+5. **Better Documentation**: Comprehensive examples and troubleshooting
+
+### Quick Start with Simplified Interface
+
+```python
+import pynlm
+
+# Create a simple brain (one line!)
+brain = pynlm.create_brain(pynlm.create_default_config())
+brain.initialize()
+
+# Make it think for 100 steps
+for i in range(100):
+    brain.step(i)
+
+print("Done! Your brain thought", brain.get_total_spike_count(), "times")
+```
+
+**Important**: Use `pynlm` for the simplified Python interface!
 
 ---
 
@@ -221,64 +251,88 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
+### Project 2: Brain Watching a World
+
+```python
+import pynlm
+
+# Setup (using simplified interface)
+brain = pynlm.create_brain(pynlm.create_default_config())
+brain.initialize()
+world = pynlm.create_simple_world()
+world.configure(width=20, height=20, vision_width=8, vision_height=8)
+world.reset()
+agent = pynlm.create_agent_brain(brain)
+agent.initialize(world)
+
+# Watch the world for 30 steps
+for i in range(30):
+    world.update(0.1)
+    agent.process_sensory_input(world.get_sensory_percept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.get_average_firing_rate())
+```
+
 ### Project 3: Complete Agent
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Setup (using simplified interface)
+config = pynlm.create_advanced_config()
+brain = pynlm.create_brain(config)
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world = pynlm.create_simple_world()
+world.configure(width=15, height=15, vision_width=8, vision_height=8)
 world.reset()
-agent = pynlm.createAgentBrain(brain)
+agent = pynlm.create_agent_brain(brain)
 agent.initialize(world)
 
 # Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+agent.enable_reward_modulation(True)
+agent.enable_curiosity(True)
 
 # Run agent
 for step in range(100):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
+    agent.process_sensory_input(world.get_sensory_percept())
     brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+    action = agent.decode_motor_command()
+    world.apply_motor_command(action, world.get_simulation_time())
     
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Step {step}: {brain.get_firing_neuron_count()} neurons firing")
 
 print("Agent simulation complete!")
 ```
 
 ---
 
-## Quick Reference
+## Quick Reference (PyNLM Interface)
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
+| What you want | PyNLM Code |
+|--------------|------------|
+| Create brain | `pynlm.create_brain(config)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+| Create world | `pynlm.create_simple_world()` |
+| Create agent | `pynlm.create_agent_brain(brain)` |
+| Get brain stats | `brain.get_firing_neuron_count()` |
+| See world | `world.get_sensory_percept()` |
+| Make action | `agent.decode_motor_command()` |
 
 ---
 
-## Troubleshooting
+## Troubleshooting (PyNLM)
 
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
 
 **"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
+- Did you call `world.apply_motor_command()`?
 - Check that `world.update()` is being called
 
 **"Everything is 0"**
@@ -287,11 +341,15 @@ print("Agent simulation complete!")
 
 ---
 
-## Next Steps
+## Next Steps (PyNLM)
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+When you're comfortable with the simplified interface:
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details** - Contains advanced usage patterns
+2. **Explore `docs/ARCHITECTURE.md` to understand how it all works**
+3. **Experiment with different configurations!** - Try various `create_advanced_config()` settings
+4. **Try the command-line interface!** - Use `nlm` command for batch processing
+5. **Create your own mini-projects** - Apply NLM to your specific use case
+
+That's it! You're now ready to use the simplified NLM interface.
+
