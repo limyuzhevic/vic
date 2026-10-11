@@ -1,13 +1,17 @@
 #include "Config.hpp"
+#include "core/Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <mutex>
+#include "JsonConfigParser.hpp"
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::mutex mutex;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -18,82 +22,52 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+// Load from JSON/YAML file (supports both formats)
+bool Config::loadFromJsonFile(const std::string& filepath) {
+    return JsonConfigParser::parseFile(filepath, *this);
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
+bool Config::loadFromYamlFile(const std::string& filepath) {
+    // For now, treat YAML as JSON since we don't have a YAML parser
+    return JsonConfigParser::parseFile(filepath, *this);
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+// Save to JSON/YAML file
+bool Config::saveToJsonFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
+    file << JsonConfigParser::serializeToJson(*this);
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+bool Config::saveToYamlFile(const std::string& filepath) const {
+    // For now, write JSON format as YAML
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
+        return false;
+    }
+    
+    file << JsonConfigParser::serializeToYaml(*this);
+    return true;
+}
+
+std::string Config::toJson() const {
+    return JsonConfigParser::serializeToJson(*this);
+}
+
+std::string Config::toYaml() const {
+    return JsonConfigParser::serializeToYaml(*this);
+}
+// Get values
+
+template<typename T> std::optional<T> Config::get(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -108,13 +82,18 @@ std::optional<T> Config::get(const std::string& key) const {
     }
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+template<typename T> T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto value = get<T>(key);
+    if (value) {
+        return *value;
+    }
+    return defaultValue;
 }
 
+// Set values
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -122,7 +101,7 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.push_back(ConfigEntry(key, value, source));
     }
 }
 
@@ -143,11 +122,16 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
+    return it != pImpl->entries.end();
 }
 
 void Config::remove(const std::string& key) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -156,8 +140,9 @@ void Config::remove(const std::string& key) {
 }
 
 std::vector<std::string> Config::getKeys() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
         keys.push_back(entry.key);
     }
@@ -165,27 +150,53 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     pImpl->entries.clear();
 }
 
 std::string Config::summary() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\\\"" << arg << "\\\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << "\\\"" << item << "\\\"";
+                    first = false;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
             } else {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ")\\n";
     }
     return oss.str();
 }
 
+// Internal helpers
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
