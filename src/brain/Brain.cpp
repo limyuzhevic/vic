@@ -6,15 +6,13 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../memory/SemanticMemory.hpp"
+#include "../memory/ProceduralMemory.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -32,6 +30,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -46,9 +46,12 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<PredictionError> predictionError;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -112,6 +115,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -151,6 +156,7 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        checkpointManager->configure("./checkpoints", 10000, 10, true);
     }
     
     DevelopmentalStage developmentalStage;
@@ -239,8 +245,9 @@ bool Brain::initialize() {
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Initialize semantic and procedural memory
+    pImpl->semanticMemory->initialize(this);
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -761,24 +768,39 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
-bool Brain::save(const std::string& filepath) const {
+bool Brain::save(const std::string& filepath) {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
-        
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not initialized");
+        return false;
+    }
+    
+    // Configure checkpoint manager with directory containing the filepath
+    std::string checkpointDir = filepath.substr(0, filepath.find_last_of('/'));
+    if (checkpointDir.empty()) checkpointDir = ".";
+    
+    pImpl->checkpointManager->configure(checkpointDir, 10000, 10, true);
+    
+    // Save checkpoint immediately
+    if (!pImpl->checkpointManager->saveImmediately("brain_state")) {
+        NLM_LOG_ERROR("Failed to save checkpoint with manager");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Brain state saved successfully with manager");
+    return true;
+}
+    
+    // Save checkpoint immediately
+    if (!pImpl->checkpointManager->saveImmediately("brain_state")) {
+        NLM_LOG_ERROR("Failed to save checkpoint");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Brain state saved successfully");
+    return true;
+}
         
         // Write neurons
         NeuronCheckpointData neuronData;
@@ -819,28 +841,38 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags().value);
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
+// Remove duplicate synapses section from the end
+    }
+    
+    // Check if we have duplicate code and fix it
+    for (auto it = --pImpl->synapses.end(); it != pImpl->synapses.end(); ) {
+        if (std::find(pImpl->synapses.begin(), it, *it) != it) {
+            it = pImpl->synapses.erase(it);
+        } else {
+            ++it;
         }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+    }
+    
+    // Now write synapses using checkpoint manager
+    if (!pImpl->checkpointManager->saveImmediately("brain_state")) {
+        NLM_LOG_ERROR("Failed to save checkpoint with manager");
         return false;
     }
+    
+    NLM_LOG_INFO("Brain state saved successfully with manager");
+    return true;
+    
+} catch (const std::exception& e) {
+    NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+    return false;
+}
 }
 
 bool Brain::load(const std::string& filepath) {
@@ -1013,11 +1045,13 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
@@ -1051,10 +1085,16 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {
