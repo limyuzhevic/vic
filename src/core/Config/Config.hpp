@@ -93,6 +93,14 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    bool validateFilePath(const std::string& filepath) const;
+    
+    // Error handling
+    static std::string formatError(const std::string& operation, const std::string& details) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +108,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isValidKey(const std::string& key);
+    static bool isValidFilePath(const std::string& filepath);
+    static bool isValidParameterValue(const ConfigValue& value, const std::string& key = "");
 };
 
 } // namespace nlm

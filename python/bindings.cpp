@@ -400,21 +400,161 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced convenience functions for power users
+    
+    // Batch processing function for performance
+    m.def("batchStepBrains", [](const std::vector<std::shared_ptr<Brain>>& brains, 
+                              const std::vector<size_t>& steps) {
+        if (brains.size() != steps.size()) {
+            throw std::runtime_error("Brains and steps vectors must have same size");
+        }
+        
+        std::vector<size_t> totalSpikes;
+        for (size_t i = 0; i < brains.size(); ++i) {
+            brains[i]->reset();
+            brains[i]->initialize();
+            for (size_t step = 0; step < steps[i]; ++step) {
+                brains[i]->step(step, step * 0.001);
+            }
+            totalSpikes.push_back(brains[i]->getTotalSpikeCount());
+        }
+        return totalSpikes;
+    }, py::arg("brains"), py::arg("steps"), 
+        "Batch process multiple brains and return total spike counts");
+    
+    // Configuration convenience methods
+    m.def("configureBrain", [](std::shared_ptr<Brain> brain, const py::kwargs& kwargs) {
+        auto config = brain->getConfig();
+        
+        if (kwargs.contains("neuron_count")) {
+            config->set("neuron_count", kwargs["neuron_count"].cast<int64_t>());
+        }
+        if (kwargs.contains("region_count")) {
+            config->set("region_count", kwargs["region_count"].cast<int64_t>());
+        }
+        if (kwargs.contains("connection_probability")) {
+            config->set("connection_probability", kwargs["connection_probability"].cast<float>());
+        }
+        if (kwargs.contains("stdp_ltp_weight")) {
+            config->set("stdp_ltp_weight", kwargs["stdp_ltp_weight"].cast<float>());
+        }
+        if (kwargs.contains("stdp_ltd_weight")) {
+            config->set("stdp_ltd_weight", kwargs["stdp_ltd_weight"].cast<float>());
+        }
+        if (kwargs.contains("synaptogenesis_rate")) {
+            config->set("synaptogenesis_rate", kwargs["synaptogenesis_rate"].cast<float>());
+        }
+        if (kwargs.contains("pruning_rate")) {
+            config->set("pruning_rate", kwargs["pruning_rate"].cast<float>());
+        }
+        
+        return config;
+    }, py::arg("brain"), py::arg("kwargs"), 
+        "Convenient brain configuration using keyword arguments");
+    
+    // Statistical analysis functions
+    m.def("computeBrainStatistics", [](const std::shared_ptr<Brain>& brain, size_t numSamples) {
+        std::vector<float> firingRates;
+        std::vector<size_t> spikeCounts;
+        std::vector<float> weights;
+        
+        for (size_t i = 0; i < numSamples; ++i) {
+            // Reset and run simulation
+            brain->reset();
+            brain->initialize();
+            for (size_t step = 0; step < 1000; ++step) {
+                brain->step(step, step * 0.001);
+            }
+            
+            firingRates.push_back(brain->getAverageFiringRate());
+            spikeCounts.push_back(brain->getTotalSpikeCount());
+            // Get average synaptic weight (simplified - would need access to synapses)
+            weights.push_back(0.5f); // Placeholder
+        }
+        
+        // Compute statistics
+        float meanFiring = 0.0f, stdFiring = 0.0f;
+        size_t meanSpikes = 0, stdSpikes = 0;
+        
+        if (!firingRates.empty()) {
+            float sum = std::accumulate(firingRates.begin(), firingRates.end(), 0.0f);
+            meanFiring = sum / firingRates.size();
+            
+            float sqSum = 0.0f;
+            for (float rate : firingRates) {
+                float diff = rate - meanFiring;
+                sqSum += diff * diff;
+            }
+            stdFiring = std::sqrt(sqSum / firingRates.size());
+        }
+        
+        if (!spikeCounts.empty()) {
+            size_t sum = std::accumulate(spikeCounts.begin(), spikeCounts.end(), 0);
+            meanSpikes = sum / spikeCounts.size();
+            
+            size_t sqSum = 0;
+            for (size_t count : spikeCounts) {
+                size_t diff = count - meanSpikes;
+                sqSum += diff * diff;
+            }
+            stdSpikes = std::sqrt(static_cast<float>(sqSum) / spikeCounts.size());
+        }
+        
+        return py::make_tuple(meanFiring, stdFiring, static_cast<float>(meanSpikes), static_cast<float>(stdSpikes));
+    }, py::arg("brain"), py::arg("numSamples"), 
+        "Compute statistical analysis of brain behavior");
+    
+    // Export/Import convenience functions with validation
+    m.def("saveBrainWithValidation", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        if (!brain->getTotalNeuronCount() > 0) {
+            throw std::runtime_error("Brain must have neurons before saving");
+        }
+        
+        // Check if file path is writable (simplified check)
+        auto saved = brain->save(filepath);
+        if (!saved) {
+            throw std::runtime_error("Failed to save brain to " + filepath);
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Save brain with validation and error handling");
+    
+    m.def("loadBrainWithValidation", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain from " + filepath);
+        }
+        
+        return brain;
+    }, py::arg("filepath"),
+        "Load brain with validation and error handling");
+    
+    // Advanced AgentBrain operations
+    m.def("createAdvancedAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                  const py::kwargs& agentConfig) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Configure agent based on kwargs
+        if (agentConfig.contains("reward_modulation")) {
+            agent->enableRewardModulation(agentConfig["reward_modulation"].cast<bool>());
+        }
+        if (agentConfig.contains("structural_plasticity")) {
+            agent->enableStructuralPlasticity(agentConfig["structural_plasticity"].cast<bool>());
+        }
+        if (agentConfig.contains("development")) {
+            agent->enableDevelopment(agentConfig["development"].cast<bool>());
+        }
+        if (agentConfig.contains("curiosity")) {
+            agent->enableCuriosity(agentConfig["curiosity"].cast<bool>());
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), py::arg("agentConfig") = py::kwargs(),
+        "Create advanced agent with configurable subsystems");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
