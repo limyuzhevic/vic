@@ -1,0 +1,584 @@
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+
+namespace {
+
+// Helper functions for serialization
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    nlohmann::json j;
+    std::visit([&j](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            j = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            j = arg;
+        }
+    }, value);
+    return j;
+}
+
+ConfigValue jsonToConfigValue(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // Try to detect array type
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                return j.get<std::vector<int64_t>>();
+            } else if (j[0].is_number_float()) {
+                return j.get<std::vector<double>>();
+            } else if (j[0].is_string()) {
+                return j.get<std::vector<std::string>>();
+            }
+        }
+        return std::vector<int64_t>{};
+    }
+    return "";
+}
+
+YAML::Node configValueToYaml(const ConfigValue& value) {
+    YAML::Node node;
+    std::visit([&node](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            node = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            node = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            node = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            node = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            node = YAML::Load(std::to_string(arg.front()));
+            for (size_t i = 1; i < arg.size(); ++i) {
+                node.push_back(arg[i]);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            node = YAML::Load(std::to_string(arg.front()));
+            for (size_t i = 1; i < arg.size(); ++i) {
+                node.push_back(arg[i]);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            node = YAML::Load("");
+            for (const auto& item : arg) {
+                node.push_back(item);
+            }
+        }
+    }, value);
+    return node;
+}
+
+ConfigValue yamlToConfigValue(const YAML::Node& node) {
+    if (node.IsScalar()) {
+        if (node.IsInteger()) {
+            return node.as<int64_t>();
+        } else if (node.IsDouble()) {
+            return node.as<double>();
+        } else if (node.IsBoolean()) {
+            return node.as<bool>();
+        } else {
+            return node.as<std::string>();
+        }
+    } else if (node.IsSequence()) {
+        if (node.size() == 0) {
+            return std::vector<int64_t>{};
+        }
+        
+        if (node[0].IsInteger()) {
+            std::vector<int64_t> result;
+            for (const auto& item : node) {
+                result.push_back(item.as<int64_t>());
+            }
+            return result;
+        } else if (node[0].IsDouble()) {
+            std::vector<double> result;
+            for (const auto& item : node) {
+                result.push_back(item.as<double>());
+            }
+            return result;
+        } else if (node[0].IsScalar()) {
+            std::vector<std::string> result;
+            for (const auto& item : node) {
+                result.push_back(item.as<std::string>());
+            }
+            return result;
+        }
+    }
+    return "";
+}
+
+std::string detectFileFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return "";
+    }
+    
+    std::string firstLine;
+    if (std::getline(file, firstLine)) {
+        // Check for JSON (starts with { or [)
+        if (firstLine.find_first_not_of(" \t\n\r") == '{' || 
+            firstLine.find_first_not_of(" \t\n\r") == '[') {
+            return "json";
+        }
+        // Check for YAML (common YAML indicators)
+        if (firstLine.find(':') != std::string::npos || 
+            firstLine.find('-') != std::string::npos) {
+            return "yaml";
+        }
+    }
+    
+    // Default to simple key=value format for backward compatibility
+    return "simple";
+}
+
+} // namespace
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    initializeSchemaRegistry();
+}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    try {
+        std::string format = detectFileFormat(filepath);
+        
+        if (format == "json") {
+            std::ifstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            nlohmann::json j;
+            file >> j;
+            
+            if (j.is_object()) {
+                for (auto it = j.begin(); it != j.end(); ++it) {
+                    ConfigValue value = jsonToConfigValue(it.value());
+                    set(it.key(), value, ConfigSource::File);
+                }
+            }
+        } else if (format == "yaml") {
+            YAML::Node doc = YAML::LoadFile(filepath);
+            
+            for (const auto& node : doc) {
+                if (node.IsMap()) {
+                    for (const auto& pair : node) {
+                        std::string key = pair.first.as<std::string>();
+                        ConfigValue value = yamlToConfigValue(pair.second);
+                        set(key, value, ConfigSource::File);
+                    }
+                } else if (node.IsScalar()) {
+                    ConfigValue value = yamlToConfigValue(node);
+                    set(std::to_string(node.as<int>()), value, ConfigSource::File);
+                }
+            }
+        } else {
+            // Fallback to simple key=value format for backward compatibility
+            std::ifstream file(filepath);
+            if (!file.is_open()) {
+                return false;
+            }
+            
+            std::string line;
+            while (std::getline(file, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Handle JSON/YAML parsing errors gracefully
+        return false;
+    }
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    try {
+        // First, save to a JSON file for proper type support
+        std::string jsonPath = filepath;
+        if (jsonPath.substr(jsonPath.find_last_of(".") + 1) != "json") {
+            jsonPath += ".json";
+        }
+        
+        nlohmann::json j = nlohmann::json::object();
+        for (const auto& entry : pImpl->entries) {
+            j[entry.key] = configValueToJson(entry.value);
+        }
+        
+        std::ofstream jsonFile(jsonPath);
+        if (!jsonFile.is_open()) {
+            return false;
+        }
+        
+        jsonFile << j.dump(2);
+        jsonFile.close();
+        
+        // Also save a simple key=value version for backward compatibility
+        std::string simplePath = filepath;
+        if (simplePath.find('.') != std::string::npos) {
+            simplePath.erase(simplePath.find_last_of('.'));
+        }
+        simplePath += "_simple.txt";
+        
+        std::ofstream simpleFile(simplePath);
+        if (simpleFile.is_open()) {
+            for (const auto& entry : pImpl->entries) {
+                simpleFile << "# " << entry.description << "\n";
+                
+                std::visit([&simpleFile](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>) {
+                        simpleFile << entry.key << " = \"" << arg << "\"\n";
+                    } else if constexpr (std::is_same_v<T, bool>) {
+                        simpleFile << entry.key << " = " << (arg ? "true" : "false") << "\n";
+                    } else if constexpr (std::is_same_v<T, std::vector<int64_t>> ||
+                                        std::is_same_v<T, std::vector<int>> ||
+                                        std::is_same_v<T, std::vector<double>> ||
+                                        std::is_same_v<T, std::vector<std::string>>) {
+                        simpleFile << entry.key << " = [";
+                        bool first = true;
+                        std::visit([&simpleFile, &first](auto&& arr) {
+                            for (const auto& item : arr) {
+                                if (!first) simpleFile << ", ";
+                                if constexpr (std::is_same_v<decltype(item), std::string>) {
+                                    simpleFile << "\"" << item << "\"";
+                                } else {
+                                    simpleFile << item;
+                                }
+                                first = false;
+                            }
+                        }, entry.value);
+                        simpleFile << "]\n";
+                    } else {
+                        simpleFile << entry.key << " = " << arg << "\n";
+                    }
+                }, entry.value);
+            }
+            simpleFile.close();
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Handle file I/O errors gracefully
+        return false;
+    }
+}
+
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    try {
+        return std::get<T>(it->value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
+}
+
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+bool Config::has(const std::string& key) const {
+    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+}
+
+void Config::remove(const std::string& key) {
+    pImpl->entries.erase(
+        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }),
+        pImpl->entries.end()
+    );
+}
+
+std::vector<std::string> Config::getKeys() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    return keys;
+}
+
+void Config::clear() {
+    pImpl->entries.clear();
+}
+
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
+
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+void Config::initializeSchemaRegistry() {
+    // Initialize default schema registry with known configuration keys and their validation rules
+    
+    // Neuron count validation
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("neuron_count", "int", 
+            "Number of neurons in the brain", true, 
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    // Simulation timestep validation
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("simulation_timestep", "double",
+            "Simulation timestep in seconds", true,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    // Connection probability validation
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("connection_probability", "double",
+            "Connection probability for random connectivity", true,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    // Log level validation
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("log_level", "string",
+            "Log level for logging", true,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>{"debug", "info", "warning", "error", "critical"}));
+    
+    // Boolean values validation
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("log_to_file", "bool",
+            "Whether to log to file", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    // Additional validation for specific keys
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("region_count", "int",
+            "Number of brain regions", true,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("plasticity_learning_rate", "double",
+            "Plasticity learning rate", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("stdp_ltp_weight", "double",
+            "STDP LTP weight", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("stdp_ltd_weight", "double",
+            "STDP LTD weight", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("stdp_time_constant", "double",
+            "STDP time constant", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("development_synaptogenesis_rate", "double",
+            "Development synaptogenesis rate", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("development_pruning_rate", "double",
+            "Development pruning rate", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("reward_discount_factor", "double",
+            "Reward discount factor", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchema::getInstance().registerSchema(
+        ConfigSchema("environment_width", "double",
+            "Environment width", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("environment_height", "double",
+            "Environment height", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("visualization_update_rate", "double",
+            "Visualization update rate", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("max_simulation_steps", "int",
+            "Maximum simulation steps", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("environment_name", "string",
+            "Environment name", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+    
+    ConfigSchemaRegistry::getInstance().registerSchema(
+        ConfigSchema("log_filename", "string",
+            "Log filename", false,
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::vector<std::string>()));
+}
+
+} // namespace nlm
