@@ -289,6 +289,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Enhanced Brain class with Pythonic API
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +352,102 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Enhanced Pythonic API additions
+        .def("run_plasticity_experiment", [](Brain& self) {
+            self.updatePlasticity();
+        }, "Run plasticity updates for all neurons")
+        
+        .def("get_statistics", [](const Brain& self) {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["average_firing_rate"] = self.getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = self.getExcitationInhibitionRatio();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["pending_spike_events"] = self.getPendingSpikeEventCount();
+            return stats;
+        }, "Get brain statistics as a dictionary")
+        
+        .def("inject_current_to_all", [](Brain& self, double current) {
+            for (const auto& rid : self.getRegionIds()) {
+                if (auto* region = self.getRegion(rid)) {
+                    for (const auto& neuron : region->getAllNeurons()) {
+                        self.injectCurrent(neuron->getId(), current);
+                    }
+                }
+            }
+        }, py::arg("current"), "Inject current into all neurons")
+        
+        .def("create_neuron", [](Brain& self, NeuronType type) {
+            auto region = self.getRegion(self.getRegionIds()[0]);
+            if (region) {
+                auto neuron = std::make_unique<Neuron>(nlm::NeuronId(0));
+                neuron->setType(type);
+                region->addNeuron(std::move(neuron));
+            }
+        }, py::arg("type"), "Create a new neuron with given type")
+        
+        .def("get_neuron_by_id", [](Brain& self, NeuronId neuron_id) {
+            for (const auto& rid : self.getRegionIds()) {
+                if (auto* region = self.getRegion(rid)) {
+                    for (const auto& neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuron_id) {
+                            return neuron;
+                        }
+                    }
+                }
+            }
+            return (Neuron*)nullptr;
+        }, py::arg("neuron_id"), py::return_value_policy::reference_internal,
+             "Get neuron by ID")
+        
+        .def("count_neurons_by_type", [](const Brain& self, NeuronType type) {
+            size_t count = 0;
+            for (const auto& rid : self.getRegionIds()) {
+                if (auto* region = self.getRegion(rid)) {
+                    for (const auto& neuron : region->getAllNeurons()) {
+                        if (neuron->getType() == type) {
+                            count++;
+                        }
+                    }
+                }
+            }
+            return count;
+        }, py::arg("type"), "Count neurons of specific type")
+        
+        .def("enable_all_plasticity", [](Brain& self, bool hebbian, bool stdp, bool reward) {
+            for (const auto& rid : self.getRegionIds()) {
+                if (auto* region = self.getRegion(rid)) {
+                    for (auto& synapse : region->getSynapses()) {
+                        synapse->enablePlasticity(hebbian, stdp, reward);
+                    }
+                }
+            }
+        }, py::arg("hebbian"), py::arg("stdp"), py::arg("reward"),
+             "Enable plasticity for all synapses")
+        
+        .def("get_most_active_neurons", [](Brain& self, size_t count) {
+            return self.getSpikeSystem()->getMostActiveNeurons(count);
+        }, py::arg("count"), "Get most active neurons")
+        
+        .def("get_development_status", [](const Brain& self) {
+            py::dict status;
+            status["stage"] = self.getDevelopmentalStage();
+            return status;
+        }, "Get developmental status")
+        
+        .def("is_developing", &Brain::getDevelopmentalStage,
+             "Check if brain is in developmental stage")
+        
+        .def("__repr__", [](const Brain& self) {
+            return "<Brain: " + std::to_string(self.getTotalNeuronCount()) + 
+                   " neurons, " + std::to_string(self.getTotalSynapseCount()) +
+                   " synapses>";
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
