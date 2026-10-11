@@ -71,6 +71,90 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Using Advanced Features
+
+```python
+import pynlm
+
+# Create and initialize
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Performance monitoring
+monitor = pynlm.create_performance_monitor()
+monitor.start()
+
+# Run simulation with monitoring
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Record metrics
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Get performance statistics
+stats = monitor.stop()
+print(f"Simulation stats: {stats}")
+
+print("Agent simulation complete!")
+```
+
+### Example 4: Modular API Usage
+
+```python
+import pynlm
+from pynlm.core.config import Config
+from pynlm.core.types import NeuronType, ActionType
+from pynlm.agent import AgentBrain
+from pynlm.world import SimpleWorld
+from pynlm.sensory import Vision
+from pynlm.motor import Action
+
+# Modular imports for better organization
+config = Config()
+config.set("brain.neuron_count", 500)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Configure specific brain parameters
+brain.getConfig().set("brain.v_thresh", -52.0)
+
+# Create world with custom configuration
+world = SimpleWorld()
+world.configure(width=20, height=20, visionWidth=10, visionHeight=10)
+world.reset()
+world.setMaxEnergy(150.0)
+
+# Create agent
+agent = AgentBrain(brain)
+agent.initialize(world)
+
+# Enable subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+
+print("Modular API setup complete!")
+```
+
 ---
 
 ## Simple Analogy
@@ -153,31 +237,86 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
+### Pattern 4: Performance Monitoring
+
+```python
+# Enable performance monitoring
+import pynlm
+from pynlm.advanced import create_performance_monitor
+
+monitor = create_performance_monitor()
+monitor.start()
+
+# Run simulation
+for step in range(1000):
+    # ... your simulation code ...
+    
+    if step % 100 == 0:
+        monitor.record_step_time(some_timing_function())
+
+# Get performance statistics
+stats = monitor.stop()
+print(f"Average step time: {stats['avg_step_time']*1000:.2f}ms")
+print(f"Steps per second: {stats['steps_per_second']:.1f}")
+```
+
+### Pattern 5: Experiment Management
+
+```python
+# Run multiple experiments
+import pynlm
+from pynlm.advanced import create_experiment_manager
+
+experiment_manager = create_experiment_manager()
+
+# Create experiment
+exp_id = experiment_manager.create_experiment(
+    name="Test Experiment",
+    brain=brain,
+    world=world,
+    agent=agent,
+    config={"record_metrics": True, "brain_config": brain.getConfig()}
+)
+
+# Run experiment
+results = experiment_manager.run_experiment(exp_id, num_steps=1000)
+print(f"Experiment completed in {results['duration']:.2f}s")
+print(f"Total spikes: {results['metrics']['brain_metrics'][0]['total_spikes']}")
+```
+
 ---
 
 ## What Each Part Does
 
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+### Core Classes
 
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+| Function | Purpose |
+|----------|---------|
+| `pynlm.createBrain(config)` | Creates a virtual brain with neurons and synapses |
+| `brain.initialize()` | Starts up the brain. Always call this before using the brain! |
+| `brain.step(step_number)` | Makes the brain process one moment in time |
+| `pynlm.createSimpleWorld()` | Creates a simple 2D world |
+| `pynlm.createAgentBrain(brain)` | Creates an agent brain interface |
+| `brain.getFiringNeuronCount()` | Gets count of currently firing neurons |
+| `world.getSensoryPercept()` | Gets what the agent sees |
+| `agent.decodeMotorCommand()` | Gets action from brain's motor neurons |
 
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+### Advanced Features
 
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
+| Feature | Benefit |
+|---------|---------|
+| `PerformanceMonitor` | Track simulation performance |
+| `AdvancedBrainFeatures` | Enhanced brain analysis capabilities |
+| `AdvancedWorldFeatures` | Custom sensor/actuator support |
+| `ExperimentManager` | Run and manage experiments |
 
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+### Configuration
 
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+| Function | Purpose |
+|----------|---------|
+| `pynlm.createDefaultConfig()` | Create default configuration |
+| `brain.getConfig()` | Get brain configuration |
+| `config.set(key, value)` | Set configuration value |
 
 ---
 
@@ -225,6 +364,7 @@ print("Firing rate:", brain.getAverageFiringRate())
 
 ```python
 import pynlm
+from pynlm.advanced import create_performance_monitor
 
 # Setup
 config = pynlm.createDefaultConfig()
@@ -236,11 +376,14 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable learning and monitoring
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
 
-# Run agent
+monitor = create_performance_monitor()
+monitor.start()
+
+# Run agent with performance tracking
 for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
@@ -250,6 +393,12 @@ for step in range(100):
     
     if step % 20 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Get performance stats
+stats = monitor.stop()
+print(f"Simulation completed in {stats['total_time']:.2f}s")
+print(f"Firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"Steps per second: {stats['steps_per_second']:.1f}")
 
 print("Agent simulation complete!")
 ```
@@ -268,6 +417,9 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Performance monitor | `create_performance_monitor()` |
+| Experiment manager | `create_experiment_manager()` |
+| Advanced features | `AdvancedBrainFeatures`, `AdvancedWorldFeatures` |
 
 ---
 
@@ -285,13 +437,20 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Performance monitoring not working"**
+- Make sure `monitor.start()` is called before simulation
+- Check that `monitor.record_step_time()` is called each step
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md`** for more details on the old API
+2. **Read `docs/ARCHITECTURE.md`** to understand how it all works
+3. **Explore `python/pynlm/`** for the new modular API structure
+4. **Try the advanced features** in `python/pynlm/advanced.py`
+5. **Experiment with different configurations!**
+
+That's it! You're now ready to use NLM with the improved modular Python API!
