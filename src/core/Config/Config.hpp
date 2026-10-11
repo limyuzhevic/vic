@@ -71,12 +71,20 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values - comprehensive type support
+    // Note: All set() methods internally delegate to the main ConfigValue set method
+    // for type safety and consistency
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Additional convenience methods for container types
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -93,6 +101,11 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation and utilities
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const ConfigValue& value);
+    std::vector<std::string> getKeysOfType(const std::string& typePrefix) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +113,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidType(const ConfigValue& value);
+    static std::string valueToString(const ConfigValue& value);
+    
+    // File format parsers
+    bool parseJSON(const std::string& json);
+    bool parseYAML(const std::string& yaml);
 };
 
 } // namespace nlm

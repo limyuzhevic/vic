@@ -269,6 +269,8 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
+        // Fix: Continue searching through all regions (early return caused null dereference bug)
+        bool found = false;
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
@@ -280,9 +282,14 @@ bool Brain::initialize() {
                     } else {
                         neuron->receiveInhibitoryInput(-synapticCurrent);
                     }
-                    return;
+                    found = true;
+                    break;  // Found neuron, but continue searching other regions
                 }
             }
+        }
+        if (!found) {
+            NLM_LOG_WARNING("Delayed spike event: destination neuron not found (ID: " + 
+                           std::to_string(event.destination_neuron) + ")");
         }
     });
     

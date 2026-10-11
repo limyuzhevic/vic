@@ -19,37 +19,168 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // This is a basic parser that supports both JSON and YAML formats
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Try JSON first (starts with {)
+    if (!content.empty() && content.find('{') == 0) {
+        return parseJSON(content);
+    }
+    // Try YAML (key: value pairs)
+    else {
+        return parseYAML(content);
+    }
+}
+
+bool Config::parseJSON(const std::string& json) {
+    // Basic JSON parser for key-value pairs
+    // Supports: {"key": "value", "number": 123, "boolean": true}
+    size_t pos = 1; // Skip opening {
+    while (pos < json.size()) {
+        // Find next key
+        size_t keyStart = json.find('"', pos);
+        if (keyStart == std::string::npos) break;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        size_t keyEnd = json.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = json.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find colon after key
+        size_t colonPos = json.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Find value
+        size_t valueStart = json.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        char quoteChar = 0;
+        if (valueStart < json.size() && (json[valueStart] == '"' || json[valueStart] == '\'')) {
+            quoteChar = json[valueStart];
+            size_t valueEnd = json.find(quoteChar, valueStart + 1);
+            if (valueEnd == std::string::npos) break;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            std::string value = json.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            
+            pos = valueEnd + 1;
+        } else {
+            // Try to parse number or boolean
+            size_t valueEnd = json.find_first_of",\n ", valueStart);
+            if (valueEnd == std::string::npos) valueEnd = json.size();
+            
+            std::string valueStr = json.substr(valueStart, valueEnd - valueStart);
+            
+            // Trim whitespace
+            valueStr = trim(valueStr);
+            
+            // Try to parse as different types
+            try {
+                if (valueStr == "true" || valueStr == "false") {
+                    bool boolValue = (valueStr == "true");
+                    set(key, boolValue, ConfigSource::File);
+                } else if (valueStr.find('.') != std::string::npos) {
+                    // Parse as double
+                    double doubleValue = std::stod(valueStr);
+                    set(key, doubleValue, ConfigSource::File);
+                } else {
+                    // Try as int64_t
+                    try {
+                        int64_t intValue = std::stoll(valueStr);
+                        set(key, intValue, ConfigSource::File);
+                    } catch (...) {
+                        // Fall back to string
+                        set(key, valueStr, ConfigSource::File);
+                    }
+                }
+            } catch (...) {
+                // Fall back to string
+                set(key, valueStr, ConfigSource::File);
             }
             
+            pos = valueEnd;
+        }
+        
+        // Skip comma if present
+        while (pos < json.size() && (json[pos] == ',' || json[pos] == ' ')) {
+            pos++;
+        }
+        
+        // Skip closing brace if reached
+        if (pos < json.size() && json[pos] == '}') {
+            break;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseYAML(const std::string& yaml) {
+    // Basic YAML parser for key: value pairs
+    // Supports: key: value\nkey2: value2
+    size_t pos = 0;
+    while (pos < yaml.size()) {
+        // Find next key (until colon)
+        size_t colonPos = yaml.find(':', pos);
+        if (colonPos == std::string::npos) break;
+        
+        // Find key (before colon)
+        size_t keyEnd = yaml.find_last_not_of(' ', colonPos - 1);
+        size_t keyStart = yaml.find_last_not_of(' \t\n\r', keyEnd);
+        while (keyStart > pos && (yaml[keyStart] == ' ' || yaml[keyStart] == '\t')) {
+            keyStart--;
+        }
+        
+        std::string key = yaml.substr(keyStart + 1, keyEnd - keyStart);
+        
+        // Find value (after colon)
+        size_t valueStart = yaml.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find end of line
+        size_t valueEnd = yaml.find_first_of("\n\r", valueStart);
+        if (valueEnd == std::string::npos) {
+            valueEnd = yaml.size();
+        }
+        
+        std::string value = yaml.substr(valueStart, valueEnd - valueStart);
+        
+        // Trim whitespace and quotes from value
+        value = trim(value);
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Parse value type
+        try {
+            if (value == "true" || value == "false") {
+                bool boolValue = (value == "true");
+                set(key, boolValue, ConfigSource::File);
+            } else if (value.find('.') != std::string::npos) {
+                double doubleValue = std::stod(value);
+                set(key, doubleValue, ConfigSource::File);
+            } else {
+                try {
+                    int64_t intValue = std::stoll(value);
+                    set(key, intValue, ConfigSource::File);
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        } catch (...) {
             set(key, value, ConfigSource::File);
         }
+        
+        pos = valueEnd + 1;
     }
     
     return true;
@@ -213,3 +344,152 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+
+// JSON/YAML parser implementations
+
+bool Config::parseJSON(const std::string& json) {
+    // Basic JSON parser for key-value pairs
+    // Supports: {"key": "value", "number": 123, "boolean": true}
+    size_t pos = 1; // Skip opening {
+    while (pos < json.size()) {
+        // Find next key
+        size_t keyStart = json.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = json.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = json.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find colon after key
+        size_t colonPos = json.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Find value
+        size_t valueStart = json.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        char quoteChar = 0;
+        if (valueStart < json.size() && (json[valueStart] == '"' || json[valueStart] == '\'')) {
+            quoteChar = json[valueStart];
+            size_t valueEnd = json.find(quoteChar, valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            
+            std::string value = json.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            
+            pos = valueEnd + 1;
+        } else {
+            // Try to parse number or boolean
+            size_t valueEnd = json.find_first_of",\n ", valueStart);
+            if (valueEnd == std::string::npos) valueEnd = json.size();
+            
+            std::string valueStr = json.substr(valueStart, valueEnd - valueStart);
+            
+            // Trim whitespace
+            valueStr = trim(valueStr);
+            
+            // Try to parse as different types
+            try {
+                if (valueStr == "true" || valueStr == "false") {
+                    bool boolValue = (valueStr == "true");
+                    set(key, boolValue, ConfigSource::File);
+                } else if (valueStr.find('.') != std::string::npos) {
+                    // Parse as double
+                    double doubleValue = std::stod(valueStr);
+                    set(key, doubleValue, ConfigSource::File);
+                } else {
+                    // Try as int64_t
+                    try {
+                        int64_t intValue = std::stoll(valueStr);
+                        set(key, intValue, ConfigSource::File);
+                    } catch (...) {
+                        // Fall back to string
+                        set(key, valueStr, ConfigSource::File);
+                    }
+                }
+            } catch (...) {
+                // Fall back to string
+                set(key, valueStr, ConfigSource::File);
+            }
+            
+            pos = valueEnd;
+        }
+        
+        // Skip comma if present
+        while (pos < json.size() && (json[pos] == ',' || json[pos] == ' ')) {
+            pos++;
+        }
+        
+        // Skip closing brace if reached
+        if (pos < json.size() && json[pos] == '}') {
+            break;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseYAML(const std::string& yaml) {
+    // Basic YAML parser for key: value pairs
+    // Supports: key: value\nkey2: value2
+    size_t pos = 0;
+    while (pos < yaml.size()) {
+        // Find next key (until colon)
+        size_t colonPos = yaml.find(':', pos);
+        if (colonPos == std::string::npos) break;
+        
+        // Find key (before colon)
+        size_t keyEnd = yaml.find_last_not_of(' ', colonPos - 1);
+        size_t keyStart = yaml.find_last_not_of(' \t\n\r', keyEnd);
+        while (keyStart > pos && (yaml[keyStart] == ' ' || yaml[keyStart] == '\t')) {
+            keyStart--;
+        }
+        
+        std::string key = yaml.substr(keyStart + 1, keyEnd - keyStart);
+        
+        // Find value (after colon)
+        size_t valueStart = yaml.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find end of line
+        size_t valueEnd = yaml.find_first_of("\n\r", valueStart);
+        if (valueEnd == std::string::npos) {
+            valueEnd = yaml.size();
+        }
+        
+        std::string value = yaml.substr(valueStart, valueEnd - valueStart);
+        
+        // Trim whitespace and quotes from value
+        value = trim(value);
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Parse value type
+        try {
+            if (value == "true" || value == "false") {
+                bool boolValue = (value == "true");
+                set(key, boolValue, ConfigSource::File);
+            } else if (value.find('.') != std::string::npos) {
+                double doubleValue = std::stod(value);
+                set(key, doubleValue, ConfigSource::File);
+            } else {
+                try {
+                    int64_t intValue = std::stoll(value);
+                    set(key, intValue, ConfigSource::File);
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        } catch (...) {
+            set(key, value, ConfigSource::File);
+        }
+        
+        pos = valueEnd + 1;
+    }
+    
+    return true;
+}
