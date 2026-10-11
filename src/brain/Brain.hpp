@@ -48,7 +48,23 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
-class Brain {
+/**
+ * @class Brain
+ * @brief Main brain class coordinating neural computation and cognitive systems
+ * 
+ * The Brain class serves as the central coordinator of the neural system, implementing
+ * real spiking neural computation with event-driven dynamics and integrated cognitive
+ * capabilities including memory, prediction, planning, and neuromodulation.
+ * 
+ * This class follows a Phase-based development architecture, currently implementing
+ * Phase 6: Integrated Artificial Brain with comprehensive neural computation and cognition.
+ * 
+ * @note This class uses the PIMPL pattern for implementation hiding, with all
+ * actual implementation details in the private Impl struct.
+ * 
+ * @note Memory management is handled through unique_ptr for all internal components
+ * to ensure proper cleanup and avoid resource leaks.
+ */
 public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);
