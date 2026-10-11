@@ -2,9 +2,12 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/pytypes.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,6 +22,57 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception classes for better error handling
+class NLMException : public std::runtime_error {
+public:
+    enum class ErrorCode {
+        INVALID_ARGUMENT,
+        NOT_INITIALIZED,
+        FILE_NOT_FOUND,
+        VALIDATION_ERROR,
+        SIMULATION_ERROR,
+        MEMORY_ERROR,
+        UNKNOWN
+    };
+    
+    NLMException(ErrorCode code, const std::string& message)
+        : std::runtime_error(formatMessage(code, message)), code_(code) {}
+    
+    ErrorCode getCode() const { return code_; }
+    
+    static std::string formatMessage(ErrorCode code, const std::string& message) {
+        const char* codeStr = "UNKNOWN";
+        switch (code) {
+            case ErrorCode::INVALID_ARGUMENT: codeStr = "INVALID_ARGUMENT"; break;
+            case ErrorCode::NOT_INITIALIZED: codeStr = "NOT_INITIALIZED"; break;
+            case ErrorCode::FILE_NOT_FOUND: codeStr = "FILE_NOT_FOUND"; break;
+            case ErrorCode::VALIDATION_ERROR: codeStr = "VALIDATION_ERROR"; break;
+            case ErrorCode::SIMULATION_ERROR: codeStr = "SIMULATION_ERROR"; break;
+            case ErrorCode::MEMORY_ERROR: codeStr = "MEMORY_ERROR"; break;
+        }
+        return "[" + std::string(codeStr) + "] " + message;
+    }
+    
+private:
+    ErrorCode code_;
+};
+
+// Register exceptions with pybind11
+py::register_exception<NLMException>(m, "NLMException");
+
+// Register specific error code enumerations
+void registerErrorCodes(py::module_& m) {
+    py::enum_<NLMException::ErrorCode> errorCodeEnum(m, "ErrorCode");
+    errorCodeEnum
+        .value("INVALID_ARGUMENT", NLMException::ErrorCode::INVALID_ARGUMENT)
+        .value("NOT_INITIALIZED", NLMException::ErrorCode::NOT_INITIALIZED)
+        .value("FILE_NOT_FOUND", NLMException::ErrorCode::FILE_NOT_FOUND)
+        .value("VALIDATION_ERROR", NLMException::ErrorCode::VALIDATION_ERROR)
+        .value("SIMULATION_ERROR", NLMException::ErrorCode::SIMULATION_ERROR)
+        .value("MEMORY_ERROR", NLMException::ErrorCode::MEMORY_ERROR)
+        .export_values();
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -27,6 +81,26 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Exception translation for C++ to Python exceptions
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMException& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::invalid_argument& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::out_of_range& e) {
+            PyErr_SetString(PyExc_IndexError, e.what());
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError, "Unknown error occurred");
+        }
+    });
+
+    // Error code enumerations
+    registerErrorCodes(m);
+    
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
