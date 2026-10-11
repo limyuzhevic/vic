@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -55,13 +56,22 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
+    // Load from simple key=value format (backward compatibility)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Convert JSON data to ConfigEntry objects
+    void convertJSONToConfig(const nlohmann::json& jsonData);
+    
+    // Load from command line arguments with improved error handling
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file with proper value serialization
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -72,11 +82,11 @@ public:
     T getOr(const std::string& key, const T& defaultValue) const;
     
     // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
     
     // Check existence
     bool has(const std::string& key) const;
