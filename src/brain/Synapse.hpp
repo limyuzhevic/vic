@@ -7,9 +7,22 @@ namespace nlm {
 // Forward declaration
 class Neuron;
 
-// Synapse representing a connection between neurons
+// Synapse representing a connection between two neurons
 // Implements real synaptic transmission with delays and short-term plasticity
-
+// Synapses are the fundamental communication mechanism in the NLM brain
+// They transmit electrical signals (spikes) from presynaptic to postsynaptic neurons
+//
+// Key properties:
+// - Transmission delay (simulates physical propagation time)
+// - Synaptic weight (strength of connection, can change via plasticity)
+// - Synaptic type (excitatory, inhibitory, modulatory, electrical)
+// - Spike history recording for STDP learning
+// - Plasticity flags (Hebbian, STDP, reward-modulated)
+// - Eligibility traces for reinforcement learning
+// - Short-term plasticity (depression/facilitation)
+//
+// When presynaptic neuron fires, synapse schedules delayed spike delivery
+// to postsynaptic neuron, causing synaptic current injection
 class Synapse {
 public:
     // Create synapse with IDs

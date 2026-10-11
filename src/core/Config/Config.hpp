@@ -43,7 +43,17 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Configuration system for NLM (Neural Learning Machine)
+// Manages all runtime parameters for neural simulation
+// Provides type-safe access to configuration values with multiple sources:
+// - Default: Hard-coded defaults
+// - File: Loaded from JSON/YAML configuration file
+// - Command Line: Overrides from command line arguments
+// - Runtime: Set programmatically during execution
+//
+// Configuration supports primitive types (int, double, string, bool) and collections
+// Values can be retrieved with type-safe get() or getOr() methods
+// Configuration is thread-safe for concurrent access
 class Config {
 public:
     Config();

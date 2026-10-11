@@ -42,6 +42,20 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
+// This is the basic computational unit of the NLM brain system
+// Each neuron receives synaptic inputs, integrates them over time,
+// and fires spikes when its membrane potential exceeds threshold
+//
+// Key properties:
+// - Membrane potential dynamics governed by LIF differential equation
+// - Refractory period after firing to prevent runaway excitation
+// - Synaptic inputs (excitatory, inhibitory, modulatory)
+// - Plasticity mechanisms (STDP, Hebbian, reward-modulated)
+// - Connection management (incoming/outgoing synapses)
+//
+// LIF dynamics:
+// dV/dt = (V_rest - V)/tau + I/C
+// where V is membrane potential, tau is time constant, I is input current, C is capacitance
 class Neuron {
 public:
     // Create neuron with ID

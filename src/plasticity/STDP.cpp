@@ -1,139 +1,112 @@
+# STDP.cpp - Real Spike-Timing-Dependent Plasticity Implementation
+// Implements the Phase 2 STDP learning rule
+// Real biology: pre-before-post -> LTP, post-before-pre -> LTD
+// This is one of the most important learning mechanisms in computational neuroscience
+
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
-struct STDP::Impl {
-    float ltpWeight;      // A+ for potentiation
-    float ltdWeight;      // A- for depression
-    float timeConstant;   // Tau for exponential window (ms)
-    float minWeight;      // Minimum synaptic weight
-    float maxWeight;      // Maximum synaptic weight
-    
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
-};
+// STDP Implementation
+// Spike-timing-dependent plasticity based on biological principles
+// LTP (Long-Term Potentiation): pre fires before post -> weight increases
+// LTD (Long-Term Depression): post fires before pre -> weight decreases
+// Maximum weight change constrained to maintain stability
 
-STDP::STDP() : pImpl(new Impl) {}
-
-STDP::~STDP() = default;
-
-void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
-    
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
-        }
-    }
-    
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-        
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
-        
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
-    }
+STDP::STDP() : pImpl(new Impl()) {
+    // Initialize STDP parameters with biologically plausible values
+    pImpl->ltpWeight = 0.02f;    // LTP magnitude (typically 0.01-0.03)
+    pImpl->ltdWeight = 0.015f;   // LTD magnitude (typically 0.01-0.02)
+    pImpl->timeConstant = 20.0f;  // Time constant for eligibility traces (ms)
+    pImpl->minimumWeight = 0.01f; // Prevent zero weights
+    pImpl->maximumWeight = 1.0f;  // Prevent runaway excitation
 }
 
-void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
-    
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
-}
-
-const char* STDP::getName() const {
-    return "STDP";
+void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
+    // Configure STDP parameters with validation
+    pImpl->ltpWeight = std::clamp(ltpWeight, 0.001f, 0.1f);
+    pImpl->ltdWeight = std::clamp(ltdWeight, 0.001f, 0.1f);
+    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
-}
-
-float STDP::getLTPWeight() const {
-    return pImpl->ltpWeight;
+    pImpl->ltpWeight = std::clamp(weight, 0.001f, 0.1f);
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
-}
-
-float STDP::getLTDWeight() const {
-    return pImpl->ltdWeight;
+    pImpl->ltdWeight = std::clamp(weight, 0.001f, 0.1f);
 }
 
 void STDP::setTimeConstant(float tau) {
     pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
 }
 
+float STDP::getLTPWeight() const {
+    return pImpl->ltpWeight;
+}
+
+float STDP::getLTDWeight() const {
+    return pImpl->ltdWeight;
+}
+
 float STDP::getTimeConstant() const {
     return pImpl->timeConstant;
 }
 
-void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
-    setLTPWeight(ltpWeight);
-    setLTDWeight(ltdWeight);
-    setTimeConstant(tau);
+void STDP::update(Synapse* synapse, 
+                  const std::vector<Timestamp>& preSpikes,
+                  const std::vector<Timestamp>& postSpikes,
+                  TimestepDuration dt) {
+    if (!synapse) return;
+    
+    // Calculate weight change from all spike pairings
+    SynapticWeight totalDelta = 0.0f;
+    
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            float deltaT = postTime - preTime;  // Positive if pre before post
+            
+            if (std::abs(deltaT) < pImpl->timeConstant * 10) {  // Within relevant window
+                if (deltaT > 0) {
+                    // Pre before post -> LTP (potentiate)
+                    float ltp = pImpl->ltpWeight * std::exp(-deltaT / pImpl->timeConstant);
+                    totalDelta += ltp;
+                } else {
+                    // Post before pre -> LTD (depress)
+                    float ltd = pImpl->ltdWeight * std::exp(deltaT / pImpl->timeConstant);
+                    totalDelta -= ltd;
+                }
+            }
+        }
+    }
+    
+    // Apply total weight change with modulation
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + totalDelta;
+    
+    // Apply neuromodulation factor (dopamine can strengthen or weaken STDP)
+    float neuromodulationFactor = 1.0f;  // Default no modulation
+    // In real implementation, this would come from dopamine system
+    
+    newWeight = newWeight * neuromodulationFactor;
+    
+    // Enforce weight bounds to maintain stability
+    newWeight = std::clamp(newWeight, pImpl->minimumWeight, pImpl->maximumWeight);
+    
+    // Apply the weight change
+    synapse->setWeight(newWeight);
+    
+    // Update eligibility trace for reward-modulated STDP
+    float &eligibility = const_cast<float&>(synapse->getEligibilityTrace());
+    eligibility = std::max(0.0f, eligibility + totalDelta * 0.1f);
+}
+
+const char* STDP::getName() const {
+    return "STDP";
 }
 
 } // namespace nlm
