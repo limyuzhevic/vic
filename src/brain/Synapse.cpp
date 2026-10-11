@@ -12,7 +12,7 @@ struct Synapse::Impl {
     SynapticWeight weight;
     Delay delay;  // Synaptic delay in simulation steps
     
-    // Synapse type
+// Synapse type
     SynapseType type;
     
     // Spike history for STDP
@@ -35,15 +35,24 @@ struct Synapse::Impl {
     float efficacy;
     
     // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
-    
-    // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
-    
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float EXCITATORY_WEIGHT_MIN = 0.1f;
+    static constexpr float EXCITATORY_WEIGHT_MAX = 0.4f;
+    static constexpr float EXCITATORY_EFFICIENCY_MIN = 0.8f;
+    static constexpr float EXCITATORY_EFFICIENCY_MAX = 1.0f;
+    static constexpr float INHIBITORY_WEIGHT_MIN = 0.1f;
+    static constexpr float INHIBITORY_WEIGHT_MAX = 0.4f;
+    static constexpr float INHIBITORY_EFFICIENCY_MIN = 0.8f;
+    static constexpr float INHIBITORY_EFFICIENCY_MAX = 1.0f;
+    static constexpr float OTHER_WEIGHT_MIN = -0.1f;
+    static constexpr float OTHER_WEIGHT_MAX = 0.1f;
+    static constexpr float OTHER_EFFICIENCY_MIN = 0.9f;
+    static constexpr float OTHER_EFFICIENCY_MAX = 1.0f;
+    static constexpr Delay MIN_DELAY = 1;
+    static constexpr Delay MAX_DELAY = 5;
+    static constexpr float INITIAL_SHORT_TERM_DEPRESSION = 1.0f;
+    static constexpr float INITIAL_SHORT_TERM_FACILITATION = 0.0f;
+    static constexpr float INITIAL_ELIGIBILITY_TRACE = 0.0f;
+    static constexpr float INITIAL_SPIKE_TIME = -1.0f;
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -234,32 +243,32 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        pImpl->weight = rng.uniformReal(EXCITATORY_WEIGHT_MIN, EXCITATORY_WEIGHT_MAX);
         // Excitatory synapses have moderate initial efficacy
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        pImpl->efficacy = rng.uniformReal(EXCITATORY_EFFICIENCY_MIN, EXCITATORY_EFFICIENCY_MAX);
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
-        pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        pImpl->weight = -rng.uniformReal(INHIBITORY_WEIGHT_MIN, INHIBITORY_WEIGHT_MAX);
+        pImpl->efficacy = rng.uniformReal(INHIBITORY_EFFICIENCY_MIN, INHIBITORY_EFFICIENCY_MAX);
     } else {
         // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
-        pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        pImpl->weight = rng.uniformReal(OTHER_WEIGHT_MIN, OTHER_WEIGHT_MAX);
+        pImpl->efficacy = rng.uniformReal(OTHER_EFFICIENCY_MIN, OTHER_EFFICIENCY_MAX);
     }
     
-    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    // Random delay: MIN_DELAY to MAX_DELAY steps (MIN_DELAY to MAX_DELAY ms at 1ms timestep)
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(MIN_DELAY, MAX_DELAY));
     
     // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+    pImpl->shortTermDepression = INITIAL_SHORT_TERM_DEPRESSION;  // Fully recovered
+    pImpl->shortTermFacilitation = INITIAL_SHORT_TERM_FACILITATION;  // No initial facilitation
     
     // Initialize eligibility trace to 0
-    pImpl->eligibilityTrace = 0.0f;
+    pImpl->eligibilityTrace = INITIAL_ELIGIBILITY_TRACE;
     
     // Initialize last spike times
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->lastPreSpikeTime = INITIAL_SPIKE_TIME;
+    pImpl->lastPostSpikeTime = INITIAL_SPIKE_TIME;
 }
 
 } // namespace nlm

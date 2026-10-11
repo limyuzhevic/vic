@@ -22,6 +22,15 @@ struct Neuron::Impl {
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float LIF_TIMESTEP = 0.001f;  // 1ms
+    static constexpr float MIN_MEMBRANE_POTENTIAL = -100.0f;
+    static constexpr float MAX_MEMBRANE_POTENTIAL = 50.0f;
+    static constexpr float INITIAL_MEMBRANE_POTENTIAL_RANGE = 3.0f;
+    static constexpr float INITIAL_THRESHOLD_RANGE = 2.0f;
+    static constexpr float INITIAL_RESTING_POTENTIAL_RANGE = 2.0f;
+    static constexpr float INITIAL_RESET_POTENTIAL_MAX_DELTA = 5.0f;
+    static constexpr uint32_t MIN_REFRACTORY_PERIOD = 2;
+    static constexpr uint32_t MAX_REFRACTORY_PERIOD = 10;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -229,10 +238,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, MIN_MEMBRANE_POTENTIAL, MAX_MEMBRANE_POTENTIAL);
     
-    // Check for spike
-    if (V >= threshold) {
+    // Check for spike with epsilon tolerance
+    const float epsilon = 1e-6f;
+    if (V >= threshold - epsilon) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -241,7 +251,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         recordSpike(currentTime);
         
         // Reset membrane potential
-        V = V_reset;
+        V = pImpl->state.resetPotential;
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
@@ -250,8 +260,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is active but not firing
         pImpl->state.firingState = FiringState::Active;
     }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+}
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
@@ -261,7 +278,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    TimestepDuration dt = LIF_TIMESTEP;  // 1ms default
     stepLIF(currentTime, dt);
 }
 
@@ -274,19 +291,19 @@ void Neuron::reset() {
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-INITIAL_MEMBRANE_POTENTIAL_RANGE, INITIAL_MEMBRANE_POTENTIAL_RANGE);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = -55.0f + rng.uniformReal(-INITIAL_THRESHOLD_RANGE, INITIAL_THRESHOLD_RANGE);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-INITIAL_RESTING_POTENTIAL_RANGE, INITIAL_RESTING_POTENTIAL_RANGE);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, INITIAL_RESET_POTENTIAL_MAX_DELTA);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    // Refractory period: MIN_REFRACTORY_PERIOD to MAX_REFRACTORY_PERIOD typical
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(MIN_REFRATORY_PERIOD, MAX_REFRACTORY_PERIOD));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

@@ -80,26 +80,19 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng(std::make_unique<RandomGenerator>(getSeedFromConfig()))
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(getTimestepFromConfig())
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(getReplayIntervalFromConfig())
+        , consolidationInterval(getConsolidationIntervalFromConfig())
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
@@ -131,23 +124,23 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", DEFAULT_STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", DEFAULT_STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", DEFAULT_STDP_TAU);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", DEFAULT_SYNAPTOGENESIS_RATE);
+        float pruningRate = config->getOr<float>("pruning_rate", DEFAULT_PRUNING_RATE);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = getTimestepFromConfig();
         
         // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        replayInterval = getReplayIntervalFromConfig();
+        consolidationInterval = getConsolidationIntervalFromConfig();
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -178,12 +171,25 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", DEFAULT_NEURON_COUNT);
+    size_t regionCount = pImpl->config->getOr<size_t>("region_count", DEFAULT_REGION_COUNT);
+    float connectionProbability = pImpl->config->getOr<float>("connection_probability", DEFAULT_CONNECTION_PROBABILITY);
+    
+    // Validate configuration
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count (0), must be at least 1");
+        return false;
+    }
+    
+    // Calculate neurons per region with minimum allocation
+    size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0 && neuronCount > 0) {
+        neuronsPerRegion = 1;  // Ensure minimum neurons per region
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, " +
+                 std::to_string(neuronsPerRegion) + " neurons per region");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -191,14 +197,23 @@ bool Brain::initialize() {
     }
     
     // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
+    size_t neuronsPerPopulation = neuronsPerRegion;
     for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            auto* region = getRegion(RegionId(i + 1));
+            if (region) {
+                // Calculate population sizes with minimum allocation
+                size_t sensoryNeurons = neuronsPerPopulation / 4;
+                size_t internalNeurons = neuronsPerPopulation / 2;
+                size_t motorNeurons = neuronsPerPopulation / 4;
+                
+                // Ensure minimum neurons for each population type
+                if (sensoryNeurons == 0 && neuronsPerPopulation > 0) sensoryNeurons = 1;
+                if (internalNeurons == 0 && neuronsPerPopulation > 0) internalNeurons = 1;
+                if (motorNeurons == 0 && neuronsPerPopulation > 0) motorNeurons = 1;
+                
+                auto sensoryPopId = region->addPopulation(sensoryNeurons, NeuronType::Sensory);
+                auto internalPopId = region->addPopulation(internalNeurons, NeuronType::Internal);
+                auto motorPopId = region->addPopulation(motorNeurons, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -225,7 +240,8 @@ bool Brain::initialize() {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 
+                DEFAULT_SYNAPSE_EXCITATORY_WEIGHT, DEFAULT_SYNAPSE_INHIBITORY_WEIGHT);
         }
     }
     
@@ -233,11 +249,13 @@ bool Brain::initialize() {
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    size_t workingMemoryCapacity = neuronCount / 10;
+    if (workingMemoryCapacity == 0 && neuronCount > 0) workingMemoryCapacity = 1;
+    pImpl->workingMemory->setCapacity(workingMemoryCapacity);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(DEFAULT_MAX_EPISODES);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -247,13 +265,13 @@ bool Brain::initialize() {
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPlanningDepth(DEFAULT_PLANNING_DEPTH);
     
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(DEFAULT_INHIBITION_STRENGTH);
+    pImpl->attention->setExcitationStrength(DEFAULT_EXCITATION_STRENGTH);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -571,15 +589,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            sp->setSynaptogenesisRate(DEFAULT_SYNAPTAGENESIS_BASE_RATE * plasticityMod);
+            sp->setPruningRate(DEFAULT_PRUNING_BASE_RATE * (2.0f - plasticityMod));
         }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        pImpl->episodicMemory->consolidate(DEFAULT_CONSOLIDATION_THRESHOLD);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -603,15 +621,15 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            normalizedValue = static_cast<float>(values[i]) * DEFAULT_INPUT_NORMALIZATION_FACTOR;
         }
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        if (pImpl->workingMemory && normalizedValue > DEFAULT_WORKING_MEMORY_THRESHOLD) {
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / DEFAULT_INPUT_NORMALIZATION_FACTOR);
         }
     }
 }

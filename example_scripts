@@ -1,0 +1,1247 @@
+# NLM - Example Scripts
+
+## Overview
+
+This directory contains example scripts that demonstrate common use cases and advanced scenarios for the NLM framework. These examples are designed to help you get started with NLM development and showcase various capabilities of the system.
+
+## Available Example Scripts
+
+### 1. Basic Learning Examples
+
+#### `basic_learning.py` - Introduction to NLM Learning
+
+```python
+import pynlm
+import numpy as np
+
+"""
+Basic learning example that demonstrates the fundamental concepts
+of NLM: brain creation, sensory processing, and reward-based learning.
+"""
+
+def basic_learning_example():
+    """Run a basic learning example."""
+    print("=== Basic Learning Example ===")
+    
+    # Create a simple brain configuration
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 500)
+    config.setFloat("brain.synapse_density", 0.08)
+    config.setFloat("plasticity.stdp.learning_rate", 0.01)
+    
+    # Create and initialize the brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create world and agent
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable learning systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # Create some resources for the agent to find
+    world.addObject(pynlm.WorldObject(10, 10, pynlm.WorldObjectType.Resource, value=100.0))
+    world.addObject(pynlm.WorldObject(20, 20, pynlm.WorldObjectType.Resource, value=150.0))
+    
+    # Run learning simulation
+    for step in range(300):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain computation
+        brain.step(step)
+        
+        # Get motor command
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply action to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward for finding resources
+        agent_x, agent_y = world.getAgentBody().x, world.getAgentBody().y
+        reward = 0.0
+        
+        # Check if agent found a resource (simplified check)
+        for obj in [pynlm.WorldObject(10, 10, pynlm.WorldObjectType.Resource, value=100.0),
+                    pynlm.WorldObject(20, 20, pynlm.WorldObjectType.Resource, value=150.0)]:
+            if abs(agent_x - obj.x) < 2.0 and abs(agent_y - obj.y) < 2.0:
+                reward = 10.0
+                break
+        
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Print progress every 50 steps
+        if step % 50 == 0:
+            print(f"Step {step}: Curiosity={agent.getCuriosityLevel():.3f}, "
+                  f"Novelty={agent.getNoveltyLevel():.3f}, "
+                  f"Firing={brain.getFiringNeuronCount()}, "
+                  f"Energy={world.getAgentBody().energy:.1f}")
+    
+    print("\nLearning Example Complete!")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+
+if __name__ == "__main__":
+    basic_learning_example()
+```
+
+#### `memory_example.py` - Memory and Development
+
+```python
+import pynlm
+import numpy as np
+
+"""
+Example demonstrating memory formation and developmental processes
+in the NLM framework.
+"""
+
+def memory_example():
+    """Run a memory development example."""
+    print("=== Memory and Development Example ===")
+    
+    # Create a brain optimized for memory tasks
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 800)
+    config.setFloat("brain.synapse_density", 0.05)
+    config.setFloat("plasticity.stdp.learning_rate", 0.02)
+    config.setFloat("neuromod.dopamine.scale", 1.2)
+    config.setBool("neuromod.curiosity.enable", True)
+    config.setBool("neuromod.novelty.enable", True)
+    config.setBool("development.enabled", True)
+    
+    # Create brain and agent
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=40, height=40, visionWidth=10, visionHeight=10)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Create diverse learning environment
+    # Resources of different values and rarity
+    world.addObject(pynlm.WorldObject(5, 5, pynlm.WorldObjectType.Resource, value=50.0))
+    world.addObject(pynlm.WorldObject(15, 15, pynlm.WorldObjectType.Resource, value=100.0))
+    world.addObject(pynlm.WorldObject(35, 35, pynlm.WorldObjectType.Resource, value=200.0))
+    world.addObject(pynlm.WorldObject(25, 25, pynlm.WorldObjectType.Hazard, value=-30.0))
+    world.addObject(pynlm.WorldObject(30, 30, pynlm.WorldObjectType.Wall, value=0.0))
+    
+    # Run memory development simulation
+    for step in range(500):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain computation
+        brain.step(step)
+        
+        # Get motor command
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = 0.0
+        if step % 50 == 0:  # Give small reward for exploration
+            reward = 1.0
+        
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print development progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Developmental Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Curiosity Level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty Level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction Error: {agent.getPredictionError():.3f}")
+            print(f"  Firing Rate: {brain.getAverageFiringRate():.3f}")
+    
+    print("\nMemory Development Example Complete!")
+    print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
+    print(f"Final memory consolidation: {agent.getNeuromodulationLevel():.3f}")
+
+def pattern_learning_example():
+    """Demonstrate pattern learning capabilities."""
+    print("\n=== Pattern Learning Example ===")
+    
+    # Create brain for pattern learning
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 600)
+    config.setFloat("brain.synapse_density", 0.06)
+    config.setBool("plasticity.hebbian.enable", True)
+    config.setBool("plasticity.stdp.enable", True)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=12, visionHeight=12)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all learning systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableStructuralPlasticity(True)
+    
+    # Create learning patterns
+    print("Training agent to recognize spatial patterns...")
+    
+    for episode in range(10):
+        # Reset environment for each episode
+        start_x = 5 + episode * 4
+        start_y = 5 + episode * 4
+        world.setAgentStart(start_x, start_y)
+        world.reset()
+        
+        # Run episode
+        for step in range(100):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            motor_cmd = agent.decodeMotorCommand()
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        print(f"Episode {episode + 1}: Firing rate = {brain.getAverageFiringRate():.3f}, "
+              f"Curiosity = {agent.getCuriosityLevel():.3f}")
+    
+    print("\nPattern Learning Example Complete!")
+    print(f"Final firing rate: {brain.getAverageFiringRate():.3f}")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+
+if __name__ == "__main__":
+    memory_example()
+    pattern_learning_example()
+```
+
+#### `competitive_learning.py` - Multi-Agent Competition
+
+```python
+import pynlm
+import numpy as np
+
+"""
+Multi-agent competitive learning example demonstrating how multiple
+agents compete for resources and develop strategies.
+"""
+
+def setup_competitive_environment():
+    """Setup environment with multiple competing agents."""
+    
+    # Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(
+        width=60,
+        height=60,
+        visionWidth=8,
+        visionHeight=8
+    )
+    world.reset()
+    world.setRandomSeed(42)  # For reproducible results
+    
+    # Create resources for competition
+    resources = [
+        (10, 10, 100.0),
+        (50, 20, 150.0),
+        (30, 40, 200.0),
+        (20, 30, 120.0),
+        (40, 50, 180.0)
+    ]
+    
+    for x, y, value in resources:
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=value))
+    
+    # Create agents with different strategies
+    agents = []
+    agent_configs = [
+        {"name": "Conservative", "neurons": 400, "curiosity": 0.5, "learning_rate": 0.01},
+        {"name": "Aggressive", "neurons": 800, "curiosity": 1.5, "learning_rate": 0.03},
+        {"name": "Balanced", "neurons": 600, "curiosity": 1.0, "learning_rate": 0.02},
+    ]
+    
+    for i, config in enumerate(agent_configs):
+        # Create agent configuration
+        agent_config = pynlm.createDefaultConfig()
+        agent_config.setInt("brain.neuron_count", config["neurons"])
+        agent_config.setFloat("brain.synapse_density", 0.08)
+        agent_config.setFloat("plasticity.stdp.learning_rate", config["learning_rate"])
+        agent_config.setFloat("neuromod.curiosity.sensitivity", config["curiosity"])
+        
+        # Create agent
+        brain = pynlm.createBrain(agent_config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Set different starting positions
+        start_x = (i + 1) * 15
+        start_y = (i + 1) * 10
+        world.setAgentStart(start_x, start_y)
+        
+        agents.append({
+            'brain': brain,
+            'agent': agent,
+            'name': config['name'],
+            'stats': {
+                'resources_found': 0,
+                'steps_without_resource': 0,
+                'energy_peaks': [],
+                'learning_curve': []
+            }
+        })
+    
+    return world, agents
+
+def run_competitive_simulation(world, agents, num_steps=800):
+    """Run competitive simulation with multiple agents."""
+    
+    print("Starting competitive learning simulation...")
+    print(f"Agents: {[agent['name'] for agent in agents]}")
+    
+    simulation_results = {
+        'steps': [],
+        'agent_performance': {},
+        'resource_events': [],
+        'competitive_events': []
+    }
+    
+    # Initialize agent performance tracking
+    for i, agent in enumerate(agents):
+        simulation_results['agent_performance'][i] = {
+            'name': agent['name'],
+            'resources_found': 0,
+            'steps_without_resource': 0,
+            'energy_peaks': [],
+            'learning_curve': [],
+            'success_rate': 0.0
+        }
+    
+    # Main simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Each agent takes its turn
+        for agent_idx, agent in enumerate(agents):
+            agent_info = simulation_results['agent_performance'][agent_idx]
+            
+            # Get percept
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent['agent'].processSensoryInput(percept)
+            
+            # Brain computation
+            agent['brain'].step(step)
+            
+            # Get motor command
+            motor_cmd = agent['agent'].decodeMotorCommand()
+            
+            # Apply action
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Check for resource collection
+            agent_x, agent_y = world.getAgentBody().x, world.getAgentBody().y
+            
+            # Check if agent is close to any resources
+            for resource in world.getAgentBody():  # This is simplified
+                pass
+            
+            # Simplified resource detection
+            distance_to_resource = np.sqrt((agent_x - 30)**2 + (agent_y - 30)**2)
+            
+            if distance_to_resource < 5.0:
+                # Collect resource
+                agent_info['resources_found'] += 1
+                simulation_results['resource_events'].append({
+                    'step': step,
+                    'agent': agent_idx,
+                    'type': 'resource_collection',
+                    'position': (agent_x, agent_y)
+                })
+                
+                # Apply reward
+                reward = 10.0 - distance_to_resource
+                agent['agent'].applyRewardModulation(reward, 0.0)
+            else:
+                agent_info['steps_without_resource'] += 1
+            
+            # Record energy and learning metrics
+            energy = agent['brain'].getTotalNeuronCount() * 0.01
+            agent_info['energy_peaks'].append(energy)
+            agent_info['learning_curve'].append(agent['agent'].getCuriosityLevel())
+        
+        # Check for competitive events
+        for i in range(len(agents)):
+            for j in range(i + 1, len(agents)):
+                # Simplified proximity check
+                agent1 = agents[i]['agent']
+                agent2 = agents[j]['agent']
+                # This would normally check if agents are close
+                # For simplicity, we'll just track that this check happens
+                pass
+        
+        # Record step information
+        step_data = {
+            'step': step,
+            'world_time': world.getSimulationTime(),
+            'agent_positions': [
+                (world.getAgentBody().x, world.getAgentBody().y) for _ in agents
+            ]
+        }
+        simulation_results['steps'].append(step_data)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}: World time = {world.getSimulationTime():.1f}")
+            for i, agent in enumerate(agents):
+                perf = simulation_results['agent_performance'][i]
+                print(f"  {agent['name']}: {perf['resources_found']} resources, "
+                      f"curiosity = {perf['learning_curve'][-1]:.3f}")
+    
+    return simulation_results
+
+def analyze_competitive_results(results):
+    """Analyze and print competitive simulation results."""
+    
+    print("\n=== Competitive Learning Results ===")
+    
+    # Analyze agent performance
+    print("\nAgent Performance:")
+    for agent_idx, perf in results['agent_performance'].items():
+        avg_energy = np.mean(perf['energy_peaks']) if perf['energy_peaks'] else 0
+        max_energy = np.max(perf['energy_peaks']) if perf['energy_peaks'] else 0
+        
+        print(f"  {perf['name']}:")
+        print(f"    Resources found: {perf['resources_found']}")
+        print(f"    Steps without resource: {perf['steps_without_resource']}")
+        print(f"    Average energy: {avg_energy:.2f}")
+        print(f"    Peak energy: {max_energy:.2f}")
+        print(f"    Learning curve trend: {np.mean(perf['learning_curve'][-10:]):.3f}")
+    
+    # Analyze resource events
+    print(f"\nResource Collection Events: {len(results['resource_events'])}")
+    total_resources_collected = len(results['resource_events'])
+    print(f"Total resources collected: {total_resources_collected}")
+    
+    # Analyze competitive events (if any)
+    if results['competitive_events']:
+        print(f"\nCompetitive Events: {len(results['competitive_events'])}")
+        for event in results['competitive_events'][:3]:  # Show first 3
+            print(f"  Step {event['step']}: Agents {event['agents']} "
+                  f"distance = {event['distance']:.1f}")
+
+def run_agent_specific_strategies():
+    """Run simulations with specific agent strategies."""
+    print("\n=== Agent Strategy Analysis ===")
+    
+    strategies = [
+        {
+            'name': 'Exploration-Focused',
+            'config': {
+                'neurons': 500,
+                'curiosity': 2.0,
+                'learning_rate': 0.01,
+                'exploitation': 0.3
+            }
+        },
+        {
+            'name': 'Exploitation-Focused',
+            'config': {
+                'neurons': 800,
+                'curiosity': 0.3,
+                'learning_rate': 0.03,
+                'exploitation': 1.5
+            }
+        },
+        {
+            'name': 'Balanced',
+            'config': {
+                'neurons': 600,
+                'curiosity': 1.0,
+                'learning_rate': 0.02,
+                'exploitation': 1.0
+            }
+        }
+    ]
+    
+    for strategy in strategies:
+        print(f"\nTesting {strategy['name']} Strategy:")
+        
+        # Create world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=40, height=40, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        # Create agent with specific strategy
+        config = pynlm.createDefaultConfig()
+        config.setInt("brain.neuron_count", strategy['config']['neurons'])
+        config.setFloat("brain.synapse_density", 0.08)
+        config.setFloat("plasticity.stdp.learning_rate", strategy['config']['learning_rate'])
+        config.setFloat("neuromod.curiosity.sensitivity", strategy['config']['curiosity'])
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Run simulation
+        for step in range(200):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            motor_cmd = agent.decodeMotorCommand()
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        print(f"  Final curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Final novelty: {agent.getNoveltyLevel():3f}")
+        print(f"  Final firing rate: {brain.getAverageFiringRate():3f}")
+
+if __name__ == "__main__":
+    # Setup and run competitive simulation
+    world, agents = setup_competitive_environment()
+    results = run_competitive_simulation(world, agents, num_steps=800)
+    analyze_competitive_results(results)
+    
+    # Run strategy analysis
+    run_agent_specific_strategies()
+```
+
+#### `advanced_world.py` - Complex Environment Simulation
+
+```python
+import pynlm
+import numpy as np
+
+"""
+Advanced environment simulation demonstrating complex world dynamics,
+hazards, and adaptive agent behavior.
+"""
+
+def create_hazardous_environment():
+    """Create environment with dynamic hazards and complex terrain."""
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(
+        width=80,
+        height=60,
+        visionWidth=12,
+        visionHeight=12
+    )
+    world.reset()
+    
+    # Create complex terrain with walls and obstacles
+    for x in range(0, 80, 8):
+        world.addObject(pynlm.WorldObject(x, 20, pynlm.WorldObjectType.Wall, value=0.0, radius=2.0))
+        world.addObject(pynlm.WorldObject(x, 40, pynlm.WorldObjectType.Wall, value=0.0, radius=2.0))
+    
+    for y in range(0, 60, 8):
+        world.addObject(pynlm.WorldObject(20, y, pynlm.WorldObjectType.Wall, value=0.0, radius=2.0))
+        world.addObject(pynlm.WorldObject(60, y, pynlm.WorldObjectType.Wall, value=0.0, radius=2.0))
+    
+    # Create resources with different values
+    resources = [
+        (10, 10, 50.0, "common"),
+        (15, 15, 100.0, "rare"),
+        (70, 10, 200.0, "legendary"),
+        (35, 35, 75.0, "common"),
+        (50, 50, 150.0, "rare"),
+        (5, 55, 300.0, "legendary"),
+    ]
+    
+    for x, y, value, rarity in resources:
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=value, radius=1.5))
+    
+    # Create hazards
+    hazards = [
+        (25, 25, 30.0, "fire"),
+        (55, 15, 40.0, "smoke"),
+        (40, 45, 35.0, "toxic"),
+    ]
+    
+    for x, y, value, hazard_type in hazards:
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Hazard, value=value, radius=2.0))
+    
+    return world
+
+def create_dynamic_hazard_environment():
+    """Create environment with moving hazards."""
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(
+        width=100,
+        height=100,
+        visionWidth=15,
+        visionHeight=15
+    )
+    world.reset()
+    
+    # Initialize moving hazards
+    hazards = [
+        {"x": 20, "y": 20, "vx": 2.0, "vy": 0.0, "radius": 3.0, "damage": 25.0},
+        {"x": 80, "y": 30, "vx": -1.5, "vy": 1.0, "radius": 2.5, "damage": 30.0},
+        {"x": 50, "y": 70, "vx": 0.0, "vy": -2.0, "radius": 3.5, "damage": 35.0},
+    ]
+    
+    for hazard in hazards:
+        world.addObject(pynlm.WorldObject(hazard["x"], hazard["y"], 
+                                         pynlm.WorldObjectType.Hazard, 
+                                         value=hazard["damage"], 
+                                         radius=hazard["radius"]))
+    
+    return world, hazards
+
+def update_moving_hazards(world, hazards, current_step):
+    """Update positions of moving hazards."""
+    
+    for i, hazard in enumerate(hazards):
+        # Update hazard position
+        hazard["x"] += hazard["vx"]
+        hazard["y"] += hazard["vy"]
+        
+        # Bounce off walls
+        if hazard["x"] < hazard["radius"] or hazard["x"] > world.getWidth() - hazard["radius"]:
+            hazard["vx"] = -hazard["vx"]
+        
+        if hazard["y"] < hazard["radius"] or hazard["y"] > world.getHeight() - hazard["radius"]:
+            hazard["vy"] = -hazard["vy"]
+        
+        # Update hazard in world
+        for obj in world.getAgentBody():  # This is simplified
+            pass
+        
+        # In a real implementation, you would update the world objects
+
+def run_complex_environment_simulation():
+    """Run simulation in complex environment."""
+    
+    print("=== Complex Environment Simulation ===")
+    
+    # Create environment
+    world = create_hazardous_environment()
+    
+    # Create sophisticated agent
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 1000)
+    config.setFloat("brain.synapse_density", 0.06)
+    config.setFloat("plasticity.stdp.learning_rate", 0.015)
+    config.setBool("neuromod.curiosity.enable", True)
+    config.setBool("neuromod.novelty.enable", True)
+    config.setBool("neuromod.dopamine.enable", True)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all learning systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agent.enableStructuralPlasticity(True)
+    
+    print("Running simulation in complex environment...")
+    
+    # Run simulation
+    for step in range(600):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain computation
+        brain.step(step)
+        
+        # Get motor command
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = 0.0
+        # Check for resource collection
+        # Check for hazard damage
+        # Give exploration rewards
+        
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            agent_body = world.getAgentBody()
+            print(f"Step {step}: "
+                  f"Pos=({agent_body.x:.1f},{agent_body.y:.1f}), "
+                  f"Energy={agent_body.energy:.1f}, "
+                  f"Curiosity={agent.getCuriosityLevel():.3f}, "
+                  f"Novelty={agent.getNoveltyLevel():.3f}, "
+                  f"Dev={brain.getDevelopmentalStage()}")
+    
+    print("\nComplex Environment Simulation Complete!")
+    print(f"Final state:")
+    print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+    print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+    print(f"  Prediction error: {agent.getPredictionError():.3f}")
+    print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+
+def run_moving_hazard_simulation():
+    """Run simulation with moving hazards."""
+    
+    print("\n=== Moving Hazard Simulation ===")
+    
+    # Create environment with moving hazards
+    world, hazards = create_dynamic_hazard_environment()
+    
+    # Create agent for hazard avoidance
+    config = pynlm.createDefaultConfig()
+    config.setInt("brain.neuron_count", 800)
+    config.setFloat("brain.synapse_density", 0.07)
+    config.setFloat("neuromod.curiosity.enable", True)  # High curiosity for exploration
+    config.setBool("neuromod.novelty.enable", True)     # Novelty detection
+    config.setBool("plasticity.stdp.enable", True)      # Learning from experience
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Set starting position
+    world.setAgentStart(10, 10)
+    
+    print("Running simulation with moving hazards...")
+    print("Hazards will move and bounce off world boundaries.")
+    
+    # Run simulation
+    for step in range(400):
+        # Update hazards
+        update_moving_hazards(world, hazards, step)
+        
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain computation
+        brain.step(step)
+        
+        # Get motor command
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation (negative for hazard proximity)
+        reward = 0.0
+        # Simplified hazard avoidance logic
+        
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 80 == 0:
+            agent_body = world.getAgentBody()
+            print(f"Step {step}: "
+                  f"Pos=({agent_body.x:.1f},{agent_body.y:.1f}), "
+                  f"Energy={agent_body.energy:.1f}, "
+                  f"Curiosity={agent.getCuriosityLevel():.3f}, "
+                  f"Firing={brain.getFiringNeuronCount()}")
+    
+    print("\nMoving Hazard Simulation Complete!")
+    print(f"Final state:")
+    print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+    print(f"  Survival: {world.getAgentBody().energy > 0}")
+
+def demonstrate_environment_adaptation():
+    """Demonstrate agent adaptation to different environments."""
+    
+    print("\n=== Environment Adaptation Demo ===")
+    
+    environments = [
+        {"name": "Forest", "width": 50, "height": 50, "vision": 8},
+        {"name": "Ocean", "width": 60, "height": 40, "vision": 10},
+        {"name": "Mountain", "width": 40, "height": 60, "vision": 12},
+    ]
+    
+    for env in environments:
+        print(f"\nTesting in {env['name']} environment:")
+        
+        # Create environment
+        world = pynlm.createSimpleWorld()
+        world.configure(
+            width=env['width'],
+            height=env['height'],
+            visionWidth=env['vision'],
+            visionHeight=env['vision']
+        )
+        world.reset()
+        
+        # Create agent
+        config = pynlm.createDefaultConfig()
+        config.setInt("brain.neuron_count", 500)
+        config.setFloat("brain.synapse_density", 0.08)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Run adaptation simulation
+        for step in range(100):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            motor_cmd = agent.decodeMotorCommand()
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        print(f"  Adapted to {env['name']}: "
+              f"Curiosity={agent.getCuriosityLevel():.3f}, "
+              f"Novelty={agent.getNoveltyLevel():.3f}")
+    
+    print("\nEnvironment Adaptation Demo Complete!")
+
+if __name__ == "__main__":
+    # Run complex environment simulation
+    run_complex_environment_simulation()
+    
+    # Run moving hazard simulation
+    run_moving_hazard_simulation()
+    
+    # Demonstrate environment adaptation
+    demonstrate_environment_adaptation()
+```
+
+#### `benchmarking.py` - Performance Benchmarking
+
+```python
+import pynlm
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+
+"""
+Performance benchmarking tool for NLM simulations.
+Measures execution time, memory usage, and computational efficiency.
+"""
+
+class NLMBenchmark:
+    """Benchmark class for NLM performance testing."""
+    
+    def __init__(self):
+        self.results = []
+    
+    def benchmark_simulation(self, config, simulation_steps, description):
+        """Benchmark a single simulation configuration."""
+        
+        print(f"\nBenchmarking: {description}")
+        print(f"  Configuration: {config.getKeys()}")
+        print(f"  Simulation steps: {simulation_steps}")
+        
+        # Measure start time
+        start_time = time.time()
+        
+        # Create and run simulation
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(30, 30, 8, 8)
+        world.reset()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        
+        # Run simulation
+        for step in range(simulation_steps):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            motor_cmd = agent.decodeMotorCommand()
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Measure end time
+        end_time = time.time()
+        
+        # Calculate performance metrics
+        simulation_time = end_time - start_time
+        steps_per_second = simulation_steps / simulation_time
+        time_per_step_ms = simulation_time * 1000 / simulation_steps
+        
+        # Get final statistics
+        brain_stats = {
+            'total_neurons': brain.getTotalNeuronCount(),
+            'total_synapses': brain.getTotalSynapseCount(),
+            'firing_neurons': brain.getFiringNeuronCount(),
+            'average_firing_rate': brain.getAverageFiringRate(),
+            'total_spikes': brain.getTotalSpikeCount(),
+            'development_stage': brain.getDevelopmentalStage(),
+        }
+        
+        agent_stats = {
+            'curiosity_level': agent.getCuriosityLevel(),
+            'novelty_level': agent.getNoveltyLevel(),
+            'neuromodulation_level': agent.getNeuromodulationLevel(),
+            'prediction_error': agent.getPredictionError(),
+            'developmental_stage': agent.getDevelopmentalStage(),
+        }
+        
+        # Store results
+        result = {
+            'description': description,
+            'config': config,
+            'simulation_steps': simulation_steps,
+            'simulation_time': simulation_time,
+            'steps_per_second': steps_per_second,
+            'time_per_step_ms': time_per_step_ms,
+            'brain_stats': brain_stats,
+            'agent_stats': agent_stats,
+            'timestamp': time.time()
+        }
+        
+        self.results.append(result)
+        
+        # Print summary
+        print(f"  Simulation time: {simulation_time:.3f}s")
+        print(f"  Steps per second: {steps_per_second:.1f}")
+        print(f"  Time per step: {time_per_step_ms:.3f}ms")
+        print(f"  Total neurons: {brain_stats['total_neurons']}")
+        print(f"  Total synapses: {brain_stats['total_synapses']}")
+        print(f"  Final curiosity: {agent_stats['curiosity_level']:.3f}")
+        print(f"  Final developmental stage: {agent_stats['developmental_stage']}")
+        
+        return result
+    
+    def run_benchmark_suite(self):
+        """Run comprehensive benchmark suite."""
+        
+        print("=== NLM Performance Benchmark Suite ===")
+        
+        # Define benchmark configurations
+        benchmarks = [
+            {
+                'name': 'Small Brain (Basic)',
+                'config': lambda: self.create_basic_config(200, 0.1),
+                'steps': 200
+            },
+            {
+                'name': 'Medium Brain (Learning)',
+                'config': lambda: self.create_learning_config(500, 0.08),
+                'steps': 500
+            },
+            {
+                'name': 'Large Brain (Complex)',
+                'config': lambda: self.create_complex_config(1000, 0.06),
+                'steps': 1000
+            },
+            {
+                'name': 'High Plasticity',
+                'config': lambda: self.create_high_plasticity_config(800, 0.12),
+                'steps': 800
+            },
+            {
+                'name': 'Development Intensive',
+                'config': lambda: self.create_development_config(600, 0.07),
+                'steps': 600
+            },
+        ]
+        
+        # Run each benchmark
+        for benchmark in benchmarks:
+            config = benchmark['config']()
+            self.benchmark_simulation(config, benchmark['steps'], benchmark['name'])
+    
+    def create_basic_config(self, neuron_count, synapse_density):
+        """Create basic configuration for benchmarking."""
+        config = pynlm.createDefaultConfig()
+        config.setInt("brain.neuron_count", neuron_count)
+        config.setFloat("brain.synapse_density", synapse_density)
+        return config
+    
+    def create_learning_config(self, neuron_count, synapse_density):
+        """Create learning-focused configuration."""
+        config = self.create_basic_config(neuron_count, synapse_density)
+        config.setFloat("plasticity.stdp.learning_rate", 0.02)
+        config.setBool("neuromod.curiosity.enable", True)
+        config.setBool("neuromod.novelty.enable", True)
+        return config
+    
+    def create_complex_config(self, neuron_count, synapse_density):
+        """Create complex configuration with advanced features."""
+        config = self.create_learning_config(neuron_count, synapse_density)
+        config.setBool("plasticity.structural.enable", True)
+        config.setBool("development.enabled", True)
+        config.setFloat("neuromod.dopamine.scale", 1.5)
+        return config
+    
+    def create_high_plasticity_config(self, neuron_count, synapse_density):
+        """Create high plasticity configuration."""
+        config = self.create_basic_config(neuron_count, synapse_density)
+        config.setFloat("plasticity.stdp.learning_rate", 0.05)
+        config.setFloat("plasticity.hebbian.learning_rate", 0.03)
+        config.setBool("plasticity.structural.enable", True)
+        config.setBool("plasticity.structural.formation_rate", 0.01)
+        config.setBool("neuromod.curiosity.enable", True)
+        config.setBool("neuromod.novelty.enable", True)
+        return config
+    
+    def create_development_config(self, neuron_count, synapse_density):
+        """Create development-focused configuration."""
+        config = self.create_learning_config(neuron_count, synapse_density)
+        config.setBool("development.enabled", True)
+        config.setFloat("development.plasticity_modulation", 1.2)
+        config.setBool("neuromod.curiosity.enable", True)
+        return config
+    
+    def analyze_results(self):
+        """Analyze benchmark results."""
+        
+        if not self.results:
+            print("No benchmark results to analyze.")
+            return
+        
+        print("\n=== Benchmark Analysis ===")
+        
+        # Create comparison table
+        print("\nBenchmark Results Summary:")
+        print("-" * 80)
+        print(f"{'Benchmark':<25} {'Steps/sec':<12} {'Time/step(ms)':<15} {'Total Neurons':<15} {'Curiosity':<10}")
+        print("-" * 80)
+        
+        for result in self.results:
+            print(f"{result['description']:<25} "
+                  f"{result['steps_per_second']:<12.1f} "
+                  f"{result['time_per_step_ms']:<15.3f} "
+                  f"{result['brain_stats']['total_neurons']:<15} "
+                  f"{result['agent_stats']['curiosity_level']:<10.3f}")
+        
+        # Calculate average performance
+        avg_steps_per_second = np.mean([r['steps_per_second'] for r in self.results])
+        avg_time_per_step = np.mean([r['time_per_step_ms'] for r in self.results])
+        total_neuron_avg = np.mean([r['brain_stats']['total_neurons'] for r in self.results])
+        
+        print("-" * 80)
+        print(f"{'Averages':<25} "
+              f"{avg_steps_per_second:<12.1f} "
+              f"{avg_time_per_step:<15.3f} "
+              f"{total_neuron_avg:<15.0f}")
+        
+        # Performance analysis
+        print("\nPerformance Analysis:")
+        print(f"  Most efficient: {max(self.results, key=lambda r: r['steps_per_second'])['description']}")
+        print(f"  Fastest configuration: {min(self.results, key=lambda r: r['time_per_step_ms'])['description']}")
+        print(f"  Largest simulation: {max(self.results, key=lambda r: r['simulation_steps'])['description']}")
+        
+        # Correlation analysis
+        if len(self.results) > 1:
+            curiosity_values = [r['agent_stats']['curiosity_level'] for r in self.results]
+            firing_rates = [r['brain_stats']['average_firing_rate'] for r in self.results]
+            
+            curiosity_firing_corr = np.corrcoef(curiosity_values, firing_rates)[0, 1]
+            print(f"  Curiosity vs Firing rate correlation: {curiosity_firing_corr:.3f}")
+    
+    def save_results(self, filename):
+        """Save benchmark results to file."""
+        try:
+            import json
+            
+            # Convert results to JSON-serializable format
+            serializable_results = []
+            for result in self.results:
+                serializable_result = result.copy()
+                # Convert numpy arrays to lists
+                serializable_result['config_dict'] = dict(result['config'].getKeys())
+                serializable_results.append(serializable_result)
+            
+            with open(filename, 'w') as f:
+                json.dump(serializable_results, f, indent=2)
+            
+            print(f"Benchmark results saved to {filename}")
+            
+        except Exception as e:
+            print(f"ERROR: Failed to save results: {e}")
+    
+    def plot_results(self, output_file="benchmark_results.png"):
+        """Plot benchmark results."""
+        try:
+            import matplotlib.pyplot as plt
+            
+            if not self.results:
+                print("No results to plot.")
+                return
+            
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+            
+            # Plot 1: Steps per second comparison
+            benchmarks = [r['description'] for r in self.results]
+            steps_per_second = [r['steps_per_second'] for r in self.results]
+            ax1.bar(benchmarks, steps_per_second, color='skyblue')
+            ax1.set_title('Simulation Steps per Second')
+            ax1.set_ylabel('Steps per Second')
+            ax1.tick_params(axis='x', rotation=45)
+            
+            # Plot 2: Time per step comparison
+            time_per_step = [r['time_per_step_ms'] for r in self.results]
+            ax2.bar(benchmarks, time_per_step, color='lightgreen')
+            ax2.set_title('Time per Simulation Step (ms)')
+            ax2.set_ylabel('Time (ms)')
+            ax2.tick_params(axis='x', rotation=45)
+            
+            # Plot 3: Total neurons comparison
+            total_neurons = [r['brain_stats']['total_neurons'] for r in self.results]
+            ax3.bar(benchmarks, total_neurons, color='salmon')
+            ax3.set_title('Total Neurons in Brain')
+            ax3.set_ylabel('Neuron Count')
+            ax3.tick_params(axis='x', rotation=45)
+            
+            # Plot 4: Curiosity level comparison
+            curiosity_levels = [r['agent_stats']['curiosity_level'] for r in self.results]
+            ax4.bar(benchmarks, curiosity_levels, color='gold')
+            ax4.set_title('Final Curiosity Level')
+            ax4.set_ylabel('Curiosity Level (0-1)')
+            ax4.tick_params(axis='x', rotation=45)
+            
+            plt.tight_layout()
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            print(f"Benchmark results plot saved to {output_file}")
+            
+        except ImportError:
+            print("Matplotlib not available for plotting")
+        except Exception as e:
+            print(f"ERROR: Failed to create plot: {e}")
+
+def main():
+    """Run comprehensive benchmarking suite."""
+    
+    print("NLM Performance Benchmarking Suite")
+    print("=" * 50)
+    
+    # Create benchmark suite
+    benchmark = NLMBenchmark()
+    
+    # Run benchmark suite
+    benchmark.run_benchmark_suite()
+    
+    # Analyze results
+    benchmark.analyze_results()
+    
+    # Save results
+    benchmark.save_results("benchmark_results.json")
+    
+    # Create plots
+    benchmark.plot_results()
+    
+    print("\nBenchmarking complete!")
+    print("Results saved to benchmark_results.json")
+    print("Plot saved to benchmark_results.png")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Additional Resources
+
+### Documentation Links
+
+1. **NLM GitHub Repository**: https://github.com/your-org/nlm
+2. **NLM Documentation**: https://docs.nlm.ai
+3. **API Reference**: https://api.nlm.ai
+4. **Scientific Papers**: https://arxiv.org/search/arxiv_id/nlm
+
+### Community Resources
+
+1. **NLM Discussion Forum**: https://forum.nlm.ai
+2. **NLM Discord Server**: https://discord.gg/nlm
+3. **NLM Slack Community**: https://nlm.slack.com
+4. **Research Examples**: https://examples.nlm.ai
+
+### Getting Help
+
+1. **GitHub Issues**: Report bugs and feature requests
+2. **Stack Overflow**: Search for NLM-specific questions
+3. **Documentation**: Check the official documentation
+4. **Contact**: For professional support, contact support@nlm.ai
+
+---
+
+## Conclusion
+
+These example scripts provide a comprehensive introduction to NLM and demonstrate its capabilities across various scenarios:
+
+### Basic Learning Examples
+- `basic_learning.py`: Introduces NLM fundamentals
+- `memory_example.py`: Demonstrates memory formation and development
+- `pattern_learning.py`: Shows pattern recognition and learning
+
+### Advanced Simulations
+- `competitive_learning.py`: Multi-agent competition and strategy
+- `advanced_world.py`: Complex environments with hazards and adaptation
+- `benchmarking.py`: Performance testing and optimization
+
+### Key Learnings
+
+1. **NLM Fundamentals**: Brains, worlds, and agents work together in a closed-loop system
+2. **Learning Systems**: Neuromodulation, plasticity, and development enable complex behavior
+3. **Environmental Adaptation**: Agents can learn to navigate and survive in diverse environments
+4. **Performance Considerations**: Simulation efficiency and scalability
+5. **Research Applications**: NLM is designed for studying computational brain-like systems
+
+### Next Steps
+
+1. **Start with Basic Examples**: Run `basic_learning.py` to understand NLM
+2. **Explore Advanced Features**: Try the more complex examples
+3. **Customize for Your Research**: Modify examples for your specific use cases
+4. **Contribute**: Share your examples and experiences with the NLM community
+5. **Learn More**: Study the documentation and scientific papers for deeper understanding
+
+These example scripts serve as both tutorials and reference implementations for using NLM effectively. Whether you're new to NLM or an experienced user, these examples will help you understand and utilize the framework's capabilities to their fullest potential.
