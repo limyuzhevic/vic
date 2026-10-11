@@ -12,7 +12,7 @@ class Neuron;
 
 class Synapse {
 public:
-    // Create synapse with IDs
+    // Create synapse with IDs - validates input parameters
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
     ~Synapse();

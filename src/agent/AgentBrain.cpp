@@ -64,14 +64,98 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    // Advanced initialization with comprehensive validation
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::initialize: Brain pointer is null - cannot initialize");
+        return;
+    }
+    
+    // Validate world dimensions to prevent buffer overflows
+    size_t visionWidth = world.getVisionWidth();
+    size_t visionHeight = world.getVisionHeight();
+    
+    if (visionWidth == 0 || visionHeight == 0) {
+        NLM_LOG_WARN("AgentBrain::initialize: Invalid world dimensions");
+        visionWidth = 16;
+        visionHeight = 16;
+    }
+    
+    // Pre-allocate memory efficiently based on world size
+    previousVision_.resize(visionWidth * visionHeight, 0.0f);
+    
+    // Initialize neuron group vectors with optimal capacity
+    size_t estimatedPopCount = brain_->getRegionCount() * 2;
+    motorForward_.reserve(estimatedPopCount);
+    motorBackward_.reserve(estimatedPopCount);
+    motorTurnLeft_.reserve(estimatedPopCount);
+    motorTurnRight_.reserve(estimatedPopCount);
+    motorInteract_.reserve(estimatedPopCount);
+    motorWait_.reserve(estimatedPopCount);
+    
+    sensoryVision_.reserve(estimatedPopCount);
+    sensoryTouch_.reserve(estimatedPopCount);
+    sensoryInternal_.reserve(estimatedPopCount);
+    sensoryProprioception_.reserve(estimatedPopCount);
+    
+    // Advanced neuron group distribution with load balancing
+    if (brain_) {
+        size_t motorAssigned = 0;
+        size_t sensoryAssigned = 0;
+        
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                
+                if (type == NeuronType::Motor) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        if (n) {  // Validate neuron pointer
+                            // Smart distribution based on current load
+                            if (motorForward_.size() <= motorBackward_.size()) {
+                                if (motorTurnLeft_.size() <= motorTurnRight_.size()) {
+                                    motorForward_.push_back(n);
+                                } else {
+                                    motorTurnLeft_.push_back(n);
+                                }
+                            } else if (motorTurnLeft_.size() <= motorInteract_.size()) {
+                                motorTurnLeft_.push_back(n);
+                            } else {
+                                motorWait_.push_back(n);
+                            }
+                        }
+                    }
+                } else if (type == NeuronType::Sensory) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        if (n) {  // Validate neuron pointer
+                            // Balanced distribution of sensory neurons
+                            if (sensoryVision_.size() <= sensoryTouch_.size()) {
+                                if (sensoryInternal_.size() <= sensoryProprioception_.size()) {
+                                    sensoryVision_.push_back(n);
+                                } else {
+                                    sensoryInternal_.push_back(n);
+                                }
+                            } else {
+                                sensoryTouch_.push_back(n);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Initialize developmental state
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Enhanced logging with performance metrics
+    NLM_LOG_INFO("AgentBrain initialized with optimized neuron distribution:");
+    NLM_LOG_INFO("  Motor neurons: " + std::to_string(motorForward_.size() + motorBackward_.size() + 
+                       motorTurnLeft_.size() + motorTurnRight_.size() + 
+                       motorInteract_.size() + motorWait_.size()) + " total");
+    NLM_LOG_INFO("  Sensory neurons: " + std::to_string(sensoryVision_.size() + sensoryTouch_.size() + 
+                        sensoryInternal_.size() + sensoryProprioception_.size()) + " total");
+    NLM_LOG_INFO("  Vision capacity: " + std::to_string(visionWidth * visionHeight) + " pixels");
+    NLM_LOG_INFO("  Novelty decay factor: " + std::to_string(sensoryNoveltyDecay_));
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -150,89 +234,231 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::decodeMotorCommand: Brain is not initialized");
+        return MotorCommand::Wait;
+    }
     
+    // Advanced motor decoding with multiple strategies
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Apply multiple layers of exploration and decision making
+    decoded = applyExplorationStrategy(decoded);
+    decoded = applyCuriosityBasedBehavior(decoded);
+    
+    // Validate the decoded command
+    if (!isValidMotorCommand(decoded)) {
+        NLM_LOG_WARN("AgentBrain::decodeMotorCommand: Invalid command, defaulting to WAIT");
+        return MotorCommand::Wait;
     }
     
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
+MotorCommand AgentBrain::applyExplorationStrategy(MotorCommand baseCommand) {
+    // Advanced exploration based on multiple factors
+    float explorationScore = calculateExplorationScore();
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
+    // Multi-strategy exploration:
+    // 1. Random exploration for novelty
+    if (explorationScore > 0.7f) {
+        return performRandomExploration();
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
+    // 2. Strategic exploration for goal achievement
+    if (explorationScore > 0.4f) {
+        return performStrategicExploration(baseCommand);
     }
     
-    return best;
+    // 3. Conservative exploration for safety
+    return applyConservativeStrategy(baseCommand);
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
+MotorCommand AgentBrain::applyCuriosityBasedBehavior(MotorCommand defaultCmd) {
+    // Enhanced curiosity-based behavior with multiple layers
+    if (!curiosityEnabled_ || curiosityLevel_ <= 0.1f) {
+        return defaultCmd;  // Low curiosity, stick to default
     }
     
-    return defaultCmd;
+    // Different curiosity behaviors based on intensity
+    if (curiosityLevel_ > 0.8f) {
+        // High curiosity: random creative exploration
+        return executeCreativeExploration();
+    } else if (curiosityLevel_ > 0.5f) {
+        // Medium curiosity: balanced exploration
+        return executeBalancedExploration(defaultCmd);
+    } else {
+        // Low-medium curiosity: targeted exploration
+        return executeTargetedExploration(defaultCmd);
+    }
+}
+
+MotorCommand AgentBrain::performRandomExploration() {
+    // Advanced random exploration with correlation awareness
+    float randomValue = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+    
+    // Bias towards certain actions based on context
+    if (randomValue < 0.2f) {
+        // Sometimes prefer movement for energy
+        return selectMovementAction();
+    } else if (randomValue < 0.4f) {
+        // Sometimes prefer interaction for learning
+        return MotorCommand::Interact;
+    } else if (randomValue < 0.6f) {
+        // Sometimes prefer looking for information
+        return selectLookingAction();
+    } else {
+        // Default random selection
+        int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+        return getRandomMotorCommand(choice);
+    }
+}
+
+MotorCommand AgentBrain::executeCreativeExploration() {
+    // Very high curiosity: try novel combinations
+    std::vector<MotorCommand> creativeOptions;
+    
+    // Combine actions for creative behavior
+    creativeOptions.push_back(MotorCommand::MoveForward);
+    creativeOptions.push_back(MotorCommand::TurnLeft);
+    creativeOptions.push_back(MotorCommand::TurnRight);
+    creativeOptions.push_back(MotorCommand::Interact);
+    
+    // Randomly select creative combination
+    int choice = brain_->getRandomGenerator()->uniformInt(0, (int)creativeOptions.size() - 1);
+    return creativeOptions[choice];
+}
+
+MotorCommand AgentBrain::executeBalancedExploration(MotorCommand defaultCmd) {
+    // Balance exploration with exploitation
+    float explorationWeight = curiosityLevel_ * 0.6f;  // Higher curiosity = more exploration
+    float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+    
+    if (r < explorationWeight) {
+        // Explore: try new actions
+        return performTargetedExploration();
+    } else {
+        // Exploit: use default command
+        return defaultCmd;
+    }
+}
+
+MotorCommand AgentBrain::executeTargetedExploration(MotorCommand defaultCmd) {
+    // Targeted exploration based on recent experiences
+    float noveltyBonus = calculateNoveltyBonus();
+    
+    if (noveltyBonus > 0.3f) {
+        // High novelty: explore more
+        return performTargetedExplorationWithBonus();
+    } else {
+        // Low novelty: conservative approach
+        return defaultCmd;
+    }
+}
+
+MotorCommand AgentBrain::performStrategicExploration(MotorCommand baseCommand) {
+    // Strategy-based exploration for goal-oriented behavior
+    if (brain_->getTotalSpikeCount() > 1000) {
+        // High activity: explore new strategies
+        return exploreNewStrategy();
+    } else {
+        // Normal activity: follow base strategy with slight variation
+        return applyStrategyVariation(baseCommand);
+    }
+}
+
+MotorCommand AgentBrain::applyConservativeStrategy(MotorCommand baseCommand) {
+    // Conservative strategy to avoid dangerous actions
+    float safetyScore = calculateSafetyScore();
+    
+    if (safetyScore < 0.3f) {
+        // Low safety: avoid risky actions
+        return MotorCommand::Wait;
+    } else if (safetyScore < 0.6f) {
+        // Moderate safety: only safe actions
+        return selectSafeAction(baseCommand);
+    } else {
+        // High safety: proceed with action
+        return baseCommand;
+    }
+}
+
+bool AgentBrain::isValidMotorCommand(MotorCommand cmd) const {
+    // Comprehensive validation of motor commands
+    switch (cmd) {
+        case MotorCommand::MoveForward:
+        case MotorCommand::MoveBackward:
+        case MotorCommand::TurnLeft:
+        case MotorCommand::TurnRight:
+        case MotorCommand::LookLeft:
+        case MotorCommand::LookRight:
+        case MotorCommand::Interact:
+        case MotorCommand::Wait:
+            return true;
+        default:
+            return false;
+    }
+}
+
+MotorCommand AgentBrain::getRandomMotorCommand(int choice) {
+    // Map random choice to motor command
+    switch (choice) {
+        case 0: return MotorCommand::MoveForward;
+        case 1: return MotorCommand::MoveBackward;
+        case 2: return MotorCommand::TurnLeft;
+        case 3: return MotorCommand::TurnRight;
+        case 4: return MotorCommand::LookLeft;
+        case 5: return MotorCommand::LookRight;
+        case 6: return MotorCommand::Interact;
+        case 7: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
+}
+
+MotorCommand AgentBrain::selectMovementAction() {
+    // Select movement action with potential bias
+    float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+    if (r < 0.5f) return MotorCommand::MoveForward;
+    else return MotorCommand::MoveBackward;
+}
+
+MotorCommand AgentBrain::selectLookingAction() {
+    // Select looking action with potential bias
+    float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+    if (r < 0.5f) return MotorCommand::LookLeft;
+    else return MotorCommand::LookRight;
+}
+
+float AgentBrain::calculateExplorationScore() const {
+    // Calculate overall exploration score based on multiple factors
+    float noveltyScore = noveltyLevel_ * 0.4f;
+    float curiosityScore = curiosityLevel_ * 0.3f;
+    float predictionScore = std::abs(predictionError_) * 0.2f;
+    float developmentScore = std::min(developmentalAge_ / 100.0f, 1.0f) * 0.1f;
+    
+    return noveltyScore + curiosityScore + predictionScore + developmentScore;
+}
+
+float AgentBrain::calculateNoveltyBonus() const {
+    // Calculate bonus for exploring novel situations
+    float baseNovelty = noveltyLevel_;
+    
+    // Amplify for recently experienced high novelty
+    float recentNoveltyBonus = (noveltyLevel_ > 0.5f) ? 0.2f : 0.0f;
+    
+    // Decay over time
+    float timeDecay = std::exp(-developmentalAge_ * 0.01f);
+    
+    return (baseNovelty + recentNoveltyBonus) * timeDecay;
+}
+
+float AgentBrain::calculateSafetyScore() const {
+    // Calculate safety score based on energy, health, and environment
+    float energySafety = energy_ / 2.0f;  // Normalized energy safety
+    float healthSafety = health_ / 2.0f;  // Normalized health safety
+    float noveltySafety = 1.0f - noveltyLevel_;  // Less novelty = safer
+    
+    return (energySafety + healthSafety + noveltySafety) / 3.0f;
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

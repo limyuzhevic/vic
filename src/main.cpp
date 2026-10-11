@@ -6,6 +6,9 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// This is a comprehensive test suite demonstrating NLM's capabilities
+// Includes basic connectivity, learning experiments, and synaptic plasticity verification
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -39,7 +42,7 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║

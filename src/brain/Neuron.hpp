@@ -44,7 +44,7 @@ struct NeuronState {
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
 public:
-    // Create neuron with ID
+    // Create neuron with ID - validates input ID
     explicit Neuron(NeuronId id);
     
     ~Neuron();

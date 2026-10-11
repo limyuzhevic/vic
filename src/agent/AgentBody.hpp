@@ -7,35 +7,39 @@ namespace nlm {
 
 // Agent body state - contains physical properties and internal state
 // This is part of the environment, not the brain
+// The AgentBody represents the physical agent's properties and state in the world
+// It tracks position, movement, energy, health, and developmental age
 struct AgentBody {
-    // Position in world
-    float x;
-    float y;
+    // Spatial position in 2D world coordinates (meters)
+    float x;                    // X coordinate (east-west)
+    float y;                    // Y coordinate (north-south)
     
-    // Orientation (radians)
-    float orientation;
+    // Orientation in radians, where 0 = positive X axis, PI/2 = positive Y axis
+    float orientation;           // Facing direction relative to world (radians)
     
-    // Velocity
-    float velocityX;
-    float velocityY;
-    float angularVelocity;
+    // Linear velocity components in world coordinates
+    float velocityX;             // Velocity in X direction (m/s)
+    float velocityY;             // Velocity in Y direction (m/s)
+    float angularVelocity;       // Angular velocity (rad/s)
     
-    // Internal state
-    float energy;          // Energy level (0-1)
-    float health;          // Health (0-1)
-    float age;             // Developmental age in simulation steps
+    // Biological/metabolic state variables
+    float energy;               // Energy level (0.0 = depleted, 1.0 = full)
+    float health;               // Health status (0.0 = dead, 1.0 = perfect)
+    float age;                  // Developmental age in simulation steps
     
-    // Movement state
-    bool isMoving;
-    bool isTurning;
-    float lastActionTime;
+    // Behavioral state flags
+    bool isMoving;              // Whether agent is currently moving
+    bool isTurning;             // Whether agent is currently turning
+    float lastActionTime;       // Timestamp of last action taken
     
+    // Default constructor initializes agent at origin with full health
     AgentBody()
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
         , energy(1.0f), health(1.0f), age(0.0f)
         , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
     
+    // Reset agent to initial state (full health, at origin)
     void reset() {
         x = 0.0f;
         y = 0.0f;

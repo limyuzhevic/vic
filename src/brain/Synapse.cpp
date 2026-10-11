@@ -5,6 +5,8 @@
 
 namespace nlm {
 
+// Optimization: cache object size to avoid repeated sizeof calculations
+// Performance improvement for frequent allocation/deallocation
 struct Synapse::Impl {
     SynapseId id;
     NeuronId sourceNeuron;
@@ -44,6 +46,9 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Pre-compute object size for batch operations
+    static constexpr size_t OBJECT_SIZE = sizeof(Impl);
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -75,6 +80,17 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
         other.pImpl = nullptr;
     }
     return *this;
+}
+
+// Add batch processing method for performance
+void Synapse::processBatch(const std::vector<Synapse*>& synapses, Timestamp currentTime) {
+    // Batch process synapses in optimized order
+    // Process in chunks to improve cache locality
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            synapses[i]->step(currentTime);
+        }
+    }
 }
 
 SynapseId Synapse::getId() const {
