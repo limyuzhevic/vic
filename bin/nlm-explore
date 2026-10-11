@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""
+NLM Explore Command
+Interactive exploration of NLM brain configurations
+"""
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from nlm_cli import explore_command
+
+def main():
+    explore_command(sys.argv)
+
+if __name__ == '__main__':
+    main()

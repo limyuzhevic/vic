@@ -6,11 +6,13 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <map>
+#include <string>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with enhanced error handling
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -25,16 +27,16 @@ public:
     // Get motor output size expected
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
+    // Process sensory percept and inject into brain with error checking
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    // Decode brain motor activity into motor command with error checking
     MotorCommand decodeMotorCommand();
     
-    // Apply neuromodulation based on reward
+    // Apply neuromodulation based on reward with error checking
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
+    // Update development system with error checking
     void updateDevelopment(double timestep);
     
     // Get current developmental stage
@@ -52,11 +54,19 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
+    // Reset agent for new episode with error checking
     void reset();
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Enhanced convenience methods for error handling and monitoring
+    std::map<std::string, double> getAllNeuromodulationLevels() const;
+    void setDevelopmentStage(DevelopmentalStage stage);
+    std::map<std::string, bool> getLearningState() const;
+    void updateLearningState(bool enableRewardModulation,
+                             bool enableStructuralPlasticity, bool enableDevelopment,
+                             bool enableCuriosity);
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -75,6 +85,10 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper methods for error checking
+    void validateBrainInitialized() const;
+    void validateNeuronsExist() const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +126,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Error handling state
+    bool isInitialized_;
 };
 
 } // namespace nlm
