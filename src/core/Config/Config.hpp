@@ -43,8 +43,26 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
+// Main configuration class for the NLM (熙然) neural simulation framework
+// Manages neural simulation parameters and settings through a flexible key-value system
+// 
+// Configuration serves as the primary interface for:
+//   - Setting neural network parameters (neuron_count, connection_probability, etc.)
+//   - Configuring simulation behavior (timestep, max_steps, etc.)
+//   - Managing learning parameters (learning_rate, regularization, etc.)
+//   - Controlling debugging and output options
+// 
+// Configuration values are stored with their source (default, file, command-line, runtime)
+// allowing override hierarchy: CommandLine > File > Runtime > Default
+// This enables flexible configuration where command-line arguments override file settings,
+// which override runtime settings, which override default values.
+// 
+// The configuration system supports multiple data types:
+//   - Basic types: int, int64_t, double, bool, std::string
+//   - Collection types: std::vector<int>, std::vector<double>, std::vector<std::string>
+// 
+// Thread safety: Config objects are not thread-safe for concurrent modification.
+// Use a single Config instance per thread or coordinate access externally.
 public:
     Config();
     ~Config();
@@ -55,14 +73,33 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load configuration from file (Phase 2: Currently uses simple key=value format, planned JSON/YAML support)
+// The file should contain configuration lines in the format:
+//   key = value
+//   key = "quoted value with spaces"
+//   key = [value1, value2, ...]  // Array format
+// Comments start with # or //
+// 
+// Returns true on success, false on file I/O errors
+// The file format is designed for human readability while maintaining flexibility
+// for complex configuration needs
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+// Supports two formats:
+//   --key=value    // Long option format
+//   -key value     // Short option format
+// Command line arguments have highest priority in configuration precedence
+// 
+// Returns true on success, false if there are parsing errors
+// Invalid arguments are logged but don't prevent successful completion
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Save configuration to file
+// The file is saved in human-readable key=value format
+// Configuration values are sorted by key for consistent output
+// Each entry includes a comment with its source (default, file, command-line, runtime)
+// 
+// Returns true on success, false on file I/O errors
+// The saved file can be reloaded using loadFromFile()
     
     // Get values
     template<typename T>

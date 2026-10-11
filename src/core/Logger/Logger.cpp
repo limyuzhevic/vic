@@ -12,6 +12,12 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    // Enable/disable logging to file
+    bool logToFile = false;
+    // Log rotation: maximum file size in bytes
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10MB
+    std::string filepath;
+    std::chrono::system_clock::time_point lastRotation;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -36,9 +42,47 @@ void ConsoleLogger::log(const LogEntry& entry) {
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
+    // Add file and line info for errors and warnings
+    if (entry.level >= LogLevel::Warning && !entry.file.empty()) {
+        oss << " in " << entry.file;
+        if (entry.line > 0) {
+            oss << ":" << entry.line;
+        }
+        if (!entry.function.empty()) {
+            oss << " (" << entry.function << ")";
+        }
+    }
+    
     oss << " " << entry.message;
     
     std::string output = oss.str();
+    
+    // Handle log file rotation
+    if (pImpl->logToFile) {
+        auto now = std::chrono::system_clock::now();
+        if (pImpl->fileOut.is_open() && 
+            pImpl->fileOut.tellp() >= static_cast<std::streamsize>(pImpl->maxFileSize) &&
+            (now - pImpl->lastRotation) > std::chrono::hours(1)) {
+            
+            pImpl->fileOut.close();
+            
+            // Rotate: add timestamp to filename
+            std::string rotatedFile = pImpl->filepath;
+            size_t dotPos = rotatedFile.find_last_of('.');
+            if (dotPos != std::string::npos) {
+                rotatedFile.insert(dotPos, "_" + 
+                    std::to_string(std::chrono::system_clock::to_time_t(now)));
+            }
+            
+            pImpl->fileOut.open(rotatedFile, std::ios::trunc);
+            pImpl->lastRotation = now;
+            
+            if (!pImpl->fileOut.is_open()) {
+                NLM_LOG_ERROR("Failed to rotate log file to: " + rotatedFile);
+                return;
+            }
+        }
+    }
     
     // Console output
     if (pImpl->useColors) {
@@ -48,9 +92,11 @@ void ConsoleLogger::log(const LogEntry& entry) {
     }
     
     // File output if set
-    if (pImpl->fileOut.is_open()) {
+    if (pImpl->logToFile && pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        if (pImpl->maxFileSize > 0) {
+            pImpl->fileOut.flush();
+        }
     }
 }
 
@@ -71,12 +117,32 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close previous file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    pImpl->filepath = filepath;
     pImpl->fileOut.open(filepath, std::ios::app);
+    pImpl->logToFile = pImpl->fileOut.is_open();
+    
+    if (pImpl->logToFile) {
+        NLM_LOG_INFO("Console logger output file set to: " + filepath);
+    } else {
+        NLM_LOG_ERROR("Failed to open log file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        pImpl->logToFile = false;
+        pImpl->filepath.clear();
+        NLM_LOG_INFO("Console logger output file closed");
     }
 }
 
@@ -106,9 +172,30 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    // Global log level
+    LogLevel globalLevel;
+    // Enable/disable structured logging with file/line/function
+    bool structuredLogging;
+    // Log message throttling to prevent spam
+    std::unordered_map<std::string, std::chrono::system_clock::time_point> lastLogTime;
+    std::chrono::nanoseconds throttleInterval;
+    // Performance monitoring
+    uint64_t totalLogs;
+    uint64_t totalErrors;
+    uint64_t totalWarnings;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->globalLevel = LogLevel::Info;
+    pImpl->structuredLogging = true;
+    pImpl->throttleInterval = std::chrono::milliseconds(100);
+    pImpl->totalLogs = 0;
+    pImpl->totalErrors = 0;
+    pImpl->totalWarnings = 0;
+    
+    // Add default console logger
+    addLogger(std::make_shared<ConsoleLogger>());
+}
 
 Logger::~Logger() = default;
 

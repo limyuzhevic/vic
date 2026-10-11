@@ -47,8 +47,22 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
-
-class Brain {
+// 
+// This is Phase 6 of the NLM (熙然) implementation:
+// - Real LIF neuron dynamics
+// - Event-driven spike propagation with synaptic delays
+// - STDP and Hebbian plasticity
+// - Structural plasticity (synaptogenesis/pruning)
+// - Integrated memory systems (working, episodic, associative)
+// - Prediction system for sensory prediction errors
+// - Cognitive systems (planning, concept formation, attention)
+// - Neuromodulation (dopamine, curiosity, novelty)
+// - Development and maturation stages
+// 
+// The Brain class orchestrates the complete neural simulation loop,
+// coordinating all integrated subsystems through a unified interface.
+// It maintains the global state and provides access to all subsystems
+// while abstracting the complexity of the neural computation.
 public:
     // Create brain with configuration
     explicit Brain(std::shared_ptr<Config> config);

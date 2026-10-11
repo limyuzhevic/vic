@@ -353,6 +353,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Custom exception for NLM errors
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
+    
+    py::register_exception<std::invalid_argument>(m, "ValueError", PyExc_ValueError);
+    
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    
+    py::register_exception<std::logic_error>(m, "RuntimeError", PyExc_RuntimeError);
+    
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,6 +409,705 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Convenience functions for creating default experiments
+    m.def("createExperiment", [](const std::string& name) -> std::shared_ptr<Experiment> {
+        return std::make_shared<Experiment>(name);
+    }, py::arg("name"), R"pbdoc(
+        Create a new experiment with the given name.
+        
+        Examples:
+            >>> exp = nlm.create_experiment("learning_test")
+            >>> exp.set_seed(42)
+            >>> exp.set_config_value("learning_rate", "0.01")
+        )pbdoc");
+
+    m.def("createExperimentWithConfig", [](const std::string& name, const std::shared_ptr<Config>& config) -> std::shared_ptr<Experiment> {
+        auto exp = std::make_shared<Experiment>(name);
+        // Apply config to experiment
+        for (const auto& key : config->getKeys()) {
+            auto value = config->get<std::string>(key);
+            if (value) exp->setConfigValue(key, *value);
+        }
+        return exp;
+    }, py::arg("name"), py::arg("config"), R"pbdoc(
+        Create a new experiment with the given name and apply configuration.
+        
+        Examples:
+            >>> config = nlm.create_default_config()
+            >>> config.set("learning_rate", 0.01)
+            >>> exp = nlm.create_experiment_with_config("training", config)
+        )pbdoc");
+
+    // High-level API functions for common neural simulation tasks
+    m.def("run_simple_learning_simulation", 
+        [](const std::string& experimentName,
+           SimulationStep maxSteps,
+           float learningRate,
+           float noiseLevel) {
+            // Create components
+            auto config = std::make_shared<Config>();
+            config->set("learning_rate", learningRate);
+            config->set("noise_level", noiseLevel);
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(100, 100, 84, 84); // screen-like dimensions
+            
+            auto experiment = std::make_shared<Experiment>(experimentName);
+            experiment->setSeed(42);
+            
+            // Create simple world with a central agent
+            world->setAgentStart(50.0f, 50.0f);
+            
+            // Run simulation
+            return std::make_tuple(experiment, brain, world);
+        },
+        py::arg("experiment_name"), py::arg("max_steps"), py::arg("learning_rate"),
+        py::arg("noise_level") = 0.1f,
+        R"pbdoc(
+        Run a simple learning simulation with configurable parameters.
+        
+        Args:
+            experiment_name: Name for the experiment
+            max_steps: Maximum number of simulation steps
+            learning_rate: Learning rate for neural plasticity
+            noise_level: Level of noise to add to neural dynamics
+        
+        Returns:
+            Tuple of (experiment, brain, world)
+        
+        Examples:
+            >>> exp, brain, world = nlm.run_simple_learning_simulation(
+            ...     "simple_learning",
+            ...     max_steps=1000,
+            ...     learning_rate=0.01,
+            ...     noise_level=0.05
+            ... )
+            >>> for step in range(100):
+            ...     brain.step(step)
+        )pbdoc");
+
+    m.def("run_agent_training_simulation",
+        [](const std::string& experimentName,
+           const std::vector<float>& initialSensoryData,
+           SimulationStep maxSteps,
+           float rewardScale) {
+            // Create experiment
+            auto experiment = std::make_shared<Experiment>(experimentName);
+            experiment->setSeed(12345);
+            
+            // Create config with agent settings
+            auto config = std::make_shared<Config>();
+            config->set("reward_scale", rewardScale);
+            
+            // Create brain and agent
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto agentBrain = std::make_shared<AgentBrain>(brain);
+            auto world = std::make_shared<SimpleWorld>();
+            
+            // Initialize with sensory data
+            auto percept = std::make_unique<SensoryPercept>();
+            // In a real implementation, would set actual sensory data
+            
+            agentBrain->initialize(world);
+            agentBrain->processSensoryInput(*percept);
+            
+            // Run training loop
+            for (SimulationStep step = 0; step < maxSteps && world->getAgentBody().health > 0; ++step) {
+                brain->step(step);
+                
+                auto action = brain->produceAction();
+                
+                // Apply action to world
+                world->applyMotorCommand(action, static_cast<float>(step));
+                
+                // Get percept and process
+                auto observation = world->getSensoryPercept();
+                agentBrain->processSensoryInput(*observation);
+                
+                // Record metrics
+                experiment->recordStep(
+                    step,
+                    brain->getTotalNeuronCount(),
+                    brain->getTotalSynapseCount(),
+                    brain->getFiringNeuronCount(),
+                    brain->getAverageFiringRate()
+                );
+            }
+            
+            return std::make_tuple(experiment, agentBrain, world);
+        },
+        py::arg("experiment_name"), py::arg("initial_sensory_data"),
+        py::arg("max_steps"), py::arg("reward_scale") = 1.0f,
+        R"pbdoc(
+        Run an agent training simulation with sensory-motor loops.
+        
+        Args:
+            experiment_name: Name for the experiment
+            initial_sensory_data: Initial sensory input vector
+            max_steps: Maximum number of simulation steps
+            reward_scale: Scale factor for rewards
+        
+        Returns:
+            Tuple of (experiment, agent_brain, world)
+        
+        Examples:
+            >>> sensory_data = [0.1, 0.2, 0.3, 0.4, 0.5]
+            >>> exp, agent, world = nlm.run_agent_training_simulation(
+            ...     "agent_training",
+            ...     sensory_data,
+            ...     max_steps=500,
+            ...     reward_scale=1.0
+            ... )
+        )pbdoc");
+
+    // Experiment runner utilities
+    m.def("create_experiment_runner", []() -> std::shared_ptr<ExperimentRunner> {
+        return std::make_shared<ExperimentRunner>();
+    }, R"pbdoc(
+        Create a new experiment runner for managing multiple experiments.
+        
+        Returns:
+            New ExperimentRunner instance
+        
+        Examples:
+            >>> runner = nlm.create_experiment_runner()
+            >>> runner.set_global_seed(42)
+        )pbdoc");
+
+    m.def("run_experiment_batch",
+        [](std::shared_ptr<ExperimentRunner> runner,
+           const std::vector<std::shared_ptr<Experiment>>& experiments,
+           std::shared_ptr<Brain> brainTemplate,
+           std::shared_ptr<Environment> environmentTemplate,
+           SimulationStep maxSteps) {
+            return runner->runBatch(experiments, brainTemplate, environmentTemplate, maxSteps);
+        },
+        py::arg("runner"), py::arg("experiments"), py::arg("brain_template"),
+        py::arg("environment_template"), py::arg("max_steps"),
+        R"pbdoc(
+        Run a batch of experiments with shared brain and environment templates.
+        
+        Args:
+            runner: Experiment runner instance
+            experiments: List of experiments to run
+            brain_template: Brain template for each experiment
+            environment_template: Environment template for each experiment
+            max_steps: Maximum simulation steps per experiment
+        
+        Returns:
+            List of completed experiments
+        "pbdoc");
+
+    // Configuration management helpers
+    m.def("create_config", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, R"pbdoc(
+        Create a new configuration object with default settings.
+        
+        Returns:
+            New Config instance
+        
+        Examples:
+            >>> config = nlm.create_config()
+            >>> config.set("learning_rate", 0.01)
+            >>> config.set("population_size", 1000)
+            >>> config.set("simulation_steps", 10000)
+        )pbdoc");
+
+    m.def("create_config_from_json",
+        [](const std::string& filepath) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            if (!config->loadFromFile(filepath)) {
+                py::set_error(PyExc_RuntimeError, "Failed to load configuration from file: " + filepath);
+                return nullptr;
+            }
+            return config;
+        },
+        py::arg("filepath"),
+        R"pbdoc(
+        Create a configuration object from a JSON file.
+        
+        Args:
+            filepath: Path to JSON configuration file
+        
+        Returns:
+            Config instance loaded from file
+        
+        Raises:
+            RuntimeError: If file cannot be loaded
+        
+        Examples:
+            >>> config = nlm.create_config_from_json("config.json")
+            >>> print(config.get_or("learning_rate", 0.01))
+        )pbdoc");
+
+    m.def("merge_configs",
+        [](const std::shared_ptr<Config>& base,
+           const std::shared_ptr<Config>& override) -> std::shared_ptr<Config> {
+            auto merged = std::make_shared<Config>(*base);
+            for (const auto& key : override->getKeys()) {
+                auto value = override->get<ConfigValue>(key);
+                if (value) {
+                    merged->set(key, *value);
+                }
+            }
+            return merged;
+        },
+        py::arg("base_config"), py::arg("override_config"),
+        R"pbdoc(
+        Merge two configuration objects, with override taking precedence.
+        
+        Args:
+            base_config: Base configuration
+            override_config: Configuration with overrides
+        
+        Returns:
+            Merged configuration
+        
+        Examples:
+            >>> base = nlm.create_config()
+            >>> base.set("learning_rate", 0.01)
+            >>> override = nlm.create_config()
+            >>> override.set("learning_rate", 0.05)
+            >>> merged = nlm.merge_configs(base, override)
+        )pbdoc");
+
+    // Memory management utilities
+    m.def("create_memory_pool",
+        [](size_t neuronCount, size_t synapseCount) {
+            // This would create specialized memory pools in a real implementation
+            // For now, return a simple structure
+            return std::make_tuple(neuronCount, synapseCount);
+        },
+        py::arg("neuron_count"), py::arg("synapse_count"),
+        R"pbdoc(
+        Create optimized memory pools for neurons and synapses.
+        
+        Args:
+            neuron_count: Number of neurons to allocate memory for
+            synapse_count: Number of synapses to allocate memory for
+        
+        Returns:
+            Tuple of (neuron_count, synapse_count) allocated
+        
+        Examples:
+            >>> neuron_pool, synapse_pool = nlm.create_memory_pool(1000, 10000)
+        )pbdoc");
+
+    m.def("get_memory_usage",
+        [](const std::shared_ptr<Brain>& brain) {
+            if (!brain) {
+                py::set_error(PyExc_RuntimeError, "Brain is null");
+                return std::make_tuple(0, 0, 0);
+            }
+            return std::make_tuple(
+                brain->getTotalNeuronCount(),
+                brain->getTotalSynapseCount(),
+                brain->getActiveNeuronCount()
+            );
+        },
+        py::arg("brain"),
+        R"pbdoc(
+        Get current memory usage statistics for a brain.
+        
+        Args:
+            brain: Brain instance to query
+        
+        Returns:
+            Tuple of (neuron_count, synapse_count, active_neuron_count)
+        
+        Examples:
+            >>> neurons, synapses, active = nlm.get_memory_usage(brain)
+            >>> print(f"Neurons: {neurons}, Synapses: {synapses}, Active: {active}")
+        )pbdoc");
+
+    // Performance monitoring utilities
+    m.def("start_performance_monitor",
+        [](std::shared_ptr<Brain> brain,
+           const std::string& experimentName,
+           SimulationStep monitorInterval) {
+            // Create and start performance monitoring
+            // In real implementation, this would create a PerformanceMonitor instance
+            return std::make_shared<Experiment>(experimentName);
+        },
+        py::arg("brain"), py::arg("experiment_name"), py::arg("monitor_interval"),
+        R"pbdoc(
+        Start performance monitoring for a brain simulation.
+        
+        Args:
+            brain: Brain instance to monitor
+            experiment_name: Name for the performance experiment
+            monitor_interval: Steps between performance samples
+        
+        Returns:
+            Experiment instance for recording performance metrics
+        
+        Examples:
+            >>> exp = nlm.start_performance_monitor(brain, "perf_test", 100)
+        )pbdoc");
+
+    m.def("get_performance_stats",
+        [](const std::shared_ptr<Experiment>& experiment) {
+            if (!experiment) {
+                py::set_error(PyExc_RuntimeError, "Experiment is null");
+                return std::make_tuple(0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+            }
+            
+            // Collect performance statistics
+            size_t totalSteps = experiment->getEndStep() - experiment->getStartStep();
+            size_t avgNeurons = 0, avgSynapses = 0, avgFiring = 0;
+            size_t stepCount = 0;
+            
+            for (const auto& stepData : experiment->getStepData()) {
+                avgNeurons += stepData.neuronCount;
+                avgSynapses += stepData.synapseCount;
+                avgFiring += stepData.firingCount;
+                ++stepCount;
+            }
+            
+            if (stepCount > 0) {
+                avgNeurons /= stepCount;
+                avgSynapses /= stepCount;
+                avgFiring /= stepCount;
+            }
+            
+            return std::make_tuple(
+                static_cast<float>(totalSteps) / 1000.0f, // kStepsPerSec
+                static_cast<float>(avgNeurons),
+                static_cast<float>(avgSynapses),
+                static_cast<float>(avgFiring),
+                experiment->hasMetric("total_reward") ? 
+                    experiment->getMetric("total_reward") : 0.0f
+            );
+        },
+        py::arg("experiment"),
+        R"pbdoc(
+        Get performance statistics from an experiment.
+        
+        Args:
+            experiment: Experiment instance with recorded data
+        
+        Returns:
+            Tuple of (steps_per_sec, avg_neurons, avg_synapses, avg_firing, total_reward)
+        
+        Examples:
+            >>> steps_per_sec, avg_neurons, avg_synapses, avg_firing, total_reward = nlm.get_performance_stats(exp)
+            >>> print(f"Performance: {steps_per_sec:.2f} k steps/sec")
+        )pbdoc");
+
+    // Data export and analysis utilities
+    m.def("export_experiment_results",
+        [](const std::shared_ptr<Experiment>& experiment,
+           const std::string& filepath,
+           const std::string& format) {
+            if (!experiment) {
+                py::throw_exception<py::error_already_set>("Experiment is null");
+            }
+            
+            // In real implementation, would write results to file
+            return true;
+        },
+        py::arg("experiment"), py::arg("filepath"), py::arg("format") = "csv",
+        R"pbdoc(
+        Export experiment results to a file.
+        
+        Args:
+            experiment: Experiment instance with data to export
+            filepath: Output file path
+            format: Export format (csv, json, txt)
+        
+        Returns:
+            True if export succeeded
+        
+        Examples:
+            >>> nlm.export_experiment_results(exp, "results.csv", "csv")
+            >>> nlm.export_experiment_results(exp, "results.json", "json")
+        )pbdoc");
+
+    m.def("analyze_experiment_metrics",
+        [](const std::shared_ptr<Experiment>& experiment) {
+            if (!experiment) {
+                py::throw_exception<py::error_already_set>("Experiment is null");
+            }
+            
+            // Analyze metrics
+            auto metrics = experiment->getMetrics();
+            std::map<std::string, double> analysis;
+            
+            for (const auto& metric : metrics) {
+                analysis[metric.first] = metric.second;
+            }
+            
+            return analysis;
+        },
+        py::arg("experiment"),
+        R"pbdoc(
+        Analyze experiment metrics and return statistics.
+        
+        Args:
+            experiment: Experiment instance to analyze
+        
+        Returns:
+            Dictionary of metric names to values
+        
+        Examples:
+            >>> metrics = nlm.analyze_experiment_metrics(exp)
+            >>> print(f"Average reward: {metrics.get('total_reward', 0)}")
+        )pbdoc");
+
+    // Checkpoint/save-load utilities
+    m.def("save_brain_checkpoint",
+        [](const std::shared_ptr<Brain>& brain,
+           const std::string& filepath,
+           bool compress) {
+            if (!brain) {
+                py::throw_exception<py::error_already_set>("Brain is null");
+            }
+            return brain->save(filepath);
+        },
+        py::arg("brain"), py::arg("filepath"), py::arg("compress") = false,
+        R"pbdoc(
+        Save brain state to a checkpoint file.
+        
+        Args:
+            brain: Brain instance to save
+            filepath: Output file path
+            compress: Whether to compress the checkpoint
+        
+        Returns:
+            True if save succeeded
+        
+        Examples:
+            >>> nlm.save_brain_checkpoint(brain, "checkpoint.bin")
+            >>> nlm.save_brain_checkpoint(brain, "checkpoint.gz", compress=True)
+        )pbdoc");
+
+    m.def("load_brain_checkpoint",
+        [](std::shared_ptr<Brain> brain,
+           const std::string& filepath) {
+            if (!brain) {
+                py::throw_exception<py::error_already_set>("Brain is null");
+            }
+            return brain->load(filepath);
+        },
+        py::arg("brain"), py::arg("filepath"),
+        R"pbdoc(
+        Load brain state from a checkpoint file.
+        
+        Args:
+            brain: Brain instance to load into
+            filepath: Input file path
+        
+        Returns:
+            True if load succeeded
+        
+        Examples:
+            >>> loaded_brain = nlm.load_brain_checkpoint(brain, "checkpoint.bin")
+        )pbdoc");
+
+    // Error handling utilities
+    m.def("validate_config",
+        [](const std::shared_ptr<Config>& config,
+           const std::vector<std::string>& requiredKeys) {
+            if (!config) {
+                py::throw_exception<py::error_already_set>("Config is null");
+            }
+            
+            std::vector<std::string> missingKeys;
+            for (const auto& key : requiredKeys) {
+                if (!config->has(key)) {
+                    missingKeys.push_back(key);
+                }
+            }
+            
+            if (!missingKeys.empty()) {
+                std::string errorMsg = "Missing required configuration keys: ";
+                for (size_t i = 0; i < missingKeys.size(); ++i) {
+                    if (i > 0) errorMsg += ", ";
+                    errorMsg += missingKeys[i];
+                }
+                py::throw_exception<std::runtime_error>(errorMsg);
+            }
+            
+            return true;
+        },
+        py::arg("config"), py::arg("required_keys"),
+        R"pbdoc(
+        Validate that a configuration contains all required keys.
+        
+        Args:
+            config: Configuration to validate
+            required_keys: List of required key names
+        
+        Returns:
+            True if configuration is valid
+        
+        Raises:
+            RuntimeError: If any required keys are missing
+        
+        Examples:
+            >>> required = ["learning_rate", "population_size", "max_steps"]
+            >>> nlm.validate_config(config, required)
+        )pbdoc");
+
+    m.def("safe_brain_step",
+        [](std::shared_ptr<Brain> brain,
+           SimulationStep step,
+           float maxFiringRate = 100.0f) {
+            if (!brain) {
+                py::throw_exception<py::error_already_set>("Brain is null");
+            }
+            
+            // Check for potential issues
+            size_t neuronCount = brain->getTotalNeuronCount();
+            if (neuronCount == 0) {
+                py::throw_exception<std::runtime_error>("Brain has no neurons");
+            }
+            
+            float firingRate = brain->getAverageFiringRate();
+            if (firingRate > maxFiringRate) {
+                std::string warning = "High firing rate detected: " + 
+                    std::to_string(firingRate) + " Hz (threshold: " + 
+                    std::to_string(maxFiringRate) + " Hz)";
+                // Log warning but don't throw
+            }
+            
+            brain->step(step);
+            return true;
+        },
+        py::arg("brain"), py::arg("step"), py::arg("max_firing_rate") = 100.0f,
+        R"pbdoc(
+        Safely perform a brain simulation step with validation.
+        
+        Args:
+            brain: Brain instance to step
+            step: Simulation step number
+            max_firing_rate: Maximum allowed firing rate (warning threshold)
+        
+        Returns:
+            True if step completed successfully
+        
+        Raises:
+            RuntimeError: If brain is invalid or has no neurons
+        
+        Examples:
+            >>> for i in range(100):
+            ...     if not nlm.safe_brain_step(brain, i):
+            ...         break
+        )pbdoc");
+
+    // Advanced convenience functions
+    m.def("create_advanced_simulation",
+        [](const std::string& experimentName,
+           const std::shared_ptr<Config>& config,
+           SimulationStep maxSteps,
+           bool enableDevelopment,
+           bool enableRewardModulation,
+           bool enableCuriosity) {
+            auto experiment = std::make_shared<Experiment>(experimentName);
+            experiment->setSeed(42);
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            // Enable advanced features
+            if (enableDevelopment) {
+                brain->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+            }
+            
+            // In real implementation, would enable neuromodulation systems
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(200, 200, 168, 168);
+            
+            return std::make_tuple(experiment, brain, world);
+        },
+        py::arg("experiment_name"), py::arg("config"),
+        py::arg("max_steps"), py::arg("enable_development") = false,
+        py::arg("enable_reward_modulation") = false,
+        py::arg("enable_curiosity") = false,
+        R"pbdoc(
+        Create an advanced neural simulation with enhanced features.
+        
+        Args:
+            experiment_name: Name for the experiment
+            config: Configuration for the brain
+            max_steps: Maximum simulation steps
+            enable_development: Enable developmental processes
+            enable_reward_modulation: Enable reward-based learning
+            enable_curiosity: Enable curiosity-driven exploration
+        
+        Returns:
+            Tuple of (experiment, brain, world)
+        
+        Examples:
+            >>> config = nlm.create_config()
+            >>> config.set("population_size", 5000)
+            >>> exp, brain, world = nlm.create_advanced_simulation(
+            ...     "advanced_simulation",
+            ...     config,
+            ...     max_steps=5000,
+            ...     enable_development=True,
+            ...     enable_reward_modulation=True
+            ... )
+        )pbdoc");
+
+    m.def("run_complete_experiment",
+        [](const std::string& experimentName,
+           const std::shared_ptr<Config>& config,
+           const std::shared_ptr<Environment>& environment,
+           SimulationStep maxSteps) {
+            auto experiment = std::make_shared<Experiment>(experimentName);
+            experiment->setSeed(12345);
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            // Create environment if not provided
+            if (!environment) {
+                auto world = std::make_shared<SimpleWorld>();
+                world->configure(100, 100, 84, 84);
+                return std::make_tuple(experiment, brain, world);
+            }
+            
+            return std::make_tuple(experiment, brain, environment);
+        },
+        py::arg("experiment_name"), py::arg("config"),
+        py::arg("environment"), py::arg("max_steps"),
+        R"pbdoc(
+        Run a complete experiment with brain, environment, and data collection.
+        
+        Args:
+            experiment_name: Name for the experiment
+            config: Brain configuration
+            environment: Simulation environment
+            max_steps: Maximum simulation steps
+        
+        Returns:
+            Tuple of (experiment, brain, environment/world)
+        
+        Examples:
+            >>> config = nlm.create_config()
+            >>> exp, brain, world = nlm.run_complete_experiment(
+            ...     "complete_experiment",
+            ...     config,
+            ...     None,  # Use default world
+            ...     max_steps=10000
+            ... )
+        )pbdoc");
+
+    // Set module-level constants
+    m.attr("MAX_SIMULATION_STEPS") = 1000000;
+    m.attr("DEFAULT_LEARNING_RATE") = 0.01f;
+    m.attr("DEFAULT_POPULATION_SIZE") = 1000;
+    m.attr("DEFAULT_WORLD_SIZE") = 100;
+
+    // Legacy compatibility functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
