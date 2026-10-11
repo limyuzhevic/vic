@@ -31,7 +31,6 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 
-void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
