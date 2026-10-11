@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include "../core/Constants.hpp"
 
 namespace nlm {
 
@@ -18,16 +19,16 @@ static float urand(uint64_t& state, float min, float max) {
 }
 
 SimpleWorld::SimpleWorld()
-    : width_(20.0f)
-    , height_(20.0f)
-    , visionWidth_(16)
-    , visionHeight_(16)
-    , maxEnergy_(100.0f)
-    , energyDecayRate_(0.01f)
-    , resourceEnergyGain_(30.0f)
+    : width_(Constants::DEFAULT_WORLD_WIDTH)
+    , height_(Constants::DEFAULT_WORLD_HEIGHT)
+    , visionWidth_(Constants::DEFAULT_VISION_WIDTH)
+    , visionHeight_(Constants::DEFAULT_VISION_HEIGHT)
+    , maxEnergy_(Constants::DEFAULT_MAX_ENERGY)
+    , energyDecayRate_(Constants::DEFAULT_ENERGY_DECAY_RATE)
+    , resourceEnergyGain_(Constants::DEFAULT_RESOURCE_ENERGY_GAIN)
     , simTime_(0.0)
-    , rngSeed_(42)
-    , rngState_(42)
+    , rngSeed_(Constants::DEFAULT_RANDOM_SEED)
+    , rngState_(Constants::DEFAULT_RANDOM_SEED)
 {
     agent_.reset();
 }
@@ -78,10 +79,7 @@ void SimpleWorld::setAgentStart(float x, float y) {
     agent_.y = y;
 }
 
-void SimpleWorld::update(double timestep) {
-    simTime_ += timestep;
-    
-    // Apply velocity to position
+        // Apply velocity to position
     agent_.x += agent_.velocityX * timestep;
     agent_.y += agent_.velocityY * timestep;
     
@@ -118,11 +116,11 @@ uint64_t SimpleWorld::nextRandom() {
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
     ActionResult result;
-    const float moveSpeed = 3.0f;
-    const float turnSpeed = 2.0f;
+    const float moveSpeed = Constants::DEFAULT_MOVE_SPEED;
+    const float turnSpeed = Constants::DEFAULT_TURN_SPEED;
     
     // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
+    if (currentTime - agent_.lastActionTime < 0.1f) {
         return ActionResult(0.0f, false, "too soon");
     }
     
@@ -214,13 +212,13 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     return result;
 }
 
-ActionResult SimpleWorld::interact() {
+void SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
     
     // Check for objects in interaction range
-    const float interactRange = 1.0f;
+    const float interactRange = Constants::DEFAULT_INTERACT_RANGE;
     
     for (auto& obj : objects_) {
         if (!obj.active) continue;
@@ -233,12 +231,12 @@ ActionResult SimpleWorld::interact() {
             obj.active = false;  // Consume the object
             
             if (obj.type == WorldObjectType::Resource) {
-                agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
+                agent_.energy = std::min(maxEnergy_, agent_.energy + Constants::DEFAULT_RESOURCE_ENERGY_GAIN);
                 result.reward = obj.value;  // Positive reward
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
+                agent_.health -= Constants::DEFAULT_HAZARD_DAMAGE;
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
@@ -302,9 +300,9 @@ void SimpleWorld::generateVision() {
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     
-    const int rayCount = 16;
-    const float fov = M_PI / 2.0f;  // 90 degree FOV
-    const float maxRange = 8.0f;
+    const int rayCount = Constants::DEFAULT_RAY_COUNT;
+    const float fov = Constants::DEFAULT_FOV;  // radians
+    const float maxRange = Constants::DEFAULT_MAX_RANGE;
     
     std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
     
@@ -342,7 +340,7 @@ void SimpleWorld::generateVision() {
                 break;
             }
             
-            t += 0.1f;
+            t += Constants::DEFAULT_RAY_STEP_SIZE;
         }
     }
     
@@ -357,15 +355,15 @@ void SimpleWorld::generateVision() {
         float dy = std::sin(angle);
         
         float t = 0.0f;
-        while (t < 1.5f) {
+        while (t < Constants::DEFAULT_TOUCH_RANGE) {
             float px = agent_.x + dx * t;
             float py = agent_.y + dy * t;
             
             if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
-                touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
+                touch[i] = 1.0f - t / Constants::DEFAULT_TOUCH_RANGE;  // Closer = stronger signal
                 break;
             }
-            t += 0.1f;
+            t += Constants::DEFAULT_RAY_STEP_SIZE;
         }
     }
     sensory_.setTouch(touch);
@@ -383,9 +381,9 @@ void SimpleWorld::generateVision() {
     proprioception[0] = agent_.x / width_;     // Normalized X
     proprioception[1] = agent_.y / height_;    // Normalized Y
     proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
-    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
-    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
-    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
+    proprioception[3] = std::abs(agent_.velocityX) / Constants::DEFAULT_VELOCITY_SCALE;  // Speed X
+    proprioception[4] = std::abs(agent_.velocityY) / Constants::DEFAULT_VELOCITY_SCALE;  // Speed Y
+    proprioception[5] = std::abs(agent_.angularVelocity) / Constants::DEFAULT_ANGULAR_VELOCITY_SCALE;  // Turn rate
     sensory_.setProprioception(proprioception);
     
     // No audio for now
@@ -396,7 +394,7 @@ void SimpleWorld::checkCollisions() {
     // Passive collision check (for damage when moving into objects)
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
+        agent_.health -= Constants::DEFAULT_HAZARD_PASSIVE_DAMAGE;
     }
 }
 

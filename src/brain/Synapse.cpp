@@ -1,5 +1,6 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -35,15 +36,15 @@ struct Synapse::Impl {
     float efficacy;
     
     // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
+    static constexpr float MIN_WEIGHT = Constants::MIN_WEIGHT;
+    static constexpr float MAX_WEIGHT = Constants::MAX_WEIGHT;
     
     // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
+    static constexpr float STP_FACILITATION_TAU = Constants::DEFAULT_STDP_FACILITATION_TAU;  // ms
+    static constexpr float STP_DEPRESSION_TAU = Constants::DEFAULT_STDP_DEPRESSION_TAU;    // ms
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr size_t MAX_SPIKE_HISTORY = Constants::DEFAULT_MAX_SPIKE_HISTORY;
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)

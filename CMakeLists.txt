@@ -87,7 +87,7 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
+target_include_directories(nlm PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
@@ -119,13 +119,41 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Main executable
+# Main executable (CLI-based)
 add_executable(nlm
     src/main.cpp
 )
+target_include_directories(nlm PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo
+    src/experiments/Phase4Demo.cpp
+)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
