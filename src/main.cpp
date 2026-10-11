@@ -28,6 +28,108 @@
 
 using namespace nlm;
 
+bool validateConfig(const Config& config) {
+    bool isValid = true;
+    
+    // Check required parameters with validation
+    struct ParamValidation {
+        std::string name;
+        double minValue;
+        double maxValue;
+        bool required;
+        std::string errorMsg;
+    };
+    
+    std::vector<ParamValidation> validations = {
+        {"neuron_count", 1, 10000, true, "neuron_count must be between 1 and 10000"},
+        {"region_count", 1, 10, true, "region_count must be between 1 and 10"},
+        {"connection_probability", 0.0, 1.0, true, "connection_probability must be between 0.0 and 1.0"},
+        {"simulation_timestep", 0.0001, 0.1, true, "simulation_timestep must be between 0.0001 and 0.1"},
+        {"random_seed", 0, 1000000000, true, "random_seed must be non-negative"},
+        {"plasticity_learning_rate", 0.0, 10.0, false, "plasticity_learning_rate must be between 0.0 and 10.0"},
+        {"stdp_ltp_weight", 0.0, 1.0, false, "stdp_ltp_weight must be between 0.0 and 1.0"},
+        {"stdp_ltd_weight", 0.0, 1.0, false, "stdp_ltd_weight must be between 0.0 and 1.0"},
+        {"synaptogenesis_rate", 0.0, 1.0, false, "synaptogenesis_rate must be between 0.0 and 1.0"},
+        {"pruning_rate", 0.0, 1.0, false, "pruning_rate must be between 0.0 and 1.0"},
+        {"dopamine_baseline", 0.0, 1.0, false, "dopamine_baseline must be between 0.0 and 1.0"},
+        {"log_level", 0.0, 1.0, false, "log_level must be a valid logging level"}
+    };
+    
+    for (const auto& validation : validations) {
+        if (!config.has(validation.name)) {
+            if (validation.required) {
+                NLM_LOG_WARNING("Missing required parameter: " + validation.name);
+                isValid = false;
+            }
+            continue;
+        }
+        
+        // Get parameter value based on type
+        double value = 0.0;
+        bool hasValue = false;
+        
+        if (auto val = config.get<int64_t>(validation.name)) {
+            value = static_cast<double>(*val);
+            hasValue = true;
+        } else if (auto val = config.get<double>(validation.name)) {
+            value = *val;
+            hasValue = true;
+        } else if (auto val = config.get<float>(validation.name)) {
+            value = static_cast<double>(*val);
+            hasValue = true;
+        } else if (auto val = config.get<int>(validation.name)) {
+            value = static_cast<double>(*val);
+            hasValue = true;
+        } else if (auto val = config.get<bool>(validation.name)) {
+            // For boolean parameters, convert to 0.0 or 1.0
+            value = *val ? 1.0 : 0.0;
+            hasValue = true;
+        }
+        
+        if (hasValue) {
+            if (value < validation.minValue || value > validation.maxValue) {
+                NLM_LOG_WARNING("Invalid value for parameter " + validation.name + ": " + 
+                              std::to_string(value) + ". " + validation.errorMsg);
+                isValid = false;
+            }
+        }
+    }
+    
+    // Special validation for log_level
+    if (config.has("log_level")) {
+        auto logLevelOpt = config.get<std::string>("log_level");
+        if (logLevelOpt) {
+            std::string logLevel = *logLevelOpt;
+            std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::tolower);
+            if (logLevel != "debug" && logLevel != "info" && logLevel != "warning" && 
+                logLevel != "error" && logLevel != "critical") {
+                NLM_LOG_WARNING("Invalid log_level: " + logLevel + ". Using default 'INFO'");
+                isValid = false;
+            }
+        }
+    }
+        }
+    }
+    
+    // Special validation for connection_probability with region_count
+    if (config.has("connection_probability") && config.has("region_count") && 
+        config.has("neuron_count")) {
+        auto connProbOpt = config.get<float>("connection_probability");
+        auto regionCountOpt = config.get<int64_t>("region_count");
+        auto neuronCountOpt = config.get<int64_t>("neuron_count");
+        
+        if (connProbOpt && regionCountOpt && neuronCountOpt) {
+            float expectedSynapses = *neuronCountOpt * (*regionCountOpt - 1) * (*connProbOpt);
+            if (expectedSynapses > 1000000) {
+                NLM_LOG_WARNING("High connection probability may result in excessive synapses: " + 
+                              std::to_string(expectedSynapses));
+            }
+        }
+    }
+    
+    return isValid;
+}
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -326,45 +428,84 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Validate configuration
+    if (!validateConfig(*config)) {
+        NLM_LOG_ERROR("Configuration validation failed. Using defaults.");
+    }
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Log startup information
+    NLM_LOG_INFO("NLM Phase 2 Starting...");
+    NLM_LOG_INFO("Configuration validation completed.");
+    NLM_LOG_INFO("Starting neural computation phase.");
     
     // Load configuration
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configFileProvided = false;
+    
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+        std::string arg = argv[i];
+        if (arg == "--config" && i + 1 < argc) {
+            // Handle --config <filename> or --config=<filename>
+            configFile = argv[++i];
+            configFileProvided = true;
+        } else if (arg.find("--config=") == 0) {
+            // Handle --config=<filename>
+            configFile = arg.substr(9);
+            configFileProvided = true;
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load config from file (ignore if not found for backward compatibility)
+    if (configFileProvided) {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_ERROR("Failed to load configuration from: " + configFile);
+            NLM_LOG_INFO("Using default configuration.");
+        }
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        // Try to load default config if no config specified
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration (no config file found).");
+        }
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line arguments (excluding --config)
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        // Skip --config arguments to avoid double processing
+        if (arg == "--config" || arg.find("--config=") == 0) {
+            // Skip this arg and the next if it's --config <filename>
+            if (i + 1 < argc && arg != "--config" && arg.find("--config=") != 0) {
+                i++;
+            }
+            continue;
+        }
+        
+        // Handle other command line arguments
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        } else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            config->set(key, value, ConfigSource::CommandLine);
+        }
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
