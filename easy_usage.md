@@ -12,6 +12,14 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+**NEW: Enhanced AgentBrain Interface**
+
+This guide has been updated with NLM's latest improvements:
+- **AgentBrain Performance Optimization**: Built-in speed vs. accuracy trade-offs
+- **Advanced Configuration Presets**: Pre-configured behavior modes
+- **Detailed Performance Monitoring**: Track every aspect of agent performance
+- **Improved Error Handling**: Better debugging and error messages
+
 ---
 
 ## The 3 Things You Need to Know
@@ -155,103 +163,375 @@ agent.enableCuriosity(True)             # Explore new things
 
 ---
 
-## What Each Part Does
+---
 
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+## Advanced Agent Configuration
 
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+### Configuration Presets
 
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+NLM's AgentBrain now offers pre-configured behavior modes:
 
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
+```python
+import pynlm
 
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+# Create agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
 
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+# Goal-oriented behavior (balanced learning)
+agent.configureForGoalOrientedBehavior()
+
+# Exploration mode (curiosity-focused)
+# agent.configureForExploration()
+
+# Exploitation mode (stable performance)
+# agent.configureForExploitation()
+```
+
+### Performance Optimization
+
+Choose the right optimization strategy for your use case:
+
+```python
+# Optimize for speed (faster simulation)
+agent.optimizeForSpeed()
+
+# Optimize for accuracy (precise results)
+# agent.optimizeForAccuracy()
+```
+
+### Performance Monitoring
+
+Track your agent's performance in real-time:
+
+```python
+# Get basic statistics
+print("Steps processed:", agent.getStepCount())
+print("Sensory inputs:", agent.getInputCount())
+print("Motor commands:", agent.getOutputCount())
+
+# Get detailed metrics
+metrics = agent.getPerformanceMetrics()
+print("Dopamine level:", metrics["dopamine_level"])
+print("Curiosity level:", metrics["curiosity_level"])
+print("Average sensory response:", metrics["average_sensory_response"])
+print("Development stage:", metrics["developmental_stage"])
+
+# Log all metrics
+agent.logStatus()
+```
 
 ---
 
-## Mini Projects
+## Advanced Usage Patterns
 
-### Project 1: Silent Brain (Just Neurons)
+### Pattern 4: Monitoring and Debugging
 
 ```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
+def run_simulation_with_monitoring(brain, world, agent, num_steps):
+    print("Starting simulation with monitoring...")
+    
+    # Configure agent for accuracy
+    agent.optimizeForAccuracy()
+    
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get and process sensory input
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        # Brain thinks
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Execute action
+        result = world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation (learning)
+        agent.applyRewardModulation(result.reward, 0.0)
+        
+        # Log progress every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            print(f"  Dopamine level: {agent.getNeuromodulationLevel():.3f}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Action confidence: {agent.getMotorConfidence(action):.3f}")
+    
+    # Log final performance metrics
+    print("\n=== Final Performance Metrics ===")
+    metrics = agent.getPerformanceMetrics()
+    for key, value in metrics.items():
+        if key.startswith("motor_confidence_"):
+            print(f"  {key}: {value:.3f}")
+        elif key in ["dopamine_level", "curiosity_level", "average_sensory_response"]:
+            print(f"  {key}: {value:.3f}")
+        else:
+            print(f"  {key}: {value}")
 ```
 
-### Project 2: Brain Watching a World
+### Pattern 5: Development Tracking
 
 ```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+def track_development_over_time(brain, world, agent, total_steps=1000):
+    print("Tracking agent development over time...")
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+    # Enable development system
+    agent.enableDevelopment(True)
+    
+    # Store developmental milestones
+    developmental_stages = []
+    curiosity_levels = []
+    firing_rates = []
+    
+    for step in range(total_steps):
+        # Update world and agent
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        # Record developmental stage
+        developmental_stages.append(agent.getDevelopmentalStage())
+        curiosity_levels.append(agent.getCuriosityLevel())
+        firing_rates.append(brain.getFiringNeuronCount())
+        
+        # Log every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Stage: {agent.getDevelopmentalStage()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Firing rate: {brain.getAverageFiringRate():.3f}")
+    
+    # Analyze development progression
+    print("\n=== Development Analysis ===")
+    print(f"Initial development stage: {developmental_stages[0]}")
+    print(f"Final development stage: {developmental_stages[-1]}")
+    print(f"Peak curiosity level: {max(curiosity_levels):.3f}")
+    print(f"Average firing rate: {sum(firing_rates)/len(firing_rates):.1f}")
 ```
 
-### Project 3: Complete Agent
+### Pattern 6: Custom Configuration
+
+```python
+def create_custom_agent(config_file=None, enable_features=None):
+    import pynlm
+    
+    # Create default configuration
+    config = pynlm.createDefaultConfig()
+    
+    if config_file:
+        # Load custom configuration
+        config.loadFromFile(config_file)
+    else:
+        # Set default values
+        config.set("neuron_count", 1000)
+        config.set("region_count", 4)
+        config.set("connection_probability", 0.1)
+        config.set("stdp_ltp_weight", 0.01)
+        config.set("stdp_ltd_weight", 0.012)
+    
+    # Create brain and agent
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Enable requested features
+    if enable_features is None:
+        enable_features = []
+    
+    if "reward_modulation" in enable_features:
+        agent.enableRewardModulation(True)
+    
+    if "structural_plasticity" in enable_features:
+        agent.enableStructuralPlasticity(True)
+    
+    if "development" in enable_features:
+        agent.enableDevelopment(True)
+    
+    if "curiosity" in enable_features:
+        agent.enableCuriosity(True)
+    
+    # Configure for specific behavior
+    if "exploration" in enable_features:
+        agent.configureForExploration()
+    elif "exploitation" in enable_features:
+        agent.configureForExploitation()
+    else:
+        agent.configureForGoalOrientedBehavior()
+    
+    return brain, agent
+```
+
+---
+
+## Power User Examples
+
+### Example 4: Multi-Agent Simulation
 
 ```python
 import pynlm
+import threading
+import time
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+def run_agent_simulation(agent_id, brain_config, shared_world):
+    print(f"Starting Agent {agent_id}")
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    # Create agent
+    brain = pynlm.createBrain(brain_config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(shared_world)
+    
+    # Configure for exploration (agents compete)
+    agent.configureForExploration()
+    agent.optimizeForSpeed()
+    
+    # Run agent loop
+    for step in range(500):
+        shared_world.update(0.1)
+        
+        percept = shared_world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        result = shared_world.applyMotorCommand(action, shared_world.getSimulationTime())
+        
+        agent.applyRewardModulation(result.reward, 0.0)
+        
+        if step % 100 == 0:
+            print(f"Agent {agent_id} Step {step}: {agent.getCuriosityLevel():.3f} curiosity")
+    
+    return agent.getPerformanceMetrics()
 
-print("Agent simulation complete!")
+# Create shared world
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Create different configurations for different agents
+configs = []
+for i in range(3):
+    config = pynlm.createDefaultConfig()
+    config.set("neuron_count", 500 + i * 100)
+    configs.append(config)
+
+# Run multiple agents concurrently
+agents = []
+threads = []
+
+for i, config in enumerate(configs):
+    thread = threading.Thread(
+        target=lambda i=i, config=config: agents.append(run_agent_simulation(i, config, world))
+    )
+    threads.append(thread)
+    thread.start()
+    time.sleep(0.1)  # Stagger agent starts
+
+# Wait for all agents to complete
+for thread in threads:
+    thread.join()
+
+print("All agent simulations completed!")
+for i, agent in enumerate(agents):
+    print(f"Agent {i} total steps: {agent['steps_processed']}")
+```
+
+### Example 5: Real-time Performance Monitoring
+
+```python
+import pynlm
+import time
+
+class PerformanceMonitor:
+    def __init__(self, agent):
+        self.agent = agent
+        self.metrics = {
+            'start_time': time.time(),
+            'steps': [],
+            'curiosity': [],
+            'firing_rates': [],
+            'dopamine_levels': []
+        }
+    
+    def record_step(self, step, brain):
+        self.metrics['steps'].append(step)
+        self.metrics['curiosity'].append(self.agent.getCuriosityLevel())
+        self.metrics['firing_rates'].append(brain.getAverageFiringRate())
+        self.metrics['dopamine_levels'].append(self.agent.getNeuromodulationLevel())
+    
+    def generate_report(self):
+        import statistics
+        
+        report = {
+            'total_steps': len(self.metrics['steps']),
+            'elapsed_time': time.time() - self.metrics['start_time'],
+            'steps_per_second': len(self.metrics['steps']) / 
+                             (time.time() - self.metrics['start_time']),
+            'curiosity_stats': {
+                'mean': statistics.mean(self.metrics['curiosity']),
+                'min': min(self.metrics['curiosity']),
+                'max': max(self.metrics['curiosity']),
+                'std': statistics.stdev(self.metrics['curiosity']) if len(self.metrics['curiosity']) > 1 else 0
+            },
+            'firing_rate_stats': {
+                'mean': statistics.mean(self.metrics['firing_rates']),
+                'min': min(self.metrics['firing_rates']),
+                'max': max(self.metrics['firing_rates'])
+            },
+            'dopamine_stats': {
+                'mean': statistics.mean(self.metrics['dopamine_levels']),
+                'min': min(self.metrics['dopamine_levels']),
+                'max': max(self.metrics['dopamine_levels'])
+            }
+        }
+        
+        return report
+
+def run_monitored_simulation(brain, world, agent, num_steps):
+    monitor = PerformanceMonitor(agent)
+    
+    for step in range(num_steps):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        result = world.applyMotorCommand(action, world.getSimulationTime())
+        
+        agent.applyRewardModulation(result.reward, 0.0)
+        
+        # Record metrics
+        monitor.record_step(step, brain)
+        
+        # Log every 100 steps
+        if step % 100 == 0:
+            report = monitor.generate_report()
+            print(f"Step {step} - Performance: {report['steps_per_second']:.1f} steps/sec")
+    
+    # Generate final report
+    final_report = monitor.generate_report()
+    print("\n=== Final Performance Report ===")
+    print(f"Total simulation time: {final_report['elapsed_time']:.1f} seconds")
+    print(f"Performance: {final_report['steps_per_second']:.1f} steps/second")
+    print(f"Average curiosity level: {final_report['curiosity_stats']['mean']:.3f}")
+    print(f"Curiosity range: {final_report['curiosity_stats']['min']:.3f} - {final_report['curiosity_stats']['max']:.3f}")
+    print(f"Average firing rate: {final_report['firing_rate_stats']['mean']:.1f} Hz")
+    
+    return final_report
 ```
 
 ---
@@ -269,6 +549,16 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
+**NEW: Advanced Agent Methods**
+
+| Advanced Feature | Method |
+|-----------------|--------|
+| Configure for behavior | `agent.configureForGoalOrientedBehavior()` |
+| Optimize performance | `agent.optimizeForSpeed()` / `agent.optimizeForAccuracy()` |
+| Get performance metrics | `agent.getPerformanceMetrics()` |
+| Monitor progress | `agent.logStatus()` |
+| Track statistics | `agent.getStepCount()`, `agent.getInputCount()`, `agent.getOutputCount()` |
+
 ---
 
 ## Troubleshooting
@@ -285,13 +575,32 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Performance is slow"**
+- Try `agent.optimizeForSpeed()`
+- Check if you need all features enabled
+
+**"Metrics are not updating"**
+- Make sure you're calling `agent.initialize()` before recording metrics
+- Verify that `agent.processSensoryInput()` is being called
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Explore HOW_TO_USE.md** for more detailed technical information
+2. **Read docs/ARCHITECTURE.md** to understand how all the systems integrate
+3. **Experiment with different configurations** and optimization strategies
+4. **Try the power user examples** to see what's possible with the advanced features
+5. **Create your own performance monitoring systems** using the new metrics API
+
+**NEW: What's Possible with NLM v2**
+
+- **Multi-agent simulations** with shared environments
+- **Real-time performance monitoring** and analysis
+- **Custom behavior configurations** for specific use cases
+- **Advanced optimization strategies** for speed vs. accuracy trade-offs
+- **Detailed statistical analysis** of agent behavior over time
+
+That's it! You're now ready to use NLM with all its advanced features and optimizations. The AgentBrain class provides unprecedented control over neural simulation performance and behavior, making it suitable for everything from simple demonstrations to complex research applications.

@@ -387,18 +387,56 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        
+        // Configuration methods
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable development system")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable/disable curiosity system")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        
+        // Advanced configuration presets
+        .def("configureForGoalOrientedBehavior", &AgentBrain::configureForGoalOrientedBehavior,
+             "Configure agent for goal-oriented behavior (balanced)")
+        .def("configureForExploration", &AgentBrain::configureForExploration,
+             "Configure agent for exploration behavior (curiosity-focused)")
+        .def("configureForExploitation", &AgentBrain::configureForExploitation,
+             "Configure agent for exploitation behavior (stable)")
+        
+        // Performance optimization
+        .def("optimizeForSpeed", &AgentBrain::optimizeForSpeed,
+             "Optimize agent performance for speed")
+        .def("optimizeForAccuracy", &AgentBrain::optimizeForAccuracy,
+             "Optimize agent performance for accuracy")
+        
+        // Statistical and monitoring methods
+        .def("getAverageSensoryResponse", &AgentBrain::getAverageSensoryResponse,
+             "Get average sensory response across all neurons")
+        .def("getMotorConfidence", &AgentBrain::getMotorConfidence,
+             py::arg("cmd"), "Get confidence level for a motor command")
+        
+        // Advanced utility methods
+        .def("getStepCount", &AgentBrain::getStepCount,
+             "Get total number of steps processed")
+        .def("getInputCount", &AgentBrain::getInputCount,
+             "Get total number of sensory input events processed")
+        .def("getOutputCount", &AgentBrain::getOutputCount,
+             "Get total number of motor commands produced")
+        .def("getPerformanceMetrics", &AgentBrain::getPerformanceMetrics,
+             "Get detailed performance metrics")
+        .def("logStatus", &AgentBrain::logStatus,
+             "Log current agent status and performance metrics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
