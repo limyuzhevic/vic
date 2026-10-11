@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Find nlohmann_json
+find_package(nlohmann_json 3.11.2 REQUIRED)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -83,9 +86,22 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
+    # Visualization system
     src/visualization/VisualizationInterface.cpp
-)
+    src/visualization/Visualizer.cpp
+    src/visualization/InteractiveVisualizer.cpp
+    src/visualization/NetworkVisualizer.cpp
+    src/visualization/SpikeVisualizer.cpp
+    src/visualization/DataExporter.cpp
+    src/visualization/AnimationGenerator.cpp
+    src/visualization/WebDashboard.cpp
+    src/visualization/HTMLExporter.cpp
+    src/cli/VisualizationIntegration.cpp
+    src/experiments/VisualizationExperiment.cpp
+    src/visualization/PerformanceVisualizer.cpp
+    src/visualization/SpikeVisualizationSuite.cpp
+    src/visualization/VisualizationTestRunner.cpp
+
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

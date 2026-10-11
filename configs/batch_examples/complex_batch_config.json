@@ -1,0 +1,48 @@
+// Complex configuration for batch processing
+// This config tests parameter variations and advanced features
+
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-10-11T16:00:50Z",
+    "author": "NLM Developer"
+  },
+  "simulation": {
+    "random_seed": 456,
+    "simulation_timestep": 0.0005,
+    "max_simulation_steps": 1000,
+    "simulation_time_limit": 10.0,
+    "neuron_count": 500,
+    "region_count": 5,
+    "connection_probability": 0.25
+  },
+  "plasticity": {
+    "plasticity_learning_rate": 0.03,
+    "stdp_ltp_weight": 0.03,
+    "stdp_ltd_weight": 0.025,
+    "stdp_time_constant": 0.03,
+    "development_synaptogenesis_rate": 0.2,
+    "development_pruning_rate": 0.1
+  },
+  "neuromodulation": {
+    "dopamine_baseline": 0.7,
+    "reward_discount_factor": 0.9,
+    "curiosity_weight": 0.5,
+    "reward_weight": 0.6,
+    "prediction_error_weight": 0.4
+  },
+  "environment": {
+    "environment_name": "ComplexWorld",
+    "environment_width": 200,
+    "environment_height": 150
+  },
+  "logging": {
+    "log_level": "INFO",
+    "log_to_file": true,
+    "log_filename": "batch_processing.log"
+  },
+  "visualization": {
+    "visualization_enabled": true,
+    "visualization_update_rate": 10.0
+  }
+}

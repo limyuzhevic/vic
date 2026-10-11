@@ -1,0 +1,43 @@
+# Batch Example Configuration
+# This file demonstrates batch processing with parameter variations
+
+batch_name = "Parameter Sweep Batch"
+
+# Base configuration
+base_config = "configs/batch_examples/complex_batch_config.json"
+
+# Parameter variations to sweep
+parameters = {
+    "neuron_count": [100, 200, 300, 400],
+    "plasticity_learning_rate": [0.01, 0.02, 0.03],
+    "stdp_ltp_weight": [0.01, 0.02, 0.03]
+}
+
+# Processing options
+processing_options = {
+    "profile": "standard",
+    "parallel_execution": true,
+    "batch_size": 2,
+    "num_threads": 4,
+    "aggregate_results": true,
+    "statistics_only": false,
+    "error_handling": true,
+    "checkpoint_enabled": false,
+    "resource_monitoring": true
+}
+
+# Expected metrics to collect
+metrics = [
+    "execution_time",
+    "neuron_count",
+    "spike_count",
+    "synaptic_changes",
+    "learning_detected"
+]
+
+# Output configuration
+output = {
+    "format": "json",
+    "output_file": "parameter_sweep_results.json",
+    "verbose": true
+}

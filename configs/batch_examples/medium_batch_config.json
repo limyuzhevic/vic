@@ -1,0 +1,39 @@
+// Medium configuration for batch processing
+// This config processes a moderate number of neurons with extended simulation
+
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-10-11T16:00:50Z",
+    "author": "NLM Developer"
+  },
+  "simulation": {
+    "random_seed": 123,
+    "simulation_timestep": 0.001,
+    "max_simulation_steps": 500,
+    "simulation_time_limit": 5.0,
+    "neuron_count": 200,
+    "region_count": 3,
+    "connection_probability": 0.20
+  },
+  "plasticity": {
+    "plasticity_learning_rate": 0.02,
+    "stdp_ltp_weight": 0.025,
+    "stdp_ltd_weight": 0.02,
+    "stdp_time_constant": 0.02,
+    "development_synaptogenesis_rate": 0.15,
+    "development_pruning_rate": 0.08
+  },
+  "neuromodulation": {
+    "dopamine_baseline": 0.5,
+    "reward_discount_factor": 0.95,
+    "curiosity_weight": 0.3,
+    "reward_weight": 0.4,
+    "prediction_error_weight": 0.3
+  },
+  "environment": {
+    "environment_name": "StandardWorld",
+    "environment_width": 100,
+    "environment_height": 100
+  }
+}

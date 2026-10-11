@@ -22,6 +22,27 @@
 
 namespace nlm {
 
+/**
+ * Brain::Impl struct
+ * 
+ * @struct Impl
+ * @brief Internal implementation details for Brain class
+ * @details Comprehensive brain state management including:
+ *         - Core neural dynamics (regions, connections)
+ *         - Integrated memory systems (working, episodic, associative)
+ *         - Prediction and cognition systems
+ *         - Development and neuromodulation systems
+ *         - Plasticity and spike systems
+ *         - Simulation state and statistics
+ * 
+ * This struct encapsulates the complete brain architecture following:
+ * Phase 6: INTEGRATED ARTIFICIAL BRAIN
+ * 
+ * @note PIMPL pattern provides ABI stability while hiding implementation complexity
+ * @warning This is an internal implementation detail, not part of public API
+ * @see Brain::Brain() constructor for implementation
+ * @see Brain::step() for main simulation loop documentation
+ */
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
@@ -78,6 +99,19 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    /**
+     * Impl constructor with comprehensive configuration
+     * 
+     * @param cfg Configuration object for brain initialization
+     * @post Initializes brain with biologically plausible defaults:
+     *       - Random seed from config or default (42)
+     *       - Timestep: 0.001s (1ms)
+     *       - Initial development stage: Initial
+     *       - Replay interval: 100 steps
+     *       - Consolidation interval: 1000 steps
+     * @warning Complex initialization may take significant time
+     * @throws NLMException if configuration invalid
+     */
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -156,15 +190,111 @@ struct Brain::Impl {
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
+        // Initialize random generator with seed from config
+        uint64_t seed = 42;  // Default seed
+        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+            seed = *seedOpt;
+        }
+        rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Initialize plasticity systems
+        spikeSystem = std::make_unique<SpikeSystem>();
+        stdp = std::make_unique<STDP>();
+        hebbian = std::make_unique<Hebbian>();
+        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        
+        // Initialize memory systems
+        workingMemory = std::make_unique<NeuralWorkingMemory>();
+        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize prediction system
+        predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize cognition systems
+        planner = std::make_unique<NeuralPlanner>();
+        conceptFormation = std::make_unique<ConceptFormation>();
+        attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize development system
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
+        
+        // Configure STDP parameters
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        stdp->configure(ltpWeight, ltdWeight, tau);
+        
+        // Configure structural plasticity
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        structuralPlasticity->setPruningRate(pruningRate);
+        
+        // Get timestep
+        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        
+        // Get integration intervals from config
+        replayInterval = config->getOr<size_t>("replay_interval", 100);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        
+        // Initialize checkpoint manager
+        checkpointManager = std::make_unique<CheckpointManager>();
+    }
+    
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+};
 
+/**
+ * Brain constructor with configuration
+ * 
+ * @param config Shared configuration object for brain initialization
+ * @post Brain object created with internal implementation
+ * @note Configuration validation occurs during initialize(), not construction
+ * @see initialize() for complete brain setup
+ */
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
-
+    
+/**
+ * Brain destructor - comprehensive cleanup
+ * 
+ * @post All brain resources released:
+ *       - Neural systems shutdown
+ *       - Memory systems cleared
+ *       - Plasticity systems finalized
+ *       - Checkpoint manager closed
+ *       - Dynamic memory deallocated
+ */
 Brain::~Brain() = default;
-
+    
+/**
+ * Move constructor - efficient brain transfer
+ * 
+ * @param other Brain to move from (will be invalidated)
+ * @post this->pImpl = other->pImpl, other->pImpl = nullptr
+ * @note Move semantics provide efficient transfer without deep copying
+ */
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
-
+    
+/**
+ * Move assignment operator - efficient brain reassignment
+ * 
+ * @param other Brain to move from (will be invalidated)
+ * @post this->pImpl = other->pImpl, other->pImpl = nullptr
+ * @return Reference to this brain
+ * @note Move assignment provides efficient transfer without deep copying
+ */
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
@@ -174,6 +304,27 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+/**
+ * Initialize brain with configuration
+ * 
+ * @return true if initialization successful, false if failed
+ * @post Brain ready for simulation; all systems initialized
+ * @details Performs comprehensive initialization including:
+ *         - Region creation based on configuration (neuron_count, region_count)
+ *         - Neuron population setup across regions (sensory, internal, motor)
+ *         - Synapse connectivity initialization (connection_probability)
+ *         - Integration system startup and configuration
+ *         - Memory system initialization and capacity setup
+ *         - Plasticity system configuration (STDP, Hebbian, structural)
+ *         - Neuromodulation system startup
+ *         - Spike system registration for event-driven processing
+ *         - Checkpoint system configuration
+ * 
+ * @warning This may take significant time for large networks (1000+ neurons)
+ * @warning Complex initialization may fail if configuration invalid
+ * @see step() for simulation execution
+ * @see reset() for state reset
+ */
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -215,8 +366,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     

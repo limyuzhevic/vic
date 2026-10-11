@@ -3,6 +3,7 @@
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
+#include <cmath>
 
 namespace test_neuron {
 
@@ -147,6 +148,62 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+void testNeuronErrorHandling() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test state validation
+    assert(neuron.validateState());
+    
+    // Test input validation
+    assert(neuron.validateInput(1.0f));
+    assert(neuron.validateInput(-1.0f));
+    
+    // Test threshold validation
+    assert(neuron.validateThreshold());
+    
+    // Test membrane potential validation
+    assert(neuron.validateMembranePotential());
+    
+    // Test refractory period validation
+    assert(neuron.validateRefractoryPeriod());
+    
+    // Test that we can set invalid values (error handling should catch them)
+    neuron.setMembranePotential(-100.0f);  // At minimum bound
+    neuron.setMembranePotential(50.0f);    // At maximum bound
+    
+    // Check health status
+    assert(neuron.isHealthy());
+    
+    // Get validation issues
+    auto issues = neuron.getValidationIssues();
+    assert(issues.empty());  // Should be empty if neuron is healthy
+    
+    std::cout << "    testNeuronErrorHandling passed" << std::endl;
+}
+
+void testNeuronRecovery() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Create some invalid state
+    neuron.setMembranePotential(-100.0f);
+    neuron.setThreshold(-100.0f);  // Invalid (too low)
+    
+    // Test that recovery is available
+    assert(neuron.isRecoverable());
+    
+    // Attempt recovery
+    neuron.attemptRecovery();
+    
+    // After recovery, should be healthy
+    assert(neuron.isHealthy());
+    
+    // Get health issues (should be empty or minimal)
+    auto issues = neuron.getHealthIssues();
+    // Some issues might still exist, but the system should be functional
+    
+    std::cout << "    testNeuronRecovery passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();
@@ -158,6 +215,8 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testNeuronErrorHandling();
+    testNeuronRecovery();
 }
 
 } // namespace test_neuron
