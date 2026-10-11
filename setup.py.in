@@ -1,0 +1,24 @@
+# Simple setup.py template for NLM Python package
+# This template is used by CMake to generate the setup.py file
+
+setup(
+    name='pynlm',
+    version='2.0.0-enhanced',
+    description='Enhanced NLM (Neural Learning Machine) Python bindings',
+    long_description='Enhanced Python bindings for the NLM C++ neural simulation framework with validation, context managers, and advanced features.',
+    author='NLM Authors',
+    author_email='nlm@example.com',
+    url='https://github.com/nlm-project/nlm',
+    packages=['pynlm'],
+    ext_modules=[Extension('pynlm.pynlm_enhanced', ['python/bindings.cpp'])],
+    install_requires=[],
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: C++',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    ],
+    python_requires='>=3.8',
+)

@@ -1,5 +1,7 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Phase 3: Python Bindings Tests
+// Phase 4: Performance Benchmarks
 
 #include <iostream>
 #include <cassert>
@@ -35,6 +37,20 @@ namespace test_stdp {
 
 namespace test_brain {
     void runAll();
+}
+
+namespace test_python_bindings {
+    void runAll();
+}
+
+namespace benchmark_python {
+    void runPythonBindingBenchmarks();
+}
+
+// Add the implementation of runAll() for Python bindings
+void test_python_bindings::runAll() {
+    std::cout << "Running enhanced Python bindings test suite..." << std::endl;
+    test_python_bindings::runPythonBindingTests();
 }
 
 int main() {
@@ -113,6 +129,29 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python Bindings tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "=== NLM Performance Benchmarks ===" << std::endl;
+    std::cout << "Benchmarking Python bindings performance" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Running Performance benchmarks..." << std::endl;
+    try {
+        benchmark_python::runPythonBindingBenchmarks();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

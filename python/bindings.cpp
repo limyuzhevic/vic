@@ -142,16 +142,16 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(Enhanced Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,46 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Enhanced validation and schema methods
+        .def("isValid", &Config::isValid, py::arg("key"),
+             "Check if a configuration key has a valid value")
+        .def("validate", &Config::validate,
+             "Validate the entire configuration")
+        .def("getValidationErrors", &Config::getValidationErrors, py::arg("key"),
+             "Get validation errors for a configuration key")
+        .def("getValidationWarnings", &Config::getValidationWarnings, py::arg("key"),
+             "Get validation warnings for a configuration key")
+        .def("getGroups", &Config::getGroups,
+             "Get all configuration groups")
+        .def("getParametersInGroup", &Config::getParametersInGroup, py::arg("group"),
+             "Get all parameters in a specific group")
+        .def("getParameterDescription", &Config::getParameterDescription, py::arg("key"),
+             "Get detailed description of a parameter")
+        
+        // Template methods
+        .def("loadFromTemplate", &Config::loadFromTemplate, py::arg("templateName"),
+             "Load configuration from a predefined template")
+        .def_static("getAvailableTemplates", &Config::getAvailableTemplates,
+                   "Get list of available configuration templates")
+        
+        // Set and get with Pythonic interface
+        .def("set", (bool (Config::*)(const std::string&, const std::any&)) &Config::set,
+             py::arg("key"), py::arg("value"),
+             "Set a configuration value with validation")
+        .def("get", (py::object (Config::*)(const std::string&) const) &Config::get<std::string>, py::arg("key"),
+             "Get a configuration value as a Python object")
+        
+        // Additional Python-specific convenience methods
+        .def("getInt", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue") = 0,
+             "Get an integer configuration value with default")
+        .def("getDouble", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue") = 0.0,
+             "Get a double configuration value with default")
+        .def("getString", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue") = "",
+             "Get a string configuration value with default")
+        .def("getBool", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue") = false,
+             "Get a boolean configuration value with default")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

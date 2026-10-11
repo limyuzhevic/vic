@@ -1,3 +1,6 @@
+# NLM Build Configuration
+# Updated for enhanced Python bindings and comprehensive testing
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -97,6 +100,7 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +108,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +116,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,34 +124,155 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Enhanced configuration system
+add_library(nlm_config_enhanced STATIC
+    src/core/Config/ConfigEnhanced.cpp
+)
+
+target_include_directories(nlm_config_enhanced PUBLIC src/core/Config)
+target_link_libraries(nlm_config_enhanced PUBLIC nlm_core)
+
+# Python bindings (enhanced)
+add_library(nlm_python_enhanced MODULE
+    python/bindings.cpp
+)
+
+set_target_properties(nlm_python_enhanced PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
+
+target_include_directories(nlm_python_enhanced PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${PYTHON_INCLUDE_DIRS}
+    ${pybind11_INCLUDE_DIR}
+)
+
+target_link_libraries(nlm_python_enhanced PRIVATE
+    nlm_core
+    nlm_agent
+    nlm_world
+    nlm_config_enhanced
+)
+
+if(MSVC)
+    target_compile_options(nlm_python_enhanced PRIVATE /permissive-)
+endif()
+
+# Python bindings configuration
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 CONFIG REQUIRED)
+
+# Enhanced Python module setup
+pybind11_add_module(pynlm_enhanced python/bindings.cpp)
+target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world nlm_config_enhanced)
+target_include_directories(pynlm_enhanced PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+if(MSVC)
+    target_compile_options(pynlm_enhanced PRIVATE /permissive-)
+endif()
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
-add_subdirectory(tests)
 
-# Install targets (future)
+# Core unit tests
+add_executable(nlm_test
+    tests/test_main.cpp
+    tests/test_types.cpp
+    tests/test_config.cpp
+    tests/test_random.cpp
+    tests/test_clock.cpp
+    tests/test_neuron.cpp
+    tests/test_synapse.cpp
+    tests/test_stdp.cpp
+    tests/test_brain.cpp
+)
+
+target_link_libraries(nlm_test PRIVATE nlm_core)
+target_compile_features(nlm_test PRIVATE cxx_std_20)
+
+add_test(NAME nlm_test COMMAND nlm_test)
+
+# Python bindings tests
+add_executable(nlm_python_test
+    tests/test_python_bindings.cpp
+    tests/benchmark_python.cpp
+)
+
+target_link_libraries(nlm_python_test PRIVATE nlm_core nlm_config_enhanced)
+target_compile_features(nlm_python_test PRIVATE cxx_std_20)
+
+add_test(NAME nlm_python_test COMMAND nlm_python_test)
+
+# Python API test script
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python_api.py
+    ${CMAKE_CURRENT_BINARY_DIR}/test_python_api.py
+    COPYONLY
+)
+
+add_custom_target(python_api_tests
+    COMMAND python3 ${CMAKE_CURRENT_BINARY_DIR}/test_python_api.py
+    DEPENDS nlm_python_test
+    COMMENT "Running Python API tests"
+)
+
+# Installation targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+install(TARGETS nlm_python_enhanced pynlm_enhanced
+    LIBRARY DESTINATION python/nlm
+    ARCHIVE DESTINATION python/nlm
+    RUNTIME DESTINATION python/nlm
+)
+
+# Documentation targets
+add_custom_target(doc
+    COMMAND doxygen Doxyfile
+    COMMENT "Generate documentation"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Create a simple installation script for Python packages
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/setup.py
+    @ONLY
+)
+
+# Summary message
+message(STATUS "NLM project configuration complete")
+message(STATUS "  - C++ core library: nlm_core")
+message(STATUS "  - Python bindings: nlm_python_enhanced")
+message(STATUS "  - Enhanced config: nlm_config_enhanced")
+message(STATUS "  - Test suite: Core unit tests + Python bindings tests")
