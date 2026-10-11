@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NEURAL_REGION_HPP
+#define NEURAL_REGION_HPP
 
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
@@ -81,7 +82,9 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    neural_region_impl_ptr pImpl;
 };
 
 } // namespace nlm
+
+#endif // NEURAL_REGION_HPP

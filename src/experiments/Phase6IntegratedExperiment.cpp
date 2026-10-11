@@ -36,7 +36,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to initialize brain");
         result.endTime = time(nullptr);
         return result;
     }
@@ -47,11 +47,31 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create agent
     AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    if (!agent.initialize(world)) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to initialize agent");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    if (!agent.enableRewardModulation(true)) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to enable reward modulation");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    if (!agent.enableStructuralPlasticity(config.enableDevelopment)) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to enable structural plasticity");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    if (!agent.enableDevelopment(config.enableDevelopment)) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to enable development");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    if (!agent.enableCuriosity(true)) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to enable curiosity");
+        result.endTime = time(nullptr);
+        return result;
+    }
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
@@ -128,21 +148,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Test checkpointing
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
+        if (!brain->save(config.checkpointPath)) {
+            NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to save checkpoint");
+        } else {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
+            if (!brain2->initialize()) {
+                NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to initialize new brain for checkpointing");
+            } else if (!brain2->load(config.checkpointPath)) {
+                NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::run: Failed to load checkpoint");
+            } else {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
             }
-        } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
         }
     }
     
@@ -169,7 +189,7 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Brain initialization failed");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Brain initialization failed");
         return false;
     }
     
@@ -179,14 +199,14 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     if (brain->getWorkingMemory() != nullptr) {
         NLM_LOG_INFO("[PASS] Working memory is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Working memory is NOT integrated");
         success = false;
     }
     
     if (brain->getEpisodicMemory() != nullptr) {
         NLM_LOG_INFO("[PASS] Episodic memory is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Episodic memory is NOT integrated");
         success = false;
     }
     
@@ -194,14 +214,14 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     if (brain->getDopamine() != nullptr) {
         NLM_LOG_INFO("[PASS] Dopamine system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Dopamine system is NOT integrated");
         success = false;
     }
     
     if (brain->getCuriosity() != nullptr) {
         NLM_LOG_INFO("[PASS] Curiosity system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Curiosity system is NOT integrated");
         success = false;
     }
     
@@ -209,7 +229,7 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     if (brain->getPredictionSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Prediction system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Prediction system is NOT integrated");
         success = false;
     }
     
@@ -217,21 +237,21 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     if (brain->getPlanner() != nullptr) {
         NLM_LOG_INFO("[PASS] Planner is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Planner is NOT integrated");
         success = false;
     }
     
     if (brain->getConceptFormation() != nullptr) {
         NLM_LOG_INFO("[PASS] Concept formation is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Concept formation is NOT integrated");
         success = false;
     }
     
     if (brain->getAttention() != nullptr) {
         NLM_LOG_INFO("[PASS] Attention is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Attention is NOT integrated");
         success = false;
     }
     
@@ -239,7 +259,7 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     if (brain->getDevelopmentSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Development system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::verifyIntegration: Development system is NOT integrated");
         success = false;
     }
     
@@ -253,14 +273,15 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
-    
-    // Get memory systems
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testMemoryIntegration: Brain initialization failed");
+        return false;
+    }
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
     
     if (!wm || !em) {
-        NLM_LOG_ERROR("Memory systems not available");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testMemoryIntegration: Memory systems not available");
         return false;
     }
     
@@ -293,15 +314,16 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
-    
-    // Get neuromodulation systems
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testNeuromodulationIntegration: Brain initialization failed");
+        return false;
+    }
     auto* dopamine = brain->getDopamine();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
     
     if (!dopamine || !curiosity || !novelty) {
-        NLM_LOG_ERROR("Neuromodulation systems not available");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testNeuromodulationIntegration: Neuromodulation systems not available");
         return false;
     }
     
@@ -340,16 +362,19 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     // Save checkpoint
     std::string path = "/tmp/nlm_checkpoint_test.bin";
     if (!brain1->save(path)) {
-        NLM_LOG_ERROR("Failed to save checkpoint");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testCheckpointing: Failed to save checkpoint");
         return false;
     }
     
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    if (!brain2->initialize()) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testCheckpointing: Failed to initialize brain for checkpoint load");
+        return false;
+    }
     
     if (!brain2->load(path)) {
-        NLM_LOG_ERROR("Failed to load checkpoint");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testCheckpointing: Failed to load checkpoint");
         return false;
     }
     
@@ -370,11 +395,12 @@ bool Phase6IntegratedExperiment::testReplay() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
-    
-    auto* em = brain->getEpisodicMemory();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testReplay: Brain initialization failed");
+        return false;
+    }
     if (!em) {
-        NLM_LOG_ERROR("Episodic memory not available");
+        NLM_LOG_ERROR("[ERROR] Phase6IntegratedExperiment::testReplay: Episodic memory not available");
         return false;
     }
     

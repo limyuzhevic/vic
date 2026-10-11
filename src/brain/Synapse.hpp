@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNAPSE_HPP
+#define SYNAPSE_HPP
 
 #include "../core/Types/Types.hpp"
 
@@ -82,7 +83,9 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    synapse_impl_ptr pImpl;
 };
 
 } // namespace nlm
+
+#endif // SYNAPSE_HPP

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NEURAL_POPULATION_HPP
+#define NEURAL_POPULATION_HPP
 
 #include "../core/Types/Types.hpp"
 #include "Neuron.hpp"
@@ -69,7 +70,9 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    neural_population_impl_ptr pImpl;
 };
 
 } // namespace nlm
+
+#endif // NEURAL_POPULATION_HPP
