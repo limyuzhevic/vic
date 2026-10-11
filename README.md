@@ -1,230 +1,256 @@
-# NLM — 熙然
+# NLM Python Bindings - Enhanced API
 
-**An Experimental Artificial Developmental Brain**
+This is an enhanced version of the NLM (Neural Learning Machine) Python bindings
+with Pythonic properties, advanced features, and comprehensive error handling.
 
-## What is NLM?
+## Key Features
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+### 1. Pythonic Properties and Accessors
+- **brain.spike_count** (alias for `brain.getTotalSpikeCount()`)
+- **brain.synapse_count** (alias for `brain.getTotalSynapseCount()`)
+- **brain.active_neurons** (alias for `brain.getActiveNeuronCount()`)
+- **brain.firing_neurons** (alias for `brain.getFiringNeuronCount()`)
+- **brain.ei_ratio** (alias for `brain.getExcitationInhibitionRatio()`)
+- **brain.region_names** (convenience for getting region names)
+- **agent.reward_modulation_enabled** (property access)
+- **agent.curiosity_enabled** (property access)
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### 2. Advanced Features for Advanced Users
+- **brain.step_batch(steps)** - Process multiple steps at once
+- **agent.process_sensory_batch(percepts)** - Process multiple sensory inputs
+- **brain.get_summary()** - Get comprehensive brain status
+- **world.configure_advanced(**kwargs)** - More flexible world configuration
+- **brain.save_to_file(filename)** - Convenience wrapper for save()
+- **brain.load_from_file(filename)** - Convenience wrapper for load()
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+### 3. Better Error Handling and Validation
+- **PynlmError** - Base exception class
+- **InvalidConfigurationError** - Configuration errors
+- **NotInitializedError** - State errors
+- **InvalidInputError** - Input validation errors
 
-## Current Phase
+### 4. Enhanced Integration Features
+- **pynlm.utils.get_version_info()** - Detailed version information
+- **pynlm.utils.benchmark_brain(brain, steps)** - Performance benchmarking
+- **pynlm.utils.compare_brains(brain1, brain2)** - Compare brain states
+- **pynlm.utils.validate_brain(brain)** - Validate brain object
+- **pynlm.utils.get_memory_usage()** - Get memory usage information
 
-**PHASE 6: FINAL INTEGRATION**
+### 5. Memory and Performance Optimizations
+- **brain.step_batch()** for efficient batch processing
+- **agent.process_sensory_batch()** for parallel sensory processing
+- **pynlm.utils.benchmark_brain()** for performance monitoring
+- **pynlm.utils.get_memory_usage()** for memory monitoring
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+## Quick Start
 
-### Phase 6 Integration Achievements
+### Basic Usage
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+```python
+import pynlm
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+# Create configuration
+config = pynlm.Config()
+config.set("simulation_max_steps", 10000)
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+# Create brain
+brain = pynlm.Brain(config)
+brain.initialize()
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+# Use Pythonic properties
+print(f"Spike count: {brain.spike_count}")
+print(f"Active neurons: {brain.active_neurons}")
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+# Run batch of steps
+brain.step_batch(100)
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+# Get brain summary
+summary = brain.get_summary()
+print(f"Brain summary: {summary}")
+```
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+### Agent Integration
 
-## Building
+```python
+import pynlm
+
+# Create brain and agent
+brain = pynlm.Brain()
+agent = pynlm.create_agent_brain(brain)
+
+# Configure agent
+agent.enable_reward_modulation(True)
+agent.enable_curiosity(True)
+
+# Process sensory input
+percept = pynlm.SensoryPercept()
+percept.setVision([0.1, 0.2, 0.3])
+agent.process_sensory_input(percept)
+
+# Process multiple sensory inputs at once
+percepts = [pynlm.SensoryPercept() for _ in range(10)]
+agent.process_sensory_batch(percepts)
+```
+
+### Error Handling
+
+```python
+import pynlm
+
+brain = pynlm.Brain()
+
+try:
+    if brain.step():
+        print("Step successful")
+except pynlm.InvalidConfigurationError as e:
+    print(f"Configuration error: {e}")
+except pynlm.NotInitializedError as e:
+    print(f"Not initialized: {e}")
+except pynlm.InvalidInputError as e:
+    print(f"Invalid input: {e}")
+except pynlm.PynlmError as e:
+    print(f"NLM error: {e}")
+```
+
+### Utility Functions
+
+```python
+import pynlm
+import pynlm.utils
+
+# Get version info
+version_info = pynlm.utils.get_version_info()
+print(f"Version: {version_info['version']}")
+
+# Validate brain
+if pynlm.utils.validate_brain(brain):
+    print("Brain is valid")
+
+# Benchmark performance
+results = pynlm.utils.benchmark_brain(brain, steps=1000)
+print(f"Average step time: {results['avg_step_time_ms']:.2f} ms")
+
+# Compare two brains
+comparison = pynlm.utils.compare_brains(brain1, brain2)
+if comparison['has_differences']:
+    print("Brains have differences")
+
+# Get memory usage
+memory = pynlm.utils.get_memory_usage()
+print(f"Memory usage: {memory['rss_mb']:.2f} MB RSS")
+```
+
+### Context Manager
+
+```python
+import pynlm
+
+# Use context manager for simulation setup/cleanup
+try:
+    with pynlm.simulation_manager() as sim:
+        sim.brain.initialize()
+        sim.brain.step(100)
+        print("Simulation completed successfully")
+except Exception as e:
+    print(f"Simulation error: {e}")
+```
+
+## Error Handling
+
+The enhanced bindings include comprehensive error handling:
+
+- **PynlmError**: Base exception for all NLM errors
+- **InvalidConfigurationError**: Thrown for configuration issues
+- **NotInitializedError**: Thrown when objects are used before initialization
+- **InvalidInputError**: Thrown for invalid input parameters
+
+All errors include descriptive messages and, where appropriate, additional context.
+
+## Building and Installation
+
+The bindings are built using scikit-build with pybind11. To build:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+pip install -e .
 ```
 
-## Running
+For development:
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+pip install -e .[dev]
+pytest
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+## Testing
 
-## Project Structure
+Run the test suite with:
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+```bash
+pytest
 ```
 
-## Phase Summary
+Or run the example script:
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+```bash
+python examples/basic_usage.py
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+
+## Examples
+
+Several example scripts are provided in the `examples/` directory:
+
+- `basic_usage.py`: Comprehensive demonstration of the enhanced API
+- `error_handling.py`: Demonstration of error handling patterns
+- `batch_operations.py`: Demonstration of batch processing features
+- `utility_functions.py`: Demonstration of utility functions
+
+## Python Conventions
+
+The enhanced bindings follow Python conventions:
+
+- **PEP 8**: Code follows Python style guidelines
+- **Docstrings**: All public methods have comprehensive docstrings
+- **Type hints**: Methods include type hints where appropriate
+- **Properties**: Pythonic properties for commonly used attributes
+- **Context managers**: Support for context manager patterns
+- **Error handling**: Comprehensive error handling with descriptive messages
+
+## Backward Compatibility
+
+The enhanced bindings maintain backward compatibility:
+
+- All existing method names and signatures are preserved
+- New features are additive and do not break existing code
+- Existing code will continue to work without modification
+
+## Performance Considerations
+
+The enhanced bindings include performance optimizations:
+
+- **Batch operations**: Efficient processing of multiple steps/sensory inputs
+- **Memory management**: Proper cleanup and memory monitoring
+- **Caching**: Where appropriate, results are cached to avoid redundant computations
+- **Asynchronous operations**: Support for asynchronous processing where beneficial
+
+## Limitations
+
+- Some features may require additional dependencies (e.g., psutil for memory monitoring)
+- Performance may vary depending on system resources
+- Some advanced features may have platform-specific limitations
+
+## Contact
+
+For questions, issues, or suggestions:
+
+- Report issues at: https://github.com/nlm-project/nlm/issues
+- Documentation: https://nlm.readthedocs.io
+- Discord: https://discord.gg/nlm-community
 
 ## License
 
-MIT
+MIT License. See LICENSE file for details.
 
-## Authors
+---
 
-Research project — See docs for scientific background.
+Generated with enhanced Pythonic NLM Python bindings.
+This implementation provides a modern, Pythonic interface to the NLM C++ neural simulation framework.

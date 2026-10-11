@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,6 +21,36 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Helper functions for error handling
+inline void checkNullPointer(const void* ptr, const std::string& operation) {
+    if (!ptr) {
+        throw std::runtime_error("Operation '" + operation + "': null pointer access");
+    }
+}
+
+inline void checkInvalidNeuronId(NeuronId id, const std::string& operation) {
+    if (id.value == 0) {
+        throw std::runtime_error("Operation '" + operation + "': invalid neuron ID");
+    }
+}
+
+inline void checkInvalidRegionId(RegionId id, const std::string& operation) {
+    if (id.value == 0) {
+        throw std::runtime_error("Operation '" + operation + "': invalid region ID");
+    }
+}
+
+inline void checkCondition(bool condition, const std::string& errorMsg) {
+    if (!condition) {
+        throw std::runtime_error(errorMsg);
+    }
+}
+
+// Version information
+const char* getVersion() {
+    return "1.0.0";
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -26,6 +58,8 @@ PYBIND11_MODULE(pynlm, m) {
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
+
+    m.attr("__version__") = getVersion();
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -350,10 +384,132 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+.def("logStatus", &Brain::logStatus,
+              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    // Add missing Brain class methods with error handling and parameter validation
+        .def("getPendingSpikeEventCount", [](const Brain& brain) {
+            const SpikeSystem* spikeSys = brain.getSpikeSystem();
+            checkNullPointer(spikeSys, "getPendingSpikeEventCount");
+            return spikeSys->getPendingSpikeEventCount();
+        }, "Get count of pending spike events with null check")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"), "Set developmental stage with validation")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"), "Apply neuromodulatory signal")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current to all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("getRandomGenerator", [](Brain& brain) {
+            RandomGenerator* rng = brain.getRandomGenerator();
+            checkNullPointer(rng, "getRandomGenerator");
+            return rng;
+        }, "Get random generator with null check")
+        .def("getWorkingMemory", [](Brain& brain) {
+            NeuralWorkingMemory* memory = brain.getWorkingMemory();
+            checkNullPointer(memory, "getWorkingMemory");
+            return memory;
+        }, "Get working memory with null check")
+        .def("getEpisodicMemory", [](Brain& brain) {
+            NeuralEpisodicMemory* memory = brain.getEpisodicMemory();
+            checkNullPointer(memory, "getEpisodicMemory");
+            return memory;
+        }, "Get episodic memory with null check")
+        .def("getAssociativeMemory", [](Brain& brain) {
+            NeuralAssociativeMemory* memory = brain.getAssociativeMemory();
+            checkNullPointer(memory, "getAssociativeMemory");
+            return memory;
+        }, "Get associative memory with null check")
+        .def("getPredictionSystem", [](Brain& brain) {
+            PredictionSystem* predSys = brain.getPredictionSystem();
+            checkNullPointer(predSys, "getPredictionSystem");
+            return predSys;
+        }, "Get prediction system with null check")
+        .def("getPlanner", [](Brain& brain) {
+            NeuralPlanner* planner = brain.getPlanner();
+            checkNullPointer(planner, "getPlanner");
+            return planner;
+        }, "Get planner with null check")
+        .def("getConceptFormation", [](Brain& brain) {
+            ConceptFormation* concept = brain.getConceptFormation();
+            checkNullPointer(concept, "getConceptFormation");
+            return concept;
+        }, "Get concept formation with null check")
+        .def("getAttention", [](Brain& brain) {
+            AttentionalSelection* attention = brain.getAttention();
+            checkNullPointer(attention, "getAttention");
+            return attention;
+        }, "Get attention with null check")
+        .def("getDevelopmentSystem", [](Brain& brain) {
+            DevelopmentSystem* devSys = brain.getDevelopmentSystem();
+            checkNullPointer(devSys, "getDevelopmentSystem");
+            return devSys;
+        }, "Get development system with null check")
+        .def("getDopamine", [](Brain& brain) {
+            Dopamine* dopamine = brain.getDopamine();
+            checkNullPointer(dopamine, "getDopamine");
+            return dopamine;
+        }, "Get dopamine with null check")
+        .def("getCuriosity", [](Brain& brain) {
+            Curiosity* curiosity = brain.getCuriosity();
+            checkNullPointer(curiosity, "getCuriosity");
+            return curiosity;
+        }, "Get curiosity with null check")
+        .def("getNovelty", [](Brain& brain) {
+            Novelty* novelty = brain.getNovelty();
+            checkNullPointer(novelty, "getNovelty");
+            return novelty;
+        }, "Get novelty with null check")
+        .def("getPredictionErrorSignal", [](Brain& brain) {
+            PredictionError* predError = brain.getPredictionErrorSignal();
+            checkNullPointer(predError, "getPredictionErrorSignal");
+            return predError;
+        }, "Get prediction error signal with null check")
+        .def("getSTDP", [](Brain& brain) {
+            STDP* stdp = brain.getSTDP();
+            checkNullPointer(stdp, "getSTDP");
+            return stdp;
+        }, "Get STDP with null check")
+        .def("getHebbian", [](Brain& brain) {
+            Hebbian* hebbian = brain.getHebbian();
+            checkNullPointer(hebbian, "getHebbian");
+            return hebbian;
+        }, "Get Hebbian with null check")
+        .def("getStructuralPlasticity", [](Brain& brain) {
+            StructuralPlasticity* structPlast = brain.getStructuralPlasticity();
+            checkNullPointer(structPlast, "getStructuralPlasticity");
+            return structPlast;
+        }, "Get structural plasticity with null check")
+        .def("getSpikeSystem", [](Brain& brain) {
+            SpikeSystem* spikeSys = brain.getSpikeSystem();
+            checkNullPointer(spikeSys, "getSpikeSystem");
+            return spikeSys;
+        }, "Get spike system with null check");
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
