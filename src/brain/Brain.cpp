@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -77,6 +78,9 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Neuron lookup for O(1) spike delivery optimization
+    std::unordered_map<NeuronId, Neuron*> neuronLookup;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -151,6 +155,9 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize neuron lookup table for O(1) spike delivery
+        neuronLookup.clear();
     }
     
     DevelopmentalStage developmentalStage;
@@ -214,6 +221,12 @@ bool Brain::initialize() {
                 }
             }
             
+            // Initialize neuron lookup table for O(1) spike delivery
+            auto allNeurons = region->getAllNeurons();
+            for (auto* neuron : allNeurons) {
+                pImpl->neuronLookup[neuron->getId()] = neuron;
+            }
+            
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
@@ -243,7 +256,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -268,7 +281,21 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
+        // O(1) lookup using neuron lookup table
+        auto it = pImpl->neuronLookup.find(event.destination_neuron);
+        if (it != pImpl->neuronLookup.end()) {
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                it->second->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                it->second->receiveInhibitoryInput(-synapticCurrent);
+            }
+            return;
+        }
+        
+        // Fallback to slow lookup for neurons that might be missing from lookup
+        // This shouldn't happen in normal operation but provides robustness
         for (auto& region : pImpl->regions) {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
@@ -284,6 +311,10 @@ bool Brain::initialize() {
                 }
             }
         }
+        
+        // Log if neuron not found (should be rare)
+        NLM_LOG_WARNING("Delayed spike event destination neuron not found: " + 
+                       std::to_string(event.destination_neuron));
     });
     
     // Configure checkpoint manager
@@ -533,7 +564,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % pImpl->consolidationInterval == 0) {  // Align with consolidation interval
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
@@ -547,7 +578,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+    if (currentStep % pImpl->consolidationInterval == 0) {  // Align with plasticity and consolidation
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
