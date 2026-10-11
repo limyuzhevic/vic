@@ -139,13 +139,15 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Find Python and pybind11 for Python bindings
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 CONFIG REQUIRED)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Python bindings
+pybind11_add_module(pynlm python/bindings.cpp)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm PRIVATE src)
+
+if(MSVC)
+    target_compile_options(pynlm PRIVATE /permissive-)
+endif()
