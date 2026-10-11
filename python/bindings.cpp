@@ -6,15 +6,15 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include "core/Types/Types.hpp"
+#include "agent/AgentBrain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
+#include "agent/AgentBody.hpp"
+#include "agent/SensoryPercept.hpp"
 
 namespace py = pybind11;
 namespace nlm {
