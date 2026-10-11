@@ -395,6 +395,16 @@ public:
      */
     bool shouldSave(uint64_t currentStep) const;
     
+    /**
+     * Save complete brain state
+     */
+    bool saveBrain();
+    
+    /**
+     * Load complete brain state
+     */
+    bool loadBrain(const std::string& filepath);
+    
 private:
     std::string checkpointDir_;
     uint64_t saveIntervalSteps_;
