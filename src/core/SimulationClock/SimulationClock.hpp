@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdexcept>
 #include "Types.hpp"
 
 namespace nlm {
