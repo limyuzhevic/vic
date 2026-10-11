@@ -82,6 +82,68 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Python API Usage
+
+The NLM project includes enhanced Python bindings `pynlm` that provide a user-friendly interface to the C++ neural simulation framework.
+
+#### Installation
+```bash
+# Install the Python bindings with all enhancements
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
+#### Basic Usage
+```python
+import pynlm
+
+# Create a brain with default configuration
+brain = pynlm.createBrain()
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+
+# Get statistics
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate()}")
+```
+
+#### Advanced Usage
+```python
+import pynlm
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+brain = pynlm.createBrain()
+agent = pynlm.createAgentBrain(brain)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run complete episode
+world.reset()
+world.setAgentStart(10.0, 10.0)
+agent.initialize(world)
+
+episode = world.runEpisode(agent, num_steps=500, timestep=0.1)
+print(f"Episode completed with {episode['total_reward']:.2f} total reward")
+```
+
+The enhanced Python bindings provide:
+- **Enhanced validation** with helpful error messages
+- **Convenience factory methods** for common patterns
+- **Comprehensive statistics** aggregation
+- **Batch processing** capabilities
+- **Advanced mathematical utilities**
+- **Complete error handling** and type safety
+
 ## Project Structure
 
 ```
