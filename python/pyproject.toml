@@ -1,0 +1,11 @@
+# Python package configuration for NLM Python bindings
+
+This file provides additional package configuration using pyproject.toml format,
+which is the modern standard for Python packaging.
+
+The configuration includes:
+- Build system requirements
+- Package metadata
+- Python version requirements
+- Dependencies
+- Build backend configuration
