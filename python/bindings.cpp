@@ -162,7 +162,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -170,7 +170,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("__repr__", [](const SensoryInput& self) {
+            return "<SensoryInput type=" + std::to_string(static_cast<int>(self.getType())) + ">";
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -202,92 +205,129 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
         .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("getType", &Action::getType, "Get the action type")
+        .def("setType", &Action::setType, py::arg("type"), "Set the action type")
+        .def("getParameters", &Action::getParameters, "Get action parameters")
+        .def("setParameters", &Action::setParameters, py::arg("params"), "Set action parameters")
+        .def("getName", &Action::getName, "Get human-readable action name")
+        .def("clone", &Action::clone, "Create a copy of this action")
+        .def("__repr__", [](const Action& self) {
+            return "<Action type=" + std::to_string(static_cast<int>(self.getType())) + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
         .def(py::init<float, float, WorldObjectType, float, float>(),
              py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+             py::arg("radius") = 0.5f,
+             "Create a world object with position, type, and properties")
+        .def_readwrite("x", &WorldObject::x, "Object X coordinate")
+        .def_readwrite("y", &WorldObject::y, "Object Y coordinate")
+        .def_readwrite("radius", &WorldObject::radius, "Object radius")
+        .def_readwrite("type", &WorldObject::type, "Object type")
+        .def_readwrite("value", &WorldObject::value, "Object value/health")
+        .def_readwrite("active", &WorldObject::active, "Whether object is active")
+        .def("__repr__", [](const WorldObject& self) {
+            return "<WorldObject type=" + std::to_string(static_cast<int>(self.type)) +
+                   " x=" + std::to_string(self.x) + " y=" + std::to_string(self.y) + ">";
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
-        .def_readwrite("x", &AgentBody::x)
-        .def_readwrite("y", &AgentBody::y)
-        .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
-        .def_readwrite("energy", &AgentBody::energy)
-        .def_readwrite("health", &AgentBody::health)
-        .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def_readwrite("x", &AgentBody::x, "Agent X position")
+        .def_readwrite("y", &AgentBody::y, "Agent Y position")
+        .def_readwrite("orientation", &AgentBody::orientation, "Agent orientation in radians")
+        .def_readwrite("velocityX", &AgentBody::velocityX, "X velocity")
+        .def_readwrite("velocityY", &AgentBody::velocityY, "Y velocity")
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity, "Angular velocity")
+        .def_readwrite("energy", &AgentBody::energy, "Current energy level")
+        .def_readwrite("health", &AgentBody::health, "Current health level")
+        .def_readwrite("age", &AgentBody::age, "Agent age in simulation steps")
+        .def_readwrite("isMoving", &AgentBody::isMoving, "Whether agent is moving")
+        .def_readwrite("isTurning", &AgentBody::isTurning, "Whether agent is turning")
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime, "Time of last action")
+        .def("reset", &AgentBody::reset, "Reset agent body to initial state")
+        .def("__repr__", [](const AgentBody& self) {
+            return "<AgentBody x=" + std::to_string(self.x) + " y=" + std::to_string(self.y) +
+                   " energy=" + std::to_string(self.energy) + " health=" + std::to_string(self.health) + ">";
+        });
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
         .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+             py::arg("reward"), py::arg("success"), py::arg("message") = "",
+             "Create an action result with reward, success status, and message")
+        .def_readwrite("reward", &ActionResult::reward, "Reward value from action")
+        .def_readwrite("success", &ActionResult::success, "Whether action was successful")
+        .def_readwrite("message", &ActionResult::message, "Result message")
+        .def("__repr__", [](const ActionResult& self) {
+            return "<ActionResult reward=" + std::to_string(self.reward) +
+                   " success=" + (self.success ? "true" : "false") + " message=\"" + self.message + "\">";
+        });
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("getVision", &SensoryPercept::getVision, "Get vision data")
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"), "Set vision data")
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth, "Get vision width")
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight, "Get vision height")
+        .def("getTouch", &SensoryPercept::getTouch, "Get touch data")
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"), "Set touch data")
+        .def("getInternal", &SensoryPercept::getInternal, "Get internal signals")
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"), "Set internal signals")
+        .def("getProprioception", &SensoryPercept::getProprioception, "Get proprioception data")
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"), "Set proprioception data")
+        .def("getAudio", &SensoryPercept::getAudio, "Get audio data")
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"), "Set audio data")
+        .def("getAllSignals", &SensoryPercept::getAllSignals, "Get all sensory signals")
+        .def("getTimestamp", &SensoryPercept::getTimestamp, "Get sensory percept timestamp")
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"), "Set sensory percept timestamp")
+        .def("__repr__", [](const SensoryPercept& self) {
+            return "<SensoryPercept timestamp=" + std::to_string(self.getTimestamp()) + ">";
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure the world dimensions and vision parameters")
+        .def("reset", &SimpleWorld::reset, "Reset world state to initial conditions")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set the agent's starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state for the given timestep")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply a motor command to the agent")
+        .def("getSensoryPercept", [](const SimpleWorld& self) {
+            // Return a copy instead of reference to prevent dangling references
+            return self.getSensoryPercept();
+        }, "Get current sensory percept from world")
+        .def("getAgentBody", [](SimpleWorld& self) {
+            // Return a copy instead of reference to prevent dangling references
+            return self.getAgentBody();
+        }, "Get current agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add a world object")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid within world bounds")
+        .def("getWidth", &SimpleWorld::getWidth, "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight, "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy, "Get maximum agent energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum agent energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for deterministic behavior")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get current random seed");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -402,24 +442,69 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration with standard NLM settings",
+           py::return_value_policy::take_ownership);
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create a new brain with configuration",
+           py::return_value_policy::take_ownership);
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a new simple 2D world for NLM simulation",
+           py::return_value_policy::take_ownership);
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface",
+           py::return_value_policy::take_ownership);
 
+    // Global constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Create convenience functions for common operations
+    m.def("setupStandardBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        return std::make_tuple(config, std::make_shared<Brain>(config));
+    }, "Create a standard brain configuration with typical parameters");
+
+    m.def("createVisionSensory", [](size_t width, size_t height, size_t channels) {
+        return std::make_shared<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+       "Create vision sensory input with specified dimensions");
+
+    m.def("createAudioSensory", [](size_t sampleRate, size_t numSamples) {
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"),
+       "Create audio sensory input with specified parameters");
+
+    m.def("createInternalSensory", []() {
+        return std::make_shared<InternalSignals>();
+    }, "Create internal signals sensory input");
+
+    m.def("createAction", [](ActionType type, std::vector<float> parameters) {
+        return std::make_shared<Action>(type, parameters);
+    }, py::arg("type"), py::arg("parameters") = std::vector<float>(),
+       "Create a motor action with type and parameters");
+
+    m.def("printBanner", []() {
+        std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+    }, "Print the NLM banner and welcome message");
 
 } // namespace nlm

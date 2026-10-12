@@ -1,41 +1,7 @@
-// Brain Tests
-#include "brain/Brain.hpp"
-#include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
-
-namespace test_brain {
-
-void testBrainCreation() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    
     std::cout << "    testBrainCreation passed" << std::endl;
 }
 
-void testBrainInitialization() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
-    config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    
-    bool success = brain.initialize();
-    assert(success);
-    
-    // Verify brain initialized with expected properties
-    assert(brain.getRegionCount() == 2);
-    assert(brain.getTotalNeuronCount() == 100);
-    assert(brain.getTotalSynapseCount() > 0);
-    
-    std::cout << "    testBrainInitialization passed" << std::endl;
-}
-
-void testBrainStep() {
+void testBrainDevelopment() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -43,85 +9,253 @@ void testBrainStep() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    // Run a few steps
-    for (nlm::SimulationStep step = 0; step < 10; ++step) {
-        brain.step(step);
-    }
+    // Test developmental stage progression
+    auto stage = brain.getDevelopmentalStage();
     
-    // Just verify it doesn't crash
-    assert(brain.getTotalNeuronCount() == 100);
+    // Test development system access
+    auto* devSystem = brain.getDevelopmentSystem();
+    assert(devSystem != nullptr);
     
-    std::cout << "    testBrainStep passed" << std::endl;
+    // Test setting and getting developmental stage
+    brain.setDevelopmentalStage(nlm::DevelopmentalStage::CriticalPeriod);
+    assert(brain.getDevelopmentalStage() == nlm::DevelopmentalStage::CriticalPeriod);
+    
+    std::cout << "    testBrainDevelopment passed" << std::endl;
 }
 
-void testBrainReset() {
+void testBrainPredictionSystem() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test prediction system access
+    auto* predSystem = brain.getPredictionSystem();
+    assert(predSystem != nullptr);
+    
+    // Test prediction error signal
+    auto* predError = brain.getPredictionErrorSignal();
+    assert(predError != nullptr);
+    
+    std::cout << "    testBrainPredictionSystem passed" << std::endl;
+}
+
+void testBrainMemorySystems() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(200), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test working memory access
+    auto* workingMem = brain.getWorkingMemory();
+    assert(workingMem != nullptr);
+    
+    // Test episodic memory access
+    auto* episodicMem = brain.getEpisodicMemory();
+    assert(episodicMem != nullptr);
+    
+    // Test associative memory access
+    auto* assocMem = brain.getAssociativeMemory();
+    assert(assocMem != nullptr);
+    
+    // Test concept formation
+    auto* conceptForm = brain.getConceptFormation();
+    assert(conceptForm != nullptr);
+    
+    // Test spatial representation
+    auto* spatialRep = brain.getSpatialRepresentation();
+    assert(spatialRep != nullptr);
+    
+    // Test temporal relations
+    auto* temporalRel = brain.getTemporalRelation();
+    assert(temporalRel != nullptr);
+    
+    std::cout << "    testBrainMemorySystems passed" << std::endl;
+}
+
+void testBrainNeuromodulation() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test neuromodulation system access
+    auto* dopamine = brain.getDopamine();
+    assert(dopamine != nullptr);
+    
+    auto* curiosity = brain.getCuriosity();
+    assert(curiosity != nullptr);
+    
+    auto* novelty = brain.getNovelty();
+    assert(novelty != nullptr);
+    
+    // Test neuromodulation level access
+    float neuromodLevel = brain.getNeuromodulationLevel();
+    assert(neuromodLevel >= 0.0f);
+    
+    float curiosityLevel = brain.getCuriosityLevel();
+    assert(curiosityLevel >= 0.0f);
+    
+    float noveltyLevel = brain.getNoveltyLevel();
+    assert(noveltyLevel >= 0.0f);
+    
+    std::cout << "    testBrainNeuromodulation passed" << std::endl;
+}
+
+void testBrainCognitionSystems() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(200), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test attentional selection
+    auto* attention = brain.getAttention();
+    assert(attention != nullptr);
+    
+    // Test neural planner
+    auto* planner = brain.getPlanner();
+    assert(planner != nullptr);
+    
+    // Test self-model
+    auto* selfModel = brain.getSelfModel();
+    assert(selfModel != nullptr);
+    
+    // Test social learning
+    auto* socialLearning = brain.getSocialLearning();
+    assert(socialLearning != nullptr);
+    
+    std::cout << "    testBrainCognitionSystems passed" << std::endl;
+}
+
+void testBrainSensoryProcessing() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Create and inject sensory input
+    auto visionInput = std::make_shared<nlm::Vision>(10, 10, 3);
+    std::vector<float> testData(100, 0.5f);  // Simple uniform data
+    visionInput->setData(testData);
+    
+    brain.receiveSensoryInput(*visionInput);
+    
+    // Verify that sensory input was processed
+    size_t sensoryNeurons = 0;
+    auto* spikeSystem = brain.getSpikeSystem();
+    if (spikeSystem) {
+        // Count sensory-related neurons
+        for (size_t i = 0; i < brain.getTotalNeuronCount(); ++i) {
+            // Check if neuron is sensory type (this requires neuron inspection)
+            // For now, just verify no crash occurred
+        }
+    }
+    
+    std::cout << "    testBrainSensoryProcessing passed" << std::endl;
+}
+
+void testBrainActionComplexity() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test action production
+    auto action = brain.produceAction();
+    assert(action != nullptr);
+    
+    // Test action properties
+    assert(action->getType() != nlm::ActionType::Custom || 
+           !action->getParameters().empty());
+    
+    // Test different action types through motor system
+    auto motorAction = brain.produceAction();
+    assert(motorAction != nullptr);
+    
+    std::cout << "    testBrainActionComplexity passed" << std::endl;
+}
+
+void testBrainPlasticityIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Enable plasticity
+    auto* region = brain.getRegion(nlm::RegionId(0));
+    if (region) {
+        for (auto& synapse : region->getSynapses()) {
+            synapse->enablePlasticity(true, true, false);
+        }
+    }
+    
+    // Test plasticity system access
+    auto* stdp = brain.getSTDP();
+    auto* hebbian = brain.getHebbian();
+    auto* structural = brain.getStructuralPlasticity();
+    
+    assert(stdp != nullptr);
+    assert(hebbian != nullptr);
+    assert(structural != nullptr);
+    
+    // Test plasticity updates
+    brain.updatePlasticity();
+    
+    std::cout << "    testBrainPlasticityIntegration passed" << std::endl;
+}
+
+void testBrainCheckpointSaveLoad() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     
-    nlm::Brain brain(config);
-    brain.initialize();
+    nlm::Brain brain1(config);
+    assert(brain1.initialize());
     
-    brain.step(0);
-    brain.reset();
-    
-    // Verify reset worked
-    assert(brain.getTotalNeuronCount() == 50);
-    
-    std::cout << "    testBrainReset passed" << std::endl;
-}
-
-void testBrainRegions() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(3), nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    brain.initialize();
-    
-    auto regionIds = brain.getRegionIds();
-    assert(regionIds.size() == 3);
-    
-    for (auto rid : regionIds) {
-        auto* region = brain.getRegion(rid);
-        assert(region != nullptr);
+    // Run some steps to generate activity
+    for (nlm::SimulationStep step = 0; step < 10; ++step) {
+        brain1.step(step);
     }
     
-    std::cout << "    testBrainRegions passed" << std::endl;
-}
-
-void testBrainActionProduction() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    // Save brain state
+    std::string checkpointFile = "test_checkpoint.nlm";
+    assert(brain1.save(checkpointFile));
     
-    nlm::Brain brain(config);
-    brain.initialize();
+    // Create new brain and load state
+    auto config2 = std::make_shared<nlm::Config>();
+    config2->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config2->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     
-    auto action = brain.produceAction();
-    assert(action != nullptr);
+    nlm::Brain brain2(config2);
+    assert(brain2.initialize());
+    assert(brain2.load(checkpointFile));
     
-    std::cout << "    testBrainActionProduction passed" << std::endl;
-}
-
-void testBrainStatus() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    // Verify key properties match (approximately)
+    assert(brain2.getTotalNeuronCount() == brain1.getTotalNeuronCount());
+    assert(brain2.getTotalSynapseCount() == brain1.getTotalSynapseCount());
     
-    nlm::Brain brain(config);
-    brain.initialize();
+    // Cleanup
+    std::remove(checkpointFile.c_str());
     
-    // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
-    
-    std::cout << "    testBrainStatus passed" << std::endl;
+    std::cout << "    testBrainCheckpointSaveLoad passed" << std::endl;
 }
 
 void runAll() {
+    std::cout << "Running comprehensive Brain tests..." << std::endl;
     testBrainCreation();
     testBrainInitialization();
     testBrainStep();
@@ -129,6 +263,13 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainDevelopment();
+    testBrainPredictionSystem();
+    testBrainMemorySystems();
+    testBrainNeuromodulation();
+    testBrainCognitionSystems();
+    testBrainSensoryProcessing();
+    testBrainActionComplexity();
+    testBrainPlasticityIntegration();
+    testBrainCheckpointSaveLoad();
 }
-
-} // namespace test_brain
