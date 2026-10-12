@@ -52,7 +52,7 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
+| `nlm_phase6_demo` | Executable | Phase 6 integration test |
 
 ### Build Options
 
@@ -188,6 +188,7 @@ world.update(timestep=0.1)
 
 ```python
 import pynlm
+
 
 def run_agent_simulation(num_steps=1000):
     """Run a complete agent simulation with brain and world."""
@@ -531,3 +532,5 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+This document provides comprehensive guidance for using NLM, from basic setup to advanced simulations. The system is designed to be both powerful and accessible, with clear APIs and extensive documentation.
