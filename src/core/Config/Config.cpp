@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,14 +20,30 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first (Phase 2 feature)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Check if file looks like JSON (starts with {)
+    char firstChar;
+    file.get(firstChar);
+    file.clear();
+    file.seekg(0);
+    
+    if (firstChar == '{') {
+        // Try JSON parsing
+        try {
+            return parseJsonFromFile(filepath);
+        } catch (const std::exception&) {
+            // Fall back to simple format
+            file.clear();
+            file.seekg(0);
+        }
+    }
+    
+    // Parse simple key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -50,6 +67,120 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::parseJsonFromFile(const std::string& filepath) {
+    // Simple JSON parser for configuration files
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    
+    // Basic JSON parsing - parse object keys and values
+    size_t pos = content.find('{');
+    if (pos == std::string::npos) {
+        return false;
+    }
+    
+    pos++; // Skip {
+    size_t end = content.rfind('}');
+    if (end == std::string::npos) {
+        return false;
+    }
+    
+    std::string object = content.substr(pos, end - pos);
+    
+    // Parse key-value pairs
+    size_t keyStart = 0;
+    while (keyStart < object.size()) {
+        // Find next key
+        size_t colon = object.find(':', keyStart);
+        if (colon == std::string::npos) {
+            break;
+        }
+        
+        // Find key start
+        size_t quote = object.rfind('"', colon - 1);
+        if (quote == std::string::npos) {
+            break;
+        }
+        
+        std::string key = object.substr(quote + 1, colon - quote - 2);
+        
+        // Find value
+        size_t valueStart = object.find_first_not_of(' ', colon + 1);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        // Parse value based on type
+        if (object[valueStart] == '"') {
+            // String value
+            size_t valueEnd = object.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string value = object.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            keyStart = valueEnd + 2;
+        } else if (object[valueStart] == 't' || object[valueStart] == 'f') {
+            // Boolean value
+            if (object.substr(valueStart, 5) == "true") {
+                set(key, true, ConfigSource::File);
+                keyStart = valueStart + 4;
+            } else if (object.substr(valueStart, 4) == "false") {
+                set(key, false, ConfigSource::File);
+                keyStart = valueStart + 5;
+            } else {
+                keyStart = colon + 1;
+            }
+        } else if (object[valueStart] == '-' || std::isdigit(object[valueStart])) {
+            // Number (int or double)
+            size_t numEnd = valueStart;
+            while (numEnd < object.size() && (std::isdigit(object[numEnd]) || 
+                                              object[numEnd] == '.' || 
+                                              object[numEnd] == '-' || 
+                                              object[numEnd] == 'e' || 
+                                              object[numEnd] == 'E')) {
+                numEnd++;
+            }
+            std::string numStr = object.substr(valueStart, numEnd - valueStart);
+            
+            // Try to parse as double first
+            try {
+                double doubleVal = std::stod(numStr);
+                // Check if it's an integer
+                if (numStr.find('.') == std::string::npos && numStr.find('e') == std::string::npos && 
+                    numStr.find('E') == std::string::npos) {
+                    // Try to parse as int64_t
+                    try {
+                        int64_t intVal = std::stoll(numStr);
+                        set(key, intVal, ConfigSource::File);
+                    } catch (...) {
+                        set(key, doubleVal, ConfigSource::File);
+                    }
+                } else {
+                    set(key, doubleVal, ConfigSource::File);
+                }
+            } catch (...) {
+                // Fall back to string
+                set(key, numStr, ConfigSource::File);
+            }
+            
+            keyStart = numEnd;
+        } else {
+            // Skip unknown value
+            keyStart = colon + 1;
+        }
+        
+        // Skip comma and whitespace
+        keyStart = object.find_first_not_of(", \t\n\r", keyStart);
     }
     
     return true;
@@ -84,10 +215,39 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format to avoid scientific notation
+                file.precision(6);
+                file << std::fixed << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; // TODO: Proper array serialization
+                // For now, skip arrays
+                file << "\]";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
+    file << "}\n";
     
     return true;
 }
@@ -197,6 +357,38 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Helper functions for JSON parsing
+std::string Config::extractJsonString(const std::string& text, size_t startPos, size_t& endPos) {
+    size_t quote = text.find('"', startPos);
+    if (quote == std::string::npos) {
+        endPos = text.size();
+        return "";
+    }
+    
+    size_t valueEnd = text.find('"', quote + 1);
+    if (valueEnd == std::string::npos) {
+        endPos = text.size();
+        return "";
+    }
+    
+    endPos = valueEnd + 1;
+    return text.substr(quote + 1, valueEnd - quote - 1);
+}
+
+std::string Config::extractJsonNumber(const std::string& text, size_t startPos, size_t& endPos) {
+    size_t numEnd = startPos;
+    while (numEnd < text.size() && (std::isdigit(text[numEnd]) || 
+                                    text[numEnd] == '.' || 
+                                    text[numEnd] == '-' || 
+                                    text[numEnd] == 'e' || 
+                                    text[numEnd] == 'E')) {
+        numEnd++;
+    }
+    
+    endPos = numEnd;
+    return text.substr(startPos, numEnd - startPos);
 }
 
 // Explicit template instantiations

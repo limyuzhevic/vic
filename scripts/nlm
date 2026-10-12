@@ -1,0 +1,408 @@
+#!/usr/bin/env bash
+
+# Make the script executable
+chmod +x /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_65c3bb7f-fc96-4b37-8fc8-5a93a67dbff6/scripts/nlm
+
+# Add a shebang line at the beginning of the file
+ed -s /workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_65c3bb7f-fc96-4b37-8fc8-5a93a67dbff6/scripts/nlm <<< "1i
+#!/usr/bin/env bash
+.
+wq
+"
+
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+DEFAULT_CONFIG="configs/nlm.cfg"
+DEFAULT_RUNS=1
+DEFAULT_LOG_LEVEL="info"
+
+# Help function
+function show_help() {
+    cat << EOF
+NLM (熙然) - Neural Learning Machine Command Line Interface
+
+Usage: nlm [OPTIONS] [ARGS...]
+
+Basic Operations:
+  nlm                    Run default simulation with nlm.cfg
+  nlm --help             Show this help message
+  nlm --version          Show version information
+
+Configuration:
+  nlm --config file.cfg  Load specific configuration file (JSON or key=value format)
+  nlm --runs N           Number of simulation runs (default: 1)
+  nlm --seed S           Random seed (overrides config)
+  nlm --neuron-count N   Number of neurons (overrides config)
+  nlm --timestep T       Simulation timestep (overrides config)
+
+Advanced Options:
+  nlm --verbose          Enable verbose logging
+  nlm --quiet            Suppress informational messages
+  nlm --log-level LEVEL  Set log level: debug, info, warning, error, critical
+  nlm --checkpoint FILE  Save brain state to checkpoint file
+  nlm --load-checkpoint FILE  Load brain state from checkpoint file
+
+Output Options:
+  nlm --output-dir DIR    Directory for output files (default: ./output)
+  nlm --export-json       Export simulation results as JSON
+  nlm --export-csv        Export simulation results as CSV
+  nlm --plot             Generate plots of simulation results
+
+Experiment Types:
+  nlm --experiment basic  Run basic connectivity test
+  nlm --experiment plasticity  Run plasticity learning experiment
+  nlm --experiment stdp     Run STDP verification experiment
+  nlm --experiment all      Run all experiments (default)
+
+Performance Options:
+  nlm --threads N        Number of threads (if supported)
+  nlm --gpu              Use GPU acceleration (if available)
+  nlm --optimize         Enable performance optimizations
+  nlm --benchmark        Run performance benchmarks
+
+Examples:
+  nlm                                   # Run default simulation
+  nlm --config custom.cfg --runs 5      # Run 5 times with custom config
+  nlm --seed 123 --neuron-count 1000    # Configure with specific parameters
+  nlm --experiment plasticity --verbose  # Run plasticity experiment with verbose output
+  nlm --output-dir results --export-json # Export results as JSON
+
+For more information, visit: https://github.com/your-org/nlm
+EOF
+}
+
+# Version information
+function show_version() {
+    echo "NLM (熙然) Neural Learning Machine - Phase 6: Integrated Artificial Brain"
+    echo "Version: 2.0.0"
+    echo "Build: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "Copyright: 2024-2026 Your Organization"
+    echo "License: MIT"
+}
+
+# Parse command line arguments
+function parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help)
+                show_help
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --runs)
+                RUNS="$2"
+                shift 2
+                ;;
+            --seed)
+                SEED_OVERRIDE="$2"
+                shift 2
+                ;;
+            --neuron-count)
+                NEURON_COUNT_OVERRIDE="$2"
+                shift 2
+                ;;
+            --timestep)
+                TIMESTEP_OVERRIDE="$2"
+                shift 2
+                ;;
+            --verbose)
+                LOG_LEVEL="debug"
+                shift 1
+                ;;
+            --quiet)
+                LOG_LEVEL="error"
+                shift 1
+                ;;
+            --log-level)
+                LOG_LEVEL="$2"
+                shift 2
+                ;;
+            --checkpoint)
+                CHECKPOINT_FILE="$2"
+                shift 2
+                ;;
+            --load-checkpoint)
+                LOAD_CHECKPOINT_FILE="$2"
+                shift 2
+                ;;
+            --output-dir)
+                OUTPUT_DIR="$2"
+                shift 2
+                ;;
+            --export-json)
+                EXPORT_FORMAT="json"
+                shift 1
+                ;;
+            --export-csv)
+                EXPORT_FORMAT="csv"
+                shift 1
+                ;;
+            --plot)
+                GENERATE_PLOTS=true
+                shift 1
+                ;;
+            --experiment)
+                EXPERIMENT_TYPE="$2"
+                shift 2
+                ;;
+            --threads)
+                THREADS="$2"
+                shift 2
+                ;;
+            --gpu)
+                USE_GPU=true
+                shift 1
+                ;;
+            --optimize)
+                ENABLE_OPTIMIZATIONS=true
+                shift 1
+                ;;
+            --benchmark)
+                RUN_BENCHMARKS=true
+                shift 1
+                ;;
+            *)
+                echo "${RED}Unknown option: $1${NC}" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Setup environment
+function setup_environment() {
+    # Create output directory
+    mkdir -p "$OUTPUT_DIR"
+    
+    # Setup logging
+    mkdir -p "logs"
+    
+    # Check if Python is available for plotting
+    if command -v python3 &> /dev/null; then
+        PYTHON_AVAILABLE=true
+    else
+        PYTHON_AVAILABLE=false
+        echo "${YELLOW}Warning: Python not found. Plot generation disabled.${NC}"
+    fi
+    
+    # Check if required tools are available
+    if ! command -v make &> /dev/null; then
+        echo "${RED}Error: make command not found${NC}" >&2
+        exit 1
+    fi
+    
+    if ! command -v g++ &> /dev/null; then
+        echo "${RED}Error: g++ compiler not found${NC}" >&2
+        exit 1
+    fi
+}
+
+# Build the project
+function build_project() {
+    echo "${BLUE}Building NLM...${NC}"
+    
+    # Create build directory
+    mkdir -p build
+    cd build || exit 1
+    
+    # Configure with CMake
+    cmake .. -DCMAKE_BUILD_TYPE=Release \
+             -DENABLE_PYTHON_BINDINGS=ON \
+             -DENABLE_TESTS=ON \
+             "$([ "$USE_GPU" = true ] && echo "-DUSE_GPU=ON")"
+    
+    # Build with parallel jobs
+    if [ "$THREADS" ]; then
+        make -j"$THREADS"
+    else
+        make -j$(nproc)
+    fi
+    
+    cd .. || exit 1
+    
+    if [ ! -f "build/nlm" ]; then
+        echo "${RED}Error: Build failed! nlm executable not found.${NC}" >&2
+        exit 1
+    fi
+    
+    echo "${GREEN}Build successful!${NC}"
+}
+
+# Run simulation
+function run_simulation() {
+    echo "${BLUE}Running NLM simulation...${NC}"
+    
+    # Prepare arguments
+    ARGS=""
+    
+    # Add config file
+    if [ "$CONFIG_FILE" ]; then
+        ARGS="${ARGS} --config $CONFIG_FILE"
+    fi
+    
+    # Add seed override
+    if [ "$SEED_OVERRIDE" ]; then
+        ARGS="${ARGS} --seed $SEED_OVERRIDE"
+    fi
+    
+    # Add neuron count override
+    if [ "$NEURON_COUNT_OVERRIDE" ]; then
+        ARGS="${ARGS} --neuron-count $NEURON_COUNT_OVERRIDE"
+    fi
+    
+    # Add timestep override
+    if [ "$TIMESTEP_OVERRIDE" ]; then
+        ARGS="${ARGS} --timestep $TIMESTEP_OVERRIDE"
+    fi
+    
+    # Add experiment type
+    if [ "$EXPERIMENT_TYPE" ]; then
+        ARGS="${ARGS} --experiment $EXPERIMENT_TYPE"
+    fi
+    
+    # Add checkpoint options
+    if [ "$CHECKPOINT_FILE" ]; then
+        ARGS="${ARGS} --checkpoint $CHECKPOINT_FILE"
+    fi
+    
+    if [ "$LOAD_CHECKPOINT_FILE" ]; then
+        ARGS="${ARGS} --load-checkpoint $LOAD_CHECKPOINT_FILE"
+    fi
+    
+    # Run multiple times if specified
+    for ((i=1; i<="$RUNS"; i++)); do
+        echo ""
+        echo "${YELLOW}Run $i/$RUNS${NC}"
+        
+        # Set run-specific checkpoint file
+        if [ "$CHECKPOINT_FILE" ]; then
+            RUN_CHECKPOINT="$OUTPUT_DIR/checkpoint_run_$i.ckpt"
+            ARGS="${ARGS/--checkpoint $CHECKPOINT_FILE/--checkpoint $RUN_CHECKPOINT}"
+        fi
+        
+        # Run the simulation
+        ./build/nlm $ARGS
+        
+        if [ $? -ne 0 ]; then
+            echo "${RED}Simulation failed!${NC}" >&2
+            exit 1
+        fi
+        
+        # Save results for this run
+        if [ "$EXPORT_FORMAT" ]; then
+            export_results $i
+        fi
+        
+        # Clean up checkpoint for next run (unless loading from checkpoint)
+        if [ ! "$LOAD_CHECKPOINT_FILE" ] && [ "$RUN_CHECKPOINT" ]; then
+            rm -f "$RUN_CHECKPOINT"
+        fi
+    done
+    
+    echo "${GREEN}All simulation runs completed successfully!${NC}"
+}
+
+# Export results
+function export_results() {
+    local run_id=$1
+    local output_file="$OUTPUT_DIR/run_$run_id"
+    
+    echo "${BLUE}Exporting results for run $run_id...${NC}"
+    
+    case "$EXPORT_FORMAT" in
+        "json")
+            # Generate JSON output
+            ./build/nlm --export-json > "${output_file}.json"
+            ;;
+        "csv")
+            # Generate CSV output
+            ./build/nlm --export-csv > "${output_file}.csv"
+            ;;
+        *)
+            echo "${YELLOW}No export format specified${NC}"
+            ;;
+    esac
+    
+    # Generate plots if requested
+    if [ "$GENERATE_PLOTS" ] && [ "$PYTHON_AVAILABLE" ]; then
+        echo "${BLUE}Generating plots...${NC}"
+        python3 scripts/plot_results.py "run_$run_id" "$OUTPUT_DIR"
+    fi
+}
+
+# Run benchmarks
+function run_benchmarks() {
+    echo "${BLUE}Running NLM benchmarks...${NC}"
+    
+    # Create benchmark directory
+    mkdir -p "benchmarks"
+    
+    # Run different benchmark scenarios
+    for benchmark in "neuron_creation" "synapse_formation" "plasticity" "memory_operations"; do
+        echo ""
+        echo "${YELLOW}Running benchmark: $benchmark${NC}"
+        
+        # Run benchmark with specific configuration
+        ./build/nlm --benchmark --test-type "$benchmark" \
+                   --output-dir "benchmarks/$benchmark" \
+                   --runs 10
+        
+        if [ $? -ne 0 ]; then
+            echo "${RED}Benchmark $benchmark failed!${NC}" >&2
+        fi
+    done
+    
+    # Generate benchmark report
+    echo ""
+    echo "${BLUE}Generating benchmark report...${NC}"
+    python3 scripts/generate_benchmark_report.py "benchmarks" "$OUTPUT_DIR/benchmark_report.html"
+    
+    echo "${GREEN}Benchmarks completed!${NC}"
+}
+
+# Main execution
+function main() {
+    # Set defaults
+    CONFIG_FILE="$DEFAULT_CONFIG"
+    RUNS="$DEFAULT_RUNS"
+    LOG_LEVEL="$DEFAULT_LOG_LEVEL"
+    OUTPUT_DIR="output"
+    EXPERIMENT_TYPE="all"
+    ENABLE_OPTIMIZATIONS=true
+    
+    # Parse command line arguments
+    parse_args "$@"
+    
+    # Setup environment
+    setup_environment
+    
+    # Build project
+    build_project
+    
+    # Check if running benchmarks
+    if [ "$RUN_BENCHMARKS" ]; then
+        run_benchmarks
+        exit 0
+    fi
+    
+    # Run simulation
+    run_simulation
+}
+
+# Execute main function
+main "$@"

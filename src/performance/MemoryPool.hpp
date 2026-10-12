@@ -169,18 +169,29 @@ MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
 template<typename T>
 MemoryPool<T>::~MemoryPool() {
     // Blocks are automatically freed via unique_ptr
+    // Clear free list to ensure all memory is properly returned
+    while (!empty()) {
+        T* obj = allocate();
+        deallocate(obj);
+    }
 }
 
 template<typename T>
 void MemoryPool<T>::addBlock() {
+    // Create a new block
     auto block = std::make_unique<Block>(slabSize_, blockSize_);
     
-    // Chain existing blocks
+    // Chain existing blocks safely
     Block* expected = nullptr;
-    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
+    Block* newBlock = block.get();
+    
+    if (!currentBlock_.compare_exchange_strong(expected, newBlock, 
+                                                 std::memory_order_acq_rel, 
+                                                 std::memory_order_acquire)) {
         // Another thread already added a block, add to chain
-        block->nextBlock = expected;
+        newBlock->nextBlock = expected;
     } else {
+        // Successfully took ownership, release from unique_ptr
         block.release();
     }
     

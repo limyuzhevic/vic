@@ -366,7 +366,8 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 from config file
+    // Load comprehensive defaults from nlm.cfg for better parameter management
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -382,14 +383,44 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Load additional parameters from nlm.cfg if available (comprehensive defaults)
+    std::string comprehensiveConfigFile = "configs/nlm.cfg";
+    if (config->loadFromFile(comprehensiveConfigFile)) {
+        NLM_LOG_INFO("Loaded comprehensive configuration from: " + comprehensiveConfigFile);
+    } else {
+        NLM_LOG_INFO("Using minimal configuration (nlm.cfg not found).");
+    }
+    
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration (from nlm.cfg):");
+    
+    // Log key configuration values
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    
+    // Advanced configuration options (if present in nlm.cfg)
+    if (config->has("replay_interval")) {
+        NLM_LOG_INFO("  replay_interval: " + std::to_string(config->getOr<size_t>("replay_interval", 100)));
+    }
+    if (config->has("consolidation_interval")) {
+        NLM_LOG_INFO("  consolidation_interval: " + std::to_string(config->getOr<size_t>("consolidation_interval", 1000)));
+    }
+    if (config->has("working_memory_capacity")) {
+        NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<size_t>("working_memory_capacity", 50)));
+    }
+    
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

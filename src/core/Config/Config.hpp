@@ -58,6 +58,9 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Parse JSON from file (Phase 2 feature)
+    bool parseJsonFromFile(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -100,6 +103,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    static std::string extractJsonString(const std::string& text, size_t startPos, size_t& endPos);
+    static std::string extractJsonNumber(const std::string& text, size_t startPos, size_t& endPos);
 };
 
 } // namespace nlm
