@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string lastError;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,40 +20,28 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Try to parse as JSON first
+    json j;
+    try {
+        file >> j;
+        clear();
+        parseJson(j);
+        return true;
+    } catch (const json::parse_error&) {
+        // Reset file stream for YAML parsing
+        file.clear();
+        file.seekg(0);
     }
     
-    return true;
+    // Try to parse as YAML if JSON parsing fails
+    // For now, we'll assume YAML is similar enough to JSON for basic parsing
+    // In a full implementation, we'd use a YAML parser like yaml-cpp
+    return loadFromFileSimpleFormat(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -184,32 +173,34 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+std::string Config::getLastError() const {
+    return pImpl->lastError;
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Helper functions for file format detection and parsing
+bool Config::isBoolean(const std::string& str) const {
+    std::string lower = toLower(str);
+    return lower == "true" || lower == "false" || lower == "yes" || lower == "no" ||
+           lower == "y" || lower == "n" || lower == "on" || lower == "off";
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::isTrue(const std::string& str) const {
+    std::string lower = toLower(str);
+    return lower == "true" || lower == "yes" || lower == "y" || lower == "on";
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::isInteger(const std::string& str) const {
+    if (str.empty()) return false;
+    char* endptr;
+    std::strtoll(str.c_str(), &endptr, 10);
+    return *endptr == '\0';
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::isFloat(const std::string& str) const {
+    if (str.empty()) return false;
+    char* endptr;
+    std::strtod(str.c_str(), &endptr);
+    return *endptr == '\0';
+}
 
 } // namespace nlm

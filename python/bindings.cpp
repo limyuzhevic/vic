@@ -400,26 +400,136 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Convenience factory functions
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Create a demo configuration for quick testing
+    m.def("createDemoConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Demo settings: small brain for quick testing
+        config->set("neuron_count", 500);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1);
+        config->set("stdp_ltp_weight", 0.001);
+        config->set("stdp_ltd_weight", 0.001);
+        config->set("curiosity_enabled", true);
+        config->set("reward_modulation_enabled", true);
+        config->set("structural_plasticity_enabled", false); // Keep simple for demos
+        return config;
+    }, "Create a demo configuration optimized for quick testing and demonstrations");
+
+    // Create a research configuration for scientific experiments
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Research settings: larger brain for meaningful results
+        config->set("neuron_count", 10000);
+        config->set("region_count", 3);
+        config->set("connection_probability", 0.05);
+        config->set("stdp_ltp_weight", 0.01);
+        config->set("stdp_ltd_weight", 0.012);
+        config->set("curiosity_enabled", true);
+        config->set("reward_modulation_enabled", true);
+        config->set("structural_plasticity_enabled", true);
+        config->set("development_enabled", true);
+        config->set("checkpointing_enabled", true);
+        config->set("replay_enabled", true);
+        return config;
+    }, "Create a research configuration optimized for scientific experiments with full feature set");
+
+    // Create a brain from JSON file
+    m.def("createBrainFromJSON", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from JSON file: " + filepath);
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("filepath"), "Create a brain from a JSON configuration file");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Create a brain from YAML file
+    m.def("createBrainFromYAML", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from YAML file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from a YAML configuration file");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Create a quick agent setup for common scenarios
+    m.def("createQuickAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        // Enable common subsystems for quick agents
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize an agent with common subsystems enabled");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Create a simple simulation helper
+    m.def("createSimpleSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        return [brain, world, agent](int steps) {
+            for (int step = 0; step < steps; ++step) {
+                // Update world
+                world->update(0.1);
+                
+                // Get sensory input
+                auto percept = world->getSensoryPercept();
+                
+                // Process sensory input
+                agent->processSensoryInput(percept);
+                
+                // Brain step
+                brain->step(step);
+                
+                // Get action
+                auto action = agent->decodeMotorCommand();
+                
+                // Apply action
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                // Optional: Apply reward modulation (can be customized)
+                auto internal = percept.getInternal();
+                float reward = internal.empty() ? 0.0f : internal[0];
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            return std::make_tuple(brain, world, agent);
+        };
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+       "Create a simple simulation function that runs for a given number of steps");
+
+    // Create a brain from config dictionary
+    m.def("createBrainFromConfigDict", [](py::dict config_dict) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Convert Python dict to Config
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value_obj = item.second;
+            
+            // Try to convert to appropriate type
+            if (value_obj.is(py::int_())) {
+                int64_t val = py::cast<int64_t>(value_obj);
+                config->set(key, val);
+            } else if (value_obj.is(py::float_())) {
+                double val = py::cast<double>(value_obj);
+                config->set(key, val);
+            } else if (value_obj.is(py::bool_())) {
+                bool val = py::cast<bool>(value_obj);
+                config->set(key, val);
+            } else if (value_obj.is(py::str())) {
+                std::string val = py::cast<std::string>(value_obj);
+                config->set(key, val);
+            } else if (value_obj.is(py::list())) {
+                // Handle list types
+                py::list list_val = py::cast<py::list>(value_obj);
+                std::vector<double> vec;
+                for (auto item : list_val) {
+                    vec.push_back(py::cast<double>(item));
+                }
+                config->set(key, vec);
+            }
+        }
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("config_dict"), "Create a brain from a Python dictionary configuration");
 
 } // namespace nlm
