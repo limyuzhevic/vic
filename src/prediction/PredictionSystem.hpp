@@ -14,6 +14,9 @@ public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);

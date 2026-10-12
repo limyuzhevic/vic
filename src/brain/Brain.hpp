@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;  // Add SelfModel to forward declarations
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -163,6 +164,9 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Self model for action consequences
+    class SelfModel* getSelfModel();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
