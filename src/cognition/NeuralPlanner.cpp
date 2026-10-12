@@ -1,4 +1,5 @@
 #include "NeuralPlanner.hpp"
+#include "../utils/ActionSequenceUtils.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -108,41 +109,9 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
 }
 
 std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size_t depth) {
-    std::vector<std::vector<ActionType>> result;
-    
-    // Simple enumeration of action sequences
-    std::vector<ActionType> baseActions = {
-        ActionType::MoveForward, ActionType::MoveBackward,
-        ActionType::TurnLeft, ActionType::TurnRight,
-        ActionType::Interact, ActionType::Wait
-    };
-    
-    // For now, generate sequences of depth actions
-    // This could be optimized with pruning
-    
-    std::function<void(std::vector<ActionType>&, size_t)> generate = 
-        [&](std::vector<ActionType>& current, size_t remaining) {
-            if (remaining == 0) {
-                result.push_back(current);
-                return;
-            }
-            
-            for (ActionType action : baseActions) {
-                current.push_back(action);
-                generate(current, remaining - 1);
-                current.pop_back();
-            }
-        };
-    
-    std::vector<ActionType> current;
-    generate(current, depth);
-    
-    // Limit number of sequences
-    if (result.size() > 100) {
-        result.resize(100);
-    }
-    
-    return result;
+    // Use the extracted utility functions for better modularity
+    // This provides flexible planning strategies
+    return ActionSequenceUtils::generateActionSequences(depth, {}, 100);
 }
 
 float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
