@@ -23,34 +23,58 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
-        return;
-    }
-    
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+    // Validate entry
+    if (!entry.message.empty()) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        
+        try {
+            if (entry.level < pImpl->level) {
+                return;
+            }
+            
+            std::ostringstream oss;
+            oss << "[" << levelToString(entry.level) << "] ";
+            
+            // Add timestamp
+            auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+            oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+            
+            oss << " " << entry.message;
+            
+            std::string output = oss.str();
+            
+            // Validate output before writing
+            if (output.empty()) {
+                return;
+            }
+            
+            // Console output with exception safety
+            try {
+                if (pImpl->useColors) {
+                    std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+                } else {
+                    std::cout << output << "\n";
+                }
+            } catch (const std::exception& e) {
+                // Fallback to basic output if color formatting fails
+                std::cout << "[ERROR] Log output failed: " << e.what() << std::endl;
+            }
+            
+            // File output if set with exception safety
+            if (pImpl->fileOut.is_open()) {
+                try {
+                    pImpl->fileOut << output << "\n";
+                    pImpl->fileOut.flush();
+                } catch (const std::exception& e) {
+                    // If file logging fails, continue without it
+                    // Don't throw to preserve existing error handling semantics
+                }
+            }
+            
+        } catch (const std::exception& e) {
+            // Log logger internal error to stderr as fallback
+            std::cerr << "[CRITICAL] ConsoleLogger internal error: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -71,7 +95,26 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    try {
+        // Validate filepath
+        if (filepath.empty()) {
+            Logger::getGlobal().warning("ConsoleLogger::setOutputFile: Empty filepath provided");
+            return;
+        }
+        
+        // Close existing file if open
+        closeOutputFile();
+        
+        // Open new file with exception safety
+        pImpl->fileOut.open(filepath, std::ios::app);
+        
+        if (!pImpl->fileOut.is_open()) {
+            Logger::getGlobal().error("ConsoleLogger::setOutputFile: Failed to open file for writing: " + filepath);
+        }
+        
+    } catch (const std::exception& e) {
+        Logger::getGlobal().error("ConsoleLogger::setOutputFile: Exception opening file " + filepath + ": " + std::string(e.what()));
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
@@ -131,18 +174,46 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+    try {
+        // Validate input parameters
+        if (message.empty()) {
+            Logger::getGlobal().warning("Logger::log: Empty message provided");
+            return;
+        }
+        
+        // Validate level
+        if (static_cast<int>(level) < 0 || static_cast<int>(level) > 4) {
+            Logger::getGlobal().error("Logger::log: Invalid log level: " + std::to_string(static_cast<int>(level)));
+            return;
+        }
+        
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        
+        LogEntry entry;
+        entry.level = level;
+        entry.message = message;
+        entry.file = file.empty() ? "unknown" : file;
+        entry.line = line >= 0 ? line : 0;
+        entry.function = function.empty() ? "unknown" : function;
+        entry.timestamp = std::chrono::system_clock::now();
+        
+        // Validate log entry
+        if (entry.file.empty() || entry.function.empty()) {
+            Logger::getGlobal().warning("Logger::log: Invalid log entry fields");
+            return;
+        }
+        
+        for (auto& logger : pImpl->loggers) {
+            try {
+                logger->log(entry);
+            } catch (const std::exception& e) {
+                Logger::getGlobal().error("Logger::log: Failed to log to logger: " + std::string(e.what()));
+            }
+        }
+        
+    } catch (const std::exception& e) {
+        // Last resort error logging to stderr
+        std::cerr << "[CRITICAL] Logger::log internal error: " << e.what() << std::endl;
     }
 }
 

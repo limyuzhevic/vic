@@ -102,7 +102,7 @@ public:
     static Logger& getGlobal();
     
     // Set global logger
-    static void setGlobal(std::shared_ptr<Logger> logger);
+    struct Logger;
 
 private:
     struct Impl;

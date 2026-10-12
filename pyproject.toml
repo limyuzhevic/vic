@@ -35,6 +35,9 @@ dev = [
     "numpy>=1.20",
 ]
 
+[project.scripts]
+nlm = "nlm.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"

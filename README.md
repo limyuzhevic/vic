@@ -24,45 +24,79 @@ NLM IS intended to become:
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
-### Phase 6 Integration Achievements
+### CLI Interface (New in Phase 6)
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+NLM now includes a comprehensive command-line interface for running simulations, managing configurations, and performing analysis:
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### Basic Commands
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+- `nlm` - Run a simulation from configuration
+  ```bash
+  nlm run --config my_config.json --steps 1000
+  nlm run --config config.cfg --output results.json
+  ```
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+- `nlm create` - Create new configurations
+  ```bash
+  nlm create brain --output config.json
+  nlm create world --width 20 --height 20
+  ```
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+- `nlm validate` - Validate configuration files
+  ```bash
+  nlm validate --config config.json
+  nlm validate --config config.cfg --strict
+  ```
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+- `nlm info` - Display information about configuration or brain
+  ```bash
+  nlm info --config config.json
+  nlm info --brain brain.bin
+  ```
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+- `nlm benchmark` - Run performance benchmarks
+  ```bash
+  nlm benchmark --config config.json --duration 60
+  nlm benchmark --config config.json --iterations 5
+  ```
+
+#### Common Options
+
+- `--config` - Configuration file path
+- `--output` - Output file path
+- `--steps` - Number of simulation steps
+- `--time` - Time limit in seconds
+- `--pause` - Pause duration in seconds
+- `--verbose` - Enable verbose output
+- `--quiet` - Suppress output
+- `--debug` - Enable debug mode
+- `--test` - Run in test mode
+- `--validate` - Validate configuration only
+
+#### Python API
+
+The NLM Python API (`pynlm`) provides programmatic access to all NLM functionality:
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create a brain with the configuration
+brain = pynlm.createBrain(config)
+
+# Initialize the brain
+brain.initialize()
+
+# Run a simulation step
+brain.step(step, time)
+
+# Get brain statistics
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Synapses: {brain.getTotalSynapseCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+```
 
 ## Building
 
@@ -82,37 +116,164 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Command Line Interface
+
+After building, the `nlm` command will be available in your PATH. Run `nlm --help` to see all available commands and options.
+
 ## Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── docs/           # Documentation
+├── src/           # Source code
+│   ├── cli/       # CLI implementation (NEW)
+│   ├── core/      # Core utilities
+│   ├── brain/     # Neural components (integrated)
+│   ├── ...        # Other systems
+│   └── ...
+├── tests/         # Unit tests
+├── configs/       # Example configuration files
+└── python/        # Python bindings
+    ├── pyproject.toml  # CLI entry points (NEW)
+    └── bindings.cpp   # Python bindings
 ```
+
+## CLI Command Reference
+
+### nlm run
+
+Runs a simulation from a configuration file.
+
+**Options:**
+- `--config PATH` - Configuration file (JSON, YAML, or .cfg format)
+- `--steps N` - Number of simulation steps
+- `--output PATH` - Output file to save brain state
+- `--pause SECONDS` - Pause between steps
+
+**Examples:**
+```bash
+# Run with JSON config
+nlm run --config my_config.json --steps 1000
+
+# Run with simple config and save results
+nlm run --config config.cfg --output results.json
+```
+
+### nlm create
+
+Creates a new configuration file.
+
+**Options:**
+- `--type TYPE` - Configuration type: `brain` or `world`
+- `--output PATH` - Output file path
+
+**Examples:**
+```bash
+# Create a brain configuration
+nlm create brain --output brain_config.json
+
+# Create a world configuration
+nlm create world --width 20 --height 20 --output world_config.json
+```
+
+### nlm validate
+
+Validates a configuration file.
+
+**Options:**
+- `--config PATH` - Configuration file to validate
+- `--strict` - Enable strict validation mode
+
+**Examples:**
+```bash
+# Validate configuration
+nlm validate --config config.json
+
+# Validate with strict checking
+nlm validate --config config.cfg --strict
+```
+
+### nlm info
+
+Displays information about configuration or brain state.
+
+**Options:**
+- `--config PATH` - Configuration file to inspect
+- `--brain PATH` - Brain file to analyze
+- `--field FIELD` - Specific field to display (default: all)
+
+**Examples:**
+```bash
+# Show configuration details
+nlm info --config config.json
+
+# Show brain statistics
+nlm info --brain brain.bin
+```
+
+### nlm benchmark
+
+Runs a performance benchmark on the NLM brain.
+
+**Options:**
+- `--config PATH` - Configuration file
+- `--duration SECONDS` - Benchmark duration
+- `--iterations N` - Number of iterations
+
+**Examples:**
+```bash
+# Run benchmark for 60 seconds
+nlm benchmark --config config.json --duration 60
+
+# Run 5 iterations
+nlm benchmark --config config.json --iterations 5
+```
+
+## Technical Considerations
+
+### Configuration File Formats
+
+NLM supports three configuration file formats:
+
+1. **JSON (.json)** - Structured data format
+2. **YAML (.yaml/.yml)** - Human-readable format
+3. **Simple (.cfg)** - Key=value format
+
+Configuration files are automatically detected based on file extension.
+
+### Argument Parsing
+
+The CLI uses CLI11 library for modern, intuitive command-line argument parsing with support for:
+- Subcommands (run, create, validate, info, benchmark)
+- Options with and without values
+- Flags (boolean options)
+- Help generation
+
+### Integration with Existing Systems
+
+The CLI integrates seamlessly with:
+- **Config system** - Uses existing Config class for configuration management
+- **Logger system** - Integrates with NLM logging framework
+- **Python API** - Provides command-line access to Python functionality
+- **Testing system** - Includes built-in testing capabilities
+
+### Output Formats
+
+The CLI supports multiple output formats:
+- **JSON** - Structured data for machine processing
+- **CSV** - Tabular data for analysis
+- **Console** - Human-readable output
+- **YAML** - Structured data format
+
+### Error Handling
+
+Comprehensive error handling includes:
+- File not found errors
+- Format validation errors
+- Configuration validation errors
+- Runtime errors with helpful messages
 
 ## Phase Summary
 
@@ -152,7 +313,7 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (Complete - Final Integration with CLI)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
@@ -161,6 +322,7 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- **NEW: Comprehensive CLI interface added**
 
 ## Scientific Limitations
 
@@ -186,6 +348,7 @@ Phase 6 DOES investigate:
 - Whether developmental stages can modulate learning
 - Whether replay can reinforce memory consolidation
 - Whether the complete brain loop functions coherently
+- **Whether the CLI provides an accessible interface for research**
 
 ## Architecture Philosophy
 

@@ -6,6 +6,24 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Find nlohmann/json (header-only library)
+find_package(nlohmann_json 3.2.0 QUIET)
+if (nlohmann_json_FOUND)
+    message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
+    set(NLM_USE_NLOHMANN_JSON ON)
+else()
+    message(WARNING "nlohmann_json not found - JSON support will be disabled")
+endif()
+
+# Find yaml-cpp
+find_package(yaml-cpp QUIET)
+if (yaml-cpp_FOUND)
+    message(STATUS "Found yaml-cpp: ${yaml-cpp_VERSION}")
+    set(NLM_USE_YAML_CPP ON)
+else()
+    message(WARNING "yaml-cpp not found - YAML support will be disabled")
+endif()
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -138,6 +156,9 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# CLI executable
+add_subdirectory(src/cli)
 
 # Testing
 enable_testing()
