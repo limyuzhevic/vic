@@ -1,0 +1,428 @@
+name: NLM Scan Tools Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  code-quality-scan:
+    runs-on: ubuntu-latest
+    name: Code Quality Tools Scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            git \
+            pkg-config \
+            libclang-dev \
+            lcov
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Run ClangTidy Code Analysis
+        run: |
+          mkdir -p build
+          cmake --build build --target nlm_core --parallel 4
+          cd build
+          clang-tidy -p . --config-file=.clang-tidy src/*.cpp src/*/*.cpp src/*/*/*.cpp 2>&1 | head -100
+
+      - name: Run CPPCheck Static Analysis
+        run: |
+          mkdir -p build
+          cmake --build build --target nlm_core --parallel 4
+          cd build
+          cppcheck --enable=all --std=c++20 --template="[{severity}] {file}:{line}: {message}" src/ > cppcheck-results.txt 2>&1 || true
+          cat cppcheck-results.txt
+
+      - name: Run ClangFormat Check
+        run: |
+          find src -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | xargs -I {} sh -c 'echo "Checking {}:" && clang-format --style=file --dry-run {}'
+
+      - name: Run CppDepend (include graph analysis)
+        if: runner.os != 'Windows'
+        run: |
+          cd build
+          if command -v cpd >/dev/null 2>&1; then
+            cpd --exclude-path="tests/*" src/
+          else
+            echo "CppDepend not available, skipping"
+          fi
+
+      - name: Upload code quality results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: code-quality-results
+          path: |
+            build/cppcheck-results.txt
+            build/clang-tidy-results.txt
+            build/format-results.txt
+            build/cpd-results.txt
+          retention-days: 30
+
+  documentation-scan:
+    runs-on: ubuntu-latest
+    name: Documentation Quality Scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            doxygen \
+            graphviz
+
+      - name: Generate Doxygen documentation
+        run: |
+          mkdir -p build
+          cd build
+          doxygen Doxyfile 2>/dev/null || {
+            echo "/* Doxyfile configuration */" > Doxyfile
+            echo "PROJECT_NAME = \"NLM\"" >> Doxyfile
+            echo "INPUT = src/" >> Doxyfile
+            echo "OUTPUT_DIRECTORY = docs/doxygen" >> Doxyfile
+            echo "GENERATE_LATEX = NO" >> Doxyfile
+            echo "GENERATE_HTML = YES" >> Doxyfile
+            echo "GENERATE_XML = YES" >> Doxyfile
+            echo "EXCLUDE = *test* *benchmark*" >> Doxyfile
+            doxygen Doxyfile
+          }
+
+      - name: Validate Doxygen output
+        run: |
+          cd build
+          if [ -f "docs/doxygen/index.html" ]; then
+            echo "✅ Doxygen documentation generated successfully"
+            echo "Generated files: $(find docs/doxygen -name \"*.html\" | wc -l)"
+          else
+            echo "❌ Doxygen documentation generation failed"
+            exit 1
+          fi
+
+      - name: Generate Python documentation
+        run: |
+          pip install sphinx sphinx-rtd-theme
+          cd python
+          sphinx-build -b html docs/source docs/build/html 2>/dev/null || {
+            mkdir -p docs/source
+            cat > docs/source/index.rst << EOF
+.. NLM Python API Documentation
+
+Welcome to the NLM Python API Documentation
+
+.. autoclass:: pynlm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: pynlm.Brain
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: pynlm.World
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: pynlm.Agent
+   :members:
+   :undoc-members:
+   :show-inheritance:
+EOF
+            sphinx-build -b html docs/source docs/build/html
+          }
+
+      - name: Validate Python documentation
+        run: |
+          cd python/docs/build
+          if [ -f "html/index.html" ]; then
+            echo "✅ Python documentation generated successfully"
+            echo "Generated files: $(find html -name \"*.html\" | wc -l)"
+          else
+            echo "❌ Python documentation generation failed"
+            exit 1
+          fi
+
+      - name: Upload documentation scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: documentation-scan-results
+          path: |
+            build/docs/doxygen/
+            python/docs/build/html/
+          retention-days: 30
+
+  performance-scan:
+    runs-on: ubuntu-latest
+    name: Performance Tools Scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev \
+            python3-pip \
+            time \
+            perf
+
+      - name: Configure and build with profiling
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-pg -O2 -march=native"
+          cmake --build build --target nlm_core --parallel 4
+
+      - name: Run profiling tools
+        run: |
+          cd build
+          if command -v gprof >/dev/null 2>&1; then
+            ./nlm_core --benchmark-profile > profile-output.txt 2>&1
+            gprof nlm_core gmon.out > gprof-results.txt 2>&1
+            echo "✅ Profiling completed"
+          else
+            echo "gprof not available, skipping detailed profiling"
+          fi
+
+      - name: Run performance benchmarks
+        run: |
+          mkdir -p build/benchmarks
+          cmake --build build --target benchmarks --parallel 4
+          cd build/benchmarks
+          if [ -f "benchmarks_sample_main" ] || [ -f "benchmarks_sample_main.exe" ]; then
+            ./benchmarks_sample_main --output benchmark-results.json
+            echo "✅ Performance benchmarks completed"
+          else
+            echo "Benchmarks target not found"
+          fi
+
+      - name: Upload performance scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-scan-results
+          path: |
+            build/profile-output.txt
+            build/gprof-results.txt
+            build/benchmark-results.json
+            build/benchmarks/
+          retention-days: 30
+
+  complexity-scan:
+    runs-on: ubuntu-latest
+    name: Code Complexity Scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install complexity analysis tools
+        run: |
+          pip install radon mccabe
+
+      - name: Analyze code complexity with Radon
+        run: |
+          radon cc src/ --min B --max B -j 4 > radon-complexity.txt 2>&1 || true
+          radon mi src/ --min A --max F -j 4 > radon-maintainability.txt 2>&1 || true
+          cat radon-complexity.txt
+          cat radon-maintainability.txt
+
+      - name: Analyze McCabe complexity
+        run: |
+          mccabe src/ > mccabe-complexity.txt 2>&1 || true
+          cat mccabe-complexity.txt
+
+      - name: Validate complexity metrics
+        run: |
+          python3 -c "
+          import re
+          metrics_file = 'mccabe-complexity.txt'
+          if os.path.exists(metrics_file):
+              with open(metrics_file) as f:
+                  content = f.read()
+                  # Parse McCabe complexity results
+                  functions = re.findall(r'(\w+\.\w+)\s+\((\d+)\)', content)
+                  if functions:
+                      avg_complexity = sum(int(c) for _, c in functions) / len(functions)
+                      print(f'Average McCabe complexity: {avg_complexity:.2f}')
+                      if avg_complexity > 20:
+                          print('⚠️ High complexity detected, consider refactoring')
+                      else:
+                          print('✅ Complexity within acceptable range')
+          else:
+              print('No complexity metrics found')
+          "
+
+      - name: Upload complexity analysis results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: complexity-analysis-results
+          path: |
+            radon-complexity.txt
+            radon-maintainability.txt
+            mccabe-complexity.txt
+          retention-days: 30
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    name: Dependency Analysis Scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Analyze Python dependencies
+        run: |
+          pip install pipdeptree safety
+          pipdeptree > dependency-tree.txt
+          safety check --json --output safety-scan.json
+          pip-audit --json --output audit-scan.json
+
+      - name: Analyze C/C++ dependencies
+        if: runner.os != 'Windows'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-file
+          apt-file update
+          apt-file list | grep -i "compiler\|cmake\|make" > apt-dependencies.txt
+
+      - name: Validate dependency usage
+        run: |
+          python3 -c "
+          try:
+              with open('safety-scan.json') as f:
+                  safety_data = json.load(f)
+              vulnerabilities = len(safety_data.get('vulnerabilities', []))
+              print(f'Safety check found {vulnerabilities} potential vulnerabilities')
+          except:
+              print('No safety scan results found')
+          "
+
+      - name: Upload dependency scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-analysis-results
+          path: |
+            dependency-tree.txt
+            safety-scan.json
+            audit-scan.json
+            apt-dependencies.txt
+          retention-days: 30
+
+  comprehensive-scan:
+    runs-on: ubuntu-latest
+    name: Comprehensive Tool Scan
+    needs: [code-quality-scan, documentation-scan, performance-scan, complexity-scan, dependency-scan]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all scan artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: scan-results
+
+      - name: Generate comprehensive scan report
+        run: |
+          cat > SCAN_REPORT.md << EOF
+          # NLM Code Scan Report
+          
+          ## Generated: $(date)
+          
+          ## Code Quality Metrics
+          - Code complexity: $(grep -c "def " scan-results/code-quality-scan/*.txt 2>/dev/null || echo "0") functions analyzed
+          - Documentation quality: $(find scan-results/documentation-scan -name "*.html" | wc -l) HTML files generated
+          - Performance benchmarks: $(find scan-results/performance-scan -name "benchmark-results.json" | wc -l) benchmark files
+          - Dependency analysis: $(grep -c "Package:" scan-results/dependency-scan/dependency-tree.txt 2>/dev/null || echo "0") packages analyzed
+          
+          ## Tool Coverage
+          
+          ### Code Quality Tools
+          - ClangTidy: $(if [ -f "scan-results/code-quality-scan/clang-tidy-results.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          - CPPCheck: $(if [ -f "scan-results/code-quality-scan/cppcheck-results.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          - ClangFormat: $(if [ -f "scan-results/code-quality-scan/format-results.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          
+          ### Documentation Tools
+          - Doxygen: $(if [ -d "scan-results/documentation-scan/doxygen" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          - Sphinx: $(if [ -f "scan-results/documentation-scan/html/index.html" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          
+          ### Performance Tools
+          - GProf: $(if [ -f "scan-results/performance-scan/gprof-results.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          - Benchmarking: $(if [ -f "scan-results/performance-scan/benchmark-results.json" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          
+          ### Complexity Analysis
+          - Radon Complexity: $(if [ -f "scan-results/complexity-scan/radon-complexity.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          - McCabe Complexity: $(if [ -f "scan-results/complexity-scan/mccabe-complexity.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          
+          ### Dependency Analysis
+          - Safety Check: $(if [ -f "scan-results/dependency-scan/safety-scan.json" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          - Dependency Tree: $(if [ -f "scan-results/dependency-scan/dependency-tree.txt" ]; then echo "✅ COMPLETED"; else echo "❌ FAILED"; fi)
+          
+          ## Overall Scan Status
+          - Tools executed: $(find scan-results -name "*.txt" -o -name "*.json" | wc -l)
+          - Files generated: $(find scan-results -type f | wc -l)
+          
+          ## Recommendations
+          1. Address any failed scans in the scan-results directory
+          2. Optimize code complexity where McCabe metrics exceed 20
+          3. Update dependencies with security vulnerabilities
+          4. Ensure documentation is up-to-date with code changes
+          5. Regular scan schedule to maintain code quality
+          
+          EOF
+
+      - name: Upload comprehensive scan report
+        uses: actions/upload-artifact@v3
+        with:
+          name: comprehensive-scan-report
+          path: SCAN_REPORT.md
+          retention-days: 30
+
+      - name: Deploy scan report
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          keep_files: true
+          commit_message: "Update comprehensive scan report"
+
+  notification:
+    runs-on: ubuntu-latest
+    name: Scan Notification
+    needs: comprehensive-scan
+    if: failure()
+    steps:
+      - name: Notify scan failure
+        run: |
+          echo "Scan pipeline failed!"
+          echo "Code quality issues detected."
+          echo "Please review the scan report for details."

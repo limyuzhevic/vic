@@ -1,0 +1,230 @@
+name: NLM Release Pipeline
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: 'v0.1.0'
+      publish:
+        description: 'Publish release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    name: Version Bumping Automation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="$(git describe --tags --abbrev=0 | sed 's/^v//')"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Update version in CMakeLists.txt
+        run: |
+          sed -i "s/VERSION 0.1.0/VERSION ${{ steps.version.outputs.version }}/" CMakeLists.txt
+
+      - name: Update version in pyproject.toml
+        run: |
+          sed -i "s/version = \"0.1.0\"/version = \"${{ steps.version.outputs.version }}\" /" pyproject.toml
+
+      - name: Update version in config.h
+        run: |
+          find src -name "config.h" -type f -exec sed -i "s/#define NLM_VERSION \"0.1.0\"/#define NLM_VERSION \"${{ steps.version.outputs.version }}\" /" {} \;
+
+      - name: Commit version changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CMakeLists.txt pyproject.toml src/**/*.h
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          git push
+
+      - name: Create version tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+  package-creation:
+    runs-on: ubuntu-latest
+    name: Package Creation
+    needs: version-bump
+    strategy:
+      matrix:
+        package: [wheel, conda, source, docker]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Build Python wheel
+        if: matrix.package == 'wheel'
+        run: |
+          pip install build
+          python -m build --wheel --outdir dist/
+
+      - name: Build conda package
+        if: matrix.package == 'conda'
+        run: |
+          conda install -y conda-build
+          conda build --token ${{ secrets.CONDA_TOKEN }} --output-dir dist conda/
+
+      - name: Build source package
+        if: matrix.package == 'source'
+        run: |
+          python -m build --sdist --outdir dist/
+
+      - name: Build Docker image
+        if: matrix.package == 'docker'
+        run: |
+          echo "Build Docker image for NLM v${{ needs.version-bump.outputs.version }}"
+          docker build -t nlm/nlm:${{ needs.version-bump.outputs.version }} .
+
+      - name: Push Docker image
+        if: matrix.package == 'docker' && github.ref == 'refs/heads/main'
+        run: |
+          docker push nlm/nlm:${{ needs.version-bump.outputs.version }}
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: packages-${{ matrix.package }}
+          path: dist/
+          retention-days: 7
+
+  github-release:
+    runs-on: ubuntu-latest
+    name: GitHub Release Creation
+    needs: package-creation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: "v${{ needs.version-bump.outputs.version }}"
+          name: "NLM v${{ needs.version-bump.outputs.version }}"
+          body: |
+            ## New Features
+            - Phase 6 integration complete
+            - Comprehensive benchmarking framework
+            - Multi-platform support
+
+            ## Bug Fixes
+            - Memory management optimizations
+            - Performance improvements
+            - Bug fixes from Phase 5.5 testing
+
+            ## Known Issues
+            - See `docs/LAST_KNOWN_ISSUES.md` for current limitations
+
+            ## Installation
+            ```bash
+            pip install pynlm
+            ```
+
+            ## Usage
+            ```python
+            import pynlm
+            brain = pynlm.createBrain(pynlm.createDefaultConfig())
+            brain.initialize()
+            ```
+
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/packages-wheel/
+            artifacts/packages-conda/
+            artifacts/packages-source/
+          generate_release_notes: true
+
+      - name: Release notifications
+        run: |
+          echo "Release created: ${{ steps.release.outputs.id }}"
+          echo "Download URL: ${{ steps.release.outputs.browser_download_url }}"
+
+  documentation-deployment:
+    runs-on: ubuntu-latest
+    name: Documentation Deployment
+    needs: package-creation
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs
+          keep_files: true
+          commit_message: "Deploy documentation for v${{ needs.version-bump.outputs.version }}"
+
+  tagging:
+    runs-on: ubuntu-latest
+    name: Tagging and Changelog
+    needs: version-bump
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        run: |
+          git diff --no-merges --oneline $(git describe --tags --abbrev=0 --exclude='*-rc*' --exclude='*-beta*' | sed 's/^v//')..HEAD > CHANGES.md
+          cat CHANGES.md | head -50 > CHANGELOG.md
+
+      - name: Update version tag
+        run: |
+          git tag -a "v${{ needs.version-bump.outputs.version }}" -m "Release v${{ needs.version-bump.outputs.version }}"
+          git push origin "v${{ needs.version-bump.outputs.version }}"
+
+  notification:
+    runs-on: ubuntu-latest
+    name: Release Notification
+    needs: [package-creation, github-release]
+    if: success()
+    steps:
+      - name: Notify release
+        run: |
+          echo "NLM ${{ needs.version-bump.outputs.version }} has been successfully released!"
+          echo "View release: https://github.com/nlm-project/nlm/releases/tag/v${{ needs.version-bump.outputs.version }}"

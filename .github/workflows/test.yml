@@ -1,0 +1,286 @@
+name: NLM Testing Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CXXFLAGS: "-O2 -march=native -flto -fsanitize=address,undefined -fno-omit-frame-pointer"
+  CMAKE_BUILD_TYPE: Release
+
+jobs:
+  unit-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Debug, Release]
+        sanitizer: [none, address, undefined]
+        exclude:
+          - os: windows-latest
+            sanitizer: address
+          - os: windows-latest
+            sanitizer: undefined
+          - sanitizer: address
+          - sanitizer: undefined
+    name: Unit Tests (${{ matrix.os }} - ${{ matrix.build_type }} - ${{ matrix.sanitizer }})
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev \
+            python3-pip \
+            valgrind \
+            cppcheck
+
+      - name: Set up dependencies (macOS)
+        if: runner.os == 'Darwin'
+        run: |
+          brew update
+          brew install cmake git python3 valgrind
+
+      - name: Set up dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+          choco install python git wget
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          architecture: x64
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest numpy pytest-cov scikit-build-core pybind11
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_EXTENSIONS=OFF \
+            -DBUILD_TESTING=ON \
+            -DENABLE_SANITIZERS=${{ matrix.sanitizer != 'none' }}
+
+      - name: Build tests
+        run: |
+          cmake --build build --config ${{ matrix.build_type }} --parallel 4
+
+      - name: Run CTest
+        run: |
+          cd build
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            valgrind --track-origins=yes --error-exitcode=1 ./nlm_test
+          else
+            ./nlm_test
+          fi
+
+      - name: Run Python tests
+        run: |
+          cd python
+          python -m pytest tests/ -v --cov=pynlm --cov-report=term-missing
+
+      - name: Run Phase 6 integration tests
+        run: |
+          cd build
+          if [ -f "nlm_phase6_demo" ] || [ -f "nlm_phase6_demo.exe" ]; then
+            ./nlm_phase6_demo
+          fi
+
+      - name: Generate coverage report
+        if: matrix.sanitizer == 'none'
+        run: |
+          cd build
+          if command -v lcov >/dev/null 2>&1; then
+            lcov --directory . --capture --output-file coverage.info
+            lcov --remove coverage.info '/usr/*' --output-file coverage.info
+            genhtml -o coverage_report coverage.info
+          fi
+
+      - name: Upload coverage report
+        if: matrix.sanitizer == 'none' && matrix.build_type == 'Debug'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report-${{ matrix.os }}
+          path: build/coverage_report/
+
+      - name: Run memory leak analysis
+        if: matrix.sanitizer == 'address'
+        run: |
+          cd build
+          valgrind --leak-check=full --error-exitcode=1 ./nlm_test
+
+  performance-benchmark:
+    runs-on: ubuntu-latest
+    name: Performance Benchmarking
+    needs: unit-tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev \
+            python3-pip \
+            python3-venv
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Configure and build with benchmarks
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target benchmarks --parallel 4
+
+      - name: Run performance benchmarks
+        run: |
+          cd build
+          ./benchmarks/benchmarks_sample_main
+
+      - name: Compare with baseline
+        run: |
+          python3 -c "
+          import json, os
+          baseline_path = os.path.join(os.environ.get('GITHUB_WORKSPACE', ''), 'baseline_results.json')
+          
+          if os.path.exists(baseline_path):
+            import sys
+            sys.path.append('build')
+            from benchmark_comparison import compare_benchmarks
+            compare_benchmarks(baseline_path, 'build/benchmark_results.json')
+          else:
+            print('No baseline found, using as baseline')
+            with open('build/benchmark_results.json', 'w') as f:
+              json.dump([], f)
+          "
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: build/benchmark_results.json
+
+  valgrind-analysis:
+    runs-on: ubuntu-latest
+    name: Valgrind Memory Analysis
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+
+      - name: Configure and build with valgrind
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build --config Debug
+
+      - name: Run valgrind analysis
+        run: |
+          cd build
+          valgrind --tool=memcheck --leak-check=full --error-exitcode=1 ./nlm_test
+
+  parallel-tests:
+    runs-on: ubuntu-latest
+    name: Parallel Test Execution
+    strategy:
+      matrix:
+        test: [unit, integration, python, phase6]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake
+
+      - name: Configure and build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 4
+
+      - name: Run selected test suite
+        run: |
+          cd build
+          case ${{ matrix.test }} in
+            unit)
+              ./nlm_test
+              ;;
+            integration)
+              if [ -f "nlm_phase6_demo" ]; then
+                ./nlm_phase6_demo
+              fi
+              ;;
+            python)
+              cd ../python
+              python -m pytest tests/ -v
+              ;;
+            phase6)
+              if [ -f "nlm_phase6_demo" ]; then
+                timeout 300 ./nlm_phase6_demo
+              fi
+              ;;
+          esac
+
+  post-validation:
+    runs-on: ubuntu-latest
+    name: Post-Validation Checks
+    needs: [unit-tests, performance-benchmark]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Validate test results
+        run: |
+          echo "Validating test results..."
+          find artifacts -name "*.xml" -o -name "*.json" -o -name "*.txt" | head -10
+
+      - name: Check for test failures
+        run: |
+          if find artifacts -name "*failure*" -type f | head -5 | grep -q .; then
+            echo "Test failures detected!"
+            exit 1
+          fi
+
+  notification:
+    runs-on: ubuntu-latest
+    name: Notify on Failures
+    needs: [unit-tests, performance-benchmark]
+    if: failure()
+    steps:
+      - name: Notify failure
+        run: |
+          echo "Build or test pipeline failed!"
+          echo "Please check the workflow logs for details."

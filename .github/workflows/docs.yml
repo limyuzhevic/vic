@@ -1,0 +1,195 @@
+name: NLM Documentation Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOXYGEN_VERSION: 1.9.1
+  SPHINX_VERSION: 3.5.1
+
+jobs:
+  doxygen-docs:
+    runs-on: ubuntu-latest
+    name: Doxygen Documentation Generation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            doxygen \
+            graphviz \
+            cmake \
+            make
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Doxygen
+        run: |
+          cd build
+          doxygen Doxyfile 2>/dev/null || {
+            echo "/* Doxyfile template */" > Doxyfile
+            echo "PROJECT_NAME = \"NLM\"" >> Doxyfile
+            echo "PROJECT_NUMBER = \"$(git describe --tags --abbrev=0 2>/dev/null || echo \"0.1.0\")\"" >> Doxyfile
+            echo "INPUT = src/" >> Doxyfile
+            echo "OUTPUT_DIRECTORY = docs/doxygen" >> Doxyfile
+            echo "GENERATE_LATEX = NO" >> Doxyfile
+            echo "GENERATE_HTML = YES" >> Doxyfile
+            echo "GENERATE_XML = YES" >> Doxyfile
+            echo "EXCLUDE = *test* *benchmark*" >> Doxyfile
+            doxygen Doxyfile
+          }
+
+      - name: Upload Doxygen docs
+        uses: actions/upload-artifact@v3
+        with:
+          name: doxygen-docs
+          path: build/docs/doxygen/
+          retention-days: 30
+
+  python-docs:
+    runs-on: ubuntu-latest
+    name: Python API Documentation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install sphinx sphinx-rtd-theme myst-parser sphinx-autodoc-typehints
+          pip install -e python/
+
+      - name: Generate Python docs
+        run: |
+          cd python
+          mkdir -p docs/api
+          sphinx-build -b html docs/source docs/build/html 2>/dev/null || {
+            mkdir -p docs/source
+            cat > docs/source/index.rst << EOF
+.. NLM Python API Documentation
+
+Welcome to the NLM Python API Documentation
+
+.. autoclass:: pynlm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: pynlm.Brain
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: pynlm.World
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: pynlm.Agent
+   :members:
+   :undoc-members:
+   :show-inheritance:
+EOF
+            sphinx-build -b html docs/source docs/build/html
+          }
+
+      - name: Upload Python docs
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-docs
+          path: python/docs/build/html/
+          retention-days: 30
+
+  docs-validation:
+    runs-on: ubuntu-latest
+    name: Documentation Validation
+    needs: [doxygen-docs, python-docs]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download docs artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Validate documentation structure
+        run: |
+          echo "Validating documentation structure..."
+          mkdir -p docs/staging
+          
+          # Check Doxygen docs
+          if [ -d "artifacts/doxygen-docs" ]; then
+            echo "Doxygen docs: OK (found $(find artifacts/doxygen-docs -name \"*.html\" | wc -l) HTML files)"
+          else
+            echo "WARNING: Doxygen docs not found"
+          fi
+          
+          # Check Python docs
+          if [ -d "artifacts/python-docs" ]; then
+            echo "Python docs: OK (found $(find artifacts/python-docs -name \"*.html\" | wc -l) HTML files)"
+          else
+            echo "WARNING: Python docs not found"
+          fi
+          
+          # Check for broken links (basic validation)
+          find artifacts -name \"*.html\" -exec grep -l "href=\"http" {} \; | head -5
+
+      - name: Generate documentation index
+        run: |
+          cat > docs/index.html << EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NLM Documentation Index</title>
+</head>
+<body>
+    <h1>NLM Documentation</h1>
+    <p><a href="doxygen/index.html">Doxygen API Reference</a></p>
+    <p><a href="python-docs/index.html">Python API Documentation</a></p>
+    <p>Generated on $(date)</p>
+</body>
+</html>
+EOF
+
+      - name: Upload documentation index
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation-index
+          path: docs/index.html
+          retention-days: 30
+
+  docs-hosting:
+    runs-on: ubuntu-latest
+    name: Documentation Hosting
+    needs: docs-validation
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all docs artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs
+          keep_files: true
+          allow_empty_commit: true
+          commit_message: "Deploy documentation"

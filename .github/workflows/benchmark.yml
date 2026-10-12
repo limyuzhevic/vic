@@ -1,0 +1,358 @@
+name: NLM Benchmarking Pipeline
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run at 2 AM UTC daily
+  workflow_dispatch:
+    inputs:
+      benchmark_category:
+        description: 'Benchmark category'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - memory_systems
+          - neuromodulation
+          - prediction_system
+          - cognition_systems
+          - development
+          - integration
+      neuron_count:
+        description: 'Number of neurons'
+        required: false
+        default: '1000'
+        type: string
+      steps:
+        description: 'Number of simulation steps'
+        required: false
+        default: '5000'
+        type: string
+
+env:
+  BENCHMARK_RESULTS_DIR: benchmarks/results
+  BASELINE_DIR: benchmarks/baseline
+
+jobs:
+  automated-benchmarking:
+    runs-on: ubuntu-latest
+    name: Automated Performance Benchmarking
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev \
+            python3-pip \
+            wget \
+            curl
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install benchmarking dependencies
+        run: |
+          pip install numpy pandas matplotlib scipy
+          pip install scikit-build-core pybind11
+
+      - name: Configure and build with benchmarks
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target benchmarks --parallel 4
+
+      - name: Run comprehensive benchmarks
+        run: |
+          cd build
+          echo "Running comprehensive benchmarks..."
+          
+          # Run all benchmark categories
+          benchmarks/bench_cli --benchmark all --neurons ${{ github.event.inputs.neuron_count || '1000' }} --steps ${{ github.event.inputs.steps || '5000' }} --output benchmark_results.json
+          
+          # If specific category is requested, run only that
+          if [[ "${{ github.event.inputs.benchmark_category }}" != "all" ]]; then
+            benchmarks/bench_cli --benchmark ${{ github.event.inputs.benchmark_category }} --output benchmark_results.json
+          fi
+
+      - name: Generate benchmark report
+        run: |
+          cd build
+          ./benchmarks/benchmark_report_generator --input benchmark_results.json --output benchmark_report.html
+          ./benchmarks/benchmark_cli --export --benchmark_results benchmark_results.json
+
+      - name: Compare with baseline
+        run: |
+          cd build
+          if [[ -d "../${{ env.BASELINE_DIR }}" ]]; then
+            ./benchmarks/benchmark_cli --compare --baseline "../${{ env.BASELINE_DIR }}" --current benchmark_results.json --output regression_analysis.json
+          else
+            echo "No baseline found, storing as baseline"
+            mkdir -p "../${{ env.BASELINE_DIR }}"
+            cp benchmark_results.json "../${{ env.BASELINE_DIR }}/baseline_$(date +%Y%m%d_%H%M%S).json"
+          fi
+
+      - name: Detect performance regressions
+        run: |
+          cd build
+          python3 -c "
+          import json
+          results_file = 'benchmark_results.json'
+          regression_file = 'regression_analysis.json'
+          
+          try:
+              with open(results_file) as f:
+                  results = json.load(f)
+              
+              # Simple regression detection
+              regressions = []
+              for result in results:
+                  if 'baseline' in result and 'current' in result:
+                      improvement = float(result['current']) - float(result['baseline'])
+                      if improvement > 0:  # Degradation
+                          regressions.append({
+                              'benchmark': result.get('name', 'unknown'),
+                              'improvement': improvement,
+                              'percentage': (improvement / float(result['baseline'])) * 100
+                          })
+              
+              with open(regression_file, 'w') as f:
+                  json.dump(regressions, f, indent=2)
+              
+              if regressions:
+                  print(f'Performance regression detected: {len(regressions)} issues')
+                  for r in regressions:
+                      print(f'  {r[\"benchmark\"]}: {r[\"percentage\"]:.2f}% degradation')
+              else:
+                  print('No performance regressions detected')
+                  
+          except Exception as e:
+              print(f'Error analyzing results: {e}')
+          "
+
+      - name: Store benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: build/benchmark_results.json
+          retention-days: 90
+
+      - name: Store regression analysis
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: regression-analysis
+          path: build/regression_analysis.json
+          retention-days: 90
+
+  historical-tracking:
+    runs-on: ubuntu-latest
+    name: Historical Performance Tracking
+    needs: automated-benchmarking
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download previous benchmark results
+        uses: actions/download-artifact@v3
+        with:
+          path: previous_results
+
+      - name: Compare with historical data
+        run: |
+          echo "Comparing with historical performance data..."
+          mkdir -p "${{ env.BENCHMARK_RESULTS_DIR }}"
+          
+          # Generate historical trend analysis
+          python3 -c "
+          import json, os, glob, pandas as pd
+          
+          # Load current and historical results
+          current_files = glob.glob('previous_results/*/benchmark-results/*')
+          all_results = []
+          
+          for file in current_files:
+              try:
+                  with open(file) as f:
+                      all_results.extend(json.load(f))
+              except:
+                  pass
+          
+          if all_results:
+              df = pd.DataFrame(all_results)
+              if 'timestamp' in df.columns:
+                  df['timestamp'] = pd.to_datetime(df['timestamp'])
+                  
+                  # Generate trend analysis
+                  trends = []
+                  for benchmark in df['benchmark'].unique():
+                      subset = df[df['benchmark'] == benchmark]
+                      if len(subset) > 1:
+                          recent = subset.tail(3)
+                          older = subset.head(3)
+                          
+                          if not recent.empty and not older.empty:
+                              recent_avg = recent['score'].mean()
+                              older_avg = older['score'].mean()
+                              
+                              trend = (recent_avg - older_avg) / older_avg * 100
+                              trends.append({
+                                  'benchmark': benchmark,
+                                  'trend': trend,
+                                  'recent_avg': recent_avg,
+                                  'older_avg': older_avg,
+                                  'change': trend
+                              })
+                  
+                  # Save trends
+                  with open('performance_trends.json', 'w') as f:
+                      json.dump(trends, f, indent=2)
+                  
+                  print(f'Analyzed {len(trends)} benchmark trends')
+                  for trend in trends:
+                      if abs(trend['change']) > 5:
+                          status = 'REGRESSION' if trend['change'] < 0 else 'IMPROVEMENT'
+                          print(f'  {trend[\"benchmark\"]}: {status} {abs(trend[\"change\"]):.2f}%')
+              else:
+                  print('No timestamp data for trend analysis')
+          else:
+              print('No benchmark data available for historical analysis')
+          "
+
+      - name: Upload performance trends
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-trends
+          path: performance_trends.json
+          retention-days: 90
+
+  baseline-maintenance:
+    runs-on: ubuntu-latest
+    name: Baseline Maintenance
+    needs: automated-benchmarking
+    if: github.event_name == 'schedule' || github.event.inputs.benchmark_category == 'all'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Update baseline
+        run: |
+          echo "Updating performance baseline..."
+          mkdir -p "${{ env.BASELINE_DIR }}"
+          
+          # Find and copy latest benchmark results to baseline
+          latest_result=$(find artifacts -name "benchmark_results.json" -type f -exec ls -t {} + | head -1)
+          
+          if [ -n "$latest_result" ]; then
+            baseline_file="${{ env.BASELINE_DIR }}/baseline_$(date +%Y%m%d_%H%M%S).json"
+            cp "$latest_result" "$baseline_file"
+            echo "Baseline updated: $baseline_file"
+          else
+            echo "No benchmark results found to update baseline"
+          fi
+
+      - name: Clean old baselines
+        run: |
+          find "${{ env.BASELINE_DIR }}" -name "baseline_*.json" -type f -mtime +30 -delete
+          echo "Cleaned old baselines (older than 30 days)"
+
+  reporting:
+    runs-on: ubuntu-latest
+    name: Benchmark Reporting
+    needs: [automated-benchmarking, historical-tracking, baseline-maintenance]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all benchmark artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Generate comprehensive benchmark report
+        run: |
+          echo "Generating comprehensive benchmark report..."
+          
+          cat > BENCHMARK_REPORT.md << EOF
+          # NLM Benchmarking Report
+          
+          ## Executive Summary
+          - Generated: $(date)
+          - Total benchmarks run: $(find artifacts -name "benchmark_results.json" -type f | wc -l)
+          - Performance regressions detected: $(find artifacts -name "regression_analysis.json" -type f | wc -l)
+          - Trend analyses completed: $(find artifacts -name "performance_trends.json" -type f | wc -l)
+          
+          ## Recent Performance Trends
+          $(python3 -c "
+          import json, os
+          
+          trends_file = 'artifacts/performance-trends/performance_trends.json'
+          if os.path.exists(trends_file):
+              with open(trends_file) as f:
+                  trends = json.load(f)
+              
+              print('| Benchmark | Trend | Change |')
+              print('|-----------|-------|--------|')
+              for trend in trends[:10]:
+                  status = '✅' if trend['change'] >= -5 else '⚠️' if trend['change'] >= -15 else '❌'
+                  print(f'| {trend['benchmark']} | {status} {trend['change']:+.2f}% | {trend['change']:+.2f}% |')
+          else:
+              print('No trend data available')
+          ")
+          
+          ## Key Metrics
+          - Average performance across all benchmarks
+          - Memory usage patterns
+          - Spike generation rates
+          - Integration test success rate
+          
+          ## Recommendations
+          - Focus on benchmarks showing regression
+          - Consider system upgrades for memory-intensive benchmarks
+          - Optimize for spike generation benchmarks
+          
+          ## Files Created
+          - benchmark_results.json
+          - regression_analysis.json
+          - performance_trends.json
+          EOF
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-report
+          path: BENCHMARK_REPORT.md
+          retention-days: 30
+
+      - name: Deploy to documentation site
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          keep_files: true
+          commit_message: "Update benchmark reports"
+
+  notification:
+    runs-on: ubuntu-latest
+    name: Benchmark Notification
+    needs: reporting
+    if: failure()
+    steps:
+      - name: Notify benchmark failure
+        run: |
+          echo "Benchmark pipeline failed!"
+          echo "Performance regressions may have been detected."
+          echo "Check the benchmark report for details."

@@ -9,26 +9,26 @@ namespace nlm {
 
 class Pruning {
 public:
-    Pruning();
-    ~Pruning();
-    
-    // Get pruning threshold
-    float getThreshold() const;
-    void setThreshold(float threshold);
-    
-    // Get pruning rate
-    float getPruningRate() const;
-    void setPruningRate(float rate);
-    
-    // Update pruning
-    void update(class Brain* brain, class RandomGenerator& rng);
-    
-    // Force pruning of specific synapse
-    bool pruneSynapse(class Synapse* synapse);
-    
+  Pruning();
+  ~Pruning();
+
+  // Get pruning threshold
+  float getThreshold() const;
+  void setThreshold(float threshold);
+
+  // Get pruning rate
+  float getPruningRate() const;
+  void setPruningRate(float rate);
+
+  // Update pruning
+  void update(class Brain *brain, class RandomGenerator &rng);
+
+  // Force pruning of specific synapse
+  bool pruneSynapse(class Synapse *synapse);
+
 private:
-    struct Impl;
-    Impl* pImpl;
+  struct Impl;
+  Impl *pImpl;
 };
 
 } // namespace nlm

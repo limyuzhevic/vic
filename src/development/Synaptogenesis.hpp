@@ -9,23 +9,23 @@ namespace nlm {
 
 class Synaptogenesis {
 public:
-    Synaptogenesis();
-    ~Synaptogenesis();
-    
-    // Get formation rate
-    float getFormationRate() const;
-    void setFormationRate(float rate);
-    
-    // Get target synapse density
-    float getTargetDensity() const;
-    void setTargetDensity(float density);
-    
-    // Update synapse formation
-    void update(class Brain* brain, class RandomGenerator& rng);
-    
+  Synaptogenesis();
+  ~Synaptogenesis();
+
+  // Get formation rate
+  float getFormationRate() const;
+  void setFormationRate(float rate);
+
+  // Get target synapse density
+  float getTargetDensity() const;
+  void setTargetDensity(float density);
+
+  // Update synapse formation
+  void update(class Brain *brain, class RandomGenerator &rng);
+
 private:
-    struct Impl;
-    Impl* pImpl;
+  struct Impl;
+  Impl *pImpl;
 };
 
 } // namespace nlm

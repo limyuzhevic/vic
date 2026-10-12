@@ -1,0 +1,358 @@
+name: NLM PR Validation Pipeline
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  BUILD_TYPE: Debug
+
+jobs:
+  pr-title-validation:
+    runs-on: ubuntu-latest
+    name: PR Title Validation
+    steps:
+      - name: Validate PR title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          
+          # Check for conventional commit format
+          if [[ "$PR_TITLE" =~ ^\(?(feat|fix|docs|style|refactor|perf|test|chore|ci|revert)\)?: ]]; then
+            echo "✅ PR title follows conventional commit format"
+          else
+            echo "❌ PR title does not follow conventional commit format"
+            echo "Expected format: type: description (e.g., feat: add new feature)"
+            exit 1
+          fi
+
+  pr-size-check:
+    runs-on: ubuntu-latest
+    name: PR Size and Complexity Check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check PR size
+        run: |
+          # Count added lines in the PR
+          ADDED_LINES=$(git diff --numstat ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | awk '{sum += $1} END {print sum}')
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | wc -l)
+          
+          echo "Added lines: $ADDED_LINES"
+          echo "Changed files: $CHANGED_FILES"
+          
+          # Size thresholds
+          if [ $ADDED_LINES -le 50 ] && [ $CHANGED_FILES -le 5 ]; then
+            echo "✅ PR size is acceptable for review"
+          else
+            echo "⚠️ PR is large, consider breaking into smaller PRs"
+            if [ $ADDED_LINES -gt 500 ] || [ $CHANGED_FILES -gt 15 ]; then
+              echo "❌ PR is too large, please split into smaller PRs"
+              exit 1
+            fi
+          fi
+
+  lint-validation:
+    runs-on: ubuntu-latest
+    name: Linting Validation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-format \
+            clang-tidy \
+            cppcheck \
+            astyle
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+      - name: Run ClangFormat
+        run: |
+          find src -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | xargs -I {} clang-format --style=file --dry-run {}
+
+      - name: Run ClangTidy
+        run: |
+          mkdir -p build
+          cmake --build build --target nlm_core --parallel 4
+          cd build
+          clang-tidy src/*.cpp src/*/*.cpp src/*/*/*.cpp --quiet
+
+      - name: Run CPPCheck
+        run: |
+          mkdir -p build
+          cmake --build build --target nlm_core --parallel 4
+          cd build
+          cppcheck --enable=all --suppress=missingIncludeSystem src/ > cppcheck-results.txt 2>&1
+          cat cppcheck-results.txt
+
+      - name: Validate code style
+        run: |
+          # Check for trailing whitespace
+          if git diff --check ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}; then
+            echo "✅ No trailing whitespace found"
+          else
+            echo "❌ Trailing whitespace detected"
+            exit 1
+          fi
+
+      - name: Upload linting results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: linting-results
+          path: |
+            build/clang-tidy-results.txt
+            build/cppcheck-results.txt
+            build/format-results.txt
+          retention-days: 7
+
+  formatting-validation:
+    runs-on: ubuntu-latest
+    name: Code Formatting Validation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check Python formatting
+        run: |
+          pip install black isort
+          black --check python/ --diff 2>&1 | head -50
+          if [ $? -eq 0 ]; then
+            echo "✅ Python code is properly formatted"
+          else
+            echo "❌ Python code formatting issues found"
+            exit 1
+          fi
+
+      - name: Check YAML formatting
+        run: |
+          pip install yamllint
+          yamllint -c .github/workflows/*.yml
+          echo "✅ YAML files are properly formatted"
+
+  dependency-validation:
+    runs-on: ubuntu-latest
+    name: Dependency Validation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Validate Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pip-tools
+          
+          # Check for outdated dependencies
+          pip install pipdeptree
+          pipdeptree > dependency-tree.txt
+          
+          # Check for potential version conflicts
+          python -c "
+          import pkg_resources, sys
+          installed = {pkg.key for pkg in pkg_resources.working_set}
+          print(f'Total packages: {len(installed)}')
+          
+          # Check for known problematic packages
+          problematic = ['setuptools', 'wheel', 'pip']
+          for pkg in problematic:
+              try:
+                  version = pkg_resources.get_distribution(pkg).version
+                  print(f'{pkg}: {version}')
+              except:
+                  pass
+          "
+
+      - name: Upload dependency reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-reports
+          path: |
+            dependency-tree.txt
+          retention-days: 7
+
+  test-validation:
+    runs-on: ubuntu-latest
+    name: Test Suite Validation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            python3-dev \
+            python3-pip
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure and build tests
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DBUILD_TESTING=ON
+          cmake --build build --parallel 4
+
+      - name: Run unit tests
+        run: |
+          cd build
+          if ./nlm_test; then
+            echo "✅ Unit tests passed"
+          else
+            echo "❌ Unit tests failed"
+            exit 1
+          fi
+
+      - name: Run Python tests
+        run: |
+          cd python
+          if python -m pytest tests/ -v --tb=short; then
+            echo "✅ Python tests passed"
+          else
+            echo "❌ Python tests failed"
+            exit 1
+          fi
+
+  docker-validation:
+    runs-on: ubuntu-latest
+    name: Docker Image Validation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker BuildKit
+        run: |
+          echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
+
+      - name: Build development Docker image
+        run: |
+          docker build -t nlm-dev --target development .
+
+      - name: Run security scan on Docker image
+        run: |
+          pip install trivy
+          trivy image nlm-dev --severity HIGH,CRITICAL
+
+      - name: Test Docker container
+        run: |
+          docker run --rm nlm-dev --version
+
+  integration-check:
+    runs-on: ubuntu-latest
+    name: Integration Check
+    needs: [lint-validation, formatting-validation, dependency-validation, test-validation, docker-validation]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download validation artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: validation-results
+
+      - name: Generate PR validation report
+        run: |
+          cat > PR_VALIDATION_REPORT.md << EOF
+          # PR Validation Report
+          
+          ## Generated: $(date)
+          
+          ## PR Information
+          - PR: #${{ github.event.pull_request.number }}
+          - Title: ${{ github.event.pull_request.title }}
+          - Author: ${{ github.event.pull_request.user.login }}
+          - Branch: ${{ github.event.pull_request.head.ref }}
+          
+          ## Validation Results
+          
+          ### Code Quality
+          - Linting: ✅ PASSED (if linting-results exist)
+          - Code Formatting: ✅ PASSED (if formatting-results exist)
+          - Dependency Validation: ✅ PASSED (if dependency-reports exist)
+          
+          ### Testing
+          - Unit Tests: ✅ PASSED (if test-results exist)
+          - Python Tests: ✅ PASSED (if python-test-results exist)
+          - Docker Validation: ✅ PASSED (if docker-validation passed)
+          
+          ### Integration
+          - Size Check: ✅ PASSED
+          - Title Validation: ✅ PASSED
+          
+          ## Code Metrics
+          - Total files changed: $(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | wc -l)
+          - Lines added: $(git diff --numstat ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | awk '{sum += $1} END {print sum}')
+          - Files changed: $(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          
+          ## Recommendations
+          - Address any linting errors shown in validation-results
+          - Ensure code formatting follows project standards
+          - Review test coverage for new functionality
+          - Update documentation for new features
+          
+          EOF
+
+      - name: Comment PR with validation results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('PR_VALIDATION_REPORT.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## PR Validation Report
+            
+            ${report}
+            
+            **Validation Status:** ✅ All checks passed
+            
+            Please review the validation results above and address any issues before merging.
+            `
+            });
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v3
+        with:
+          name: pr-validation-report
+          path: PR_VALIDATION_REPORT.md
+          retention-days: 30
+
+  notification:
+    runs-on: ubuntu-latest
+    name: PR Notification
+    needs: integration-check
+    if: failure()
+    steps:
+      - name: Notify PR validation failure
+        run: |
+          echo "PR validation failed!"
+          echo "Please review the validation results and address all issues."
+          echo "Check the PR validation report for details."

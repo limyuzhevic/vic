@@ -1,0 +1,163 @@
+# Compiled binaries and object files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Build directories
+build/
+cmake-build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+venv*
+env*
+
+# Coverage reports
+coverage.xml
+*.coverage
+*.cover
+
+# Documentation
+docs/html/
+docs/doxygen/
+docs/api/
+
+# Benchmark results
+benchmarks/results/
+benchmarks/baseline/
+
+# Test results
+TestResults.xml
+.nunit
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# VS Code
+.vscode/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Eclipse
+.project
+.settings
+
+# Logs and temp files
+*.log
+temp/
+
+# Package directories
+*.egg
+*.eggs
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.whl
+*.egg-info/
+
+# Distribution / packaging
+*.zip
+*.tar.gz
+*.tgz
+
+# Build artifacts
+*.deb
+*.rpm
+
+# CUDA files
+*.cu
+*.cuh
+
+# IDE files
+.vscode
+.idea
+
+# OS specific files
+Thumbs.db
+.DS_Store
+
+# Editor swap files
+*.swo
+*.swpx
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# PyCharm
+.idea
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+
+# Maven
+target/
+
+# Gradle
+.gradle
+
+# Eclipse
+.project
+
+# Global files
+*.orig
+*.rej
+
+# Temporary files
+*.*~
+
+# Kilo specific
+.kilo/
+
+# Ignore all .github/ workflows during checkout
+!.github/workflows/*.yml
+!.github/workflows/*.yaml
+
+# Ignore build artifacts in root
+*.mod
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.vcxproj.*.user
+*.vcxproj.*.filters
+*.vcxproj.*.user
+debug/
+release/
+
+# Ignore documentation files
+docs/ARCHITECTURE.md
+docs/SCIENCE.md
+docs/ROADMAP.md
+docs/EXPERIMENTS.md
+docs/LIMITATIONS.md
+docs/PHASE6_FINAL_AUDIT.md
+docs/PHASE6_FINAL_RESULTS.md
+docs/BIOLOGICAL_FIDELITY.md
+docs/FAILURES.md
+docs/PERFORMANCE.md
+docs/SCALING.md
+
+# Ignore benchmark directories
+benchmarks/
