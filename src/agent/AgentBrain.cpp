@@ -2,6 +2,15 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <memory>
+
+namespace nlm {
+
+#include "AgentBrain.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+#include <memory>
 
 namespace nlm {
 
@@ -61,7 +70,27 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    // Clear all neuron group pointers
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    // Note: This destructor clears the std::vector containers but does not
+    // deallocate the Neuron objects themselves, as they are owned by the
+    // Brain's regions (NeuralPopulation objects) which manage their own
+    // lifetimes through unique_ptr chains. This is the correct approach
+    // as AgentBrain should only hold references to existing neurons, not
+    // ownership of them.
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);

@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +100,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // JSON parsing
+    bool parseJSON(const std::string& json);
+    ConfigValue parseJSONValue(const std::string& json, size_t& pos);
+    void skipWhitespace(const std::string& json, size_t& pos);
+    
+    // Helper to get variant index
+    static size_t getVariantIndex(const ConfigValue& value);
 };
 
 } // namespace nlm
