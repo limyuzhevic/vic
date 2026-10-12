@@ -8,6 +8,7 @@
 // - Structural plasticity (synaptogenesis/pruning)
 
 #include "core/Config/Config.hpp"
+#include "core/Constants/Constants.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -25,6 +26,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
 
 using namespace nlm;
 
@@ -344,7 +346,7 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    std::string configFile = ConfigConstants::DEFAULT_CONFIG_FILE;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -368,32 +370,32 @@ int main(int argc, char** argv) {
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("simulation_timestep", ConfigConstants::DEFAULT_SIMULATION_TIMESTEP, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(ConfigConstants::DEFAULT_NEURON_COUNT), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(ConfigConstants::DEFAULT_REGION_COUNT), ConfigSource::Default);
+    config->set("connection_probability", ConfigConstants::DEFAULT_CONNECTION_PROBABILITY, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", ConfigConstants::DEFAULT_STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", ConfigConstants::DEFAULT_STDP_LTD_WEIGHT, ConfigSource::Default);
+    config->set("stdp_tau", ConfigConstants::DEFAULT_STDP_TAU, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", ConfigConstants::DEFAULT_SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    config->set("pruning_rate", ConfigConstants::DEFAULT_PRUNING_RATE, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getIntOr("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getDoubleOr("simulation_timestep", ConfigConstants::DEFAULT_SIMULATION_TIMESTEP)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getIntOr("neuron_count", ConfigConstants::DEFAULT_NEURON_COUNT)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getIntOr("region_count", ConfigConstants::DEFAULT_REGION_COUNT)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getDoubleOr("connection_probability", ConfigConstants::DEFAULT_CONNECTION_PROBABILITY)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    double timestep = config->getDoubleOr("simulation_timestep", ConfigConstants::DEFAULT_SIMULATION_TIMESTEP);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     

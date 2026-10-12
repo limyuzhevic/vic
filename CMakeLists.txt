@@ -21,6 +21,15 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Error handling library
+add_library(nlm_error_handling INTERFACE
+)
+target_include_directories(nlm_error_handling INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/ErrorHandling>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Update dependencies to include error handling
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -29,6 +38,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Constants/Constants.cpp
+    src/core/ErrorHandling/ErrorHandling.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -92,56 +103,90 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(nlm_core PUBLIC nlm_error_handling)
+
+# Constants library
+add_library(nlm_constants INTERFACE
+)
+target_include_directories(nlm_constants INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Constants>
+    $<INSTALL_INTERFACE:include>
+)
+
+# CLI library
+add_library(nlm_cli INTERFACE
+)
+target_include_directories(nlm_cli INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/CLI>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Update dependencies to include constants and CLI
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_link_libraries(nlm_agent PUBLIC nlm_core nlm_error_handling nlm_cli)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_link_libraries(nlm_world PUBLIC nlm_core nlm_error_handling nlm_cli)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlm_constants nlm_error_handling nlm_cli)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_constants nlm_error_handling nlm_cli)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_error_handling nlm_cli)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_constants nlm_error_handling nlm_cli)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_constants nlm_error_handling nlm_cli)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Unit test for configuration improvements
+add_executable(test_config_improvements test_config_improvements.cpp)
+target_link_libraries(test_config_improvements nlm_core nlm_error_handling)
+add_test(NAME test_config_improvements COMMAND test_config_improvements)
+
+# Integration test for comprehensive verification
+add_executable(test_integration test_integration.cpp)
+target_link_libraries(test_integration nlm_core nlm_error_handling)
+add_test(NAME test_integration COMMAND test_integration)
+
+# Final integration test for all improvements
+add_executable(test_final_integration test_final_integration.cpp)
+target_link_libraries(test_final_integration nlm_core nlm_error_handling nlm_cli)
+add_test(NAME test_final_integration COMMAND test_final_integration)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

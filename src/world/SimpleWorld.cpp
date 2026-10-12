@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include "../core/Constants/Constants.hpp"
 
 namespace nlm {
 
@@ -17,17 +18,188 @@ static float urand(uint64_t& state, float min, float max) {
     return min + normalized * (max - min);
 }
 
+// Helper function to check if position is valid
+bool SimpleWorld::isValidPosition(float x, float y) const {
+    return x >= 0.0f && x < width_ && y >= 0.0f && y < height_;
+}
+
+// Helper function to get object at position
+WorldObject* SimpleWorld::getObjectAt(float x, float y) {
+    for (auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dx = obj.x - x;
+        float dy = obj.y - y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        
+        if (dist < obj.radius) {
+            return &obj;
+        }
+    }
+    return nullptr;
+}
+
+// Helper function to place initial objects
+void SimpleWorld::placeInitialObjects() {
+    objects_.clear();
+    
+    // Place some resource objects (positive reward when touched)
+    for (int i = 0; i < 5; ++i) {
+        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+    }
+    
+    // Place some hazard objects (negative reward when touched)
+    for (int i = 0; i < 3; ++i) {
+        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+    }
+}
+
+// Helper function to generate vision
+void SimpleWorld::generateVision() {
+    // Simple raycasting-based vision
+    // Cast rays in a cone in front of the agent
+    
+    const int rayCount = ConfigConstants::DEFAULT_VISION_RAY_COUNT;
+    const float fov = ConfigConstants::DEFAULT_FOV_ANGLE;  // 90 degree FOV
+    const float maxRange = ConfigConstants::DEFAULT_VISION_MAX_RANGE;
+    
+    std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
+    
+    for (int i = 0; i < rayCount; ++i) {
+        // Angle for this ray
+        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+        
+        // Cast ray
+        float dx = std::cos(angle);
+        float dy = std::sin(angle);
+        
+        float t = 0.0f;
+        while (t < maxRange) {
+            float px = agent_.x + dx * t;
+            float py = agent_.y + dy * t;
+            
+            // Check wall collision
+            if (!isValidPosition(px, py)) {
+                vision[i] = t / maxRange;
+                break;
+            }
+            
+            // Check object collision
+            WorldObject* obj = getObjectAt(px, py);
+            if (obj != nullptr) {
+                // Encode object type as intensity pattern
+                // Resource = bright, Hazard = dark, different distances
+                if (obj->type == WorldObjectType::Resource) {
+                    vision[i] = (maxRange - t) / maxRange * 0.8f;  // Bright
+                } else if (obj->type == WorldObjectType::Hazard) {
+                    vision[i] = (maxRange - t) / maxRange * 0.3f;  // Dark
+                } else {
+                    vision[i] = 0.5f;
+                }
+                break;
+            }
+            
+            t += 0.1f;
+        }
+    }
+    
+    sensory_.setVision(vision);
+    sensory_.setTimestamp(simTime_);
+}
+
+// Helper function to generate touch sensors
+void SimpleWorld::generateTouchSensors() {
+    // Generate touch sensors (proximity to obstacles in 8 directions)
+    std::vector<float> touch(8, 0.0f);
+    for (int i = 0; i < 8; ++i) {
+        float angle = agent_.orientation + 2.0f * M_PI * i / 8.0f;
+        float dx = std::cos(angle);
+        float dy = std::sin(angle);
+        
+        float t = 0.0f;
+        while (t < ConfigConstants::DEFAULT_TOUCH_RANGE) {
+            float px = agent_.x + dx * t;
+            float py = agent_.y + dy * t;
+            
+            if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
+                touch[i] = 1.0f - t / ConfigConstants::DEFAULT_TOUCH_RANGE;  // Closer = stronger signal
+                break;
+            }
+            t += 0.1f;
+        }
+    }
+    sensory_.setTouch(touch);
+}
+
+// Helper function to generate internal signals
+void SimpleWorld::generateInternalSignals() {
+    // Generate internal signals (energy, health)
+    std::vector<float> internal(4, 0.0f);
+    internal[0] = agent_.energy / ConfigConstants::DEFAULT_MAX_ENERGY;  // Energy level
+    internal[1] = agent_.health;               // Health
+    internal[2] = agent_.isMoving ? 1.0f : 0.0f;  // Movement state
+    internal[3] = agent_.isTurning ? 1.0f : 0.0f;  // Turning state
+    sensory_.setInternal(internal);
+}
+
+// Helper function to generate proprioception
+void SimpleWorld::generateProprioception() {
+    // Generate proprioception (body position/velocity)
+    std::vector<float> proprioception(6, 0.0f);
+    proprioception[0] = agent_.x / width_;     // Normalized X
+    proprioception[1] = agent_.y / height_;    // Normalized Y
+    proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
+    proprioception[3] = std::abs(agent_.velocityX) / ConfigConstants::DEFAULT_MOVE_SPEED;  // Speed X
+    proprioception[4] = std::abs(agent_.velocityY) / ConfigConstants::DEFAULT_MOVE_SPEED;  // Speed Y
+    proprioception[5] = std::abs(agent_.angularVelocity) / ConfigConstants::DEFAULT_TURN_SPEED;  // Turn rate
+    sensory_.setProprioception(proprioception);
+}
+
+// Helper function to apply movement physics
+void SimpleWorld::applyMovementPhysics(double timestep) {
+    // Apply velocity to position
+    agent_.x += agent_.velocityX * timestep;
+    agent_.y += agent_.velocityY * timestep;
+    
+    // Apply angular velocity to orientation
+    agent_.orientation += agent_.angularVelocity * timestep;
+    
+    // Normalize orientation to [-PI, PI]
+    while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
+    while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
+    
+    // Boundary collision
+    if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
+    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
+    if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
+    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+}
+
+// Helper function to check collisions
+void SimpleWorld::checkCollisions() {
+    // Passive collision check (for damage when moving into objects)
+    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
+    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
+        agent_.health -= 0.01f;  // Passive damage
+    }
+}
+
+// SimpleWorld constructor
 SimpleWorld::SimpleWorld()
-    : width_(20.0f)
-    , height_(20.0f)
-    , visionWidth_(16)
-    , visionHeight_(16)
-    , maxEnergy_(100.0f)
-    , energyDecayRate_(0.01f)
-    , resourceEnergyGain_(30.0f)
+    : width_(ConfigConstants::DEFAULT_WORLD_WIDTH)
+    , height_(ConfigConstants::DEFAULT_WORLD_HEIGHT)
+    , visionWidth_(ConfigConstants::DEFAULT_VISION_WIDTH)
+    , visionHeight_(ConfigConstants::DEFAULT_VISION_HEIGHT)
+    , maxEnergy_(ConfigConstants::DEFAULT_MAX_ENERGY)
+    , energyDecayRate_(ConfigConstants::DEFAULT_ENERGY_DECAY_RATE)
+    , resourceEnergyGain_(ConfigConstants::DEFAULT_RESOURCE_ENERGY_GAIN)
     , simTime_(0.0)
-    , rngSeed_(42)
-    , rngState_(42)
+    , rngSeed_(ConfigConstants::DEFAULT_RANDOM_SEED)
+    , rngState_(ConfigConstants::DEFAULT_RANDOM_SEED)
 {
     agent_.reset();
 }
@@ -54,22 +226,7 @@ void SimpleWorld::reset() {
     agent_.energy = maxEnergy_;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
-    objects_.clear();
-    
-    // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
-    }
-    
-    // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
-    }
-    
+    placeInitialObjects();
     generateVision();
 }
 
@@ -81,26 +238,11 @@ void SimpleWorld::setAgentStart(float x, float y) {
 void SimpleWorld::update(double timestep) {
     simTime_ += timestep;
     
-    // Apply velocity to position
-    agent_.x += agent_.velocityX * timestep;
-    agent_.y += agent_.velocityY * timestep;
-    
-    // Apply angular velocity to orientation
-    agent_.orientation += agent_.angularVelocity * timestep;
-    
-    // Normalize orientation to [-PI, PI]
-    while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
-    while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
-    
-    // Boundary collision
-    if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
-    if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    applyMovementPhysics(timestep);
     
     // Energy decay
     agent_.energy -= energyDecayRate_;
-    if (agent_.energy < 0.0f) agent_.energy = 0.0f;
+    if (agent_.energy < ConfigConstants::MIN_ENERGY) agent_.energy = ConfigConstants::MIN_ENERGY;
     
     // Update age
     agent_.age += timestep;
@@ -118,11 +260,11 @@ uint64_t SimpleWorld::nextRandom() {
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
     ActionResult result;
-    const float moveSpeed = 3.0f;
-    const float turnSpeed = 2.0f;
+    const float moveSpeed = ConfigConstants::DEFAULT_MOVE_SPEED;
+    const float turnSpeed = ConfigConstants::DEFAULT_TURN_SPEED;
     
     // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
+    if (currentTime - agent_.lastActionTime < ConfigConstants::DEFAULT_ACTION_COOLDOWN) {
         return ActionResult(0.0f, false, "too soon");
     }
     
@@ -256,29 +398,6 @@ ActionResult SimpleWorld::interact() {
     return result;
 }
 
-bool SimpleWorld::isValidPosition(float x, float y) const {
-    // Check world boundaries
-    if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
-        return false;
-    }
-    return true;
-}
-
-WorldObject* SimpleWorld::getObjectAt(float x, float y) {
-    for (auto& obj : objects_) {
-        if (!obj.active) continue;
-        
-        float dx = obj.x - x;
-        float dy = obj.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
-        
-        if (dist < obj.radius) {
-            return &obj;
-        }
-    }
-    return nullptr;
-}
-
 void SimpleWorld::addObject(const WorldObject& obj) {
     objects_.push_back(obj);
 }
@@ -295,108 +414,6 @@ void SimpleWorld::removeObject(float x, float y) {
             obj.active = false;
             return;
         }
-    }
-}
-
-void SimpleWorld::generateVision() {
-    // Simple raycasting-based vision
-    // Cast rays in a cone in front of the agent
-    
-    const int rayCount = 16;
-    const float fov = M_PI / 2.0f;  // 90 degree FOV
-    const float maxRange = 8.0f;
-    
-    std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
-    
-    for (int i = 0; i < rayCount; ++i) {
-        // Angle for this ray
-        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
-        
-        // Cast ray
-        float dx = std::cos(angle);
-        float dy = std::sin(angle);
-        
-        float t = 0.0f;
-        while (t < maxRange) {
-            float px = agent_.x + dx * t;
-            float py = agent_.y + dy * t;
-            
-            // Check wall collision
-            if (!isValidPosition(px, py)) {
-                vision[i] = t / maxRange;
-                break;
-            }
-            
-            // Check object collision
-            WorldObject* obj = getObjectAt(px, py);
-            if (obj != nullptr) {
-                // Encode object type as intensity pattern
-                // Resource = bright, Hazard = dark, different distances
-                if (obj->type == WorldObjectType::Resource) {
-                    vision[i] = (maxRange - t) / maxRange * 0.8f;  // Bright
-                } else if (obj->type == WorldObjectType::Hazard) {
-                    vision[i] = (maxRange - t) / maxRange * 0.3f;  // Dark
-                } else {
-                    vision[i] = 0.5f;
-                }
-                break;
-            }
-            
-            t += 0.1f;
-        }
-    }
-    
-    sensory_.setVision(vision);
-    sensory_.setTimestamp(simTime_);
-    
-    // Generate touch sensors (proximity to obstacles in 8 directions)
-    std::vector<float> touch(8, 0.0f);
-    for (int i = 0; i < 8; ++i) {
-        float angle = agent_.orientation + 2.0f * M_PI * i / 8.0f;
-        float dx = std::cos(angle);
-        float dy = std::sin(angle);
-        
-        float t = 0.0f;
-        while (t < 1.5f) {
-            float px = agent_.x + dx * t;
-            float py = agent_.y + dy * t;
-            
-            if (!isValidPosition(px, py) || getObjectAt(px, py) != nullptr) {
-                touch[i] = 1.0f - t / 1.5f;  // Closer = stronger signal
-                break;
-            }
-            t += 0.1f;
-        }
-    }
-    sensory_.setTouch(touch);
-    
-    // Generate internal signals (energy, health)
-    std::vector<float> internal(4, 0.0f);
-    internal[0] = agent_.energy / maxEnergy_;  // Energy level
-    internal[1] = agent_.health;               // Health
-    internal[2] = agent_.isMoving ? 1.0f : 0.0f;  // Movement state
-    internal[3] = agent_.isTurning ? 1.0f : 0.0f;  // Turning state
-    sensory_.setInternal(internal);
-    
-    // Generate proprioception (body position/velocity)
-    std::vector<float> proprioception(6, 0.0f);
-    proprioception[0] = agent_.x / width_;     // Normalized X
-    proprioception[1] = agent_.y / height_;    // Normalized Y
-    proprioception[2] = (agent_.orientation + M_PI) / (2.0f * M_PI);  // Normalized orientation
-    proprioception[3] = std::abs(agent_.velocityX) / 5.0f;  // Speed X
-    proprioception[4] = std::abs(agent_.velocityY) / 5.0f;  // Speed Y
-    proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
-    sensory_.setProprioception(proprioception);
-    
-    // No audio for now
-    sensory_.setAudio({});
-}
-
-void SimpleWorld::checkCollisions() {
-    // Passive collision check (for damage when moving into objects)
-    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
-    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
     }
 }
 
