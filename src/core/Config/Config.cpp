@@ -18,10 +18,111 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// JSON and YAML parser implementation
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Simple JSON parser for basic key-value pairs
+    // For production use, consider nlohmann/json or similar library
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Parse JSON object - simplified implementation
+    // Look for key-value pairs in format: "key" : "value" or "key" : number, boolean, etc.
+    
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find next key (starts with " after { or ,)
+        pos = content.find('"', pos);
+        if (pos == std::string::npos) break;
+        
+        size_t keyStart = pos;
+        pos = content.find('"', keyStart + 1);
+        if (pos == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, pos - keyStart - 1);
+        trim(key);
+        
+        // Find colon after key
+        pos = content.find(':', pos);
+        if (pos == std::string::npos) break;
+        
+        // Find value (skip whitespace)
+        pos = content.find_first_not_of(" \t\n\r:", pos);
+        if (pos == std::string::npos) break;
+        
+        if (content[pos] == '"') {
+            // String value
+            size_t valueEnd = content.find('"', pos + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string value = content.substr(pos + 1, valueEnd - pos - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (content[pos] == 't' || content[pos] == 'f') {
+            // Boolean value
+            std::string boolStr = "false";
+            if (content.substr(pos, 4) == "true") {
+                boolStr = "true";
+            }
+            set(key, boolStr, ConfigSource::File);
+            pos += 4;
+        } else if (content[pos] == '-' || std::isdigit(content[pos])) {
+            // Number value (integer or float)
+            size_t numEnd = content.find_first_not_of("0123456789.+-eE", pos);
+            if (numEnd == std::string::npos) break;
+            std::string numStr = content.substr(pos, numEnd - pos);
+            // Try to parse as double, then int
+            try {
+                size_t decimalPos = numStr.find('.');
+                if (decimalPos != std::string::npos) {
+                    double d = std::stod(numStr);
+                    set(key, d, ConfigSource::File);
+                } else {
+                    long l = std::stol(numStr);
+                    set(key, l, ConfigSource::File);
+                }
+            } catch (...) {
+                // Skip if conversion fails
+            }
+            pos = numEnd;
+        } else if (content[pos] == '[') {
+            // Array value - skip for now
+            // Find matching ]
+            int bracketCount = 1;
+            size_t arrayPos = pos + 1;
+            while (arrayPos < content.size() && bracketCount > 0) {
+                if (content[arrayPos] == '[') bracketCount++;
+                else if (content[arrayPos] == ']') bracketCount--;
+                arrayPos++;
+            }
+            pos = arrayPos;
+        } else if (content[pos] == '{') {
+            // Object value - skip for now
+            int braceCount = 1;
+            size_t objectPos = pos + 1;
+            while (objectPos < content.size() && braceCount > 0) {
+                if (content[objectPos] == '{') braceCount++;
+                else if (content[objectPos] == '}') braceCount--;
+                objectPos++;
+            }
+            pos = objectPos;
+        } else {
+            // Unknown value format, skip
+            pos++;
+        }
+        
+        // Skip trailing whitespace and comma
+        pos = content.find_first_not_of(" \t\n\r,", pos);
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,12 +132,12 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line.substr(0, 2) == "# ") {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
+        // Parse YAML key: value format
+        size_t pos = line.find(':');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
@@ -48,7 +149,35 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Handle YAML special values
+            if (value == "true" || value == "false") {
+                bool b = (value == "true");
+                set(key, b, ConfigSource::File);
+            } else if (value.find('.') != std::string::npos || value.find('e') != std::string::npos || value.find('E') != std::string::npos) {
+                // Float value
+                try {
+                    double d = std::stod(value);
+                    set(key, d, ConfigSource::File);
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
+            } else {
+                // Integer or string
+                try {
+                    // Check if it's an integer (no decimal point)
+                    if (value.find('.') == std::string::npos && 
+                        value.find('e') == std::string::npos && 
+                        value.find('E') == std::string::npos) {
+                        long l = std::stol(value);
+                        set(key, l, ConfigSource::File);
+                    } else {
+                        double d = std::stod(value);
+                        set(key, d, ConfigSource::File);
+                    }
+                } catch (...) {
+                    set(key, value, ConfigSource::File);
+                }
+            }
         }
     }
     
@@ -84,9 +213,30 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write configuration entries with actual values
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

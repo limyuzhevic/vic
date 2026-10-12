@@ -161,18 +161,97 @@ struct NeuronCheckpointData {
 /**
  * Synapse state for checkpointing
  */
-struct SynapseCheckpointData {
-    std::vector<uint64_t> sourceNeuron;
-    std::vector<uint64_t> destinationNeuron;
-    std::vector<float> weight;
-    std::vector<uint32_t> delay;
-    std::vector<uint8_t> synapseType;
-    std::vector<uint8_t> plasticityFlags;
-    std::vector<float> eligibilityTrace;
-    std::vector<float> efficacy;
-    std::vector<float> shortTermDepression;
-    std::vector<float> shortTermFacilitation;
+struct WorkingMemoryCheckpointData {
+    uint64_t neuronCount;
+    uint64_t traceCount;
+    
+    WorkingMemoryCheckpointData() : neuronCount(0), traceCount(0) {}
 };
+
+struct EpisodicMemoryCheckpointData {
+    uint64_t episodeCount;
+    uint64_t maxEpisodes;
+    
+    EpisodicMemoryCheckpointData() : episodeCount(0), maxEpisodes(0) {}
+};
+
+struct AssociativeMemoryCheckpointData {
+    uint64_t associationCount;
+    
+    AssociativeMemoryCheckpointData() : associationCount(0) {}
+};
+
+struct PredictionSystemCheckpointData {
+    uint64_t learnedPredictions;
+    uint64_t predictionErrorCount;
+    
+    PredictionSystemCheckpointData() : learnedPredictions(0), predictionErrorCount(0) {}
+};
+
+struct NeuralPlannerCheckpointData {
+    size_t planningDepth;
+    float confidence;
+    
+    NeuralPlannerCheckpointData() : planningDepth(0), confidence(0.0f) {}
+};
+
+struct ConceptFormationCheckpointData {
+    uint64_t conceptCount;
+    uint64_t activationCount;
+    
+    ConceptFormationCheckpointData() : conceptCount(0), activationCount(0) {}
+};
+
+struct AttentionCheckpointData {
+    float inhibitionStrength;
+    float excitationStrength;
+    
+    AttentionCheckpointData() : inhibitionStrength(0.0f), excitationStrength(0.0f) {}
+};
+
+struct NeuromodulatorCheckpointData {
+    float level;
+    float plasticityFactor;
+    
+    NeuromodulatorCheckpointData() : level(0.0f), plasticityFactor(1.0f) {}
+};
+
+struct DevelopmentSystemCheckpointData {
+    DevelopmentalStage stage;
+    float progress;
+    
+    DevelopmentSystemCheckpointData() : stage(DevelopmentalStage::Initial), progress(0.0f) {}
+};
+
+struct RandomGeneratorCheckpointData {
+    uint64_t seed;
+    std::vector<uint64_t> state;
+    
+    RandomGeneratorCheckpointData() : seed(0) {}
+};
+
+struct SimulationCheckpointData {
+    uint64_t step;
+    double simulationTime;
+    DevelopmentalStage developmentalStage;
+    
+    SimulationCheckpointData() : step(0), simulationTime(0.0), developmentalStage(DevelopmentalStage::Initial) {}
+};
+
+/**
+ * Checkpoint writer methods for memory systems
+ */
+bool writeWorkingMemory(const WorkingMemoryCheckpointData& data);
+bool writeEpisodicMemory(const EpisodicMemoryCheckpointData& data);
+bool writeAssociativeMemory(const AssociativeMemoryCheckpointData& data);
+bool writePredictionSystem(const PredictionSystemCheckpointData& data);
+bool writePlanner(const NeuralPlannerCheckpointData& data);
+b bool writeConceptFormation(const ConceptFormationCheckpointData& data);
+b bool writeAttention(const AttentionCheckpointData& data);
+bool writeNeuromodulator(const NeuromodulatorCheckpointData& data, const std::string& type);
+bool writeDevelopmentSystem(const DevelopmentSystemCheckpointData& data);
+bool writeRandomState(const RandomGeneratorCheckpointData& data);
+bool writeSimulationState(const SimulationCheckpointData& data);
 
 /**
  * Checkpoint reader
