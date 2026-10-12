@@ -119,13 +119,36 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 2 demo utilities
+add_library(nlm_demo_utils STATIC
+    src/experiments/DemoUtils.cpp
+)
+target_include_directories(nlm_demo_utils PUBLIC src)
+target_link_libraries(nlm_demo_utils PUBLIC nlm_core)
+
+# Learning experiment framework
+add_library(nlm_learning STATIC
+    src/experiments/LearningExperiment.cpp
+)
+target_include_directories(nlm_learning PUBLIC src)
+target_link_libraries(nlm_learning PUBLIC nlm_core)
+
+# Main executable
+
+# Learning experiment framework
+add_library(nlm_learning STATIC
+    src/experiments/LearningExperiment.cpp
+)
+target_include_directories(nlm_learning PUBLIC src)
+target_link_libraries(nlm_learning PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_demo_utils nlm_learning)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -139,12 +162,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
