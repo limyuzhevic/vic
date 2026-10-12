@@ -1,11 +1,16 @@
-#pragma once
-
+// Standard includes
 #include <string>
 #include <memory>
 #include <sstream>
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <unordered_map>
+#include <optional>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -56,6 +61,8 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    const std::ofstream& getOutputFile() const { return fileOut; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -103,10 +110,29 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    
+    // Flush all logs to output
+    void flushAll();
+    
+    // Shutdown logger (cleanup resources)
+    void shutdown();
+    
+    // Check if logger is properly initialized
+    bool isInitialized() const;
+    
+    // Exception handling
+    static void throwError(const std::string& message, 
+                           const std::string& file = "", int line = 0,
+                           const std::string& function = "");
+    
+    // Get current performance metrics
+    const std::vector<StructuredLogEntry>& getPerformanceMetrics() const;
+    void clearPerformanceMetrics();
+    
+    // Log structured event with performance data
+    void logStructuredEvent(const std::string& component, const std::string& event,
+                           const std::string& severity, const std::string& message,
+                           const std::unordered_map<std::string, std::string>& metadata = {});
 };
 
 // Convenience macro for file/line/function info
@@ -137,5 +163,3 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
-
-} // namespace nlm

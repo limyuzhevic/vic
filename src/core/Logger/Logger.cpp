@@ -4,6 +4,9 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <unordered_map>
+#include <optional>
+#include <chrono>
 
 namespace nlm {
 
@@ -184,6 +187,90 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+}
+
+void Logger::flushAll() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    // Flush all loggers (primarily console logger)
+    for (auto& logger : pImpl->loggers) {
+        auto consoleLogger = std::dynamic_pointer_cast<ConsoleLogger>(logger);
+        if (consoleLogger) {
+            // Console logger doesn't have flushAll method, just close file if open
+            consoleLogger->closeOutputFile();
+        }
+    }
+}
+
+void Logger::shutdown() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->loggers.clear();
+}
+
+bool Logger::isInitialized() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return !pImpl->loggers.empty();
+}
+
+void Logger::throwError(const std::string& message,
+                        const std::string& file, int line,
+                        const std::string& function) {
+    std::ostringstream oss;
+    oss << "NLM Error: " << message;
+    if (!file.empty()) {
+        oss << " (" << file;
+        if (line > 0) oss << ":" << line;
+        oss << ")";
+    }
+    if (!function.empty()) {
+        oss << " in " << function;
+    }
+    throw NLMException(oss.str(), file, line, function);
+}
+
+const std::vector<StructuredLogEntry>& Logger::getPerformanceMetrics() const {
+    return getGlobalMetrics().getEvents();
+}
+
+void Logger::clearPerformanceMetrics() {
+    getGlobalMetrics().clear();
+}
+
+void Logger::logStructuredEvent(const std::string& component, const std::string& event,
+                               const std::string& severity, const std::string& message,
+                               const std::unordered_map<std::string, std::string>& metadata) {
+    // This method is for structured logging integration
+    // Currently we primarily use the performance metrics system for this
+    std::string fullMessage = component + "::" + event + ": " + message;
+    
+    if (severity == "PERFORMANCE") {
+        // Try to extract duration from message or use default
+        double durationMs = 0.0;
+        // Simple parsing for demonstration
+        size_t tookPos = fullMessage.find("took");
+        if (tookPos != std::string::npos) {
+            size_t msPos = fullMessage.find("ms", tookPos);
+            if (msPos != std::string::npos) {
+                std::string durationStr = fullMessage.substr(tookPos + 4, msPos - tookPos - 4);
+                try {
+                    durationMs = std::stod(durationStr);
+                } catch (...) {
+                    durationMs = 0.0;
+                }
+            }
+        }
+        NLM_LOG_PERFORMANCE(component, event, durationMs);
+    } else {
+        // Use regular logging for other structured events
+        if (severity == "INFO") {
+            info(fullMessage);
+        } else if (severity == "ERROR") {
+            error(fullMessage);
+        } else if (severity == "WARNING") {
+            warning(fullMessage);
+        } else {
+            info(fullMessage);
+        }
+    }
 }
 
 // LogStream implementation
