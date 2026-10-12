@@ -69,49 +69,27 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // State variable access
+    float getStateVariable(const std::string& name) const;
+    void updateStateVariables(const std::vector<float>& percept);
+    
+    // Goal and motivation
+    void updateMotivation();
+    float getMotivation() const { return goalValues_ ? (*goalValues_)["overall"] : 0.0f; }
+    
+    // Action preferences
+    void updateActionPreferences();
+    float getActionPreference(MotorCommand command) const;
+    
+    // Performance tracking
+    uint64_t getDecisionCount() const { return decisionCount_; }
+    float getActionSuccessRate() const { return totalActions_ ? (double)successfulActions_ / totalActions_ : 0.0f; }
+    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
-};
+    // Helper methods for goal selection
+    MotorCommand selectWithGoals();
+    float getGoalValue(const std::string& goal) const;
+    float getDevelopmentalStageValue() const;
+    std::vector<float> perceptToVector(const SensoryPercept& percept) const;
 
 } // namespace nlm

@@ -4,6 +4,11 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
+#include <unordered_map>
+#include <thread>
+#include <iomanip>
+#include <ctime>
 
 namespace nlm {
 
@@ -12,12 +17,19 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    // Performance monitoring
+    std::unordered_map<std::string, uint64_t> logCounts;
+    std::chrono::system_clock::time_point startTime;
+    uint64_t totalLogs = 0;
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->startTime = std::chrono::system_clock::now();
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    pImpl->startTime = std::chrono::system_clock::now();
 }
 
 ConsoleLogger::~ConsoleLogger() = default;
@@ -36,9 +48,20 @@ void ConsoleLogger::log(const LogEntry& entry) {
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
+    // Add performance metrics for info logs
+    if (entry.level == LogLevel::Info && entry.message.find("Step") != std::string::npos) {
+        // This is likely a simulation step, add performance metrics
+        auto now = std::chrono::system_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - pImpl->startTime);
+        oss << " [Uptime: " << duration.count() << "ms, Total Logs: " << ++pImpl->totalLogs << "]";
+    }
+    
     oss << " " << entry.message;
     
     std::string output = oss.str();
+    
+    // Update log counts
+    pImpl->logCounts[entry.message]++;
     
     // Console output
     if (pImpl->useColors) {
@@ -106,9 +129,17 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    // Performance monitoring
+    std::chrono::system_clock::time_point sessionStart;
+    uint64_t sessionLogCount = 0;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->sessionStart = std::chrono::system_clock::now();
+    // Add default console logger
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    addLogger(consoleLogger);
+}
 
 Logger::~Logger() = default;
 
@@ -140,6 +171,21 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    
+    // Performance metrics for periodic info logs
+    static uint64_t periodicCheck = 0;
+    static auto lastPeriodicTime = entry.timestamp;
+    if (++periodicCheck % 1000 == 0) {  // Every 1000 logs
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(entry.timestamp - lastPeriodicTime);
+        if (duration.count() >= 1.0) {  // At least 1 second
+            lastPeriodicTime = entry.timestamp;
+            // Add session metrics
+            auto sessionDuration = std::chrono::duration_cast<std::chrono::seconds>(entry.timestamp - pImpl->sessionStart);
+            std::string perfMsg = "[SESSION: " + std::to_string(sessionDuration.count()) + "s, " + 
+                                 "Logs: " + std::to_string(++pImpl->sessionLogCount) + "]";
+            entry.message = perfMsg + " " + entry.message;
+        }
+    }
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
