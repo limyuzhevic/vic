@@ -6,7 +6,7 @@
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
+    : brain_(std::move(brain))
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -19,46 +19,126 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , explorationRate_(0.2f)  // New feature: configurable exploration rate
+    , attentionWeight_(0.7f)   // New feature: attention system weight
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
+    // Initialize neuron groups with better organization
+    initializeNeuronGroups();
+    
+    // Set up advanced features
+    setupAdvancedFeatures();
+}
+
+void AgentBrain::initializeNeuronGroups() {
+    if (!brain_) return;
+    
+    // Clear existing groups
+    clearNeuronGroups();
+    
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                organizeMotorNeurons(pop, pop->getNeurons());
+            } else if (type == NeuronType::Sensory) {
+                organizeSensoryNeurons(pop, pop->getNeurons());
             }
         }
     }
+}
+
+void AgentBrain::organizeMotorNeurons(const std::shared_ptr<NeuralPopulation>& population, 
+                                     const std::vector<Neuron*>& neurons) {
+    if (neurons.empty()) return;
+    
+    // Advanced motor organization: distribute across action dimensions
+    // Instead of simple modulo, use a more sophisticated distribution
+    size_t totalNeurons = neurons.size();
+    
+    // Calculate balanced distribution
+    size_t neuronsPerAction = std::max<size_t>(1, totalNeurons / 6); // 6 action types
+    
+    for (size_t i = 0; i < totalNeurons; ++i) {
+        Neuron* neuron = neurons[i];
+        
+        // Determine action based on position in population
+        size_t actionIndex = 0;
+        if (i < neuronsPerAction * 2) {
+            actionIndex = 0; // Move forward
+        } else if (i < neuronsPerAction * 3) {
+            actionIndex = 1; // Move backward
+        } else if (i < neuronsPerAction * 4) {
+            actionIndex = 2; // Turn left
+        } else if (i < neuronsPerAction * 5) {
+            actionIndex = 3; // Turn right
+        } else if (i < neuronsPerAction * 5.5) {
+            actionIndex = 4; // Interact
+        } else {
+            actionIndex = 5; // Wait
+        }
+        
+        switch (actionIndex) {
+            case 0: motorForward_.push_back(neuron); break;
+            case 1: motorBackward_.push_back(neuron); break;
+            case 2: motorTurnLeft_.push_back(neuron); break;
+            case 3: motorTurnRight_.push_back(neuron); break;
+            case 4: motorInteract_.push_back(neuron); break;
+            case 5: motorWait_.push_back(neuron); break;
+        }
+    }
+}
+
+void AgentBrain::organizeSensoryNeurons(const std::shared_ptr<NeuralPopulation>& population,
+                                       const std::vector<Neuron*>& neurons) {
+    if (neurons.empty()) return;
+    
+    // Enhanced sensory organization: spatial and temporal aspects
+    size_t totalNeurons = neurons.size();
+    size_t sensoryGroups = 4; // Vision, Touch, Internal, Proprioception
+    
+    for (size_t i = 0; i < totalNeurons; ++i) {
+        Neuron* neuron = neurons[i];
+        
+        // Distribute based on both neuron index and population characteristics
+        size_t groupIndex = i % sensoryGroups;
+        
+        switch (groupIndex) {
+            case 0: sensoryVision_.push_back(neuron); break;
+            case 1: sensoryTouch_.push_back(neuron); break;
+            case 2: sensoryInternal_.push_back(neuron); break;
+            case 3: sensoryProprioception_.push_back(neuron); break;
+        }
+    }
+}
+
+void AgentBrain::setupAdvancedFeatures() {
+    // Configure attention system
+    if (brain_) {
+        auto* attentionSystem = brain_->getAttention();
+        if (attentionSystem) {
+            attentionSystem->setAttentionStrength(attentionWeight_);
+        }
+    }
+    
+    // Set up curiosity threshold for exploration
+    curiosityThreshold_ = 0.3f * (1.0f - explorationRate_); // Dynamic threshold
+}
+
+void AgentBrain::clearNeuronGroups() {
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    previousVision_.clear();
 }
 
 AgentBrain::~AgentBrain() = default;

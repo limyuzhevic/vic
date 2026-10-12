@@ -8,6 +8,10 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // JSON/YAML schema validation
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> validators;
+    // File format tracking
+    std::string currentFileFormat; // "json", "yaml", or "ini"
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,40 +23,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    clearError();
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        setCurrentError(ConfigError::FileNotFound, "Cannot open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Read entire file content for format detection
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    if (content.empty()) {
+        setCurrentError(ConfigError::ParseError, "Config file is empty: " + filepath);
+        return false;
     }
     
-    return true;
+    // Detect file format by content
+    pImpl->currentFileFormat = detectFileFormatByContent(content);
+    
+    if (pImpl->currentFileFormat == "json") {
+        return loadFromJSON(content);
+    } else if (pImpl->currentFileFormat == "yaml") {
+        return loadFromYAML(content);
+    } else if (pImpl->currentFileFormat == "ini") {
+        return loadFromINI(content);
+    } else {
+        setCurrentError(ConfigError::ParseError, "Unsupported file format for: " + filepath);
+        return false;
+    }
+}
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

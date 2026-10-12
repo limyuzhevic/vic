@@ -1,0 +1,59 @@
+#pragma once
+
+#include "nlm/core/Config/Config.hpp"
+#include <map>
+#include <string>
+#include <vector>
+
+namespace nlm {
+
+// Advanced configuration generator
+class AdvancedConfigGenerator {
+public:
+    static std::shared_ptr<Config> createAdvancedConfig();
+    static std::shared_ptr<Config> createExplorationConfig(float explorationRate);
+    static std::shared_ptr<Config> createDevelopmentConfig(float developmentRate);
+    static std::shared_ptr<Config> createConfigFromDict(const std::map<std::string, std::string>& params);
+};
+
+// Advanced agent configuration
+class AdvancedAgentConfig {
+public:
+    static std::shared_ptr<Config> createConfigForTask(const std::string& task);
+    static std::map<std::string, std::string> getTaskDefaults(const std::string& task);
+};
+
+// Configuration validation utilities
+class ConfigValidator {
+public:
+    static bool validate(const std::shared_ptr<Config>& config);
+    static std::string getValidationErrors(const std::shared_ptr<Config>& config);
+};
+
+// Performance benchmarking utilities
+class PerformanceBenchmark {
+public:
+    struct BenchmarkResult {
+        double elapsedTime;
+        size_t stepsPerSecond;
+        size_t neuronsCreated;
+        size_t synapsesCreated;
+        float memoryUsage;
+        std::string timestamp;
+    };
+
+    static BenchmarkResult benchmarkBrainCreation(const std::shared_ptr<Config>& config);
+    static BenchmarkResult benchmarkSimulation(const std::shared_ptr<Config>& config, size_t numSteps);
+    static void printBenchmarkResult(const BenchmarkResult& result, const std::string& title);
+};
+
+// Advanced config presets for different scenarios
+namespace ConfigPresets {
+    static std::shared_ptr<Config> createMinimalConfig();
+    static std::shared_ptr<Config> createStandardConfig();
+    static std::shared_ptr<Config> createResearchConfig();
+    static std::shared_ptr<Config> createSurvivalConfig();
+    static std::shared_ptr<Config> createSocialConfig();
+}
+
+} // namespace nlm

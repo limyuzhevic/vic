@@ -31,6 +31,16 @@ enum class ConfigSource {
     Runtime
 };
 
+// Error types for configuration
+enum class ConfigError {
+    None,
+    FileNotFound,
+    ParseError,
+    InvalidKey,
+    InvalidValue,
+    SchemaValidationError
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -93,9 +103,29 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling
+    bool hasError() const { return currentError != ConfigError::None; }
+    ConfigError getError() const { return currentError; }
+    std::string getErrorMessage() const { return errorMessage; }
+    void clearError() { currentError = ConfigError::None; errorMessage.clear(); }
+    
+    // Validation
+    bool validate() const;
+    
+protected:
+    // Allow derived classes to access internals
+    void setCurrentError(ConfigError error, const std::string& message) {
+        currentError = error;
+        errorMessage = message;
+    }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Error state
+    ConfigError currentError = ConfigError::None;
+    std::string errorMessage;
     
     // Internal helpers
     static std::string trim(const std::string& str);

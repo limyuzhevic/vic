@@ -139,9 +139,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Enable testing
 enable_testing()
 add_subdirectory(tests)
+
+# Test target
+add_executable(test_improvements
+    tests/test_improvements.cpp
+)
+target_link_libraries(test_improvements
+    PUBLIC nlm_core nlm_agent nlm_world nlm_phase3
+)
+
+# Advanced CLI executable
+add_executable(nlm_advanced
+    src/advanced/advanced_cli.cpp
+)
+target_link_libraries(nlm_advanced
+    PUBLIC nlm_core nlm_agent nlm_world nlm_phase3
+)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

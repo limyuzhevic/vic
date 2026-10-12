@@ -69,7 +69,38 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced configuration for experienced users
+    void setExplorationRate(float rate) { explorationRate_ = std::clamp(rate, 0.0f, 1.0f); }
+    void setAttentionWeight(float weight) { attentionWeight_ = std::clamp(weight, 0.0f, 2.0f); }
+    float getExplorationRate() const { return explorationRate_; }
+    float getAttentionWeight() const { return attentionWeight_; }
+    
+    // New advanced motor control methods
+    void setMotorBias(const std::string& action, float bias) { motorBiases_[action] = bias; }
+    float getMotorBias(const std::string& action) const { 
+        auto it = motorBiases_.find(action);
+        return it != motorBiases_.end() ? it->second : 0.0f;
+    }
+    
+    // Enhanced sensory processing methods
+    void setSensoryGain(const std::string& modality, float gain) { 
+        sensoryGains_[modality] = gain;
+    }
+    float getSensoryGain(const std::string& modality) const {
+        auto it = sensoryGains_.find(modality);
+        return it != sensoryGains_.end() ? it->second : 1.0f;
+    }
+    
 private:
+    // Helper methods
+    void initializeNeuronGroups();
+    void organizeMotorNeurons(const std::shared_ptr<NeuralPopulation>& population, 
+                             const std::vector<Neuron*>& neurons);
+    void organizeSensoryNeurons(const std::shared_ptr<NeuralPopulation>& population,
+                               const std::vector<Neuron*>& neurons);
+    void setupAdvancedFeatures();
+    void clearNeuronGroups();
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
@@ -109,9 +140,26 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Advanced configuration parameters
+    float explorationRate_;
+    float attentionWeight_;
+    float curiosityThreshold_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // New features for experienced users
+    std::unordered_map<std::string, float> motorBiases_;      // Action biases
+    std::unordered_map<std::string, float> sensoryGains_;     // Sensory gains
+    
+    // Performance optimization
+    mutable float cachedFiringRate_;
+    mutable bool firingRateValid_;
+    
+    // Statistics and metrics
+    size_t totalSteps_;
+    float cumulativeReward_;
 };
 
 } // namespace nlm

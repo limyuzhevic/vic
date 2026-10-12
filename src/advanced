@@ -1,0 +1,370 @@
+// NLM Advanced Configuration Generator
+// Creates advanced configurations with experimental features enabled
+
+#include "nlm/core/Config/Config.hpp"
+#include <map>
+#include <vector>
+
+using namespace nlm;
+
+class AdvancedConfigGenerator {
+public:
+    static std::shared_ptr<Config> createAdvancedConfig() {
+        auto config = std::make_shared<Config>();
+        
+        // Basic brain configuration
+        config->set("neuron_count", 2000, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.15, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        // Learning and plasticity
+        config->set("stdp_ltp_weight", 0.03, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.02, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001, ConfigSource::Default);
+        
+        // Neuromodulation
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+        
+        // Advanced features
+        config->set("enable_prediction", true, ConfigSource::Default);
+        config->set("enable_novelty", true, ConfigSource::Default);
+        config->set("enable_attention", true, ConfigSource::Default);
+        config->set("enable_concept_formation", true, ConfigSource::Default);
+        
+        // Performance
+        config->set("performance_monitoring", true, ConfigSource::Default);
+        config->set("checkpoint_interval", 1000, ConfigSource::Default);
+        config->set("replay_interval", 500, ConfigSource::Default);
+        
+        // Exploration parameters
+        config->set("explore_mode", "1", ConfigSource::Default);
+        config->set("attention_weight", 0.8, ConfigSource::Default);
+        config->set("curiosity_threshold", 0.3, ConfigSource::Default);
+        config->set("development_rate", 1.0, ConfigSource::Default);
+        
+        // Memory parameters
+        config->set("working_memory_capacity", 500, ConfigSource::Default);
+        config->set("episodic_memory_max_episodes", 1000, ConfigSource::Default);
+        config->set("consolidation_interval", 2000, ConfigSource::Default);
+        
+        // Sensory gains
+        config->set("sensory_gain_vision", 1.2, ConfigSource::Default);
+        config->set("sensory_gain_touch", 1.5, ConfigSource::Default);
+        config->set("sensory_gain_internal", 1.0, ConfigSource::Default);
+        config->set("sensory_gain_proprioception", 1.0, ConfigSource::Default);
+        
+        // Motor biases
+        config->set("motor_bias_moveForward", 0.2, ConfigSource::Default);
+        config->set("motor_bias_turnLeft", 0.1, ConfigSource::Default);
+        config->set("motor_bias_turnRight", 0.1, ConfigSource::Default);
+        config->set("motor_bias_moveBackward", 0.2, ConfigSource::Default);
+        config->set("motor_bias_interact", 0.3, ConfigSource::Default);
+        
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createExplorationConfig(float explorationRate) {
+        auto config = createAdvancedConfig();
+        config->set("explore_mode", explorationRate > 0.5 ? "1" : "0", ConfigSource::Default);
+        config->set("curiosity_threshold", std::max(0.1f, 0.5f - explorationRate), ConfigSource::Default);
+        config->set("attention_weight", 0.5 + explorationRate * 0.5, ConfigSource::Default);
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createDevelopmentConfig(float developmentRate) {
+        auto config = createAdvancedConfig();
+        config->set("development_rate", developmentRate, ConfigSource::Default);
+        config->set("plasticity_factor", 1.0 + developmentRate * 0.5, ConfigSource::Default);
+        config->set("enable_development", developmentRate > 0.0, ConfigSource::Default);
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createConfigFromDict(const std::map<std::string, std::string>& params) {
+        auto config = std::make_shared<Config>();
+        
+        for (const auto& param : params) {
+            std::string key = param.first;
+            std::string value = param.second;
+            
+            // Parse boolean values
+            if (value == "true" || value == "1" || value == "yes") {
+                config->set(key, true, ConfigSource::File);
+            } else if (value == "false" || value == "0" || value == "no") {
+                config->set(key, false, ConfigSource::File);
+            } else {
+                // Try to parse as number
+                try {
+                    if (value.find('.') != std::string::npos) {
+                        float floatValue = std::stof(value);
+                        config->set(key, floatValue, ConfigSource::File);
+                    } else {
+                        int intValue = std::stoi(value);
+                        config->set(key, intValue, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // Keep as string
+                    config->set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        return config;
+    }
+};
+
+// Advanced AgentBrain Configuration Helper
+class AdvancedAgentConfig {
+public:
+    static std::shared_ptr<Config> createConfigForTask(const std::string& task) {
+        auto config = AdvancedConfigGenerator::createAdvancedConfig();
+        
+        if (task == "exploration") {
+            config->set("explore_mode", "1", ConfigSource::Runtime);
+            config->set("curiosity_threshold", 0.2, ConfigSource::Runtime);
+            config->set("attention_weight", 1.5, ConfigSource::Runtime);
+        } else if (task == "navigation") {
+            config->set("explore_mode", "0", ConfigSource::Runtime);
+            config->set("curiosity_threshold", 0.8, ConfigSource::Runtime);
+            config->set("attention_weight", 0.5, ConfigSource::Runtime);
+            config->set("motor_bias_moveForward", 0.5, ConfigSource::Runtime);
+        } else if (task == "social") {
+            config->set("enable_novelty", true, ConfigSource::Runtime);
+            config->set("enable_concept_formation", true, ConfigSource::Runtime);
+            config->set("attention_weight", 1.0, ConfigSource::Runtime);
+        } else if (task == "learning") {
+            config->set("plasticity_factor", 1.5, ConfigSource::Runtime);
+            config->set("consolidation_interval", 1000, ConfigSource::Runtime);
+        }
+        
+        return config;
+    }
+    
+    static std::map<std::string, std::string> getTaskDefaults(const std::string& task) {
+        std::map<std::string, std::string> defaults;
+        
+        if (task == "exploration") {
+            defaults["explore_mode"] = "1";
+            defaults["curiosity_threshold"] = "0.2";
+            defaults["attention_weight"] = "1.5";
+            defaults["enable_curiosity"] = "true";
+            defaults["enable_structural_plasticity"] = "true";
+        } else if (task == "navigation") {
+            defaults["explore_mode"] = "0";
+            defaults["curiosity_threshold"] = "0.8";
+            defaults["attention_weight"] = "0.5";
+            defaults["enable_curiosity"] = "false";
+            defaults["motor_bias_moveForward"] = "0.5";
+        }
+        
+        return defaults;
+    }
+};
+
+// Config validation utilities
+class ConfigValidator {
+public:
+    static bool validate(const std::shared_ptr<Config>& config) {
+        bool isValid = true;
+        
+        // Check required keys
+        std::vector<std::string> requiredKeys = {
+            "neuron_count", "region_count", "connection_probability",
+            "simulation_timestep", "enable_curiosity"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                NLM_LOG_ERROR("Missing required config key: " + key);
+                isValid = false;
+            }
+        }
+        
+        // Validate numeric ranges
+        auto neuronCount = config->getOr<size_t>("neuron_count", 0);
+        if (neuronCount == 0 || neuronCount > 100000) {
+            NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount));
+            isValid = false;
+        }
+        
+        auto timestep = config->getOr<double>("simulation_timestep", 0.0);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep));
+            isValid = false;
+        }
+        
+        auto connectionProb = config->getOr<float>("connection_probability", 0.0f);
+        if (connectionProb < 0.0f || connectionProb > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProb));
+            isValid = false;
+        }
+        
+        return isValid;
+    }
+    
+    static std::string getValidationErrors(const std::shared_ptr<Config>& config) {
+        std::string errors;
+        
+        auto neuronCount = config->getOr<size_t>("neuron_count", 0);
+        if (neuronCount == 0 || neuronCount > 100000) {
+            errors += "Invalid neuron_count: " + std::to_string(neuronCount) + "\n";
+        }
+        
+        auto timestep = config->getOr<double>("simulation_timestep", 0.0);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            errors += "Invalid simulation_timestep: " + std::to_string(timestep) + "\n";
+        }
+        
+        return errors;
+    }
+};
+
+// Performance benchmarking utilities
+class PerformanceBenchmark {
+public:
+    struct BenchmarkResult {
+        double elapsedTime;      // seconds
+        size_t stepsPerSecond;   // steps processed per second
+        size_t neuronsCreated;   // total neurons created
+        size_t synapsesCreated;   // total synapses created
+        float memoryUsage;       // approximate memory usage in MB
+        std::string timestamp;   // benchmark timestamp
+    };
+    
+    static BenchmarkResult benchmarkBrainCreation(const std::shared_ptr<Config>& config) {
+        BenchmarkResult result;
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            result.neuronsCreated = brain->getTotalNeuronCount();
+            result.synapsesCreated = brain->getTotalSynapseCount();
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        result.elapsedTime = duration.count() / 1000.0;
+        result.stepsPerSecond = (result.elapsedTime > 0) ? (result.neuronsCreated * 10 / result.elapsedTime) : 0;
+        result.memoryUsage = (result.neuronsCreated * 128.0) / (1024.0 * 1024.0); // Rough estimate
+        
+        auto now = std::chrono::system_clock::now();
+        auto timeT = std::chrono::system_clock::to_time_t(now);
+        result.timestamp = std::ctime(&timeT);
+        
+        return result;
+    }
+    
+    static BenchmarkResult benchmarkSimulation(const std::shared_ptr<Config>& config, size_t numSteps) {
+        BenchmarkResult result;
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            for (size_t step = 0; step < numSteps; ++step) {
+                brain->step(step, step * config->getOr<double>("simulation_timestep", 0.001));
+            }
+            
+            result.neuronsCreated = brain->getTotalNeuronCount();
+            result.synapsesCreated = brain->getTotalSynapseCount();
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        result.elapsedTime = duration.count() / 1000.0;
+        result.stepsPerSecond = (result.elapsedTime > 0) ? (numSteps / result.elapsedTime) : 0;
+        result.memoryUsage = (result.neuronsCreated * 128.0) / (1024.0 * 1024.0);
+        
+        auto now = std::chrono::system_clock::now();
+        auto timeT = std::chrono::system_clock::to_time_t(now);
+        result.timestamp = std::ctime(&timeT);
+        
+        return result;
+    }
+    
+    static void printBenchmarkResult(const BenchmarkResult& result, const std::string& title) {
+        NLM_LOG_INFO("=== " + title + " ===");
+        NLM_LOG_INFO("Benchmark completed at: " + result.timestamp);
+        NLM_LOG_INFO("Elapsed time: " + std::to_string(result.elapsedTime) + " seconds");
+        NLM_LOG_INFO("Steps per second: " + std::to_string(result.stepsPerSecond));
+        NLM_LOG_INFO("Neurons created: " + std::to_string(result.neuronsCreated));
+        NLM_LOG_INFO("Synapses created: " + std::to_string(result.synapsesCreated));
+        NLM_LOG_INFO("Estimated memory usage: " + std::to_string(result.memoryUsage) + " MB");
+        NLM_LOG_INFO("=== End Benchmark ===");
+    }
+};
+
+// Advanced config presets for different scenarios
+namespace ConfigPresets {
+    
+    static std::shared_ptr<Config> createMinimalConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1);
+        config->set("enable_curiosity", false);
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createStandardConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.15);
+        config->set("enable_curiosity", true);
+        config->set("enable_structural_plasticity", true);
+        config->set("enable_development", true);
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createResearchConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 5000);
+        config->set("region_count", 4);
+        config->set("connection_probability", 0.2);
+        config->set("enable_curiosity", true);
+        config->set("enable_structural_plasticity", true);
+        config->set("enable_development", true);
+        config->set("enable_prediction", true);
+        config->set("enable_attention", true);
+        config->set("enable_concept_formation", true);
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createSurvivalConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 2000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.05);
+        config->set("enable_curiosity", true);
+        config->set("enable_structural_plasticity", true);
+        config->set("enable_development", true);
+        config->set("enable_reward_modulation", true);
+        config->set("curiosity_threshold", 0.3);
+        config->set("attention_weight", 1.2);
+        config->set("motor_bias_moveForward", 0.6);
+        return config;
+    }
+    
+    static std::shared_ptr<Config> createSocialConfig() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 3000);
+        config->set("region_count", 3);
+        config->set("connection_probability", 0.25);
+        config->set("enable_curiosity", true);
+        config->set("enable_structural_plasticity", true);
+        config->set("enable_development", true);
+        config->set("enable_novelty", true);
+        config->set("enable_concept_formation", true);
+        config->set("attention_weight", 1.0);
+        config->set("enable_prediction", true);
+        return config;
+    }
+}
