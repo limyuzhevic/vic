@@ -71,7 +71,21 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Check if file can be opened for appending
+    std::ofstream testFile(filepath, std::ios::app);
+    if (!testFile.is_open()) {
+        NLM_LOG_ERROR("Failed to open log file for writing: " + filepath);
+        return;
+    }
+    testFile.close();
+    
+    // Now try to actually open it
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (!pImpl->fileOut.is_open()) {
+        NLM_LOG_ERROR("Failed to reopen log file: " + filepath);
+    } else {
+        NLM_LOG_INFO("Log output file set to: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {

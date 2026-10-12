@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -22,13 +23,18 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    NLM_LOG_INFO("Loading configuration from file: " + filepath);
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,9 +55,16 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNum) + " in file " + filepath + ": " + line);
         }
     }
     
+    if (file.bad()) {
+        NLM_LOG_ERROR("File read error occurred while reading configuration file: " + filepath);
+    }
+    
+    NLM_LOG_INFO("Successfully loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from file: " + filepath);
     return true;
 }
 
@@ -79,8 +92,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    NLM_LOG_INFO("Saving configuration to file: " + filepath);
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
+        return false;
+    }
+    
+    if (!file.good()) {
+        NLM_LOG_ERROR("File is in bad state for writing configuration file: " + filepath);
+        file.close();
         return false;
     }
     
@@ -89,6 +111,22 @@ bool Config::saveToFile(const std::string& filepath) const {
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    file.flush();
+    
+    if (file.bad()) {
+        NLM_LOG_ERROR("File write error occurred while saving configuration file: " + filepath);
+        file.close();
+        return false;
+    }
+    
+    if (!file.good()) {
+        NLM_LOG_ERROR("File is in bad state after writing configuration file: " + filepath);
+        file.close();
+        return false;
+    }
+    
+    file.close();
+    NLM_LOG_INFO("Successfully saved " + std::to_string(pImpl->entries.size()) + " configuration entries to file: " + filepath);
     return true;
 }
 
