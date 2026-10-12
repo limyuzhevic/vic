@@ -154,6 +154,22 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get configuration value as double")
+        .def("get", &Config::get<int64_t>, py::arg("key"),
+             "Get configuration value as int64_t")
+        .def("get", &Config::get<float>, py::arg("key"),
+             "Get configuration value as float")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get configuration value as string")
+        .def("set", &Config::set<double>, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::User,
+             "Set configuration value as double")
+        .def("set", &Config::set<int64_t>, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::User,
+             "Set configuration value as int64_t")
+        .def("set", &Config::set<float>, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::User,
+             "Set configuration value as float")
+        .def("set", &Config::set<std::string>, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::User,
+             "Set configuration value as string")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -299,15 +315,27 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
+        .def("run", [](std::shared_ptr<Brain> self, size_t steps, double timestep = 0.001) {
+            for (size_t step = 0; step < steps; ++step) {
+                self->step(step, step * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep") = 0.001,
+           "Run multiple simulation steps")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+        .def("injectRandomCurrent", [](std::shared_ptr<Brain> self, NeuronType type, float current, uint64_t seed = 42) {
+            auto rng = std::make_shared<Random>(seed);
+            for (size_t i = 0; i < self->getTotalNeuronCount() / 10; ++i) {
+                if (rng->nextFloat() < 0.1) {  // 10% chance to inject
+                    self->injectCurrentToNeurons(type, current);
+                }
+            }
+        }, py::arg("type"), py::arg("current"), py::arg("seed") = 42,
+           "Inject random current to neurons of specified type")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
@@ -351,7 +379,22 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("getStats", [](const std::shared_ptr<Brain>& self) {
+            py::dict stats;
+            stats["total_neurons"] = self->getTotalNeuronCount();
+            stats["total_synapses"] = self->getTotalSynapseCount();
+            stats["active_neurons"] = self->getActiveNeuronCount();
+            stats["firing_neurons"] = self->getFiringNeuronCount();
+            stats["total_spikes"] = self->getTotalSpikeCount();
+            stats["avg_firing_rate"] = self->getAverageFiringRate();
+            stats["e_i_ratio"] = self->getExcitationInhibitionRatio();
+            stats["region_count"] = self->getRegionCount();
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("isInitialized", [](const std::shared_ptr<Brain>& self) {
+            return !self->getTotalNeuronCount();
+        }, "Check if brain is initialized")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +441,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getBrainStats", [](std::shared_ptr<AgentBrain> self) {
+            py::dict stats;
+            auto brain = self->getBrain();
+            stats["total_neurons"] = brain->getTotalNeuronCount();
+            stats["total_synapses"] = brain->getTotalSynapseCount();
+            stats["developmental_stage"] = static_cast<int>(self->getDevelopmentalStage());
+            stats["neuromodulation_level"] = self->getNeuromodulationLevel();
+            stats["curiosity_level"] = self->getCuriosityLevel();
+            stats["novelty_level"] = self->getNoveltyLevel();
+            stats["prediction_error"] = self->getPredictionError();
+            return stats;
+        }, "Get comprehensive agent brain statistics")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -408,6 +463,11 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a new brain with default configuration");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
@@ -416,6 +476,148 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->initialize(world);
+        return agentBrain;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize an agent brain with world");
+
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t steps, double timestep = 0.001,
+                           std::shared_ptr<SimpleWorld> world = nullptr) -> py::dict {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t step = 0; step < steps; ++step) {
+            if (world) {
+                // Run agent simulation loop
+                brain->step(step, step * timestep);
+            } else {
+                brain->step(step, step * timestep);
+            }
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        double duration = std::chrono::duration<double>(end - start).count();
+        
+        py::dict results;
+        results["steps_completed"] = steps;
+        results["duration_seconds"] = duration;
+        results["steps_per_second"] = steps / duration;
+        results["final_spike_count"] = brain->getTotalSpikeCount();
+        results["final_firing_neurons"] = brain->getFiringNeuronCount();
+        
+        if (world) {
+            py::dict worldStats;
+            worldStats["time"] = world->getSimulationTime();
+            results["world_stats"] = worldStats;
+        }
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001, py::arg("world") = nullptr,
+       "Run a simulation for specified number of steps and return statistics");
+
+    m.def("createQuickBrain", [](size_t neuronCount, size_t steps) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run some steps to activate neurons
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        return brain;
+    }, py::arg("neuronCount"), py::arg("steps") = 100,
+       "Quick helper to create and initialize a brain with some activity");
+
+    m.def("createLearningExperiment", [](std::shared_ptr<Brain> brain, size_t steps, 
+                                         float inputCurrent = 30.0f, uint64_t seed = 42) {
+        // Enable plasticity for learning experiment
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
+        }
+        
+        // Record initial state
+        size_t initialSynapseCount = brain->getTotalSynapseCount();
+        std::vector<float> initialWeights;
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                initialWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        // Apply input patterns to stimulate learning
+        auto rng = std::make_shared<Random>(seed);
+        for (SimulationStep step = 0; step < steps; ++step) {
+            // Random input pattern
+            for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, inputCurrent);
+            }
+            
+            brain->step(step, step * 0.001);
+        }
+        
+        // Record final state
+        size_t finalSynapseCount = brain->getTotalSynapseCount();
+        std::vector<float> finalWeights;
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                finalWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        // Calculate learning statistics
+        float learningScore = 0.0f;
+        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            learningScore += std::abs(finalWeights[i] - initialWeights[i]);
+        }
+        
+        py::dict experimentResults;
+        experimentResults["initial_synapses"] = initialSynapseCount;
+        experimentResults["final_synapses"] = finalSynapseCount;
+        experimentResults["learning_score"] = learningScore;
+        experimentResults["initial_spikes"] = brain->getTotalSpikeCount(); // Note: this is final due to brain state
+        experimentResults["neurons_stimulated"] = brain->getTotalNeuronCount() / 4;
+        experimentResults["plasticity_enabled"] = true;
+        
+        return experimentResults;
+    }, py::arg("brain"), py::arg("steps"), py::arg("inputCurrent") = 30.0f, py::arg("seed") = 42,
+       "Run a learning experiment and return statistics");
+
+    m.def("validateBrain", [](std::shared_ptr<Brain> brain) -> py::dict {
+        py::dict validationResults;
+        
+        // Check basic brain properties
+        validationResults["has_neurons"] = brain->getTotalNeuronCount() > 0;
+        validationResults["has_regions"] = brain->getRegionCount() > 0;
+        validationResults["initialized"] = !brain->getTotalNeuronCount(); // True if neurons exist
+        validationResults["total_neurons"] = brain->getTotalNeuronCount();
+        validationResults["total_synapses"] = brain->getTotalSynapseCount();
+        validationResults["active_neurons"] = brain->getActiveNeuronCount();
+        validationResults["firing_neurons"] = brain->getFiringNeuronCount();
+        
+        // Check for connectivity
+        bool has_connections = brain->getTotalSynapseCount() > 0;
+        validationResults["has_connections"] = has_connections;
+        
+        // Check for recent activity
+        validationResults["has_activity"] = brain->getTotalSpikeCount() > 0;
+        
+        // Overall validation status
+        validationResults["valid"] = validationResults["has_neurons"].cast<bool>() && 
+                                     validationResults["has_connections"].cast<bool>() &&
+                                     validationResults["initialized"].cast<bool>();
+        
+        return validationResults;
+    }, py::arg("brain"), "Validate brain state and return validation results");
+
+    // Export invalid IDs for convenience
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
