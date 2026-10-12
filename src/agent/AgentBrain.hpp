@@ -2,6 +2,7 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AgentBrainConstants.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -15,6 +16,9 @@ class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Initialize neuron groups with balanced distribution
+    void initializeNeuronGroups();
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
