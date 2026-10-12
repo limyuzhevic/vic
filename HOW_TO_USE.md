@@ -6,8 +6,8 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 
 This document covers:
 1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+2. Installing the enhanced Python library
+3. Using the enhanced NLM Python API with new features
 
 ---
 
@@ -70,7 +70,7 @@ make install
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 2: Installing the Enhanced Python Library
 
 ### From Source (Recommended for Development)
 
@@ -105,176 +105,199 @@ pip install dist/*.whl
 import pynlm
 
 # Check version
-print(pynlm.__version__)
+print(pynlm.__version__ if hasattr(pynlm, '__version__') else "NLM Python API")
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
+# Create a simple brain using enhanced presets
+config = pynlm.createConfigFromPreset("standard")
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+
+# Test enhanced features
+brain.initialize()
+brain.step(0)
+print(f"Spikes: {brain.getTotalSpikeCount()}")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Enhanced Python Library
 
-### Basic Usage
+### Enhanced Basic Usage
 
-#### Creating a Brain
+#### Creating a Brain with Presets
 
 ```python
 import pynlm
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
-
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
+# Create using preset - no need to configure details
+brain = pynlm.createBrainFromPreset("standard")
 brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
-#### Running a Simulation
+#### Running a Simulation with Monitoring
 
 ```python
 import pynlm
+from pynlm_enhanced import run_simulation_loop, SimulationMonitor
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Create brain with preset
+brain = pynlm.createBrainFromPreset("research")
 brain.initialize()
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
-```
-
-#### Creating a Simple World
-
-```python
-import pynlm
-
-# Create a simple 2D world
+# Create world
 world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
 
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
+# Create agent with learning features
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run simulation with monitoring
+monitor = SimulationMonitor(brain, agent, world)
+run_simulation_loop(
+    brain, world, agent,
+    steps=500, timestep=0.001,
+    monitor=monitor,
+    verbose=True
 )
 
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
+# Get performance summary
+print("\n=== Simulation Summary ===")
+print(f"Total steps: {monitor.get_summary()['total_steps']}")
+print(f"Average step time: {monitor.get_summary()['avg_step_time_ms']:.2f} ms")
+print(f"Steps per second: {monitor.get_summary()['steps_per_second']:.0f}")
 ```
 
-### Complete Agent Example
+#### Advanced Configuration with Presets
 
 ```python
 import pynlm
+from pynlm_enhanced import createConfigFromPreset
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+# Create configuration with custom parameters
+config = createConfigFromPreset(
+    "large",
+    neuron_count=3000,  # Override preset
+    plasticity_stdp_enable=True,
+    neuromod_curiosity_enable=True,
+    development_enable=True
+)
+
+# Save configuration
+config.saveToFile("my_research_config.json")
+
+# Load configuration later
+new_config = pynlm.Config()
+new_config.loadFromFile("my_research_config.json")
+```
+
+### Complete Agent Example with Enhanced Features
+
+```python
+import pynlm
+from pynlm_enhanced import (
+    createConfigFromPreset, 
+    createBrainFromPreset, 
+    run_simulation_loop,
+    SimulationMonitor,
+    analyze_brain_state,
+    create_agent_with_features
+)
+
+def run_research_simulation(num_steps=2000):
+    """Run a complete enhanced agent simulation."""
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
+    # 1. Create configuration with research preset
+    config = createConfigFromPreset("research")
     
-    # 2. Create brain and initialize
+    # 2. Create and initialize brain
     brain = pynlm.createBrain(config)
     brain.initialize()
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    # 3. Create enhanced agent with all features
+    agent = create_agent_with_features(
+        brain, world,
+        enable_reward=True,
+        enable_curiosity=True,
+        enable_development=True,
+        enable_plasticity=True
+    )
     
     # 4. Create and configure world
     world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.configure(width=50, height=50, visionWidth=8, visionHeight=8)
     world.reset()
-    world.setAgentStart(10.0, 10.0)
+    world.setAgentStart(25.0, 25.0)
     
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Create monitor for performance tracking
+    monitor = SimulationMonitor(brain, agent, world)
     
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    # 7. Run simulation loop with monitoring
+    run_simulation_loop(
+        brain, world, agent, num_steps,
+        timestep=0.001, monitor=monitor, verbose=True
+    )
+    
+    # 8. Analyze results
+    analysis = analyze_brain_state(brain)
+    
+    print("\n=== Research Simulation Results ===")
+    print(f"Simulation steps: {num_steps}")
+    print(f"Final firing rate: {analysis['average_firing_rate']:.2f}")
+    print(f"Total spikes: {analysis['total_spikes']}")
+    print(f"Excitation/Inhibition ratio: {analysis['excitation_inhibition_ratio']:.3f}")
+    print(f"Development stage: {analysis['developmental_stage']}")
+    
+    # 9. Save experiment data
+    experiment_data = {
+        "steps": num_steps,
+        "config": analysis,
+        "performance": monitor.get_summary(),
+        "agent_state": {
+            "curiosity_level": agent.getCuriosityLevel(),
+            "novelty_level": agent.getNoveltyLevel(),
+        }
+    }
+    
+    import json
+    with open(f"experiment_research_{num_steps}.json", "w") as f:
+        json.dump(experiment_data, f, indent=2)
+    
+    return analysis, monitor
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the research simulation
+results, performance = run_research_simulation(2000)
 ```
 
-### Key Classes and Methods
+### Key Classes and Methods (Enhanced)
 
 #### Brain Class
 
 ```python
-# Creation
-brain = pynlm.createBrain(config)
+# Creation with presets
+brain = pynlm.createBrainFromPreset("standard")
+brain = pynlm.createBrain(config)  # Traditional way
 
 # Initialization
 brain.initialize()
 
 # Simulation
 brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
+brain.step(step_number, time)    # Run with timestamp
 brain.reset()                     # Reset brain state
 
 # Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+brain.receiveSensoryInput(input)  # Inject sensory data
+action = brain.produceAction()    # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -284,8 +307,8 @@ brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
 # State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+brain.save("checkpoint.bin")      # Save state
+brain.load("checkpoint.bin")      # Load state
 
 # Regions
 region_id = brain.addRegion("cortex")
@@ -295,8 +318,9 @@ region = brain.getRegion(region_id)
 #### Config Class
 
 ```python
-# Create
-config = pynlm.createDefaultConfig()
+# Create with presets
+config = pynlm.createConfigFromPreset("large")
+config = pynlm.createDefaultConfig()  # Traditional way
 
 # Query
 if config.has("brain.neuron_count"):
@@ -311,13 +335,14 @@ config.loadFromFile("config.json")
 config.saveToFile("config.json")
 ```
 
-#### AgentBrain Class
+#### AgentBrain Class (Enhanced)
 
 ```python
-# Creation
+# Creation with presets
+brain = pynlm.createBrainFromPreset("standard")
 agent = pynlm.createAgentBrain(brain)
 
-# Initialization
+# Initialize
 agent.initialize(world)
 
 # Sensory processing
@@ -333,17 +358,18 @@ agent.applyRewardModulation(reward, predicted_reward)
 agent.updateDevelopment(timestep)
 agent.getDevelopmentalStage()
 
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
+# Enhanced feature management
+agent = create_agent_with_features(
+    brain, world,
+    enable_reward=True,
+    enable_curiosity=True,
+    enable_development=True
+)
 
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Feature status
+agent.isRewardModulationEnabled()
+agent.isCuriosityEnabled()
+agent.isDevelopmentEnabled()
 ```
 
 #### SimpleWorld Class
@@ -378,7 +404,6 @@ world.getWidth()
 world.getHeight()
 world.getSimulationTime()
 world.getMaxEnergy()
-world.setMaxEnergy(100.0)
 ```
 
 ### Enumerations
@@ -387,9 +412,9 @@ world.setMaxEnergy(100.0)
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
 # Developmental stages
@@ -416,7 +441,7 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 4: Configuration Options
+## Part 4: Enhanced Configuration Options
 
 ### Brain Configuration
 
@@ -433,30 +458,38 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
-### Plasticity Configuration
+### Enhanced Configuration Presets
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+The enhanced API provides several preset configurations:
 
-### Neuromodulation Configuration
+#### `standard` (neuron_count=1000)
+- Balanced configuration for general use
+- All plasticity mechanisms enabled
+- Moderate neuromodulation
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+#### `large` (neuron_count=5000)  
+- Detailed simulations with more neurons
+- All plasticity mechanisms enabled
+- Enhanced neuromodulation
+- Structural plasticity enabled
+
+#### `small` (neuron_count=100)
+- Quick testing with minimal resources
+- Basic plasticity
+- Minimal neuromodulation
+
+#### `research` (neuron_count=10000)
+- Advanced research configuration
+- All plasticity mechanisms enabled
+- Full neuromodulation
+- Advanced development features
+- Optimized for research experiments
 
 ---
 
-## Part 5: Example Scripts
+## Part 5: Enhanced Example Scripts
 
-### Minimal Example
+### Minimal Example (Traditional)
 
 ```python
 import pynlm
@@ -473,19 +506,37 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
-### Environment Interaction
+### Minimal Example (Enhanced with Presets)
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Create and initialize using preset
+brain = pynlm.createBrainFromPreset("small")
 brain.initialize()
-agent = pynlm.createAgentBrain(brain)
+
+# Simulate
+for i in range(100):
+    brain.step(i)
+
+print("Simulation complete!")
+```
+
+### Environment Interaction (Enhanced)
+
+```python
+import pynlm
+from pynlm_enhanced import create_agent_with_features
+
+# Setup
+brain = pynlm.createBrainFromPreset("standard")
+brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
+
+agent = create_agent_with_features(brain, world)
 agent.initialize(world)
 
 # Run episode
@@ -496,9 +547,36 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Performance Monitoring
+
+```python
+import pynlm
+from pynlm_enhanced import SimulationMonitor, run_simulation_loop
+
+# Create brain and world
+brain = pynlm.createBrainFromPreset("large")
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+
+# Run simulation with monitoring
+monitor = SimulationMonitor(brain, agent, world)
+run_simulation_loop(
+    brain, world, agent,
+    steps=1000, timestep=0.001,
+    monitor=monitor
+)
+
+# Get performance summary
+print("Performance Summary:")
+print(f"Total steps: {monitor.get_summary()['total_steps']}")
+print(f"Average step time: {monitor.get_summary()['avg_step_time_ms']:.2f} ms")
+```
+
 ---
 
-## Troubleshooting
+## Part 6: Troubleshooting
 
 ### Build Issues
 
@@ -524,10 +602,47 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+### Enhanced Error Handling
+
+```python
+import pynlm
+from pynlm_enhanced import InvalidConfigurationError
+
+try:
+    # This will raise an error for unknown preset
+    brain = pynlm.createBrainFromPreset("unknown")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+
+try:
+    # Create brain and run simulation
+    brain = pynlm.createBrainFromPreset("standard")
+    brain.initialize()
+    
+    for i in range(100):
+        brain.step(i)  # Will fail if brain not initialized
+        
+except RuntimeError as e:
+    print(f"Runtime error: {e}")
+```
+
 ---
 
-## Further Reading
+## Part 7: Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [Enhanced API Documentation](https://nlm.readthedocs.io/en/latest/python/enhanced_api.html) - Comprehensive Python API documentation
+
+The enhanced Python API provides many new features for both beginners and advanced users. The preset system makes it easy to get started, while the monitoring and analysis tools provide deep insights into simulation performance.
+
+## Enhanced API Version
+
+This enhanced version includes:
+- Configuration presets for easy setup
+- Performance monitoring tools
+- Brain state analysis utilities
+- Enhanced error handling
+- Backward compatibility with traditional API
+- Additional modules in `pynlm_enhanced.py` for advanced features

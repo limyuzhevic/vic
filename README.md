@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -76,11 +75,99 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python API Enhanced Examples
+
+The enhanced Python API provides many new convenience functions and presets. Here are some examples:
+
+```python
+import pynlm
+
+# Example 1: Create brain using preset configurations
+brain = pynlm.createBrainFromPreset("research", neuron_count=5000)
+brain.initialize()
+
+# Example 2: Create agent with all features enabled
+config = pynlm.createConfigFromPreset("large")
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Example 3: Enhanced simulation with monitoring
+from pynlm_enhanced import run_simulation_loop, SimulationMonitor
+
+monitor = SimulationMonitor(brain, agent, world)
+success = run_simulation_loop(
+    brain, world, agent, 
+    steps=1000, timestep=0.001,
+    monitor=monitor, verbose=True
+)
+
+# Example 4: Configuration presets
+presets = ["standard", "large", "small", "research"]
+for preset in presets:
+    config = pynlm.createConfigFromPreset(preset)
+    brain = pynlm.createBrainFromPreset(preset)
+    brain.initialize()
+    # Run simulation with this preset
+    brain.reset()
+
+# Example 5: Checkpoints and experiment management
+from pynlm_enhanced import save_experiment_data
+
+# Save experiment with metadata
+filepath = save_experiment_data(
+    brain, agent, world,
+    metadata={
+        "experiment_name": "brain_development_study",
+        "researcher": "Dr. Scientist",
+        "date": time.strftime("%Y-%m-%d"),
+        "parameters": {"neuron_count": 5000, "timestep": 0.001}
+    }
+)
+```
+
+### Advanced Python API Features
+
+The enhanced API provides these additional features:
+
+#### Configuration Presets
+- `"standard"`: Balanced configuration for general use
+- `"large"`: High neuron count for detailed simulations  
+- `"small"`: Quick testing with minimal resources
+- `"research"`: Advanced research configuration
+
+#### Convenience Functions
+- `createConfigFromPreset(name, **kwargs)` - Create config from preset
+- `createBrainFromPreset(name, **kwargs)` - Create brain with preset
+- `run_simulation_loop()` - Enhanced simulation loop with monitoring
+- `analyze_brain_state()` - Comprehensive brain analysis
+
+#### Performance Monitoring
+- `SimulationMonitor` - Track simulation performance and metrics
+- `CheckpointManager` - Manage brain state checkpoints
+- Real-time statistics and progress reporting
+
+#### Error Handling
+- Enhanced exception hierarchy for better error recovery
+- Input validation and configuration checking
+- Backward compatibility with deprecation warnings
 
 ## Project Structure
 

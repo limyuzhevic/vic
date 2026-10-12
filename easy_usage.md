@@ -24,13 +24,13 @@ That's it! NLM simulates all of this.
 
 ## Quick Start (Copy & Paste)
 
-### Example 1: Simplest Brain
+### Example 1: Simplest Brain (Enhanced)
 
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Step 1: Make a brain (using enhanced preset)
+brain = pynlm.createBrainFromPreset("standard")
 
 # Step 2: Turn it on
 brain.initialize()
@@ -42,13 +42,13 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Enhanced)
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create everything with enhanced agent
+brain = pynlm.createBrainFromPreset("standard")
 brain.initialize()
 
 world = pynlm.createSimpleWorld()
@@ -57,6 +57,10 @@ world.reset()
 
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
 
 # Run for 50 steps
 for step in range(50):
@@ -69,6 +73,23 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Ultra-Simple One-Liner
+
+```python
+import pynlm
+
+# One line to create a virtual brain (with preset)
+brain = pynlm.createBrainFromPreset("small")
+
+# Initialize it
+brain.initialize()
+
+# Make it active
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
 
 ---
@@ -85,77 +106,92 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## The Simplest Possible Example
+## Common Patterns
+
+### Pattern 1: Run a Simulation (Enhanced)
+
+```python
+from pynlm_enhanced import run_simulation_loop, SimulationMonitor
+
+def run_simulation(brain, world, agent, num_steps):
+    # Create monitor for performance tracking
+    monitor = SimulationMonitor(brain, agent, world)
+    
+    # Run enhanced simulation loop with monitoring
+    success = run_simulation_loop(brain, world, agent, num_steps, monitor=monitor)
+    
+    if success:
+        print(f"Simulation completed with {monitor.get_summary()['total_steps']} steps")
+    
+    return monitor
+
+# Use it like this:
+# monitor = run_simulation(brain, world, agent, 1000)
+```
+
+### Pattern 2: Get Brain Stats (Enhanced)
+
+```python
+from pynlm_enhanced import analyze_brain_state
+
+# Just add these inside your loop:
+analysis = analyze_brain_state(brain, include_detailed=True)
+print("Neurons firing:", analysis['firing_neurons'])
+print("Total spikes:", analysis['total_spikes'])
+print("Avg firing rate:", analysis['average_firing_rate'])
+print("Development stage:", analysis['developmental_stage'])
+print("Regions:", analysis['regions_count'])
+
+if 'detailed' in analysis:
+    print("Active regions:", len(analysis['detailed']['active_regions']))
+```
+
+### Pattern 3: Enable Brain Features (Enhanced)
+
+```python
+from pynlm_enhanced import create_agent_with_features
+
+# Create agent with all features enabled
+agent = create_agent_with_features(
+    brain, world,
+    enable_reward=True,      # Learn from rewards
+    enable_curiosity=True,   # Explore new things
+    enable_development=True, # Brain matures over time
+    enable_plasticity=True   # Grow new connections
+)
+
+# Use agent with world
+agent.initialize(world)
+```
+
+---
+
+## Enhanced Configuration Options
+
+### Preset-Based Configuration
+
+Instead of struggling with configuration details, use presets:
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Quick presets - no configuration headaches
+brain = pynlm.createBrainFromPreset("small")      # For quick testing
+brain = pynlm.createBrainFromPreset("standard")   # Balanced performance  
+brain = pynlm.createBrainFromPreset("large")     # Detailed simulations
+brain = pynlm.createBrainFromPreset("research")   # Advanced research
 
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Or create configuration from presets
+config = pynlm.createConfigFromPreset("large")
 ```
 
----
+### What Each Part Does (Enhanced)
 
-## Common Patterns
+### `pynlm.createConfigFromPreset(preset_name, **kwargs)`
+Creates configuration from named presets with optional customization.
 
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
+### `pynlm.createBrainFromPreset(preset_name, **kwargs)`
+Creates brain using preset configurations instantly.
 
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
@@ -181,6 +217,56 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
+## Available Presets
+
+| Preset | Neuron Count | Description |
+|--------|-------------|-------------|
+| `standard` | 1,000 | Balanced configuration for general use |
+| `large` | 5,000 | Detailed simulations with more neurons |
+| `small` | 100 | Quick testing with minimal resources |
+| `research` | 10,000 | Advanced research configuration |
+
+### Enhanced Usage Examples
+
+```python
+import pynlm
+from pynlm_enhanced import (
+    createConfigFromPreset, 
+    createBrainFromPreset, 
+    run_simulation_loop,
+    SimulationMonitor,
+    analyze_brain_state
+)
+
+# 1. Create configuration with custom parameters
+config = createConfigFromPreset(
+    "large",
+    neuron_count=3000,  # Override preset
+    plasticity_hebbian_enable=False  # Disable Hebbian learning
+)
+
+# 2. Create brain with preset
+brain = createBrainFromPreset("research")
+brain.initialize()
+
+# 3. Run simulation with monitoring
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+
+monitor = SimulationMonitor(brain, agent, world)
+success = run_simulation_loop(
+    brain, world, agent, 
+    steps=2000, timestep=0.001,
+    monitor=monitor
+)
+
+# 4. Analyze results
+analysis = analyze_brain_state(brain)
+print(f"Simulation completed with {analysis['average_firing_rate']:.2f} avg firing rate")
+```
+
+---
+
 ## Mini Projects
 
 ### Project 1: Silent Brain (Just Neurons)
@@ -188,7 +274,7 @@ Reads the brain's motor neurons to decide what action to take.
 ```python
 import pynlm
 
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain = pynlm.createBrainFromPreset("small")
 brain.initialize()
 
 for i in range(10):
@@ -202,14 +288,17 @@ print("Silent brain test done!")
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Setup with enhanced agent
+brain = pynlm.createBrainFromPreset("standard")
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
+agent.enableCuriosity(True)
 
 # Watch the world for 30 steps
 for i in range(30):
@@ -221,24 +310,21 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Learning Agent
 
 ```python
 import pynlm
+from pynlm_enhanced import create_agent_with_features
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Setup with learning capabilities
+brain = pynlm.createBrainFromPreset("large")
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+agent = create_agent_with_features(brain, world)
 
 # Run agent
 for step in range(100):
@@ -250,6 +336,8 @@ for step in range(100):
     
     if step % 20 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"Novelty: {agent.getNoveltyLevel():.3f}")
 
 print("Agent simulation complete!")
 ```
@@ -258,40 +346,57 @@ print("Agent simulation complete!")
 
 ## Quick Reference
 
-| What you want | Code |
+### What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
+| Create brain | `pynlm.createBrainFromPreset("standard")` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
 | Create world | `pynlm.createSimpleWorld()` |
 | Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
+| Get brain stats | `analyze_brain_state(brain)` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
 ---
 
-## Troubleshooting
+## Enhanced Troubleshooting
 
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Use `analyze_brain_state(brain)` to check if brain is working
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Enable agent's motor capabilities with `agent.enableCuriosity(True)`
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Use `create_agent_with_features(brain, world)` to enable all capabilities
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details** - This has advanced C++ build instructions and configuration options
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works** - Deep dive into the neural architecture
+3. **Experiment with different configurations!** - Try different presets and see what happens
+4. **Try the `pynlm_enhanced` module** - Use convenience functions and monitoring tools
+5. **Create your own experiments** - The enhanced API makes it easier to run complex simulations
+
+That's it! You're now ready to use the enhanced NLM with all its new features and improved usability.
+
+---
+
+**New Features Added:**
+- Configuration presets for easy setup
+- Enhanced agent with feature management
+- Performance monitoring tools
+- Brain state analysis utilities
+- Simulation loop helpers
+- Better error handling
+- Backward compatibility with old-style usage
