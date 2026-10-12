@@ -1,0 +1,205 @@
+{
+  "experiment_scenarios": [
+    {
+      "id": "baseline_scenario",
+      "name": "Baseline Integration Test",
+      "description": "Baseline test of all brain systems integration",
+      "category": "baseline",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 100,
+      "test_focus": ["memory", "neuromodulation", "prediction", "cognition", "development"],
+      "thresholds": {
+        "memory_system_integration": 0.8,
+        "neuromodulation_system_integration": 0.8,
+        "prediction_system_integration": 0.8,
+        "cognition_system_integration": 0.8,
+        "development_system_integration": 0.8,
+        "cross_system_workflow": 0.8
+      },
+      "expected_outcomes": [
+        "All memory systems (working, episodic, associative) should integrate with neural processing",
+        "Neuromodulators (dopamine, curiosity, novelty, prediction error) should integrate with action selection",
+        "Prediction systems (forward, value, behavioral, meta) should integrate with sensory processing",
+        "Cognition systems (concept formation, attention, planning, self-model) should integrate with episodic memory",
+        "Development systems (plasticity, critical periods, structural changes) should integrate with learning processes",
+        "Cross-system workflows (complete brain loop, memory-development interaction) should function properly"
+      ]
+    },
+    {
+      "id": "memory_focus_scenario",
+      "name": "Memory System Focus",
+      "description": "Comprehensive memory system integration tests",
+      "category": "memory",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 200,
+      "test_focus": ["memory"],
+      "thresholds": {
+        "working_memory_neural_integration": 0.9,
+        "episodic_memory_brain_region_integration": 0.9,
+        "associative_memory_concept_integration": 0.9,
+        "memory_consolidation_cross_region": 0.9
+      },
+      "test_phases": [
+        "Phase 1: Working memory with neural processing",
+        "Phase 2: Episodic memory with brain regions",
+        "Phase 3: Associative memory with concepts",
+        "Phase 4: Memory consolidation across brain regions"
+      ],
+      "expected_outcomes": [
+        "Working memory should maintain neural activity patterns",
+        "Episodic memory should link experiences across brain regions",
+        "Associative memory should enable pattern completion",
+        "Memory consolidation should transfer memories between systems"
+      ]
+    },
+    {
+      "id": "neuromodulation_focus_scenario",
+      "name": "Neuromodulation System Focus",
+      "description": "Comprehensive neuromodulation system integration tests",
+      "category": "neuromodulation",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 150,
+      "test_focus": ["neuromodulation"],
+      "thresholds": {
+        "dopamine_working_memory_integration": 0.9,
+        "curiosity_episodic_memory_integration": 0.9,
+        "novelty_prediction_integration": 0.9,
+        "prediction_error_action_selection_integration": 0.9
+      },
+      "test_phases": [
+        "Phase 1: Dopamine integration with working memory",
+        "Phase 2: Curiosity integration with episodic memory",
+        "Phase 3: Novelty integration with prediction systems",
+        "Phase 4: Prediction error integration with action selection"
+      ],
+      "expected_outcomes": [
+        "Dopamine should modulate working memory plasticity",
+        "Curiosity should drive exploration behavior",
+        "Novelty should enhance prediction learning",
+        "Prediction error should guide action selection"
+      ]
+    },
+    {
+      "id": "prediction_focus_scenario",
+      "name": "Prediction System Focus",
+      "description": "Comprehensive prediction system integration tests",
+      "category": "prediction",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 150,
+      "test_focus": ["prediction"],
+      "thresholds": {
+        "forward_prediction_sensory_integration": 0.9,
+        "value_prediction_reward_integration": 0.9,
+        "behavioral_prediction_motor_integration": 0.9,
+        "meta_prediction_cognitive_integration": 0.9
+      },
+      "test_phases": [
+        "Phase 1: Forward prediction with sensory processing",
+        "Phase 2: Value prediction with reward systems",
+        "Phase 3: Behavioral prediction with motor systems",
+        "Phase 4: Meta-prediction with cognitive systems"
+      ],
+      "expected_outcomes": [
+        "Forward prediction should integrate with sensory processing",
+        "Value prediction should integrate with reward systems",
+        "Behavioral prediction should integrate with motor output",
+        "Meta-prediction should integrate with cognitive evaluation"
+      ]
+    },
+    {
+      "id": "cognition_focus_scenario",
+      "name": "Cognition System Focus",
+      "description": "Comprehensive cognition system integration tests",
+      "category": "cognition",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 200,
+      "test_focus": ["cognition"],
+      "thresholds": {
+        "concept_formation_episodic_memory_integration": 0.9,
+        "attention_selection_prediction_integration": 0.9,
+        "planning_action_selection_integration": 0.9,
+        "self_model_social_learning_integration": 0.9
+      },
+      "test_phases": [
+        "Phase 1: Concept formation with episodic memory",
+        "Phase 2: Attention selection with prediction systems",
+        "Phase 3: Planning with action selection",
+        "Phase 4: Self-model with social learning"
+      ],
+      "expected_outcomes": [
+        "Concept formation should use episodic memory",
+        "Attention selection should use prediction errors",
+        "Planning should constrain action selection",
+        "Self-model should integrate with social learning"
+      ]
+    },
+    {
+      "id": "development_focus_scenario",
+      "name": "Development System Focus",
+      "description": "Comprehensive development system integration tests",
+      "category": "development",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 300,
+      "test_focus": ["development"],
+      "thresholds": {
+        "plasticity_maturation_memory_integration": 0.9,
+        "critical_period_learning_integration": 0.9,
+        "structural_plasticity_neural_processing_integration": 0.9,
+        "adaptive_development_across_systems_integration": 0.9
+      },
+      "test_phases": [
+        "Phase 1: Plasticity maturation with memory systems",
+        "Phase 2: Critical period effects with learning",
+        "Phase 3: Structural plasticity with neural processing",
+        "Phase 4: Adaptive development across systems"
+      ],
+      "expected_outcomes": [
+        "Plasticity maturation should affect memory systems",
+        "Critical periods should enhance learning",
+        "Structural plasticity should modify neural connectivity",
+        "Adaptive development should optimize system performance"
+      ]
+    },
+    {
+      "id": "cross_system_workflow_scenario",
+      "name": "Cross-System Workflow Focus",
+      "description": "Comprehensive cross-system workflow integration tests",
+      "category": "cross_system",
+      "enabled": true,
+      "neuron_count": 100,
+      "region_count": 2,
+      "simulation_steps": 500,
+      "test_focus": ["cross_system"],
+      "thresholds": {
+        "complete_brain_loop_integration": 0.9,
+        "memory_development_interaction_integration": 0.9,
+        "neuromodulation_motivation_integration": 0.9,
+        "prediction_behavior_integration": 0.9
+      },
+      "test_phases": [
+        "Phase 1: Complete brain loop integration",
+        "Phase 2: Memory consolidation during development",
+        "Phase 3: Neuromodulation-driven learning",
+        "Phase 4: Prediction with behavioral adaptation"
+      ],
+      "expected_outcomes": [
+        "Complete brain loop should function properly",
+        "Memory consolidation should occur during development",
+        "Neuromodulation should drive learning",
+        "Prediction should guide behavioral adaptation"
+      ]
+    }
+  ]
+}

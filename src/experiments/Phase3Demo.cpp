@@ -5,195 +5,75 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "ExperimentBase.hpp"
+#include "ExperimentConfig.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <memory>
 
 namespace nlm {
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
-
-class Phase3Demo {
+class Phase3Demo : public ExperimentBase {
 public:
-    Phase3Demo() {}
-    ~Phase3Demo() {}
+    Phase3Demo() : ExperimentBase("Phase3Demo") {
+        logger_ = std::make_unique<ExperimentLogger>("phase3_demo.log");
+    }
+    
+    ~Phase3Demo() = default;
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
-        std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
-        std::cout << "===========================================\n\n";
+        // Use the new infrastructure
+        setStatus("Initializing Phase 3 Demo");
+        setProgress(0.0f);
         
-        // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        // Create configuration using new config system
+        auto config = ExperimentConfig::createPhase3Config(numEpisodes, stepsPerEpisode);
         
-        // Create world
-        SimpleWorld world;
-        world.configure(20.0f, 20.0f, 16, 16);
-        world.setRandomSeed(42);
+        // Run the experiment using the new Phase3Experiment class
+        Phase3Experiment experiment("Phase3Demo");
+        Phase3Results results = experiment.runExperiment(brain_.get(), numEpisodes, stepsPerEpisode);
         
-        // Create brain
-        auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
+        // Store results using new infrastructure
+        storeResult("phase3_results", results);
         
-        // Create agent brain interface
-        AgentBrain agentBrain(brain);
-        agentBrain.initialize(world);
+        // Log results
+        logger_->logPhase3Header();
+        logger_->log("Phase 3 Demo completed successfully!");
         
-        // Configure agent brain
-        agentBrain.enableRewardModulation(true);
-        agentBrain.enableStructuralPlasticity(true);
-        agentBrain.enableDevelopment(true);
-        agentBrain.enableCuriosity(true);
+        // Print summary
+        printSummary(results);
         
-        std::cout << "Initial brain state:\n";
-        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
-        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
-        std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
-        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
-        
-        // Metrics tracking
-        std::vector<ExperimentMetrics> allMetrics;
-        
-        // Run episodes
-        for (int episode = 0; episode < numEpisodes; ++episode) {
-            std::cout << "--- Episode " << episode << " started ---\n";
-            
-            // Reset world
-            world.reset();
-            agentBrain.reset();
-            brain->reset();
-            
-            ExperimentMetrics metrics;
-            metrics.episode = episode;
-            
-            float episodeReward = 0.0f;
-            
-            // Run steps
-            for (int step = 0; step < stepsPerEpisode; ++step) {
-                // 1. Get sensory percept from world
-                const SensoryPercept& percept = world.getSensoryPercept();
-                
-                // 2. Inject sensory input into brain
-                agentBrain.processSensoryInput(percept);
-                
-                // 3. Simulate brain (multiple steps per action)
-                for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
-                }
-                
-                // 4. Decode motor command from brain activity
-                MotorCommand cmd = agentBrain.decodeMotorCommand();
-                
-                // 5. Apply motor command to world
-                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
-                // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
-                
-                // 7. Update world
-                world.update(0.01);  // 10ms timestep
-                
-                // 8. Update development
-                agentBrain.updateDevelopment(0.01);
-                
-                // Track metrics
-                episodeReward += result.reward;
-                metrics.steps++;
-                metrics.totalReward += result.reward;
-                metrics.totalSpikes += brain->getFiringNeuronCount();
-                
-                // Count actions
-                switch (cmd) {
-                    case MotorCommand::MoveForward: metrics.forwardCount++; break;
-                    case MotorCommand::MoveBackward: metrics.backwardCount++; break;
-                    case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
-                    case MotorCommand::TurnRight: metrics.turnRightCount++; break;
-                    case MotorCommand::Interact: metrics.interactCount++; break;
-                    default: metrics.waitCount++; break;
-                }
-                
-                // Print periodic updates
-                if (step % 50 == 0) {
-                    std::cout << "  Step " << step 
-                              << ": reward=" << result.reward
-                              << ", action=" << motorCommandToString(cmd)
-                              << ", neuromod=" << agentBrain.getNeuromodulationLevel()
-                              << ", novelty=" << agentBrain.getNoveltyLevel()
-                              << ", energy=" << world.getAgentBody().energy
-                              << "\n";
-                }
-            }
-            
-            // Record final metrics
-            metrics.finalNovelty = agentBrain.getNoveltyLevel();
-            metrics.finalCuriosity = agentBrain.getCuriosityLevel();
-            metrics.finalEnergy = world.getAgentBody().energy;
-            metrics.predictionError = agentBrain.getPredictionError();
-            metrics.developmentalAge = agentBrain.getBrain()->getTotalSynapseCount();  // Use as proxy
-            metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
-            metrics.totalSynapses = brain->getTotalSynapseCount();
-            metrics.averageFiringRate = brain->getAverageFiringRate();
-            
-            allMetrics.push_back(metrics);
-            
-            std::cout << "--- Episode " << episode << " ended ---\n";
-            std::cout << "  Steps: " << metrics.steps << "\n";
-            std::cout << "  Total Reward: " << metrics.totalReward << "\n";
-            std::cout << "  Final Energy: " << metrics.finalEnergy << "\n";
-            std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
-            std::cout << "  Action counts: fwd=" << metrics.forwardCount 
-                      << ", bwd=" << metrics.backwardCount
-                      << ", left=" << metrics.turnLeftCount
-                      << ", right=" << metrics.turnRightCount
-                      << ", interact=" << metrics.interactCount
-                      << ", wait=" << metrics.waitCount
-                      << "\n\n";
-        }
-        
-        // Summary
-        std::cout << "===========================================\n";
-        std::cout << "SUMMARY\n";
-        std::cout << "===========================================\n";
-        
-        if (allMetrics.size() >= 2) {
-            const auto& first = allMetrics.front();
-            const auto& last = allMetrics.back();
-            
-            std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
-            std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
-            std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
-            std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";
-            
-            // Calculate behavior change
-            float rewardChange = last.totalReward - first.totalReward;
-            float actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
-            
-            std::cout << "\nBehavioral change:\n";
-            if (rewardChange > 0) {
-                std::cout << "  Reward INCREASED by " << rewardChange << " (positive learning)\n";
-            } else if (rewardChange < -5) {
-                std::cout << "  Reward DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
-            }
-            
-            if (std::abs(actionChange) > 10) {
-                std::cout << "  Forward actions changed by " << actionChange << "\n";
-            }
-            
-            // Synapse change
-            if (last.totalSynapses != first.totalSynapses) {
-                std::cout << "  Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
-            }
-        }
-        
-        std::cout << "\nPhase 3 demonstration complete.\n";
-        std::cout << "The brain received sensory input, produced actions,\n";
-        std::cout << "experienced consequences, and modified its synapses.\n";
+        setStatus("Completed");
+        setProgress(100.0f);
+    }
+    
+    void printSummary(const Phase3Results& results) {
+        std::cout << "\nPhase 3 Demo Summary:\n";
+        std::cout << "  Total Reward: " << results.totalReward << "\n";
+        std::cout << "  Total Steps: " << results.steps << "\n";
+        std::cout << "  Final Novelty: " << results.finalNovelty << "\n";
+        std::cout << "  Final Curiosity: " << results.finalCuriosity << "\n";
+        std::cout << "  Prediction Error: " << results.predictionError << "\n";
+        std::cout << "  Developmental Age: " << results.developmentalAge << "\n";
+        std::cout << "  Developmental Stage: " << results.developmentalStage << "\n";
+        std::cout << "  Total Synapses: " << results.totalSynapses << "\n";
+        std::cout << "  Average Firing Rate: " << results.averageFiringRate << "\n";
+        std::cout << "  Action Counts:\n";
+        std::cout << "    Forward: " << results.forwardCount << "\n";
+        std::cout << "    Backward: " << results.backwardCount << "\n";
+        std::cout << "    Left: " << results.turnLeftCount << "\n";
+        std::cout << "    Right: " << results.turnRightCount << "\n";
+        std::cout << "    Interact: " << results.interactCount << "\n";
+        std::cout << "    Wait: " << results.waitCount << "\n";
     }
     
 private:
+    std::unique_ptr<ExperimentLogger> logger_;
+    std::unique_ptr<Brain> brain_;
+    
     void configureEnvironment(std::shared_ptr<Config> config) {
         config->set("environment_width", 20);
         config->set("environment_height", 20);

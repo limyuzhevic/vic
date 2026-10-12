@@ -34,23 +34,51 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !brain_) {
+        if (!brain_) {
+            NLM_LOG_ERROR("NeuralWorkingMemory::store: brain_ is null");
+        }
+        return;
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
+        if (memoryNeurons_.empty()) {
+            NLM_LOG_ERROR("NeuralWorkingMemory::store: memoryNeurons_ is empty");
+            break;
+        }
+        
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        if (brain_) {
+            auto* region = brain_->getRegion(neuron.getId() / 1000);
+            if (!region) {
+                NLM_LOG_ERROR("NeuralWorkingMemory::store: region not found for neuron");
+                continue;
+            }
+            
+            auto neurons = region->getAllNeurons();
+            if (!neurons) {
+                NLM_LOG_ERROR("NeuralWorkingMemory::store: region->getAllNeurons() returned null");
+                continue;
+            }
+            
+            for (auto* nn : *neurons) {
+                if (!nn) {
+                    NLM_LOG_ERROR("NeuralWorkingMemory::store: Found null neuron");
+                    continue;
+                }
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
                 }
             }
+        } else {
+            NLM_LOG_ERROR("NeuralWorkingMemory::store: brain_ is null");
         }
         
         // Update stored activation
@@ -75,17 +103,36 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
+        
+        // Bounds checking for memory arrays
+        if (idx < memoryActivations_.size() && idx < memoryTimestamps_.size()) {
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
+        } else {
+            NLM_LOG_ERROR("NeuralWorkingMemory::storeToNeuron: Array bounds exceeded when updating neuron activation");
+            return;
+        }
     } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
+        // Check if all arrays have the same size for consistency
+        if (memoryActivations_.size() == memoryNeurons_.size() && 
+            memoryTimestamps_.size() == memoryNeurons_.size()) {
+            memoryNeurons_.push_back(neuron);
+            memoryActivations_.push_back(activation);
+            memoryTimestamps_.push_back(0);
+        } else {
+            NLM_LOG_ERROR("NeuralWorkingMemory::storeToNeuron: Memory array size mismatch");
+            return;
+        }
+    } else {
+        NLM_LOG_ERROR("NeuralWorkingMemory::storeToNeuron: Memory capacity exceeded, cannot add new neuron");
+        return;
     }
     
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
+    } else {
+        NLM_LOG_ERROR("NeuralWorkingMemory::storeToNeuron: brain_ is null");
     }
 }
 
@@ -93,8 +140,14 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
     std::vector<float> result;
     result.reserve(memoryActivations_.size());
     
-    for (float activation : memoryActivations_) {
-        result.push_back(activation);
+    // Bounds checking for memoryActivations_
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (i < memoryActivations_.size()) {
+            result.push_back(memoryActivations_[i]);
+        } else {
+            NLM_LOG_ERROR("NeuralWorkingMemory::retrieve: Array bounds exceeded when accessing memory activation");
+            break;
+        }
     }
     
     return result;
@@ -108,16 +161,39 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
+        
+        // Bounds checking for memory arrays
+        if (idx < memoryActivations_.size()) {
+            return memoryActivations_[idx];
+        } else {
+            NLM_LOG_ERROR("NeuralWorkingMemory::getNeuronActivation: Array bounds exceeded when accessing neuron activation");
+            return 0.0f;
+        }
     }
     return 0.0f;
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("NeuralWorkingMemory::update: brain_ is null");
+        return;
+    }
+    
+    // Check if all memory arrays have consistent sizes
+    if (memoryNeurons_.size() != memoryActivations_.size() || 
+        memoryNeurons_.size() != memoryTimestamps_.size()) {
+        NLM_LOG_ERROR("NeuralWorkingMemory::update: Memory array size mismatch");
+        return;
+    }
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (i >= memoryNeurons_.size() || i >= memoryActivations_.size() || 
+            i >= memoryTimestamps_.size()) {
+            NLM_LOG_ERROR("NeuralWorkingMemory::update: Array bounds exceeded during neuron update");
+            continue;
+        }
+        
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         
@@ -163,10 +239,21 @@ void NeuralWorkingMemory::runCompetition() {
     
     if (memoryActivations_.empty()) return;
     
+    // Check if all memory arrays have consistent sizes
+    if (memoryNeurons_.size() != memoryActivations_.size()) {
+        NLM_LOG_ERROR("NeuralWorkingMemory::runCompetition: Memory array size mismatch");
+        return;
+    }
+    
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (i >= memoryNeurons_.size() || i >= memoryActivations_.size()) {
+            NLM_LOG_ERROR("NeuralWorkingMemory::runCompetition: Array bounds exceeded during competition");
+            continue;
+        }
+        
         if (memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
@@ -174,6 +261,11 @@ void NeuralWorkingMemory::runCompetition() {
     
     // Inhibitory competition - suppress non-winners
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (i >= memoryNeurons_.size() || i >= memoryActivations_.size()) {
+            NLM_LOG_ERROR("NeuralWorkingMemory::runCompetition: Array bounds exceeded during inhibition");
+            continue;
+        }
+        
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
         if (!isWinner && brain_) {
@@ -190,10 +282,22 @@ bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
 float NeuralWorkingMemory::getMemoryActivity() const {
     if (memoryActivations_.empty()) return 0.0f;
     
-    float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
+    // Check if all memory arrays have consistent sizes
+    if (memoryNeurons_.size() != memoryActivations_.size()) {
+        NLM_LOG_ERROR("NeuralWorkingMemory::getMemoryActivity: Memory array size mismatch");
+        return 0.0f;
     }
+    
+    float total = 0.0f;
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (i < memoryActivations_.size()) {
+            total += memoryActivations_[i];
+        } else {
+            NLM_LOG_ERROR("NeuralWorkingMemory::getMemoryActivity: Array bounds exceeded during activity calculation");
+            break;
+        }
+    }
+    
     return total / memoryActivations_.size();
 }
 

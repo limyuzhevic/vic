@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../agent/AgentBody.hpp"
+#include "ExperimentBase.hpp"
+#include "ExperimentResults.hpp"
 #include <string>
 #include <vector>
 
@@ -28,39 +30,27 @@ private:
     Impl* pImpl;
 };
 
-// Metrics collector for Phase 3 experiments
-struct ExperimentMetrics {
-    // Episode metrics
-    int episode;
-    int steps;
-    float totalReward;
-    float finalEnergy;
-    float finalNovelty;
-    float finalCuriosity;
-    float predictionError;
+// Phase 3 experiment class using new infrastructure
+class Phase3Experiment : public ExperimentBase {
+public:
+    Phase3Experiment(const std::string& name = "Phase3Experiment");
+    ~Phase3Experiment() = default;
     
-    // Development
-    float developmentalAge;
-    std::string developmentalStage;
+    // Lifecycle management
+    bool initialize() override;
+    bool run() override;
+    void cleanup() override;
+    bool isRunning() const override;
     
-    // Network state
-    size_t totalSynapses;
-    float averageWeight;
-    float maxWeight;
-    size_t totalSpikes;
-    float averageFiringRate;
+    // Phase 3 specific methods
+    Phase3Results runExperiment(Brain* brain, size_t numEpisodes = 5, size_t stepsPerEpisode = 200);
     
-    // Motor behavior
-    int forwardCount;
-    int backwardCount;
-    int turnLeftCount;
-    int turnRightCount;
-    int interactCount;
-    int waitCount;
+    // Get accumulated results
+    const Phase3Results& getResults() const { return phase3Results_; }
     
-    ExperimentMetrics();
-    void reset();
-    std::string toCSV() const;
+private:
+    Phase3Results phase3Results_;
+    std::unique_ptr<ExperimentLogger> logger_;
 };
 
 } // namespace nlm

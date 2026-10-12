@@ -18,17 +18,73 @@ namespace nlm {
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
 
+/**
+ * @class NeuralWorkingMemory
+ * @brief Implements working memory using persistent neural activity and recurrent connections
+ * @details This working memory system is fundamentally different from traditional
+ *         vector-based storage. Instead, it uses persistent neural activity maintained
+ *         through recurrent connections and short-term plasticity mechanisms.
+ * 
+ * @note Unlike standard working memory implementations that store information
+ *       as vectors or patterns, this neural working memory:
+ *       - Encodes information as patterns of persistent neural firing
+ *       - Uses recurrent connections to maintain information over time
+ *       - Implements competitive dynamics for selective retention
+ *       - Leverages activity-dependent plasticity for memory stabilization
+ * 
+ * @warning This is a neural working memory, not a simple storage vector. Information
+ *         is encoded as neural activity patterns, not abstract representations.
+ * 
+ * @author NLM Research Team
+ * @date Version 0.1.0
+ * @ingroup memory
+ * @implements neural_memory_system
+ */
+
 class NeuralWorkingMemory {
 public:
+    // Default constructor
+    /**
+     * @brief Construct a new NeuralWorkingMemory object
+     * @details Creates a neural working memory with default parameters:
+     *          - Capacity: 100 memory traces
+     *          - Decay rate: 0.01 per timestep (1% decay per step)
+     *          - No initial brain reference
+     * 
+     * @note The working memory must be initialized with a Brain reference
+     *       before it can be used. Call initialize() with a valid Brain pointer.
+     */
     NeuralWorkingMemory();
+    
+    /**
+     * @brief Destroy the NeuralWorkingMemory object
+     * @details Cleans up all memory traces, recurrent connections, and temporary buffers.
+     *          The working memory will be in an uninitialized state after destruction.
+     */
     ~NeuralWorkingMemory();
 
     // Initialize with brain reference
+    /**
+     * @brief Initialize the working memory with a brain reference
+     * @param brain Pointer to the Brain object
+     * @details Initializes the working memory system with a reference to the
+     *          neural brain. This connection is essential for:
+     *          - Accessing neurons for memory encoding
+     *          - Using brain-wide recurrent connections
+     *          - Integrating with brain's plasticity systems
+     *          - Synchronizing with brain's simulation clock
+     * 
+     * @note This must be called before any other working memory operations.
+     *       The working memory takes a reference to the brain and will use it
+     *       for memory encoding and maintenance operations.
+     * 
+     * @param brain Pointer to Brain object, must not be nullptr
+     * @pre Brain must be fully initialized before calling this method
+     * @post Working memory is ready to store and retrieve information
+     * @see store() for storing information in working memory
+     * @see retrieve() for retrieving working memory content
+     */
     void initialize(Brain* brain);
-
-    // Store information in working memory
-    // The information is encoded as neural activity pattern
-    void store(const std::vector<float>& pattern, float strength = 1.0f);
 
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);

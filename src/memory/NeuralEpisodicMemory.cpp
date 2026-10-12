@@ -26,6 +26,13 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("NeuralEpisodicMemory::initialize: brain is null");
+        pImpl->brain = nullptr;
+        brain_ = nullptr;
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
@@ -80,7 +87,12 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(maxResults, scores.size()); ++i) {
         if (scores[i].first > 0.3f) {  // Threshold
-            results.push_back(&episodes_[scores[i].second]);
+            // Bounds checking for scores
+            if (scores[i].second < episodes_.size()) {
+                results.push_back(&episodes_[scores[i].second]);
+            } else {
+                NLM_LOG_ERROR("NeuralEpisodicMemory::retrieveSimilar: Array bounds exceeded when accessing episode");
+            }
         }
     }
     
@@ -134,7 +146,12 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByLocation(
     
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(maxResults, distances.size()); ++i) {
-        results.push_back(&episodes_[distances[i].second]);
+        // Bounds checking for distances
+        if (distances[i].second < episodes_.size()) {
+            results.push_back(&episodes_[distances[i].second]);
+        } else {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::retrieveByLocation: Array bounds exceeded when accessing episode");
+        }
     }
     
     return results;
@@ -165,13 +182,27 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 }
 
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
-    if (!episode || !brain_) return;
+    if (!episode || !brain_) {
+        if (!episode) {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::replayEpisode: episode is null");
+        }
+        if (!brain_) {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::replayEpisode: brain is null");
+        }
+        return;
+    }
     
     // Reactivate neurons that were active during this episode
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
-        float activation = i < episode->neuronActivations.size() ? 
-                          episode->neuronActivations[i] : 0.5f;
+        float activation = 0.5f;
+        
+        // Bounds checking for neuronActivations
+        if (i < episode->neuronActivations.size()) {
+            activation = episode->neuronActivations[i];
+        } else {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::replayEpisode: Array bounds exceeded when accessing neuron activation");
+        }
         
         // Inject current to reawaken this pattern
         brain_->injectCurrent(neuron, activation * 3.0f);
@@ -194,6 +225,7 @@ const EpisodicMemoryItem* NeuralEpisodicMemory::getEpisode(size_t index) const {
     if (index < episodes_.size()) {
         return &episodes_[index];
     }
+    NLM_LOG_ERROR("NeuralEpisodicMemory::getEpisode: Array bounds exceeded when accessing episode");
     return nullptr;
 }
 
@@ -202,7 +234,12 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getRecentEpisodes(s
     
     size_t start = count > episodes_.size() ? 0 : episodes_.size() - count;
     for (size_t i = start; i < episodes_.size(); ++i) {
-        results.push_back(&episodes_[i]);
+        if (i < episodes_.size()) {
+            results.push_back(&episodes_[i]);
+        } else {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::getRecentEpisodes: Array bounds exceeded when accessing episode");
+            break;
+        }
     }
     
     return results;
@@ -257,7 +294,12 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForRepla
     
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
-        results.push_back(&episodes_[std::get<2>(scored[i])]);
+        // Bounds checking for scored
+        if (std::get<2>(scored[i]) < episodes_.size()) {
+            results.push_back(&episodes_[std::get<2>(scored[i])]);
+        } else {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::getEpisodesForReplay: Array bounds exceeded when accessing episode");
+        }
     }
     
     return results;
@@ -270,6 +312,8 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
             
             // Small delay between replays
             // (In simulation, this would be steps)
+        } else {
+            NLM_LOG_ERROR("NeuralEpisodicMemory::replaySequence: Array bounds exceeded when accessing episode");
         }
     }
 }

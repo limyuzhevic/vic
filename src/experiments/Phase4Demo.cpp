@@ -8,11 +8,12 @@
 #include "agent/AgentBrain.hpp"
 #include "world/SimpleWorld.hpp"
 #include "experiments/Phase4Experiment.hpp"
+#include "experiments/ExperimentBase.hpp"
+#include "experiments/ExperimentConfig.hpp"
 #include "prediction/NeuralPrediction.hpp"
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
@@ -46,15 +47,8 @@ int main(int argc, char* argv[]) {
         numTrials = std::stoi(argv[1]);
     }
     
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    // Create configuration using new config system
+    auto config = ExperimentConfig::createPhase4Config(numTrials);
     
     // Create brain
     std::cout << "Initializing brain...\n";
@@ -66,12 +60,14 @@ int main(int argc, char* argv[]) {
     
     printHeader("PHASE 4 EXPERIMENTS");
     
-    // Run Temporal Prediction Experiment
+    // Run Temporal Prediction Experiment using new base class
     printSection("1. Temporal Prediction Learning");
     {
         TemporalPredictionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("TemporalPrediction");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Initial Prediction Error", results.predictionErrorInitial);
         printResult("Final Prediction Error", results.predictionErrorFinal);
         printResult("Improvement", results.predictionAccuracyImprovement);
@@ -84,34 +80,40 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Working Memory Experiment
+    // Run Working Memory Experiment using new base class
     printSection("2. Working Memory");
     {
         WorkingMemoryExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("WorkingMemory");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Initial Retention", results.workingMemoryRetentionInitial);
         printResult("Final Retention", results.workingMemoryRetentionFinal);
         printResult("Capacity", results.workingMemoryCapacity, 100.0f);
     }
     
-    // Run Episodic Recall Experiment
+    // Run Episodic Recall Experiment using new base class
     printSection("3. Episodic Memory");
     {
         EpisodicRecallExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("EpisodicRecall");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Recall Accuracy", results.episodicRecallAccuracy);
         printResult("Episodes Stored", results.episodesStored);
         printResult("Episodic Influence", results.episodicInfluence);
     }
     
-    // Run Concept Formation Experiment
+    // Run Concept Formation Experiment using new base class
     printSection("4. Concept Formation");
     {
         ConceptFormationExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("ConceptFormation");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Concepts Formed", results.conceptsFormed);
         printResult("Concept Stability", results.conceptStability);
         printResult("Generalization Ability", results.generalizationAbility);
@@ -121,12 +123,14 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Attention Experiment
+    // Run Attention Experiment using new base class
     printSection("5. Neural Attention");
     {
         AttentionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("Attention");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Attention Selectivity", results.attentionSelectivity);
         printResult("Distraction Resistance", results.distractionResistance);
         
@@ -135,12 +139,14 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Planning Experiment
+    // Run Planning Experiment using new base class
     printSection("6. Multi-Step Planning");
     {
         PlanningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        experiment.setName("Planning");
+        bool success = experiment.run(brain.get(), numTrials / 2);
         
+        const auto& results = experiment.getResults();
         printResult("Planning Accuracy", results.planningAccuracy);
         printResult("Planning Confidence", results.planningConfidence);
         
@@ -149,12 +155,14 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Self-Model Experiment
+    // Run Self-Model Experiment using new base class
     printSection("7. Self-Model");
     {
         SelfModelExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("SelfModel");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Self-Prediction Accuracy", results.selfPredictionAccuracy);
         printResult("Body Awareness", results.bodyAwareness);
         
@@ -163,12 +171,14 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Social Learning Experiment
+    // Run Social Learning Experiment using new base class
     printSection("8. Social Learning");
     {
         SocialLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        experiment.setName("SocialLearning");
+        bool success = experiment.run(brain.get(), numTrials / 2);
         
+        const auto& results = experiment.getResults();
         printResult("Imitation Accuracy", results.imitationAccuracy);
         printResult("Observations from Others", results.observationsFromOthers);
         
@@ -177,17 +187,19 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Run Continual Learning Experiment
+    // Run Continual Learning Experiment using new base class
     printSection("9. Continual Learning");
     {
         ContinualLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        experiment.setName("ContinualLearning");
+        bool success = experiment.run(brain.get(), numTrials);
         
+        const auto& results = experiment.getResults();
         printResult("Behavior Improvement", results.behaviorImprovement);
         printResult("Transfer Performance", results.transferPerformance);
     }
     
-    // Run Integrated Experiment
+    // Run Integrated Experiment using new base class
     printSection("10. Integrated Phase 4");
     {
         Phase4IntegratedExperiment experiment;

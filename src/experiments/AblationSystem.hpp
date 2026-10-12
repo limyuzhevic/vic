@@ -60,9 +60,6 @@ enum class AblationTarget : uint32_t {
     // Memory systems
     WorkingMemory = 11,
     EpisodicMemory = 12,
-    SemanticMemory = 13,
-    ProceduralMemory = 14,
-    Memory = 15,
     
     // Cognitive mechanisms
     Prediction = 16,

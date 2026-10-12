@@ -5,45 +5,27 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <chrono>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+// Plugin-related configuration
+struct PluginConfig {
+    std::string name;
+    std::string version;
+    std::string configFile;
+    std::string parameters;
+    bool enabled;
+    std::vector<std::string> dependencies;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    PluginConfig() : enabled(true) {}
+    PluginConfig(const std::string& n) : name(n), enabled(true) {}
 };
 
-// Main configuration class
+// Main configuration class with plugin support
 class Config {
 public:
     Config();
@@ -60,6 +42,9 @@ public:
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Enhanced CLI-specific options loading
+    void loadAdvancedCLIOptions(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -78,6 +63,11 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Plugin-specific getters
+    std::vector<PluginConfig> getPluginConfigs() const;
+    PluginConfig getPluginConfig(const std::string& pluginName) const;
+    bool hasPlugin(const std::string& pluginName) const;
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -92,6 +82,19 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // CLI-specific getters
+    bool getBool(const std::string& key, bool defaultValue) const;
+    std::string getString(const std::string& key, const std::string& defaultValue) const;
+    int getInt(const std::string& key, int defaultValue) const;
+    double getDouble(const std::string& key, double defaultValue) const;
+    LogLevel getLogLevel(const std::string& levelStr);
+    
+    // Plugin configuration helpers
+    bool configurePlugin(const std::string& pluginName, const std::string& config);
+    std::string getPluginConfig(const std::string& pluginName, const std::string& configKey) const;
+    bool loadPluginConfig(const std::string& pluginName, const std::string& configFile = "");
+    bool savePluginConfig(const std::string& pluginName, const std::string& configFile = "");
     
 private:
     struct Impl;

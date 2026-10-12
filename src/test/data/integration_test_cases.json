@@ -1,0 +1,247 @@
+{
+  "integration_test_cases": [
+    {
+      "id": "memory_working_memory_neural_processing",
+      "name": "Working Memory with Neural Processing",
+      "category": "memory",
+      "description": "Test that working memory integrates with neural processing",
+      "test_class": "MemoryIntegrationTester",
+      "test_method": "WorkingMemoryWithNeuralProcessing",
+      "complexity": "medium",
+      "estimated_duration": 5.0,
+      "requires_systems": ["working_memory", "neural_processing"],
+      "expected_behavior": "Working memory stores neural activity patterns and neural processing updates working memory representations",
+      "verification_criteria": [
+        "Working memory should maintain neuron activations",
+        "Neural processing should update working memory",
+        "Integration should be verified by cross-correlation"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["memory", "neural", "integration", "working_memory"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 10.0,
+        "max_memory_usage": 100,
+        "target_accuracy": 0.95
+      }
+    },
+    {
+      "id": "memory_episodic_memory_brain_regions",
+      "name": "Episodic Memory with Brain Regions",
+      "category": "memory",
+      "description": "Test that episodic memory integrates with brain regions",
+      "test_class": "MemoryIntegrationTester",
+      "test_method": "EpisodicMemoryWithBrainRegions",
+      "complexity": "high",
+      "estimated_duration": 8.0,
+      "requires_systems": ["episodic_memory", "brain_regions"],
+      "expected_behavior": "Episodic memory links neural activity patterns across brain regions",
+      "verification_criteria": [
+        "Episodic memory should store cross-region patterns",
+        "Brain regions should interact during episodic recall",
+        "Integration should be verified by regional timing"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["memory", "episodic", "brain_regions", "integration"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 15.0,
+        "max_memory_usage": 200,
+        "target_accuracy": 0.90
+      }
+    },
+    {
+      "id": "memory_associative_memory_concepts",
+      "name": "Associative Memory with Concepts",
+      "category": "memory",
+      "description": "Test that associative memory integrates with concepts",
+      "test_class": "MemoryIntegrationTester",
+      "test_method": "AssociativeMemoryWithConcepts",
+      "complexity": "high",
+      "estimated_duration": 10.0,
+      "requires_systems": ["associative_memory", "concepts"],
+      "expected_behavior": "Associative memory links concepts across neural representations",
+      "verification_criteria": [
+        "Associative memory should link concepts",
+        "Pattern completion should work",
+        "Association strength should propagate"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["memory", "associative", "concepts", "pattern_completion"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 20.0,
+        "max_memory_usage": 300,
+        "target_accuracy": 0.85
+      }
+    },
+    {
+      "id": "memory_consolidation_across_regions",
+      "name": "Memory Consolidation Across Brain Regions",
+      "category": "memory",
+      "description": "Test memory consolidation across brain regions",
+      "test_class": "MemoryIntegrationTester",
+      "test_method": "MemoryConsolidationAcrossBrainRegions",
+      "complexity": "very_high",
+      "estimated_duration": 15.0,
+      "requires_systems": ["memory", "brain_regions", "consolidation"],
+      "expected_behavior": "Memory consolidation moves memory from working to long-term storage across regions",
+      "verification_criteria": [
+        "Memory should transfer between systems",
+        "Cross-region consolidation should occur",
+        "Timing should be developmentally appropriate"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["memory", "consolidation", "brain_regions", "development"],
+      "test_data_requirements": ["brain_states.json", "experiment_scenarios.json"],
+      "performance_requirements": {
+        "max_execution_time": 30.0,
+        "max_memory_usage": 500,
+        "target_accuracy": 0.80
+      }
+    },
+    {
+      "id": "neuromodulation_reward_working_memory",
+      "name": "Reward with Working Memory",
+      "category": "neuromodulation",
+      "description": "Test that reward signals modulate working memory updates",
+      "test_class": "NeuromodulationIntegrationTester",
+      "test_method": "RewardWithWorkingMemory",
+      "complexity": "medium",
+      "estimated_duration": 5.0,
+      "requires_systems": ["reward", "working_memory"],
+      "expected_behavior": "Dopamine affects working memory plasticity",
+      "verification_criteria": [
+        "Reward should enhance memory encoding",
+        "Dopamine should modulate memory updates",
+        "Integration should be dopamine-dependent"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["neuromodulation", "reward", "dopamine", "working_memory"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 10.0,
+        "max_memory_usage": 100,
+        "target_accuracy": 0.95
+      }
+    },
+    {
+      "id": "neuromodulation_curiosity_episodic_memory",
+      "name": "Curiosity with Episodic Memory",
+      "category": "neuromodulation",
+      "description": "Test that curiosity drives exploration behavior with episodic memory",
+      "test_class": "NeuromodulationIntegrationTester",
+      "test_method": "CuriosityWithEpisodicMemory",
+      "complexity": "high",
+      "estimated_duration": 8.0,
+      "requires_systems": ["curiosity", "episodic_memory"],
+      "expected_behavior": "Curiosity is computed as weighted combination of novelty and prediction error",
+      "verification_criteria": [
+        "Curiosity should drive exploration",
+        "Episodic memory should guide exploration",
+        "Integration should be curiosity-dependent"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["neuromodulation", "curiosity", "episodic_memory", "exploration"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 15.0,
+        "max_memory_usage": 200,
+        "target_accuracy": 0.90
+      }
+    },
+    {
+      "id": "neuromodulation_novelty_prediction_systems",
+      "name": "Novelty with Prediction Systems",
+      "category": "neuromodulation",
+      "description": "Test that novelty detection integrates with prediction systems",
+      "test_class": "NeuromodulationIntegrationTester",
+      "test_method": "NoveltyWithPredictionSystems",
+      "complexity": "medium",
+      "estimated_duration": 6.0,
+      "requires_systems": ["novelty", "prediction"],
+      "expected_behavior": "Novelty affects prediction error computation and learning",
+      "verification_criteria": [
+        "Novelty should enhance prediction learning",
+        "Prediction should respond to novelty",
+        "Integration should be novelty-dependent"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["neuromodulation", "novelty", "prediction", "learning"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 12.0,
+        "max_memory_usage": 150,
+        "target_accuracy": 0.85
+      }
+    },
+    {
+      "id": "neuromodulation_prediction_error_action_selection",
+      "name": "Prediction Error with Action Selection",
+      "category": "neuromodulation",
+      "description": "Test that prediction error drives error-based learning with action selection",
+      "test_class": "NeuromodulationIntegrationTester",
+      "test_method": "PredictionErrorWithActionSelection",
+      "complexity": "high",
+      "estimated_duration": 10.0,
+      "requires_systems": ["prediction_error", "action_selection"],
+      "expected_behavior": "Prediction error modulates action selection through dopamine",
+      "verification_criteria": [
+        "Prediction error should guide action selection",
+        "Dopamine should mediate error-based learning",
+        "Integration should be error-dependent"
+      ],
+      "dependencies": [],
+      "prerequisites": [],
+      "tags": ["neuromodulation", "prediction_error", "action_selection", "learning"],
+      "test_data_requirements": ["brain_states.json"],
+      "performance_requirements": {
+        "max_execution_time": 20.0,
+        "max_memory_usage": 300,
+        "target_accuracy": 0.80
+      }
+    }
+  ],
+  "test_suites": [
+    {
+      "id": "memory_integration_suite",
+      "name": "Memory Integration Test Suite",
+      "description": "Comprehensive memory system integration tests",
+      "category": "memory",
+      "test_case_ids": ["memory_working_memory_neural_processing", "memory_episodic_memory_brain_regions", "memory_associative_memory_concepts", "memory_consolidation_across_regions"],
+      "estimated_total_duration": 38.0,
+      "required_systems": ["memory"],
+      "optional_systems": ["neuromodulation", "prediction", "cognition", "development"],
+      "priority": "high"
+    },
+    {
+      "id": "neuromodulation_integration_suite",
+      "name": "Neuromodulation Integration Test Suite",
+      "description": "Comprehensive neuromodulation system integration tests",
+      "category": "neuromodulation",
+      "test_case_ids": ["neuromodulation_reward_working_memory", "neuromodulation_curiosity_episodic_memory", "neuromodulation_novelty_prediction_systems", "neuromodulation_prediction_error_action_selection"],
+      "estimated_total_duration": 38.0,
+      "required_systems": ["neuromodulation"],
+      "optional_systems": ["memory", "prediction", "cognition", "development"],
+      "priority": "high"
+    },
+    {
+      "id": "cross_system_integration_suite",
+      "name": "Cross-System Integration Test Suite",
+      "description": "Comprehensive cross-system integration tests",
+      "category": "cross_system",
+      "test_case_ids": [],
+      "estimated_total_duration": 0.0,
+      "required_systems": ["all"],
+      "optional_systems": [],
+      "priority": "critical"
+    }
+  ]
+}
