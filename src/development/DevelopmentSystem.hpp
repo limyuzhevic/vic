@@ -8,6 +8,18 @@ namespace nlm {
 
 // Forward declarations
 class RandomGenerator;
+class Synaptogenesis;
+class Pruning;
+class Maturation;
+class Dopamine;
+class Reward;
+class Curiosity;
+class Novelty;
+class NeuralEpisodicMemory;
+class NeuralWorkingMemory;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 // Development system: orchestrates neural development
 // Implements developmental stages, plasticity modulation, and structural changes
@@ -45,6 +57,25 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Initialize development system with brain references
+    void initializeDevelopment(Brain* brain);
+    
+    // Integration with neural memory systems
+    void integrateWithEpisodicMemory(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    void integrateWithWorkingMemory(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Development mechanism accessors
+    Synaptogenesis* getSynaptogenesis() { return &pImpl->synaptogenesis; }
+    Pruning* getPruning() { return &pImpl->pruning; }
+    Maturation* getMaturation() { return &pImpl->maturation; }
+    
+    // Get development system (for integration)
+    static DevelopmentSystem* getDevelopmentSystem();
+    
+    // Get/set developmental stage via Brain interface
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
     
 private:
     struct Impl;

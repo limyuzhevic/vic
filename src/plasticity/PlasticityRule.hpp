@@ -2,6 +2,10 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 
 namespace nlm {
 
@@ -50,9 +54,53 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
-    // Parameters
+    // Core Hebbian learning methods
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt);
+    void computeCorrelatedActivity(const std::vector<Timestamp>& preSpikes,
+                                    const std::vector<Timestamp>& postSpikes,
+                                    float& correlation,
+                                    float& covariance);
+    void applyHebbianLearning(Synapse* synapse,
+                               const std::vector<Timestamp>& preSpikes,
+                               const std::vector<Timestamp>& postSpikes,
+                               TimestepDuration dt);
+    void computeHebbianWeightChange(Synapse* synapse,
+                                     const std::vector<Timestamp>& preSpikes,
+                                     const std::vector<Timestamp>& postSpikes,
+                                     float& weightChange,
+                                     float& eligibility);
+    void computeSTDPComponent(Synapse* synapse,
+                               const std::vector<Timestamp>& preSpikes,
+                               const std::vector<Timestamp>& postSpikes,
+                               float& stdpPotentiation,
+                               float& stdpDepression);
+    
+    // Neuromodulation
     void setLearningRate(float rate);
     float getLearningRate() const;
+    void setCorrelationThreshold(float threshold);
+    float getCorrelationThreshold() const;
+    void setNeuromodulationFactor(float factor);
+    float getNeuromodulationFactor() const;
+    
+    // Memory integration
+    void storeHebbianMemory(const std::vector<Timestamp>& preSpikes,
+                            const std::vector<Timestamp>& postSpikes,
+                            SynapseId synapseId);
+    void retrieveHebbianMemory(SynapseId synapseId,
+                               std::vector<Timestamp>& preSpikes,
+                               std::vector<Timestamp>& postSpikes);
+    void consolidateHebbianLearning();
+    void updateHebbianFromEpisodicMemory(const class NeuralEpisodicMemory* episodicMemory);
+    
+    // Optimization and error handling
+    void optimizeHebbianParameters();
+    void normalizeHebbianWeights();
+    void regularizeHebbianLearning(float lambda);
+    bool validateHebbianLearning() const;
     
 private:
     struct Impl;

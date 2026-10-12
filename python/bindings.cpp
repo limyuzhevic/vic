@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -145,21 +146,55 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON/YAML format auto-detected)")
+        .def("loadFromString", &Config::loadFromString, py::arg("data"),
+             "Load configuration from a string (JSON/YAML format auto-detected)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a file (JSON/YAML format)")
+        .def("loadFromJSONFile", &Config::loadFromJSONFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromJSONString", &Config::loadFromJSONString, py::arg("jsonString"),
+             "Load configuration from a JSON string")
+        .def("loadFromYAMLFile", &Config::loadFromYAMLFile, py::arg("filepath"),
+             "Load configuration from a YAML file")
+        .def("loadFromYAMLString", &Config::loadFromYAMLString, py::arg("yamlString"),
+             "Load configuration from a YAML string")
+        .def("toJSON", &Config::toJSON,
+             "Convert configuration to JSON string")
+        .def("toYAML", &Config::toYAML,
+             "Convert configuration to YAML string")
+        .def("toJSONFile", &Config::toJSONFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("toYAMLFile", &Config::toYAMLFile, py::arg("filepath"),
+             "Save configuration to a YAML file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getEntries", &Config::getEntries,
+             "Get all configuration entries")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("exportJSON", &Config::exportJSON,
+             "Export configuration as JSON string")
+        .def("exportYAML", &Config::exportYAML,
+             "Export configuration as YAML string")
+        .def("getParserErrors", &Config::getParserErrors,
+             "Get configuration parser errors")
+        .def("clearParserErrors", &Config::clearParserErrors,
+             "Clear configuration parser errors")
+        .def("compareJSON", &Config::compareJSON, py::arg("jsonString"),
+             "Compare configuration with JSON string")
+        .def("diffJSON", &Config::diffJSON, py::arg("jsonString"),
+             "Find differences between configuration and JSON string")
+        .def("getJSONSchema", &Config::getJSONSchema,
+             "Get JSON schema for configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -399,23 +434,239 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    
+    // Add bindings for ColorMap enum
+    py::enum_<nlm::ColorMap>(m, "ColorMap", R"pbdoc(Color map types for visualization)pbdoc")
+        .value("Default", nlm::ColorMap::Default)
+        .value("Hot", nlm::ColorMap::Hot)
+        .value("Cool", nlm::ColorMap::Cool)
+        .value("Rainbow", nlm::ColorMap::Rainbow)
+        .value("Viridis", nlm::ColorMap::Viridis)
+        .value("Plasma", nlm::ColorMap::Plasma)
+        .value("Inferno", nlm::ColorMap::Inferno)
+        .value("Magma", nlm::ColorMap::Magma)
+        .value("Cividis", nlm::ColorMap::Cividis)
+        .value("Grayscale", nlm::ColorMap::Grayscale)
+        .value("RedGreenBlue", nlm::ColorMap::RedGreenBlue)
+        .value("Thermal", nlm::ColorMap::Thermal)
+        .export_values();
 
+    // Add bindings for VisualizationMode enum
+    py::enum_<nlm::VisualizationMode>(m, "VisualizationMode", R"pbdoc(Visualization mode types)pbdoc")
+        .value("NeuronView", nlm::VisualizationMode::NeuronView)
+        .value("SynapseView", nlm::VisualizationMode::SynapseView)
+        .value("PopulationView", nlm::VisualizationMode::PopulationView)
+        .value("NetworkView", nlm::VisualizationMode::NetworkView)
+        .value("MemoryView", nlm::VisualizationMode::MemoryView)
+        .value("CognitionView", nlm::VisualizationMode::CognitionView)
+        .value("NeuromodulationView", nlm::VisualizationMode::NeuromodulationView)
+        .value("DevelopmentView", nlm::VisualizationMode::DevelopmentView)
+        .export_values();
+
+    // Add bindings for CameraSettings struct
+    py::class_<nlm::CameraSettings>(m, "CameraSettings", R"pbdoc(Camera settings for visualization)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("x", &nlm::CameraSettings::x)
+        .def_readwrite("y", &nlm::CameraSettings::y)
+        .def_readwrite("scale", &nlm::CameraSettings::scale)
+        .def_readwrite("rotation", &nlm::CameraSettings::rotation)
+        .def_readwrite("zoom", &nlm::CameraSettings::zoom);
+
+    // Add bindings for RenderingSettings struct
+    py::class_<nlm::RenderingSettings>(m, "RenderingSettings", R"pbdoc(Rendering settings for visualization)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("enableLighting", &nlm::RenderingSettings::enableLighting)
+        .def_readwrite("enableShading", &nlm::RenderingSettings::enableShading)
+        .def_readwrite("enableAntiAliasing", &nlm::RenderingSettings::enableAntiAliasing)
+        .def_readwrite("enableLOD", &nlm::RenderingSettings::enableLOD)
+        .def_readwrite("enableCaching", &nlm::RenderingSettings::enableCaching)
+        .def_readwrite("enableCompression", &nlm::RenderingSettings::enableCompression)
+        .def_readwrite("alpha", &nlm::RenderingSettings::alpha)
+        .def_readwrite("shininess", &nlm::RenderingSettings::shininess)
+        .def_readwrite("specularIntensity", &nlm::RenderingSettings::specularIntensity)
+        .def_readwrite("ambientIntensity", &nlm::RenderingSettings::ambientIntensity);
+
+    // Add bindings for PerformanceStats struct
+    py::class_<nlm::PerformanceStats>(m, "PerformanceStats", R"pbdoc(Performance statistics for visualization)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("frameTime", &nlm::PerformanceStats::frameTime)
+        .def_readwrite("updateTime", &nlm::PerformanceStats::updateTime)
+        .def_readwrite("renderTime", &nlm::PerformanceStats::renderTime)
+        .def_readwrite("memoryUsage", &nlm::PerformanceStats::memoryUsage)
+        .def_readwrite("vertexCount", &nlm::PerformanceStats::vertexCount)
+        .def_readwrite("triangleCount", &nlm::PerformanceStats::triangleCount)
+        .def_readwrite("fps", &nlm::PerformanceStats::fps);
+
+    py::class_<nlm::VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Comprehensive visualization interface for brain simulation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &nlm::VisualizationInterface::initialize,
+             "Initialize visualization system (GLFW, SDL, OpenGL setup)")
+        .def("shutdown", &nlm::VisualizationInterface::shutdown,
+             "Clean up visualization resources")
+        .def("update", &nlm::VisualizationInterface::update,
+             "Update visualization with current brain state")
+        .def("render", &nlm::VisualizationInterface::render,
+             "Render current visualization frame")
+        .def("beginFrame", &nlm::VisualizationInterface::beginFrame,
+             "Start new frame")
+        .def("endFrame", &nlm::VisualizationInterface::endFrame,
+             "End current frame")
+        .def("setBrain", &nlm::VisualizationInterface::setBrain, py::arg("brain"),
+             "Set brain reference for visualization")
+        // Visualization mode methods
+        .def("enableNeuronView", &nlm::VisualizationInterface::enableNeuronView,
+             "Enable neuron activity visualization")
+        .def("disableNeuronView", &nlm::VisualizationInterface::disableNeuronView,
+             "Disable neuron activity visualization")
+        .def("isNeuronViewEnabled", &nlm::VisualizationInterface::isNeuronViewEnabled,
+             "Check if neuron view is enabled")
+        .def("enableSynapseView", &nlm::VisualizationInterface::enableSynapseView,
+             "Enable synaptic connections visualization")
+        .def("disableSynapseView", &nlm::VisualizationInterface::disableSynapseView,
+             "Disable synaptic connections visualization")
+        .def("isSynapseViewEnabled", &nlm::VisualizationInterface::isSynapseViewEnabled,
+             "Check if synapse view is enabled")
+        .def("enablePopulationView", &nlm::VisualizationInterface::enablePopulationView,
+             "Enable neural population statistics visualization")
+        .def("disablePopulationView", &nlm::VisualizationInterface::disablePopulationView,
+             "Disable neural population statistics visualization")
+        .def("isPopulationViewEnabled", &nlm::VisualizationInterface::isPopulationViewEnabled,
+             "Check if population view is enabled")
+        .def("enableNetworkView", &nlm::VisualizationInterface::enableNetworkView,
+             "Enable network connectivity visualization")
+        .def("disableNetworkView", &nlm::VisualizationInterface::disableNetworkView,
+             "Disable network connectivity visualization")
+        .def("isNetworkViewEnabled", &nlm::VisualizationInterface::isNetworkViewEnabled,
+             "Check if network view is enabled")
+        .def("enableMemoryView", &nlm::VisualizationInterface::enableMemoryView,
+             "Enable memory system activity visualization")
+        .def("disableMemoryView", &nlm::VisualizationInterface::disableMemoryView,
+             "Disable memory system activity visualization")
+        .def("isMemoryViewEnabled", &nlm::VisualizationInterface::isMemoryViewEnabled,
+             "Check if memory view is enabled")
+        .def("enableCognitionView", &nlm::VisualizationInterface::enableCognitionView,
+             "Enable cognitive system activity visualization")
+        .def("disableCognitionView", &nlm::VisualizationInterface::disableCognitionView,
+             "Disable cognitive system activity visualization")
+        .def("isCognitionViewEnabled", &nlm::VisualizationInterface::isCognitionViewEnabled,
+             "Check if cognition view is enabled")
+        .def("enableNeuromodulationView", &nlm::VisualizationInterface::enableNeuromodulationView,
+             "Enable neuromodulator levels visualization")
+        .def("disableNeuromodulationView", &nlm::VisualizationInterface::disableNeuromodulationView,
+             "Disable neuromodulator levels visualization")
+        .def("isNeuromodulationViewEnabled", &nlm::VisualizationInterface::isNeuromodulationViewEnabled,
+             "Check if neuromodulation view is enabled")
+        .def("enableDevelopmentView", &nlm::VisualizationInterface::enableDevelopmentView,
+             "Enable developmental stage visualization")
+        .def("disableDevelopmentView", &nlm::VisualizationInterface::disableDevelopmentView,
+             "Disable developmental stage visualization")
+        .def("isDevelopmentViewEnabled", &nlm::VisualizationInterface::isDevelopmentViewEnabled,
+             "Check if development view is enabled")
+        .def("enableAllViews", &nlm::VisualizationInterface::enableAllViews,
+             "Enable all visualization modes")
+        .def("disableAllViews", &nlm::VisualizationInterface::disableAllViews,
+             "Disable all visualization modes")
+        // Rendering methods
+        .def("renderNeurons", &nlm::VisualizationInterface::renderNeurons,
+             "Render neuron populations")
+        .def("renderSynapses", &nlm::VisualizationInterface::renderSynapses,
+             "Render synaptic connections")
+        .def("renderPopulations", &nlm::VisualizationInterface::renderPopulations,
+             "Render neural population statistics")
+        .def("renderNetworkTopology", &nlm::VisualizationInterface::renderNetworkTopology,
+             "Render network connectivity")
+        .def("renderMemorySystems", &nlm::VisualizationInterface::renderMemorySystems,
+             "Render memory system activity")
+        .def("renderCognitiveSystems", &nlm::VisualizationInterface::renderCognitiveSystems,
+             "Render cognitive system activity")
+        .def("renderNeuromodulators", &nlm::VisualizationInterface::renderNeuromodulators,
+             "Render neuromodulator levels")
+        .def("renderDevelopment", &nlm::VisualizationInterface::renderDevelopment,
+             "Render developmental stage")
+        // Feature methods
+        .def("setScale", &nlm::VisualizationInterface::setScale, py::arg("scale"),
+             "Set visualization scale")
+        .def("setPosition", &nlm::VisualizationInterface::setPosition, py::arg("x"), py::arg("y"),
+             "Set visualization position")
+        .def("setColorMap", &nlm::VisualizationInterface::setColorMap, py::arg("colormap"),
+             "Set color map (string)")
+        .def("setColorMap", &nlm::VisualizationInterface::setColorMap, py::arg("colormap_enum"),
+             "Set color map (ColorMap enum)")
+        .def("setAlpha", &nlm::VisualizationInterface::setAlpha, py::arg("alpha"),
+             "Set transparency")
+        .def("setLighting", &nlm::VisualizationInterface::setLighting, py::arg("enable"),
+             "Enable/disable lighting")
+        .def("setShading", &nlm::VisualizationInterface::setShading, py::arg("enable"),
+             "Enable/disable shading")
+        .def("setAntiAliasing", &nlm::VisualizationInterface::setAntiAliasing, py::arg("enable"),
+             "Enable/disable anti-aliasing")
+        .def("setLOD", &nlm::VisualizationInterface::setLOD, py::arg("enable"),
+             "Set level of detail")
+        .def("setCaching", &nlm::VisualizationInterface::setCaching, py::arg("enable"),
+             "Enable/disable caching")
+        .def("setCompression", &nlm::VisualizationInterface::setCompression, py::arg("enable"),
+             "Enable/disable compression")
+        // Interaction methods
+        .def("setMouseCallback", &nlm::VisualizationInterface::setMouseCallback,
+             "Set mouse callback")
+        .def("setKeyboardCallback", &nlm::VisualizationInterface::setKeyboardCallback,
+             "Set keyboard callback")
+        .def("setScrollCallback", &nlm::VisualizationInterface::setScrollCallback,
+             "Set scroll callback")
+        .def("handleMouseClick", &nlm::VisualizationInterface::handleMouseClick,
+             "Handle mouse clicks")
+        .def("handleKeyPress", &nlm::VisualizationInterface::handleKeyPress,
+             "Handle key presses")
+        .def("handleMouseScroll", &nlm::VisualizationInterface::handleMouseScroll,
+             "Handle mouse scroll")
+        // Export and save methods
+        .def("saveScreenshot", &nlm::VisualizationInterface::saveScreenshot, py::arg("filename"),
+             "Save current frame as image")
+        .def("exportData", &nlm::VisualizationInterface::exportData, py::arg("filename"),
+             "Export visualization data")
+        .def("saveConfiguration", &nlm::VisualizationInterface::saveConfiguration, py::arg("filename"),
+             "Save visualization configuration")
+        .def("loadConfiguration", &nlm::VisualizationInterface::loadConfiguration, py::arg("filename"),
+             "Load visualization configuration")
+        // Performance methods
+        .def("getMemoryUsage", &nlm::VisualizationInterface::getMemoryUsage,
+             "Get memory usage")
+        .def("getPerformanceStats", &nlm::VisualizationInterface::getPerformanceStats,
+             "Get performance statistics")
+        .def("getFPS", &nlm::VisualizationInterface::getFPS,
+             "Get current FPS")
+        .def("getFrameTime", &nlm::VisualizationInterface::getFrameTime,
+             "Get frame time in milliseconds")
+        // Utility methods
+        .def("isActive", &nlm::VisualizationInterface::isActive,
+             "Check if visualization is active")
+        .def("setUpdateRate", &nlm::VisualizationInterface::setUpdateRate, py::arg("hz"),
+             "Set update rate")
+        .def("getUpdateRate", &nlm::VisualizationInterface::getUpdateRate,
+             "Get update rate")
+        .def("getBrain", &nlm::VisualizationInterface::getBrain,
+             "Get current brain reference")
+        .def("clearScreen", &nlm::VisualizationInterface::clearScreen, py::arg("r"), py::arg("g"), py::arg("b"), py::arg("a") = 1.0f,
+             "Clear screen with specific color")
+        .def("setViewport", &nlm::VisualizationInterface::setViewport, py::arg("x"), py::arg("y"), py::arg("width"), py::arg("height"),
+             "Set viewport");
+    
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
-
+    
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

@@ -48,10 +48,27 @@ public:
     // Clone
     std::unique_ptr<Action> clone() const;
     
+    // Motor system integration flags
+    void setNeuralActivation(float activation);
+    void setMemoryBased(bool isMemoryBased);
+    void setPredictionBased(bool isPredictionBased);
+    void setPlannerBased(bool isPlannerBased);
+    
+    float getNeuralActivation() const;
+    bool isMemoryBased() const;
+    bool isPredictionBased() const;
+    bool isPlannerBased() const;
+    
 private:
     ActionType type_;
     std::vector<float> parameters_;
     static const char* actionTypeToString(ActionType type);
+    
+    // Motor system integration
+    float neuralActivation_;
+    bool memoryBased_;
+    bool predictionBased_;
+    bool plannerBased_;
 };
 
 } // namespace nlm

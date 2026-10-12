@@ -18,7 +18,7 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
+# Package include directories
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
@@ -50,6 +50,7 @@ add_library(nlm_core STATIC
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Dopamine.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
@@ -91,6 +92,9 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Link with nlohmann_json and yaml-cpp
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

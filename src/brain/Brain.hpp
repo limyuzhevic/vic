@@ -19,15 +19,24 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class AdvancedWorkingMemory;
+class AdvancedEpisodicMemory;
+class AdvancedSemanticMemory;
+class AdvancedProceduralMemory;
+class AdvancedAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
+class Synaptogenesis;
+class Pruning;
+class Maturation;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Reward;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,21 +146,40 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+// ===== ADVANCED NEURAL MEMORY SYSTEMS =====
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Advanced working memory with capacity limits and LRU eviction
+    AdvancedWorkingMemory* getAdvancedWorkingMemory();
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Advanced episodic memory with temporal gap detection and relevance weighting
+    AdvancedEpisodicMemory* getAdvancedEpisodicMemory();
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Advanced semantic memory with semantic network and pattern completion
+    AdvancedSemanticMemory* getAdvancedSemanticMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // Advanced procedural memory with skill learning and adaptation
+    AdvancedProceduralMemory* getAdvancedProceduralMemory();
+    
+    // Advanced associative memory with spreading activation and chaining
+    AdvancedAssociativeMemory* getAdvancedAssociativeMemory();
+
+    // Advanced memory system integration
+    void initializeAdvancedMemorySystems();
+    void updateAdvancedMemorySystems(TimestepDuration dt);
+    void consolidateAdvancedMemory();
+    void compressAdvancedMemory();
+    void scheduleAdvancedMemoryReplay();
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
+    
+    // Get current sensory state from brain's sensory neurons
+    // Returns the current sensory input pattern from neural activity
+    const std::vector<float>& getCurrentSensoryState() const;
+    
+    // Get prediction system state
+    float getPredictionError() const;
+    float getPredictionConfidence() const;
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -167,6 +195,9 @@ public:
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
+    Synaptogenesis* getSynaptogenesis();
+    Pruning* getPruning();
+    Maturation* getMaturation();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
@@ -174,6 +205,9 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Reward - real reward computation
+    Reward* getReward();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -192,6 +226,72 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Log an experience (episodic memory)
+    // Creates and stores an episodic memory from sensory input and action
+    void logExperience(const class SensoryInput& sensoryInput, const class Action& action);
+    
+    // Get current neural activity pattern for episodic memory encoding
+    std::vector<float> getCurrentNeuralActivityPattern() const;
+    
+    // Set the current sensory input (for logging)
+    void setLastSensoryInput(const class SensoryInput& input);
+    
+    // Set the current action (for logging)
+    void setLastAction(const class Action& action);
+    
+    // Get current sensory state from brain's sensory neurons
+    // Returns the current sensory input pattern from neural activity
+    const std::vector<float>& getCurrentSensoryState() const;
+    
+    // Get prediction system state
+    float getPredictionError() const;
+    float getPredictionConfidence() const;
+    
+    // Prediction system methods
+    void predictNextState();
+    void updatePrediction(float actual);
+    void applyPredictionToEpisodicMemory();
+    
+    // Apply prediction-based reward signals
+    void applyPredictionBasedReward();
+    
+    // Log prediction error for episodic memory
+    void logPredictionError();
+    
+    // ========== CHECKPOINT SYSTEM ==========
+    
+    // Checkpoint system methods
+    bool saveCheckpoint(const std::string& name = "");
+    bool loadCheckpoint(const std::string& name);
+    std::vector<nlm::CheckpointManager::CheckpointInfo> listCheckpoints() const;
+    std::string getCheckpointDir() const;
+    std::string getLastCheckpointPath() const;
+    bool shouldSaveCheckpoint(SimulationStep currentStep) const;
+    void pruneOldCheckpoints(size_t keepCount);
+    
+    // Checkpoint validation and error handling
+    bool validateCheckpoint(const std::string& filepath) const;
+    std::string getCheckpointVersion() const;
+    bool isCheckpointCompatible(const std::string& filepath) const;
+    
+    // Checkpoint metadata
+    uint64_t getCheckpointNeuronCount() const;
+    uint64_t getCheckpointSynapseCount() const;
+    uint64_t getCheckpointRegionCount() const;
+    SimulationStep getCheckpointStep() const;
+    Timestamp getCheckpointSimulationTime() const;
+    
+    // Checkpoint statistics
+    uint64_t getCheckpointFileSize() const;
+    double getCheckpointProgress() const;
+    uint64_t getCheckpointChecksum() const;
+    
+    // Checkpoint system status
+    bool isCheckpointManagerActive() const;
+    uint64_t getCheckpointSaveInterval() const;
+    size_t getMaxCheckpoints() const;
+    bool isCheckpointCompressionEnabled() const;
     
 private:
     struct Impl;

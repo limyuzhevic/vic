@@ -2,12 +2,15 @@
 
 namespace nlm {
 
-Action::Action() : type_(ActionType::Wait) {}
+Action::Action() : type_(ActionType::Wait), neuralActivation_(0.0f), 
+                   memoryBased_(false), predictionBased_(false), plannerBased_(false) {}
 
-Action::Action(ActionType type) : type_(type) {}
+Action::Action(ActionType type) : type_(type), neuralActivation_(0.0f),
+                                 memoryBased_(false), predictionBased_(false), plannerBased_(false) {}
 
 Action::Action(ActionType type, const std::vector<float>& params) 
-    : type_(type), parameters_(params) {}
+    : type_(type), parameters_(params), neuralActivation_(0.0f),
+      memoryBased_(false), predictionBased_(false), plannerBased_(false) {}
 
 Action::~Action() = default;
 
@@ -54,6 +57,39 @@ std::string Action::getName() const {
 
 std::unique_ptr<Action> Action::clone() const {
     return std::make_unique<Action>(type_, parameters_);
+}
+
+// Motor system integration implementation
+void Action::setNeuralActivation(float activation) {
+    neuralActivation_ = activation;
+}
+
+void Action::setMemoryBased(bool isMemoryBased) {
+    memoryBased_ = isMemoryBased;
+}
+
+void Action::setPredictionBased(bool isPredictionBased) {
+    predictionBased_ = isPredictionBased;
+}
+
+void Action::setPlannerBased(bool isPlannerBased) {
+    plannerBased_ = isPlannerBased;
+}
+
+float Action::getNeuralActivation() const {
+    return neuralActivation_;
+}
+
+bool Action::isMemoryBased() const {
+    return memoryBased_;
+}
+
+bool Action::isPredictionBased() const {
+    return predictionBased_;
+}
+
+bool Action::isPlannerBased() const {
+    return plannerBased_;
 }
 
 } // namespace nlm

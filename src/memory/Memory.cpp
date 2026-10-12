@@ -1,4 +1,5 @@
 #include "Memory.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -16,7 +17,7 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Legacy implementation - basic placeholder
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -108,7 +109,7 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Legacy implementation - placeholder
 }
 
 // Semantic Memory Implementation
