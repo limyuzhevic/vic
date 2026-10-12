@@ -8,6 +8,8 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -801,6 +803,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    neuronData.regionId.push_back(static_cast<uint64_t>(neuron->getRegionId().index()));
+                    neuronData.populationId.push_back(static_cast<uint64_t>(neuron->getPopulationId().index()));
                 }
             }
         }
@@ -820,12 +825,107 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                synapseData.plasticityFlags = syn->getPlasticityFlags();
             }
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Write memory system states
+        if (pImpl->workingMemory) {
+            // Working memory data would go here
+            NLM_LOG_INFO("Saving working memory state");
+        }
+        
+        if (pImpl->episodicMemory) {
+            // Episodic memory data would go here
+            NLM_LOG_INFO("Saving episodic memory state");
+        }
+        
+        if (pImpl->associativeMemory) {
+            // Associative memory data would go here
+            NLM_LOG_INFO("Saving associative memory state");
+        }
+        
+        // Write development system state
+        NLM_LOG_INFO("Saving development system state (stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)) + ")");
+        
+        // Write neuromodulation system state
+        if (pImpl->dopamine) {
+            struct DopamineCheckpoint {
+                float level;
+                float plasticityFactor;
+            } dopamineData;
+            dopamineData.level = pImpl->dopamine->getLevel();
+            dopamineData.plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+            writer.writeSection(CheckpointSection::Neuromodulation, &dopamineData, sizeof(dopamineData));
+        }
+        if (pImpl->curiosity) {
+            struct CuriosityCheckpoint {
+                float level;
+                float explorationDrive;
+            } curiosityData;
+            curiosityData.level = pImpl->curiosity->getLevel();
+            curiosityData.explorationDrive = pImpl->curiosity->getExplorationDrive();
+            writer.writeSection(CheckpointSection::Neuromodulation, &curiosityData, sizeof(curiosityData));
+        }
+        if (pImpl->novelty) {
+            struct NoveltyCheckpoint {
+                float level;
+            } noveltyData;
+            noveltyData.level = pImpl->novelty->getLevel();
+            writer.writeSection(CheckpointSection::Neuromodulation, &noveltyData, sizeof(noveltyData));
+        }
+        
+        // Write prediction system state
+        if (pImpl->predictionSystem) {
+            struct PredictionCheckpoint {
+                std::vector<float> errorHistory;
+            } predictionData;
+            predictionData.errorHistory = pImpl->predictionSystem->getErrorHistory();
+            writer.writeSection(CheckpointSection::Memory, &predictionData, sizeof(predictionData));
+        }
+        
+        // Write cognition system states
+        if (pImpl->planner) {
+            int depth = pImpl->planner->getPlanningDepth();
+            writer.writeSection(CheckpointSection::Cognition, &depth, sizeof(depth));
+        }
+        if (pImpl->conceptFormation) {
+            size_t conceptCount = 0; // TODO: get from concept formation
+            writer.writeSection(CheckpointSection::Cognition, &conceptCount, sizeof(conceptCount));
+        }
+        if (pImpl->attention) {
+            std::vector<NeuronId> winners = pImpl->attention->getWinners();
+            writer.writeSection(CheckpointSection::Memory, &winners[0], winners.size() * sizeof(NeuronId));
+        }
+        
+        // Write development system state
+        struct DevelopmentCheckpoint {
+            int developmentStage;
+            float plasticityModifier;
+            double developmentalAge;
+        } devData;
+        devData.developmentStage = static_cast<int>(pImpl->developmentalStage);
+        devData.plasticityModifier = pImpl->developmentSystem ? pImpl->developmentSystem->getPlasticityModifier() : 1.0f;
+        devData.developmentalAge = pImpl->developmentSystem ? pImpl->developmentSystem->getDevelopmentalAge() : 0.0;
+        writer.writeSection(CheckpointSection::Development, &devData, sizeof(devData));
+        
+        // Write neuromodulation system state
+        if (pImpl->dopamine) {
+            NLM_LOG_INFO("Saving dopamine state (level: " + std::to_string(pImpl->dopamine->getLevel()) + ")");
+        }
+        if (pImpl->curiosity) {
+            NLM_LOG_INFO("Saving curiosity state (level: " + std::to_string(pImpl->curiosity->getLevel()) + ")");
+        }
+        if (pImpl->novelty) {
+            NLM_LOG_INFO("Saving novelty state (level: " + std::to_string(pImpl->novelty->getLevel()) + ")");
         }
         
         // Finalize
@@ -909,7 +1009,8 @@ bool Brain::load(const std::string& filepath) {
 }
 
 RegionId Brain::addRegion(const std::string& name) {
-    RegionId id(pImpl->nextRegionId++);
+    RegionId id(pImpl->nextRegionId);
+    pImpl->nextRegionId++;
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
     return id;

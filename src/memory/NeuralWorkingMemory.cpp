@@ -43,9 +43,10 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        // Set neuron activation - find neuron in brain's regions
+        if (Region* region = brain_->getRegion(RegionId(neuron.getId() / 1000))) {
+            const auto& neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -84,8 +85,12 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
+    if (brain_ && brain_->getWorkingMemory() == this) {
         brain_->injectCurrent(neuron, activation * 5.0f);
+    } else if (brain_ && brain_->getWorkingMemory()) {
+        NLM_LOG_WARNING("Brain working memory not this instance, cannot inject current");
+    } else if (brain_) {
+        NLM_LOG_WARNING("Brain working memory pointer is null");
     }
 }
 

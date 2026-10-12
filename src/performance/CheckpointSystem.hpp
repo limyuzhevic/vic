@@ -68,7 +68,8 @@ enum class CheckpointSection : uint32_t {
     SimulationState = 11,
     Environment = 12,
     Checksum = 13,
-    End = 14
+    Cognition = 14,
+    End = 15
 };
 
 /**
