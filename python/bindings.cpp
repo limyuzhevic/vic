@@ -2,9 +2,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/functional.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <functional>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,6 +23,80 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Version information
+static constexpr const char* PYNLM_VERSION = "0.1.0";
+static constexpr const char* PYNLM_DESCRIPTION = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
+
+// Forward declarations for exception classes
+class NLMError;
+class ConfigError;
+class BrainError;
+class WorldError;
+class AgentError;
+
+// Python exception classes
+// Exception hierarchy for better error handling and user-friendly error messages
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& msg) : std::runtime_error(msg) {}
+    
+    virtual std::string errorType() const { return "NLMError"; }
+};
+
+class ConfigError : public NLMError {
+public:
+    explicit ConfigError(const std::string& msg) : NLMError("Configuration error: " + msg) {}
+    virtual std::string errorType() const { return "ConfigError"; }
+};
+
+class BrainError : public NLMError {
+public:
+    explicit BrainError(const std::string& msg) : NLMError("Brain error: " + msg) {}
+    virtual std::string errorType() const { return "BrainError"; }
+};
+
+class WorldError : public NLMError {
+public:
+    explicit WorldError(const std::string& msg) : NLMError("World error: " + msg) {}
+    virtual std::string errorType() const { return "WorldError"; }
+};
+
+class AgentError : public NLMError {
+public:
+    explicit AgentError(const std::string& msg) : NLMError("Agent error: " + msg) {}
+    virtual std::string errorType() const { return "AgentError"; }
+};
+
+class ValidationError : public NLMError {
+public:
+    explicit ValidationError(const std::string& msg) : NLMError("Validation error: " + msg) {}
+    virtual std::string errorType() const { return "ValidationError"; }
+};
+
+class PlasticityError : public BrainError {
+public:
+    explicit PlasticityError(const std::string& msg) : BrainError("Plasticity error: " + msg) {}
+    virtual std::string errorType() const { return "PlasticityError"; }
+};
+
+class MemoryError : public BrainError {
+public:
+    explicit MemoryError(const std::string& msg) : BrainError("Memory error: " + msg) {}
+    virtual std::string errorType() const { return "MemoryError"; }
+};
+
+class NeuromodulationError : public BrainError {
+public:
+    explicit NeuromodulationError(const std::string& msg) : BrainError("Neuromodulation error: " + msg) {}
+    virtual std::string errorType() const { return "NeuromodulationError"; }
+};
+
+class DevelopmentError : public BrainError {
+public:
+    explicit DevelopmentError(const std::string& msg) : BrainError("Development error: " + msg) {}
+    virtual std::string errorType() const { return "DevelopmentError"; }
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -27,6 +105,18 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Set module version
+    m.attr("__version__") = PYNLM_VERSION;
+    m.attr("__description__") = PYNLM_DESCRIPTION;
+
+    // Register custom exceptions
+    py::register_exception<NLMError>(m, "NLMError", PyExc_RuntimeError.ptr());
+    py::register_exception<ConfigError>(m, "ConfigError", PyExc_ValueError.ptr());
+    py::register_exception<BrainError>(m, "BrainError", PyExc_RuntimeError.ptr());
+    py::register_exception<WorldError>(m, "WorldError", PyExc_RuntimeError.ptr());
+    py::register_exception<AgentError>(m, "AgentError", PyExc_RuntimeError.ptr());
+
+    // Register standard runtime_error for backward compatibility
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")

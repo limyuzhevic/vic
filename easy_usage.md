@@ -10,7 +10,7 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+**NEW: NLM v0.1.0** now includes advanced Python features for better error handling, performance monitoring, and easier usage!
 
 ---
 
