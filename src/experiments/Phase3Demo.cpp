@@ -242,20 +242,8 @@ private:
 
 } // namespace nlm
 
-// Main entry point for Phase 3 demo
+// Main entry point for Phase 3 demo using unified CLI
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
-    
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
-    
-    return 0;
+    // Use unified CLI for backward compatibility
+    return nlm::runUnifiedCLI(argc, argv);
 }

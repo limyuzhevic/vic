@@ -1,9 +1,10 @@
-#include "Logger.hpp"
+#include "ErrorHandling.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <cstring>
 
 namespace nlm {
 
@@ -23,34 +24,56 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    // Validate entry parameters
+    if (entry.level < LogLevel::Debug || entry.level > LogLevel::Critical) {
+        ExceptionManager::throwError<NLMException>(
+            "Invalid log level: " + std::to_string(static_cast<int>(entry.level)));
+    }
+    
     if (entry.level < pImpl->level) {
         return;
     }
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+    try {
+        std::ostringstream oss;
+        oss << "[" << levelToString(entry.level) << "] ";
+        
+        // Add timestamp
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        
+        if (entry.message.empty()) {
+            ExceptionManager::throwError<NLMException>(
+                "Log message is empty");
+        }
+        
+        oss << " " << entry.message;
+        
+        std::string output = oss.str();
+        
+        // Console output
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        } else {
+            std::cout << output << "\n";
+        }
+        
+        // File output if set
+        if (pImpl->fileOut.is_open()) {
+            try {
+                pImpl->fileOut << output << "\n";
+                pImpl->fileOut.flush();
+            } catch (const std::exception& e) {
+                ExceptionManager::throwError<FileError>(
+                    "Failed to write log to file: " + std::string(e.what()),
+                    FileError::Type::WriteError);
+            }
+        }
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<NLMException>(
+            "Failed to log entry: " + std::string(e.what()));
     }
 }
 
@@ -71,12 +94,84 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    // Validate input parameters
+    if (!Validation::isFilePathValid(filepath)) {
+        ExceptionManager::throwError<FileError>(
+            "Invalid file path for log output: " + filepath, FileError::Type::InvalidFormat, filepath);
+    }
+    
+    try {
+        // Check if file exists and is a directory
+        std::filesystem::path path(filepath);
+        if (std::filesystem::exists(path) && std::filesystem::is_directory(path)) {
+            ExceptionManager::throwError<FileError>(
+                "Path is a directory, not a file: " + filepath, FileError::Type::InvalidFormat, filepath);
+        }
+        
+        // Check if parent directory exists and is writable
+        if (std::filesystem::exists(path.parent_path()) && 
+            !std::filesystem::is_directory(path.parent_path())) {
+            ExceptionManager::throwError<FileError>(
+                "Parent path is not a directory: " + path.parent_path().string(),
+                FileError::Type::InvalidFormat, filepath);
+        }
+        
+        if (!std::filesystem::exists(path.parent_path()) || 
+            !std::filesystem::is_writable(path.parent_path())) {
+            ExceptionManager::throwError<FileError>(
+                "Parent directory is not writable: " + path.parent_path().string(),
+                FileError::Type::PermissionDenied, filepath);
+        }
+        
+        // Close existing file if open
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+        }
+        
+        // Open file in append mode
+        pImpl->fileOut.open(filepath, std::ios::app);
+        
+        if (!pImpl->fileOut.is_open()) {
+            ExceptionManager::throwError<FileError>(
+                "Failed to open log file: " + filepath, FileError::Type::WriteError, filepath);
+        }
+        
+        // Write timestamp to file on open
+        std::time_t now = std::time(nullptr);
+        char timeBuf[100];
+        std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        pImpl->fileOut << "[Log file opened at " << timeBuf << "]\n";
+        pImpl->fileOut.flush();
+        
+    } catch (const std::filesystem::filesystem_error& e) {
+        ExceptionManager::throwError<FileError>(
+            "File system error opening log file " + filepath + ": " + e.what(),
+            FileError::Type::InvalidFormat, filepath);
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<FileError>(
+            "Failed to open log file " + filepath + ": " + e.what(),
+            FileError::Type::WriteError, filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+        try {
+            // Write closing timestamp
+            std::time_t now = std::time(nullptr);
+            char timeBuf[100];
+            std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+            pImpl->fileOut << "[Log file closed at " << timeBuf << "]\n";
+            pImpl->fileOut.flush();
+            
+            pImpl->fileOut.close();
+        } catch (const std::exception& e) {
+            ExceptionManager::throwError<FileError>(
+                "Error closing log file: " + std::string(e.what()),
+                FileError::Type::WriteError);
+        }
     }
 }
 
@@ -113,36 +208,88 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (!logger) {
+        ExceptionManager::throwError<NLMException>(
+            "Cannot add null logger");
+    }
+    
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->loggers.push_back(logger);
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<NLMException>(
+            "Failed to add logger: " + std::string(e.what()));
+    }
 }
 
 void Logger::clearLoggers() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->loggers.clear();
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<NLMException>(
+            "Failed to clear loggers: " + std::string(e.what()));
+    }
 }
 
 void Logger::setLevel(LogLevel level) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
+    // Validate level
+    if (level < LogLevel::Debug || level > LogLevel::Critical) {
+        ExceptionManager::throwError<NLMException>(
+            "Invalid log level: " + std::to_string(static_cast<int>(level)));
+    }
+    
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        for (auto& logger : pImpl->loggers) {
+            logger->setLevel(level);
+        }
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<NLMException>(
+            "Failed to set log level: " + std::string(e.what()));
     }
 }
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    // Validate input parameters
+    if (level < LogLevel::Debug || level > LogLevel::Critical) {
+        ExceptionManager::throwError<NLMException>(
+            "Invalid log level: " + std::to_string(static_cast<int>(level)));
+    }
     
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
+    if (message.empty()) {
+        ExceptionManager::throwError<NLMException>(
+            "Log message is empty");
+    }
     
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+    if (line < 0) {
+        ExceptionManager::throwError<NLMException>(
+            "Invalid line number: " + std::to_string(line));
+    }
+    
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        
+        LogEntry entry;
+        entry.level = level;
+        entry.message = message;
+        entry.file = file;
+        entry.line = line;
+        entry.function = function;
+        entry.timestamp = std::chrono::system_clock::now();
+        
+        for (auto& logger : pImpl->loggers) {
+            try {
+                logger->log(entry);
+            } catch (const std::exception& e) {
+                // Log but don't fail the entire operation
+                std::cerr << "Error logging to logger: " << e.what() << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<NLMException>(
+            "Failed to create log entry: " + std::string(e.what()));
     }
 }
 
@@ -167,13 +314,23 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 }
 
 bool Logger::isEnabled(LogLevel level) const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
-        }
+    if (level < LogLevel::Debug || level > LogLevel::Critical) {
+        ExceptionManager::throwError<NLMException>(
+            "Invalid log level: " + std::to_string(static_cast<int>(level)));
     }
-    return false;
+    
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        for (auto& logger : pImpl->loggers) {
+            if (logger->getLevel() <= level) {
+                return true;
+            }
+        }
+        return false;
+    } catch (const std::exception& e) {
+        ExceptionManager::throwError<NLMException>(
+            "Failed to check if log level is enabled: " + std::string(e.what()));
+    }
 }
 
 Logger& Logger::getGlobal() {
