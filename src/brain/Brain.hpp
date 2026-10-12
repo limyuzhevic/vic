@@ -184,14 +184,17 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Set neuron parameters from configuration
+    void setNeuronParameters(float membraneCapacitance, float timeConstant, size_t maxSpikeHistory,
+                            uint32_t refractoryMin, uint32_t refractoryMax,
+                            float thresholdMean, float thresholdStddev,
+                            float restingPotentialMean, float restingPotentialStddev,
+                            float resetOffsetMax, float adaptationDecayRate,
+                            float adaptationContribution, float adaptationIncrement,
+                            float membranePotentialMin, float membranePotentialMax);
+
+    // Set synapse parameters from configuration
+    void setSynapseParameters(float weightMin, float weightMax, uint32_t delayMin, uint32_t delayMax);
     
 private:
     struct Impl;

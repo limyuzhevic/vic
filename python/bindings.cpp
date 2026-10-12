@@ -400,26 +400,124 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("get_sensory_input_size", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("get_motor_output_size", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("process_sensory_input", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decode_motor_command", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("apply_reward_modulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predicted_reward"),
+             "Apply reward-based neuromodulation")
+        .def("update_development", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("get_developmental_stage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("get_neuromodulation_level", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("get_curiosity_level", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("get_novelty_level", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("get_prediction_error", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("get_brain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enable_reward_modulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enable_structural_plasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enable_development", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enable_curiosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("is_reward_modulation_enabled", &AgentBrain::isRewardModulationEnabled)
+        .def("is_structural_plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("is_development_enabled", &AgentBrain::isDevelopmentEnabled)
+        .def("is_curiosity_enabled", &AgentBrain::isCuriosityEnabled);
+
+    // Enhanced configuration interface
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Enhanced brain creation with factory methods
+    m.def("create_brain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+    // Enhanced world creation
+    m.def("create_simple_world", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    // Enhanced agent brain creation
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Pythonic configuration utilities
+    m.def("load_config_from_dict", [](const py::dict& config_dict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value = item.second;
+            if (value.is_none()) {
+                config->set(key, std::string(""), ConfigSource::Runtime);
+            } else if (value.is(py::bool_())) {
+                config->set(key, py::cast<bool>(value), ConfigSource::Runtime);
+            } else if (value.is(py::int_())) {
+                config->set(key, py::cast<int64_t>(value), ConfigSource::Runtime);
+            } else if (value.is(py::float_())) {
+                config->set(key, py::cast<float>(value), ConfigSource::Runtime);
+            } else if (value.is(py::str())) {
+                config->set(key, py::cast<std::string>(value), ConfigSource::Runtime);
+            }
+        }
+        return config;
+    }, py::arg("config_dict"), "Load configuration from a Python dictionary");
+
+    // Utility functions for common operations
+    m.def("run_simulation", [](std::shared_ptr<Brain> brain, 
+                              const py::list& sensory_inputs,
+                              size_t steps = 1000) {
+        for (size_t i = 0; i < steps; ++i) {
+            if (i < sensory_inputs.size()) {
+                auto input = py::cast<std::shared_ptr<SensoryInput>>(sensory_inputs[i]);
+                brain->receiveSensoryInput(*input);
+            }
+            brain->step(i, i * 0.001);
+        }
+        return brain->produceAction();
+    }, py::arg("brain"), py::arg("sensory_inputs"), py::arg("steps") = 1000,
+       "Run a simulation with given sensory inputs");
+
+    // Version and information utilities
+    m.def("get_version", []() {
+        return std::string("NLM Phase 2 - Real Neural Computation");
+    }, "Get NLM version information");
+
+    m.def("get_build_info", []() {
+        return py::dict()
+            .def("version", "Phase 2")
+            .def("description", "Real spiking neural computation with event-driven dynamics")
+            .def("build_date", std::string(__DATE__))
+            .def("compiler", std::string(__VERSION__));
+    }, "Get build information");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm
