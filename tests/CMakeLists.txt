@@ -1,10 +1,5 @@
-cmake_minimum_required(VERSION 3.16)
-
-# Test configuration
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
-# Create test executable
-add_executable(nlm_test
+# Test executable
+add_executable(nlm_test EXCLUDE_FROM_ALL
     test_main.cpp
     test_types.cpp
     test_config.cpp
@@ -17,8 +12,5 @@ add_executable(nlm_test
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
 
-# Enable testing
-enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)

@@ -212,4 +212,219 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Implementation of missing functions
+bool Config::validateFilePath(const std::string& filepath) const {
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        return false;
+    }
+    
+    if (!std::filesystem::is_regular_file(filepath)) {
+        return false;
+    }
+    
+    // Check if file is readable
+    std::ifstream test_file(filepath);
+    return test_file.good();
+}
+
+bool Config::validateConfigKey(const std::string& key) const {
+    if (key.empty()) {
+        return false;
+    }
+    
+    // Key must start with a letter or underscore
+    if (!std::isalpha(static_cast<unsigned char>(key[0])) && key[0] != '_') {
+        return false;
+    }
+    
+    // Key can contain letters, digits, underscores, and hyphens
+    for (char c : key) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
+            return false;
+        }
+    }
+    
+    // Key length should be reasonable (1-100 characters)
+    return key.length() >= 1 && key.length() <= 100;
+}
+
+bool Config::validateConfigValue(const ConfigValue& value, const std::string& expectedType) const {
+    // Enhanced validation based on expectedType
+    if (expectedType.empty()) {
+        return true; // No validation specified
+    }
+    
+    std::string typeName = expectedType;
+    std::transform(typeName.begin(), typeName.end(), typeName.begin(), ::tolower);
+    
+    if (typeName == "string") {
+        if (std::holds_alternative<std::string>(value)) {
+            const auto& str = std::get<std::string>(value);
+            // Check string length (reasonable limits)
+            return str.length() <= 10000; // 10KB max string
+        }
+        return false;
+    } else if (typeName == "int" || typeName == "integer") {
+        return std::holds_alternative<int>(value) || std::holds_alternative<int64_t>(value);
+    } else if (typeName == "double" || typeName == "float") {
+        return std::holds_alternative<double>(value);
+    } else if (typeName == "bool" || typeName == "boolean") {
+        return std::holds_alternative<bool>(value);
+    } else if (typeName == "int_array" || typeName == "vector<int>") {
+        return std::holds_alternative<std::vector<int>>(value);
+    } else if (typeName == "double_array" || typeName == "vector<double>") {
+        return std::holds_alternative<std::vector<double>>(value);
+    } else if (typeName == "string_array" || typeName == "vector<string>") {
+        return std::holds_alternative<std::vector<std::string>>(value);
+    }
+    
+    return true; // Unknown type, assume valid
+}
+
+// JSON/YAML parsing implementations
+#if defined(HAS_NLOHMANN_JSON)
+bool Config::tryParseJSON(const std::string& jsonStr) {
+    try {
+        auto jsonData = nlohmann::json::parse(jsonStr);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::jsonToConfigValue(const nlohmann::json& json, ConfigValue& outValue) {
+    try {
+        if (json.is_string()) {
+            outValue = json.get<std::string>();
+        } else if (json.is_number_integer()) {
+            outValue = json.get<int>();
+        } else if (json.is_number_unsigned()) {
+            outValue = static_cast<int64_t>(json.get<uint64_t>());
+        } else if (json.is_number_float()) {
+            outValue = json.get<double>();
+        } else if (json.is_boolean()) {
+            outValue = json.get<bool>();
+        } else if (json.is_array()) {
+            std::vector<std::string> arrayStr;
+            for (size_t i = 0; i < json.size(); ++i) {
+                if (json[i].is_string()) {
+                    arrayStr.push_back(json[i].get<std::string>());
+                } else {
+                    arrayStr.push_back(std::to_string(json[i].get<double>()));
+                }
+            }
+            outValue = arrayStr;
+        } else if (json.is_null()) {
+            outValue = std::string("null");
+        } else {
+            outValue = json.dump();
+        }
+        return true;
+    } catch (const std::exception&) {
+        outValue = std::string();
+        return false;
+    }
+}
+#endif
+
+#if defined(HAS_YAML_CPP)
+bool Config::tryParseYAML(const std::string& yamlStr) {
+    try {
+        auto yamlData = YAML::Load(yamlStr);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::yamlToConfigValue(const YAML::Node& yaml, ConfigValue& outValue) {
+    try {
+        if (yaml.IsScalar()) {
+            std::string scalar = yaml.as<std::string>();
+            
+            if (scalar == "true" || scalar == "false") {
+                outValue = (scalar == "true");
+            } else {
+                try {
+                    outValue = std::stoi(scalar);
+                } catch (...) {
+                    try {
+                        outValue = std::stod(scalar);
+                    } catch (...) {
+                        outValue = scalar;
+                    }
+                }
+            }
+        } else if (yaml.IsSequence()) {
+            std::vector<std::string> arrayStr;
+            for (size_t i = 0; i < yaml.size(); ++i) {
+                std::string item = yaml[i].as<std::string>();
+                
+                if (item == "true" || item == "false") {
+                    arrayStr.push_back(item);
+                } else {
+                    try {
+                        int intVal = std::stoi(item);
+                        arrayStr.push_back(std::to_string(intVal));
+                    } catch (...) {
+                        try {
+                            double doubleVal = std::stod(item);
+                            arrayStr.push_back(std::to_string(doubleVal));
+                        } catch (...) {
+                            arrayStr.push_back(item);
+                        }
+                    }
+                }
+            }
+            outValue = arrayStr;
+        } else {
+            outValue = yaml.as<std::string>();
+        }
+        return true;
+    } catch (const std::exception&) {
+        outValue = std::string();
+        return false;
+    }
+}
+#endif
+
+std::string Config::configValueToString(const ConfigValue& value) {
+    std::string result;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            std::ostringstream oss;
+            oss.precision(10);
+            oss << std::fixed << arg;
+            result = oss.str();
+            if (result.find('.') != std::string::npos) {
+                result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+                if (result.back() == '.') {
+                    result.pop_back();
+                }
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = "\"" + arg + "\"";
+        }
+    }, value);
+    return result;
+}
+
 } // namespace nlm

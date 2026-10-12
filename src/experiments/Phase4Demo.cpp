@@ -1,7 +1,7 @@
-#include <iostream>
-#include <memory>
-#include <iomanip>
-#include <sstream>
+// Phase 4 Demo - Comprehensive cognitive experiments
+// Demonstrates: working memory, episodic memory, concept formation, planning, etc.
+
+#include "Demo.hpp"
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -13,29 +13,17 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
-void printHeader(const std::string& title) {
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "  " << title << "\n";
-    std::cout << std::string(60, '=') << "\n";
-}
+void printHeader(const std::string& title);
+void printResult(const std::string& name, float value, float max = 1.0f);
+void printSection(const std::string& title);
 
-void printResult(const std::string& name, float value, float max = 1.0f) {
-    std::cout << "  " << std::left << std::setw(30) << name << ": ";
-    std::cout << std::fixed << std::setprecision(3) << value;
-    if (max > 0) {
-        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
-    }
-    std::cout << "\n";
-}
-
-void printSection(const std::string& title) {
-    std::cout << "\n--- " << title << " ---\n";
-}
-
+/**
+ * Main Phase 4 demonstration
+ * Shows 10 comprehensive cognitive experiments demonstrating emergence of complex cognition
+ */
 int main(int argc, char* argv[]) {
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
@@ -222,4 +210,23 @@ int main(int argc, char* argv[]) {
     std::cout << std::string(60, '=') << "\n";
     
     return 0;
+}
+
+void printHeader(const std::string& title) {
+    std::cout << "\n" << std::string(60, '=') << "\n";
+    std::cout << "  " << title << "\n";
+    std::cout << std::string(60, '=') << "\n";
+}
+
+void printResult(const std::string& name, float value, float max) {
+    std::cout << "  " << std::left << std::setw(30) << name << ": ";
+    std::cout << std::fixed << std::setprecision(3) << value;
+    if (max > 0) {
+        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
+    }
+    std::cout << "\n";
+}
+
+void printSection(const std::string& title) {
+    std::cout << "\n--- " << title << " ---\n";
 }

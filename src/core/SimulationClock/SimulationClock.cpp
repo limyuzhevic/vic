@@ -1,6 +1,3 @@
-#include "SimulationClock.hpp"
-#include <chrono>
-
 namespace nlm {
 
 struct SimulationClock::Impl {
@@ -31,6 +28,29 @@ SimulationClock& SimulationClock::operator=(SimulationClock&& other) noexcept {
     return *this;
 }
 
+// Validation helper functions
+namespace {
+    bool validateTimeValue(Timestamp time) {
+        // Time values should be non-negative
+        return time >= 0.0;
+    }
+    
+    bool validateTimestep(TimestepDuration dt) {
+        // Timestep should be positive and reasonable
+        // Typical timestep: 0.000001 to 1.0 seconds (1 microsecond to 1 second)
+        const TimestepDuration MIN_TIMESTEP = 0.000001; // 1 microsecond
+        const TimestepDuration MAX_TIMESTEP = 1.0;      // 1 second
+        return dt > 0.0 && dt >= MIN_TIMESTEP && dt <= MAX_TIMESTEP;
+    }
+    
+    bool validateSimulationStep(SimulationStep step) {
+        // Simulation step should be non-negative and reasonable
+        // Reasonable upper bound: 1e9 steps (about 11.5 days at 1ms timestep)
+        const SimulationStep MAX_STEP = 1000000000;
+        return step <= MAX_STEP;
+    }
+} // namespace anonymous
+
 void SimulationClock::reset() {
     pImpl->step = 0;
     pImpl->time = 0.0;
@@ -47,8 +67,11 @@ SimulationStep SimulationClock::getStep() const {
 }
 
 void SimulationClock::setStep(SimulationStep step) {
-    pImpl->step = step;
-    pImpl->time = step * pImpl->timestep;
+    // Validate step before setting
+    if (validateSimulationStep(step)) {
+        pImpl->step = step;
+        pImpl->time = step * pImpl->timestep;
+    }
 }
 
 Timestamp SimulationClock::getTime() const {
@@ -56,8 +79,11 @@ Timestamp SimulationClock::getTime() const {
 }
 
 void SimulationClock::setTime(Timestamp time) {
-    pImpl->time = time;
-    pImpl->step = static_cast<SimulationStep>(time / pImpl->timestep);
+    // Validate time before setting
+    if (validateTimeValue(time)) {
+        pImpl->time = time;
+        pImpl->step = static_cast<SimulationStep>(time / pImpl->timestep);
+    }
 }
 
 TimestepDuration SimulationClock::getTimestep() const {
@@ -65,7 +91,12 @@ TimestepDuration SimulationClock::getTimestep() const {
 }
 
 void SimulationClock::setTimestep(TimestepDuration dt) {
-    pImpl->timestep = dt;
+    // Validate timestep before setting
+    if (validateTimestep(dt)) {
+        pImpl->timestep = dt;
+        // Adjust step if time exceeds new timestep
+        pImpl->step = static_cast<SimulationStep>(pImpl->time / dt);
+    }
 }
 
 bool SimulationClock::isFirstStep() const {
@@ -77,29 +108,35 @@ bool SimulationClock::isLastStep(SimulationStep totalSteps) const {
 }
 
 Timestamp SimulationClock::stepToTime(SimulationStep step) const {
+    // Validate step before conversion
+    if (!validateSimulationStep(step)) {
+        return -1.0; // Invalid time
+    }
     return step * pImpl->timestep;
 }
 
 SimulationStep SimulationClock::timeToStep(Timestamp time) const {
+    // Validate time before conversion
+    if (!validateTimeValue(time)) {
+        return static_cast<SimulationStep>(-1); // Invalid step
+    }
     return static_cast<SimulationStep>(time / pImpl->timestep);
 }
 
 void SimulationClock::advanceBy(SimulationStep steps) {
-    pImpl->step += steps;
-    pImpl->time += steps * pImpl->timestep;
+    // Validate steps before advancing
+    if (validateSimulationStep(steps)) {
+        pImpl->step += steps;
+        pImpl->time += steps * pImpl->timestep;
+    }
 }
 
 Timestamp SimulationClock::timeAtFutureStep(SimulationStep stepsAhead) const {
-    return pImpl->time + (stepsAhead * pImpl->timestep);
-}
-
-double SimulationClock::getRealTimeElapsed() const {
-    if (!pImpl->realStartSet) {
-        return 0.0;
+    // Validate steps before calculation
+    if (!validateSimulationStep(stepsAhead)) {
+        return -1.0; // Invalid time
     }
-    auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(now - pImpl->realStart);
-    return duration.count();
+    return pImpl->time + (stepsAhead * pImpl->timestep);
 }
 
 void SimulationClock::setRealTimeStart() {

@@ -29,9 +29,71 @@ RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     return *this;
 }
 
+// Validation helper functions
+namespace {
+    bool validateSeedValue(uint64_t seed) {
+        // Seed values should be reasonable (not zero or extremely large)
+        // Zero seed can lead to predictable sequences
+        // Extremely large values might cause overflow in some engines
+        const uint64_t MIN_SEED = 1;
+        const uint64_t MAX_SEED = std::numeric_limits<uint64_t>::max();
+        return seed >= MIN_SEED && seed <= MAX_SEED;
+    }
+    
+    bool validateInt64Range(int64_t min, int64_t max) {
+        // For 64-bit integer distributions, ensure range is valid
+        return min <= max;
+    }
+    
+    bool validateRealRange(double min, double max) {
+        // Real ranges should be finite and ordered
+        return min < max && !std::isinf(min) && !std::isinf(max) && 
+               !std::isnan(min) && !std::isnan(max);
+    }
+    
+    bool validateFloatRange(float min, float max) {
+        // Float ranges should be finite and ordered
+        return min < max && !std::isinf(min) && !std::isinf(max) && 
+               !std::isnan(min) && !std::isnan(max);
+    }
+    
+    bool validateNormalStddev(double stddev) {
+        // Standard deviation should be positive
+        return stddev > 0.0 && !std::isinf(stddev) && !std::isnan(stddev);
+    }
+    
+    bool validateNormalStddev(float stddev) {
+        // Standard deviation should be positive
+        return stddev > 0.0f && !std::isinf(stddev) && !std::isnan(stddev);
+    }
+    
+    bool validateBernoulliProbability(double p) {
+        // Bernoulli probability should be between 0 and 1
+        return p >= 0.0 && p <= 1.0 && !std::isinf(p) && !std::isnan(p);
+    }
+    
+    bool validatePoissonLambda(double lambda) {
+        // Poisson rate parameter should be positive
+        return lambda > 0.0 && !std::isinf(lambda) && !std::isnan(lambda);
+    }
+    
+    bool validateExponentialLambda(double lambda) {
+        // Exponential rate parameter should be positive
+        return lambda > 0.0 && !std::isinf(lambda) && !std::isnan(lambda);
+    }
+    
+    bool validateContainerSize(size_t n) {
+        // Container size should not be zero for pick operations
+        return n > 0;
+    }
+} // namespace anonymous
+
 void RandomGenerator::seed(uint64_t seed) {
-    pImpl->gen.seed(seed);
-    pImpl->currentSeed = seed;
+    // Validate seed before applying
+    if (validateSeedValue(seed)) {
+        pImpl->gen.seed(seed);
+        pImpl->currentSeed = seed;
+    }
 }
 
 uint64_t RandomGenerator::getSeed() const {
@@ -61,6 +123,7 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
+    // Validate range parameters
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
     }
@@ -69,6 +132,7 @@ double RandomGenerator::uniformReal(double min, double max) {
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
+    // Validate range parameters
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
     }

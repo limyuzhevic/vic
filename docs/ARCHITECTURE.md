@@ -127,6 +127,18 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Metrics**: Data analysis
 - **Phase4Experiment**: Phase 4 cognitive experiments
 
+### 14. Phase 2 Layer
+- **Neuron**: Individual neuron representation (LIF dynamics)
+- **Synapse**: Synaptic connection representation with real transmission dynamics
+- **Plasticity**: STDP, Hebbian, and reward-modulated plasticity rules
+- **StructuralPlasticity**: Activity-dependent synaptogenesis and pruning
+- **SpikeSystem**: Event-driven spike processing and propagation
+
+### 15. Phase 6 Layer
+- **IntegratedBrain**: Future brain integration system
+- **ScalabilitySystem**: High-performance brain interface
+- **ResearchTools**: Advanced research infrastructure
+
 ## Data Flow
 
 ### Phase 2: Neural Computation

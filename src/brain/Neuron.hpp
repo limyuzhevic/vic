@@ -26,16 +26,16 @@ struct NeuronState {
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(nlm::constants::DEFAULT_RESTING_POTENTIAL)
+        , restingPotential(nlm::constants::DEFAULT_RESTING_POTENTIAL)
+        , threshold(nlm::constants::DEFAULT_THRESHOLD)
+        , resetPotential(nlm::constants::DEFAULT_RESET_POTENTIAL)
+        , leakConductance(nlm::constants::DEFAULT_LEAK_CONDUCTANCE)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(nlm::constants::DEFAULT_REFACTORY_PERIOD)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
@@ -149,3 +149,38 @@ private:
 };
 
 } // namespace nlm
+
+// Simulation constants namespace for neuron dynamics
+namespace nlm::constants {
+    // LIF neuron parameters
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
+    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Simulation parameters
+    static constexpr TimestepDuration DEFAULT_TIMESTEP = 0.001f;  // 1ms
+    static constexpr float MS_TO_S_FACTOR = 1000.0f;  // Convert ms to s (1000 milliseconds = 1 second)
+    
+    // Default neuron parameters
+    static constexpr MembranePotential DEFAULT_THRESHOLD = -55.0f;  // mV
+    static constexpr MembranePotential DEFAULT_RESTING_POTENTIAL = -70.0f;  // mV
+    static constexpr MembranePotential DEFAULT_RESET_POTENTIAL = -70.0f;  // mV
+    static constexpr MembranePotential DEFAULT_LEAK_CONDUCTANCE = 10.0f;  // nS
+    static constexpr uint32_t DEFAULT_REFACTORY_PERIOD = 5;  // steps
+    
+    // Weight bounds for synapses
+    static constexpr float MIN_WEIGHT = -1.0f;
+    static constexpr float MAX_WEIGHT = 1.0f;
+    
+    // Short-term plasticity parameters
+    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
+    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
+    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    
+    // Synaptic efficacy bounds
+    static constexpr float MIN_EFFICIENCY = 0.0f;
+    static constexpr float MAX_EFFICIENCY = 2.0f;
+    
+    // Eligibility trace decay rate
+    static constexpr float DEFAULT_ELIGIBILITY_TRACE_DECAY = 0.001f;
+} // namespace nlm::constants

@@ -1,6 +1,7 @@
 // NLM Performance Benchmark
 // Measures simulation performance for different network sizes
 
+#include "Demo.hpp"
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
@@ -17,17 +18,23 @@
 
 using namespace nlm;
 
-// Simple performance measurement
+/**
+ * Simple performance measurement structure
+ */
 struct BenchmarkResult {
-    size_t neurons;
-    size_t synapses;
-    size_t steps;
-    double totalTime;      // seconds
-    double stepsPerSecond;
-    double spikesPerStep;
-    double synapsesPerNeuron;
+    size_t neurons = 0;
+    size_t synapses = 0;
+    size_t steps = 0;
+    double totalTime = 0.0;      // seconds
+    double stepsPerSecond = 0.0;
+    double spikesPerStep = 0.0;
+    double synapsesPerNeuron = 0.0;
 };
 
+/**
+ * Run benchmark with specific configuration
+ * Returns benchmark results for the given parameters
+ */
 BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
@@ -77,9 +84,12 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     return result;
 }
 
+/**
+ * Print benchmark results in formatted table
+ */
 void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
     std::cout << std::endl;
-    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "╔════════════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
     std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
     std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╣" << std::endl;
     std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
@@ -98,16 +108,20 @@ void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
     std::cout << std::endl;
 }
 
+/**
+ * Main benchmark entry point
+ * Runs multiple benchmarks at different network sizes and prints results
+ */
 int main() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
     ║     Performance Benchmark                                     ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════════════════╝
     )" << std::endl;
     
     // Initialize logger

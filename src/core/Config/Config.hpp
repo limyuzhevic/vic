@@ -5,6 +5,16 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+
+// Try to include JSON and YAML libraries if available
+#if defined(HAS_NLOHMANN_JSON)
+#include <nlohmann/json.hpp>
+#endif
+
+#if defined(HAS_YAML_CPP)
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -92,6 +102,28 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation functions
+    bool validateFilePath(const std::string& filepath) const;
+    bool validateConfigKey(const std::string& key) const;
+    bool validateConfigValue(const ConfigValue& value, const std::string& expectedType) const;
+    
+    // JSON/YAML parsing functions
+#if defined(HAS_NLOHMANN_JSON)
+    bool tryParseJSON(const std::string& jsonStr);
+#endif
+#if defined(HAS_YAML_CPP)
+    bool tryParseYAML(const std::string& yamlStr);
+#endif
+#if defined(HAS_NLOHMANN_JSON) && defined(HAS_YAML_CPP)
+    bool parseJsonFromFile(const std::string& filepath);
+    bool parseYamlFromFile(const std::string& filepath);
+    bool jsonToConfigValue(const nlohmann::json& json, ConfigValue& outValue);
+    bool yamlToConfigValue(const YAML::Node& yaml, ConfigValue& outValue);
+#endif
+    
+    // Helper functions
+    std::string configValueToString(const ConfigValue& value);
     
 private:
     struct Impl;
