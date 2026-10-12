@@ -122,7 +122,7 @@ public:
     const std::vector<SynapseHandle>& getIncomingSynapses() const;
     const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
-    // Plasticity state
+// Plasticity state
     const PlasticityFlags& getPlasticityFlags() const;
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
