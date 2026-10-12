@@ -9,6 +9,10 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -106,29 +110,32 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+// ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    
+    // Initialize memory systems
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    
+    // Initialize prediction system
+    predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    acetylcholine = std::make_unique<Acetylcholine>();
+    norepinephrine = std::make_unique<Norepinephrine>();
+    serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -477,7 +484,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
+    // ========== STEP 7: Update working memory and attention integration ==========
+    if (pImpl->workingMemory && pImpl->attention) {
+        // Update working memory (store current spike activity)
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        // Store firing neuron in working memory
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                    }
+                }
+            }
+        }
+        
+        // Update working memory with maintenance and competition
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Get working memory content for attention
+        std::vector<NeuronId> wmNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Apply attention to working memory content
+        pImpl->attention->update(pImpl->timestep);
+        pImpl->attention->processCompetition(wmNeurons);
+        
+        // Apply attention modulation to attended neurons
+        for (const auto& neuronId : pImpl->attention->getWinners()) {
+            if (pImpl->workingMemory->contains(neuronId)) {
+                // Enhance working memory trace through attention
+                float currentAct = pImpl->workingMemory->getNeuronActivation(neuronId);
+                pImpl->workingMemory->storeToNeuron(neuronId, 
+                    std::min(1.0f, currentAct * 1.2f));  // Boost activation
+            }
+        }
+    }
+    
+    // ========== STEP 8: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
@@ -488,7 +531,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their activity
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -505,31 +548,101 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Add working memory content to episode
+            if (pImpl->workingMemory) {
+                std::vector<float> wmPattern = pImpl->workingMemory->retrieve();
+                episode.memoryPatterns.push_back(wmPattern);
+            }
+            
+            // Add attention winners to episode
+            if (pImpl->attention) {
+                episode.attentionWinners = pImpl->attention->getWinners();
+            }
+            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    // ========== STEP 9: Update prediction system ==========
+    if (pImpl->predictionSystem && pImpl->workingMemory && pImpl->attention) {
+        // Update prediction with current brain state (from working memory)
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Create InternalSignals for prediction system
+        InternalSignals predictionInput;
+        predictionInput.addSignals(currentPattern);
+        
+        // Update predictions
+        pImpl->predictionSystem->updatePredictions(predictionInput, predictionInput);
+        
+        // Get prediction error and apply to neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate attention and curiosity
+        if (predictionError > 0.5f) {
+            // High prediction error -> increase exploration
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(pImpl->timestep * predictionError);
+            }
+            // Reduce attention to current focus to encourage exploration
+            pImpl->attention->releaseAttention();
+        }
+        
+        // Apply prediction error to dopamine (reward prediction error)
+        if (pImpl->dopamine) {
+            float normalizedError = std::min(1.0f, predictionError * 2.0f);
+            pImpl->dopamine->setLevel(normalizedError);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory && pImpl->episodicMemory && pImpl->attention) {
+        // Create pattern from working memory for concept formation
+        std::vector<float> experiencePattern = pImpl->workingMemory->retrieve();
+        std::vector<float> features = experiencePattern;
+        
+        if (!experiencePattern.empty()) {
+            // Calculate average reward from recent episodes
+            float reward = 0.0f;
+            // Use dopamine level as reward proxy (RPE)
+            reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                experiencePattern,
+                features,
+                reward,
+                currentStep
+            );
+            
+            // Use attention winners as top-down bias for concept formation
+            if (!pImpl->attention->getWinners().empty()) {
+                for (const auto& neuronId : pImpl->attention->getWinners()) {
+                    // Apply attention as bias to concept formation
+                    float salience = pImpl->workingMemory->getNeuronActivation(neuronId);
+                    pImpl->conceptFormation->updateConcept(
+                        conceptId > 0 ? conceptId : 0,
+                        experiencePattern,
+                        features,
+                        salience * 0.1f
+                    );
+                }
+            }
+            
+            // Also use prediction error as learning signal for concept formation
+            if (pImpl->predictionSystem) {
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (predictionError > 0.0f) {
+                    // Apply prediction error to concept refinement
+                    pImpl->conceptFormation->updateConcept(
+                        conceptId > 0 ? conceptId : 0,
+                        experiencePattern,
+                        features,
+                        predictionError * 0.05f
+                    );
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

@@ -311,39 +311,69 @@ config.loadFromFile("config.json")
 config.saveToFile("config.json")
 ```
 
-#### AgentBrain Class
+### Phase 6 Integration Features
 
 ```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
+# Complete integrated brain with all Phase 6 systems
 
-# Initialization
-agent.initialize(world)
+import pynlm
 
-# Sensory processing
-agent.processSensoryInput(percept)
+def createIntegratedBrain(config):
+    """Create a Phase 6 integrated brain with all systems."""
+    
+    # Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent with integrated systems
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Enable all Phase 6 subsystems
+    agent.enableIntegratedMemory(True)      # Working + episodic + associative memory
+    agent.enablePredictionSystem(True)      # Predictive coding
+    agent.enableCognitiveSystems(True)      # Planning + attention + concept formation
+    agent.enableCompleteNeuromodulation(True) # Full neuromodulation
+    
+    return brain, agent
 
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
+# Example usage
+config = pynlm.createDefaultConfig()
+brain, agent = createIntegratedBrain(config)
 
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Run integrated simulation
+for step in range(1000):
+    # Update world
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process through integrated systems
+    agent.processSensoryInput(percept)
+    
+    # Brain processes with all systems integrated
+    brain.step(step)
+    
+    # Get coordinated action
+    action = agent.decodeMotorCommand()
+    
+    # Apply reward modulation
+    reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print integrated statistics
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+        print(f"  Memory traces: {agent.getWorkingMemoryLevel()}")
+        print(f"  Prediction error: {agent.getPredictionError():.3f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Attention winners: {agent.getAttentionWinners()}")
+        print(f"  Concepts discovered: {agent.getConceptCount()}")
 ```
 
 #### SimpleWorld Class
