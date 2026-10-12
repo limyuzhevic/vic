@@ -53,4 +53,107 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
-} // namespace nlm
+void Neuromodulator::update(TimestepDuration dt) {
+    // Base neuromodulator update (default behavior)
+    // Decrease level over time
+    for (auto& n : neuromodulators_) {
+        n.second->update(dt);
+    }
+}
+
+// Update acetylcholine level
+void Neuromodulator::updateAcetylcholine(float level) {
+    for (auto& n : neuromodulators_) {
+        if (n.first == "ACh") {
+            n.second->setLevel(level);
+            break;
+        }
+    }
+}
+
+// Update norepinephrine level  
+void Neuromodulator::updateNorepinephrine(float level) {
+    for (auto& n : neuromodulators_) {
+        if (n.first == "NE") {
+            n.second->setLevel(level);
+            break;
+        }
+    }
+}
+
+// Update serotonin level
+void Neuromodulator::updateSerotonin(float level) {
+    for (auto& n : neuromodulators_) {
+        if (n.first == "5-HT") {
+            n.second->setLevel(level);
+            break;
+        }
+    }
+}
+
+// Get current neuromodulator levels
+float Neuromodulator::getAcetylcholine() const {
+    for (const auto& n : neuromodulators_) {
+        if (n.first == "ACh") {
+            return n.second->getLevel();
+        }
+    }
+    return 0.0f;
+}
+
+float Neuromodulator::getNorepinephrine() const {
+    for (const auto& n : neuromodulators_) {
+        if (n.first == "NE") {
+            return n.second->getLevel();
+        }
+    }
+    return 0.0f;
+}
+
+float Neuromodulator::getSerotonin() const {
+    for (const auto& n : neuromodulators_) {
+        if (n.first == "5-HT") {
+            return n.second->getLevel();
+        }
+    }
+    return 0.0f;
+}
+
+// Get all neuromodulator levels as a map
+std::unordered_map<std::string, float> Neuromodulator::getAllLevels() const {
+    std::unordered_map<std::string, float> levels;
+    for (const auto& n : neuromodulators_) {
+        levels[n.first] = n.second->getLevel();
+    }
+    return levels;
+}
+
+// Update neuromodulators for cognitive functions
+void Neuromodulator::updateForAttention(float novelty, float predictionError) {
+    // ACh: Increases with novelty and attention demand
+    float achLevel = 0.3f + 0.7f * novelty;
+    updateAcetylcholine(achLevel);
+    
+    // NE: Increases with prediction error and arousal
+    float neLevel = 0.2f + 0.8f * predictionError;
+    updateNorepinephrine(neLevel);
+    
+    // 5-HT: Decreases with prediction error (mood modulation)
+    float serotoninLevel = 1.0f - 0.5f * std::abs(predictionError);
+    updateSerotonin(serotoninLevel);
+}
+
+// Update neuromodulators for memory consolidation
+void Neuromodulator::updateForMemoryConsolidation(float reward) {
+    // ACh: Important for memory encoding and consolidation
+    float achLevel = 0.5f + 0.5f * reward;
+    updateAcetylcholine(achLevel);
+    
+    // NE: Modulates memory strength and emotional salience
+    float neLevel = 0.3f + 0.4f * reward;
+    updateNorepinephrine(neLevel);
+    
+    // 5-HT: Modulates memory consolidation and social aspects
+    float serotoninLevel = 0.7f;
+    updateSerotonin(serotoninLevel);
+}

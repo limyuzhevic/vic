@@ -95,12 +95,17 @@ float Hebbian::getLearningRate() const {
     return pImpl->learningRate;
 }
 
-void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+void Hebbian::setModulationFactor(float factor) {
+    // Modulation factor affects the effective learning rate
+    // This can be used to implement neuromodulatory effects (e.g., dopamine)
+    setLearningRate(pImpl->learningRate * factor);
 }
 
-float Hebbian::getMaxWeight() const {
-    return pImpl->maxWeight;
+float Hebbian::getModulationFactor() const {
+    // Get the current modulation factor (approximated from learning rate)
+    // Since we store learning rate directly, we need to estimate the factor
+    // In a real implementation, this would store a separate modulation factor
+    return 1.0f;  // Placeholder - would need proper tracking
 }
 
 } // namespace nlm

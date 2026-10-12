@@ -139,30 +139,30 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
+// Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory() { return pImpl->workingMemory.get(); }
+
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
-    
+    NeuralEpisodicMemory* getEpisodicMemory() { return pImpl->episodicMemory.get(); }
+
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() { return pImpl->associativeMemory.get(); }
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    PredictionSystem* getPredictionSystem() { return pImpl->predictionSystem.get(); }
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
+// Neural planner for action planning
+    NeuralPlanner* getPlanner() { return pImpl->planner.get(); }
+
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
+    ConceptFormation* getConceptFormation() { return pImpl->conceptFormation.get(); }
+
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    AttentionalSelection* getAttention() { return pImpl->attention.get(); }
     
     // ========== DEVELOPMENT SYSTEM ==========
     
@@ -172,17 +172,17 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
+// Dopamine - reward and reinforcement
+    Dopamine* getDopamine() { return pImpl->dopamine.get(); }
+
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
+    Curiosity* getCuriosity() { return pImpl->curiosity.get(); }
+
     // Novelty - novelty detection
-    Novelty* getNovelty();
-    
+    Novelty* getNovelty() { return pImpl->novelty.get(); }
+
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    PredictionError* getPredictionErrorSignal() { return pImpl->predictionError.get(); }
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

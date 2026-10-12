@@ -31,59 +31,50 @@ protected:
     Neuromodulator() = default;
 };
 
-// Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
-class Dopamine : public Neuromodulator {
+// Forward declarations for concrete neuromodulators
+class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+
+// NeuromodulatorManager: Manages all neuromodulators
+class NeuromodulatorManager {
 public:
-    Dopamine();
-    ~Dopamine() override;
+    NeuromodulatorManager();
+    ~NeuromodulatorManager();
     
-    const char* getName() const override;
-    float getLevel() const override;
-    void setLevel(float level) override;
-    float getPlasticityFactor() const override;
-    void update(TimestepDuration dt) override;
+    // Add a neuromodulator
+    void addNeuromodulator(const std::string& name, Neuromodulator* modulator);
     
-    // Reward signaling
-    void signalReward(float reward);
-    void signalRewardPredictionError(float error);
+    // Get neuromodulator by name
+    Neuromodulator* getNeuromodulator(const std::string& name);
+    const Neuromodulator* getNeuromodulator(const std::string& name) const;
+    
+    // Get all neuromodulator levels
+    std::unordered_map<std::string, float> getAllLevels() const;
+    
+    // Update all neuromodulators
+    void updateAll(TimestepDuration dt);
+    
+    // Update neuromodulators for specific functions
+    void updateForAttention(float novelty, float predictionError);
+    void updateForMemoryConsolidation(float reward);
+    
+    // Get individual neuromodulator levels
+    float getAcetylcholine() const;
+    float getNorepinephrine() const;
+    float getSerotonin() const;
+    float getDopamine() const;
+    
+    // Set individual neuromodulator levels
+    void setAcetylcholine(float level);
+    void setNorepinephrine(float level);
+    void setSerotonin(float level);
+    void setDopamine(float level);
     
 private:
     struct Impl;
-    Impl* pImpl;
-};
-
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
-public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
-class Norepinephrine : public Neuromodulator {
-public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
-};
-
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
-class Serotonin : public Neuromodulator {
-public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

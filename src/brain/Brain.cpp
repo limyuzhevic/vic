@@ -406,37 +406,129 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
+    // ========== STEP 5: Enhanced neuromodulation effects ==========
+    // Update novelty detection and curiosity
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get current prediction error for curiosity calculation
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                               predictionError, pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // ENHANCED DOPAMINE EFFECTS: Full neuromodulation integration
     if (pImpl->dopamine) {
+        // Get current prediction error from prediction system
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        // Enhanced reward prediction error signaling
+        pImpl->dopamine->signalRewardPredictionError(predictionError);
+        
+        // Update dopamine level (phasic bursts and tonic background)
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // ENHANCED NEURAL EXCITABILITY: More comprehensive modulation
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // 1. Baseline excitability modulation
+        float baseExcitability = 1.0f + dopamineLevel * 0.5f;
+        
+        // 2. State-dependent modulation: different effects based on developmental stage
+        float stageModulation = 1.0f;
+        switch (pImpl->developmentalStage) {
+            case DevelopmentalStage::Initial:
+                stageModulation = 1.5f;  // High sensitivity, high plasticity
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                stageModulation = 1.2f;  // Moderate sensitivity
+                break;
+            case DevelopmentalStage::Maturation:
+                stageModulation = 1.0f;  // Normal sensitivity
+                break;
+            case DevelopmentalStage::Adult:
+                stageModulation = 0.8f;  // Lower sensitivity, more stable
+                break;
+        }
+        
+        // 3. Plasticity-dependent modulation: stronger when learning is active
+        float plasticityActivity = 0.0f;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                if (syn->getEligibilityTrace() > 0.001f) {
+                    plasticityActivity += std::abs(syn->getEligibilityTrace());
+                }
+            }
+        }
+        
+        // Apply comprehensive dopaminergic modulation
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    const auto& state = neuron->getState();
+                    
+                    // 1. Baseline excitability adjustment
+                    float excitabilityBoost = baseExcitability * stageModulation;
+                    neuron->injectCurrent(excitabilityBoost * 0.1f);
+                    
+                    // 2. Spike-timing dependent modulation
+                    // Dopamine can gate STDP eligibility traces
+                    if (dopamineLevel > 0.1f) {
+                        // Enhance synaptic efficacy for recent spikes
+                        for (auto* syn : region->getSynapsesTo(neuron->getId())) {
+                            float trace = syn->getEligibilityTrace();
+                            if (trace > 0.0f) {
+                                // Dopamine stabilizes eligibility traces
+                                syn->addToEligibilityTrace(trace * 0.1f * dopamineLevel);
+                            }
+                        }
+                    }
+                    
+                    // 3. Memory consolidation modulation
+                    // Dopamine enhances episodic memory consolidation
+                    if (dopamineLevel > 0.0f && pImpl->episodicMemory) {
+                        // Boost memory encoding based on dopamine level
+                        float memoryBoost = dopamineLevel * 0.3f;
+                        // Note: Actual memory consolidation happens in step 7
+                    }
+                    
+                    // 4. Attention modulation
+                    // Dopamine influences attentional selection
+                    if (dopamineLevel > 0.0f && pImpl->attention) {
+                        // Apply dopaminergic gain to attentional signals
+                        // This happens in the attention step (step 9)
                     }
                 }
             }
         }
+        
+        // 5. Reward-modulated plasticity enhancement
+        // Dopamine strongly modulates reward-modulated Hebbian learning
+        if (pImpl->hebbian) {
+            float rewardModulation = 1.0f + dopamineLevel * 2.0f;  // Up to 3x enhancement
+            pImpl->hebbian->setModulationFactor(rewardModulation);
+        }
+        
+        // 6. Structural plasticity modulation
+        if (pImpl->structuralPlasticity) {
+            // Dopamine affects structural plasticity rates
+            float spModulation = 0.5f + 0.5f * dopamineLevel;
+            pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * spModulation);
+            pImpl->structuralPlasticity->setPruningRate(0.00001f * (2.0f - spModulation));
+        }
+        
+        // Log enhanced dopamine effects
+        NLM_LOG_INFO("Enhanced dopamine effects: level=" + std::to_string(dopamineLevel) +
+                    " prediction_error=" + std::to_string(predictionError) +
+                    " stage=" + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -511,8 +603,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // Create a simple prediction from current neural activity patterns
+        // This is a placeholder for real predictive coding implementation
+        
+        // Get current neural activity as prediction input
+        std::vector<float> neuralActivity;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    neuralActivity.push_back(std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                }
+            }
+        }
+        
+        // Store current prediction state (placeholder for real prediction system)
+        // In a real implementation, this would be passed to the prediction system
+        // to compute temporal predictions and prediction error
+        
+        // Update prediction error based on working memory activity
+        if (pImpl->workingMemory) {
+            auto memoryContent = pImpl->workingMemory->retrieve();
+            if (!memoryContent.empty()) {
+                // Simple prediction error: difference from expected (0) activity
+                float memoryActivity = 0.0f;
+                for (float act : memoryContent) {
+                    memoryActivity += std::abs(act);
+                }
+                memoryActivity /= memoryContent.size();
+                
+                // Use memory activity as prediction error signal
+                pImpl->predictionSystem->updatePredictions(
+                    SensoryInput(0.0f),  // Placeholder predicted state
+                    SensoryInput(memoryActivity)  // Placeholder actual state
+                );
+            }
+        }
+        
+        // Store prediction error in working memory for learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (std::abs(predictionError) > 0.1f) {
+            // Store prediction error as a memory trace
+            if (pImpl->workingMemory) {
+                // Find or create neuron to represent prediction error
+                NeuronId errorNeuron = NeuronId(static_cast<uint64_t>(currentStep));
+                pImpl->workingMemory->storeToNeuron(errorNeuron, predictionError * 0.1f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,25 +666,144 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current working memory content to form concepts
+        // Concepts are abstract representations of recurring patterns
+        auto workingMemoryContent = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>();
+        
+        if (!workingMemoryContent.empty()) {
+            // Encode current experience as a concept candidate
+            // Concepts form through averaging and stabilization of recurring patterns
+            pImpl->conceptFormation->updateConcept(currentStep, workingMemoryContent, 
+                                                   pImpl->timestep);
+        }
     }
+    
+    // ========== STEP 10.5: Update neural planner ==========
+    if (pImpl->planner) {
+        // The neural planner uses predictions and concepts to select actions
+        // This is the highest-level cognitive function in the integrated brain
+        if (pImpl->workingMemory && pImpl->predictionSystem) {
+            // Get current motor neuron activity patterns
+            std::vector<float> motorActivity;
+            for (auto* neuron : pImpl->motorNeurons) {
+                motorActivity.push_back(std::abs(neuron->getState().membranePotential - 
+                                              neuron->getState().restingPotential));
+            }
+            
+            // Get prediction confidence
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            
+            // Get concepts for decision making (using correct method name)
+            auto concepts = pImpl->conceptFormation ? 
+                           pImpl->conceptFormation->getConcepts() : std::vector<DiscoveredConcept>();
+            
+            // Convert concepts to prototype patterns for planning
+            std::vector<float> conceptPrototypes;
+            for (const auto& concept : concepts) {
+                conceptPrototypes.insert(conceptPrototypes.end(), 
+                                       concept.prototype.begin(), 
+                                       concept.prototype.end());
+            }
+            
+            // Plan action using the neural planner
+            ActionType plannedAction = pImpl->planner->planAction(conceptPrototypes, predictionConfidence * 0.5f);
+            
+            // Execute planned action if it's not Wait
+            if (plannedAction != ActionType::Wait) {
+                // Find and activate a motor neuron corresponding to the planned action
+                for (auto* neuron : pImpl->motorNeurons) {
+                    // Use neuron ID to determine action type based on neuron organization
+                    uint64_t neuronIndex = neuron->getId().index();
+                    ActionType actionFromNeuron = ActionType::Wait;
+                    
+                    // Simple mapping based on neuron index modulo 6 (see AgentBrain.cpp)
+                    switch (neuronIndex % 6) {
+                        case 0: actionFromNeuron = ActionType::MoveForward; break;
+                        case 1: actionFromNeuron = ActionType::MoveBackward; break;
+                        case 2: actionFromNeuron = ActionType::TurnLeft; break;
+                        case 3: actionFromNeuron = ActionType::TurnRight; break;
+                        case 4: actionFromNeuron = ActionType::Interact; break;
+                        case 5: actionFromNeuron = ActionType::Wait; break;
+                    }
+                    
+                    if (actionFromNeuron == plannedAction) {
+                        // Boost activity in this motor neuron
+                        neuron->injectCurrent(10.0f * predictionConfidence);
+                        break;
+                    }
+                }
+            }
+        }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+    // ========== STEP 13.5: Sleep/rest cycle ==========
+    // Simple sleep/rest detection based on developmental stage and activity
+    pImpl->isResting = false;
+    
+    if (currentStep % 5000 == 0) {  // Sleep every 5000 steps (approximately 5 seconds)
+        if (pImpl->developmentStage == DevelopmentalStage::Adult || 
+            pImpl->developmentStage == DevelopmentalStage::Maturation) {
+            
+            // Adult/Mature brain needs sleep for memory consolidation
+            pImpl->isResting = true;
+            
+            // Sleep mode: reduce neural activity, enhance consolidation
+            // During sleep, we:
+            // 1. Reduce ongoing neural processing to conserve energy
+            // 2. Enhance replay of important memories
+            // 3. Perform synaptic downscaling
+            // 4. Consolidate episodic memories
+            
+            // 1. Enhanced replay during sleep - replay more frequently
+            size_t sleepReplayInterval = std::max<size_t>(1, pImpl->replayInterval / 2);
+            if (currentStep % sleepReplayInterval == 0 && pImpl->episodicMemory) {
+                // Replay more episodes during sleep (importance-based)
+                auto sleepEpisodes = pImpl->episodicMemory->getEpisodesForReplay(5);
+                for (const auto* episode : sleepEpisodes) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+            }
+            
+            // 2. Enhanced consolidation during sleep
+            if (pImpl->episodicMemory) {
+                // Consolidate more aggressively during sleep
+                float sleepConsolidationThreshold = 0.1f;  // Lower threshold for consolidation
+                pImpl->episodicMemory->consolidate(sleepConsolidationThreshold);
+            }
+            
+            // 3. Synaptic downscaling during sleep (to prevent overexcitation)
+            if (pImpl->stdp) {
+                // Reduce overall synaptic weights during sleep
+                for (auto& region : pImpl->regions) {
+                    for (auto* syn : region->getSynapses()) {
+                        // Gradually reduce all synapse weights by small amount
+                        float currentWeight = syn->getWeight();
+                        if (std::abs(currentWeight) > 0.01f) {
+                            syn->setWeight(currentWeight * 0.99f);
+                        }
+                    }
+                }
+            }
+            
+            // 4. Reduce neural excitability during sleep
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Reduce membrane potential fluctuations
+                        // This helps prevent runaway excitation
+                        const auto& state = neuron->getState();
+                        float targetPotential = state.restingPotential;
+                        neuron->setMembranePotential(targetPotential);
+                        neuron->injectCurrent(-0.5f);  // Slight inhibition
+                    }
+                }
+            }
         }
     }
-    
-    // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         

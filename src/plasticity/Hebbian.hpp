@@ -17,8 +17,14 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
+    const char* getName() const override;
+    
     void setLearningRate(float rate);
     float getLearningRate() const;
+    
+    // Enhanced Hebbian: modulation factor for neuromodulatory effects
+    void setModulationFactor(float factor);
+    float getModulationFactor() const;
     
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
