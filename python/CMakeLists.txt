@@ -3,7 +3,7 @@ project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -67,6 +67,19 @@ set(NLM_AGENT_SOURCES
 
 set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+)
+
+# Add improved API sources
+set(NLM_IMPROVED_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/NLMImprovedAPI.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/ConfigBuilder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/BrainContextManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/AgentContextManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/SimulationHelpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/ErrorHandlers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/PerformanceMonitor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/QuickSetup.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/python/improved_api/Utils.cpp
 )
 
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
