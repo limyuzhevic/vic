@@ -92,13 +92,35 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Performance optimization system
+add_library(nlm_performance_optimization STATIC
+    src/performance/PerformanceOptimization.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_include_directories(nlm_performance_optimization PUBLIC src/performance)
+
+# Error handling and validation
+add_library(nlm_error_handling STATIC
+    src/core/ErrorHandling.cpp
+)
+target_include_directories(nlm_error_handling PUBLIC src/core)
+
+# Advanced agent configuration and factory
+add_library(nlm_advanced_agent_config STATIC
+    src/agent/AdvancedAgentConfiguration.hpp
+)
+
+add_library(nlm_advanced_agent_factory STATIC
+    src/agent/AdvancedAgentFactory.cpp
+)
+target_include_directories(nlm_advanced_agent_factory PUBLIC src/agent)
+target_link_libraries(nlm_advanced_agent_factory PUBLIC nlm_core nlm_error_handling nlm_agent)
+
+# Agent factory system
+add_library(nlm_agent_factory STATIC
+    src/agent/AgentBrainFactory.cpp
+)
+target_include_directories(nlm_agent_factory PUBLIC src/agent)
+target_link_libraries(nlm_agent_factory PUBLIC nlm_core nlm_error_handling nlm_performance_optimization)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
@@ -112,32 +134,39 @@ add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent_factory nlm_advanced_agent_factory nlm_error_handling nlm_agent nlm_world nlm_performance_optimization)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent_factory nlm_advanced_agent_factory nlm_error_handling nlm_agent nlm_world nlm_performance_optimization)
+
+# Phase 4 experiments
+add_library(nlm_phase4 STATIC
+    src/experiments/Phase4Experiment.cpp
+)
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent_factory nlm_advanced_agent_factory nlm_error_handling nlm_agent nlm_world nlm_performance_optimization)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent_factory nlm_advanced_agent_factory nlm_error_handling nlm_agent nlm_world nlm_performance_optimization)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent_factory nlm_advanced_agent_factory nlm_error_handling nlm_agent nlm_world nlm_phase3 nlm_performance_optimization)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent_factory nlm_advanced_agent_factory nlm_error_handling nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance_optimization)
 
 # Testing
 enable_testing()

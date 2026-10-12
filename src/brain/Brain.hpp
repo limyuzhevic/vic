@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/BrainCore.hpp"
 #include <memory>
 #include <string>
 
@@ -28,7 +29,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
-
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class CheckpointManager;
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -194,8 +199,8 @@ public:
     void logStatus() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    class BrainCore;
+    BrainCore* brainCore;
 };
 
 } // namespace nlm
