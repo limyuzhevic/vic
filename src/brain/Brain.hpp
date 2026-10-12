@@ -1,52 +1,29 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainCore.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Random/RandomGenerator.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/NeuralPrediction.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
-
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Brain: The main interface class that coordinates all brain systems
+// This class maintains backward compatibility while using the new modular architecture
 
 class Brain {
 public:
@@ -71,7 +48,6 @@ public:
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);
     
     // Inject current directly into a specific neuron
@@ -81,13 +57,13 @@ public:
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    class SpikeSystem* getSpikeSystem();
+    const class SpikeSystem* getSpikeSystem() const;
     
     // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    class STDP* getSTDP();
+    class Hebbian* getHebbian();
+    class StructuralPlasticity* getStructuralPlasticity();
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -117,13 +93,13 @@ public:
     
     // Region management
     RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
+    class NeuralRegion* getRegion(RegionId id);
+    const class NeuralRegion* getRegion(RegionId id) const;
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     
     // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    const std::vector<std::unique_ptr<class NeuralRegion>>& getRegions() const;
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
@@ -188,14 +164,28 @@ public:
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
-    RandomGenerator* getRandomGenerator();
+    class RandomGenerator* getRandomGenerator();
     
     // Logging
     void logStatus() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    // BrainCore handles the core functionality
+    std::unique_ptr<BrainCore> brainCore;
+    
+    // Direct access to subsystems (for backward compatibility and performance)
+    std::unique_ptr<NeuralWorkingMemory> workingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPlanner> neuralPlanner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attentionalSelection;
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<PredictionError> predictionError;
 };
 
 } // namespace nlm
