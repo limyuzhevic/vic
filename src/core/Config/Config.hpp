@@ -31,6 +31,37 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation result
+struct ValidationResult {
+    bool isValid;
+    std::string errorMessage;
+    
+    ValidationResult() : isValid(true), errorMessage("") {}
+    ValidationResult(bool valid, const std::string& error) : isValid(valid), errorMessage(error) {}
+    
+    static ValidationResult Valid() { return ValidationResult(true, ""); }
+    static ValidationResult Invalid(const std::string& error) { return ValidationResult(false, error); }
+};
+
+// Configuration parameter definition
+struct ParameterDefinition {
+    std::string name;
+    std::string type;  // "int", "int64_t", "double", "bool", "string", "vec_int", "vec_double", "vec_string"
+    std::string defaultValue;
+    std::string description;
+    std::string minValue;
+    std::string maxValue;
+    bool required;
+    
+    ParameterDefinition()
+        : name(), type(), defaultValue(), description(), minValue(), maxValue(), required(false) {}
+    
+    ParameterDefinition(const std::string& n, const std::string& t, const std::string& def,
+                       const std::string& desc = "", const std::string& min = "", const std::string& max = "",
+                       bool req = false)
+        : name(n), type(t), defaultValue(def), description(desc), minValue(min), maxValue(max), required(req) {}
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -92,6 +123,27 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation and parameter management
+    static void registerParameter(const ParameterDefinition& param);
+    static std::vector<ParameterDefinition> getRegisteredParameters();
+    static ValidationResult validateKey(const std::string& key, const ConfigValue& value);
+    static ValidationResult validateType(const std::string& key, const ConfigValue& value);
+    static ValidationResult validateRange(const std::string& key, const ConfigValue& value);
+    
+    // Default configuration presets
+    static void loadDefaultConfig();
+    static void loadTestConfig();
+    static void loadBenchmarkConfig();
+    
+    // Configuration presets
+    enum class Preset {
+        Default,
+        Test,
+        Benchmark
+    };
+    
+    void applyPreset(Preset preset);
     
 private:
     struct Impl;

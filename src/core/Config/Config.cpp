@@ -86,7 +86,37 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Get the actual value and write it
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -199,17 +229,61 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Static parameter registry
+static std::vector<ParameterDefinition> registeredParameters;
+static std::mutex registryMutex;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Parameter type conversion helpers
+namespace {
+    template<typename T>
+    std::string typeToString() {
+        if constexpr (std::is_same_v<T, int>) return "int";
+        else if constexpr (std::is_same_v<T, int64_t>) return "int64_t";
+        else if constexpr (std::is_same_v<T, double>) return "double";
+        else if constexpr (std::is_same_v<T, bool>) return "bool";
+        else if constexpr (std::is_same_v<T, std::string>) return "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) return "vec_int";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) return "vec_double";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) return "vec_string";
+        else return "unknown";
+    }
+    
+    template<typename T>
+    std::string valueToString(const T& value) {
+        std::ostringstream oss;
+        oss << value;
+        return oss.str();
+    }
+    
+    template<typename T>
+    T stringToValue(const std::string& str) {
+        std::istringstream iss(str);
+        T result;
+        iss >> result;
+        return result;
+    }
+    
+    // Helper to check if a value matches a type string
+    bool matchesType(const std::string& type, const ConfigValue& value) {
+        if (type == "int" && std::holds_alternative<int>(value)) return true;
+        if (type == "int64_t" && std::holds_alternative<int64_t>(value)) return true;
+        if (type == "double" && std::holds_alternative<double>(value)) return true;
+        if (type == "bool" && std::holds_alternative<bool>(value)) return true;
+        if (type == "string" && std::holds_alternative<std::string>(value)) return true;
+        if (type == "vec_int" && std::holds_alternative<std::vector<int>>(value)) return true;
+        if (type == "vec_double" && std::holds_alternative<std::vector<double>>(value)) return true;
+        if (type == "vec_string" && std::holds_alternative<std::vector<std::string>>(value)) return true;
+        return false;
+    }
+    
+    // Helper to convert ConfigValue to string
+    std::string configValueToString(const ConfigValue& value) {
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            oss << arg;
+        }, value);
+        return oss.str();
+    }
+}
 
 } // namespace nlm
