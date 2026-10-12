@@ -55,3 +55,18 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+# Enhanced documentation for Python bindings
+[build-system.requirements]
+scikit-build-core = "0.5.0"
+pybind11 = "2.11.0"
+
+[project.scripts]
+nlm-info = "pynlm.utils:print_info"
+nlm-config = "pynlm.utils:show_config"
+nlm-benchmark = "pynlm.benchmark:run_benchmarks"
+
+[tool.nlm]
+python_bindings_version = "0.1.0"
+scikit_build = true
+cmake_integration = true

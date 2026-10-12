@@ -340,19 +340,22 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Load configuration with improved argument parsing
     std::string configFile = "configs/default.cfg";
+    std::vector<std::string> extraArgs;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        // Handle --config=file or --config file
+        if (arg.substr(0, 8) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else {
+            extraArgs.push_back(arg);
         }
     }
     
@@ -360,36 +363,54 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args from extraArgs
+    if (!extraArgs.empty()) {
+        // Convert back to argv format for existing loadFromArgs
+        int extraArgc = extraArgs.size() + 1;
+        char** extraArgv = new char*[extraArgc];
+        extraArgv[0] = new char[7];  // "nlm" program name
+        strcpy(extraArgv[0], "nlm");
+        
+        for (size_t i = 0; i < extraArgs.size(); ++i) {
+            extraArgv[i + 1] = new char[extraArgs[i].size() + 1];
+            strcpy(extraArgv[i + 1], extraArgs[i].c_str());
+        }
+        
+        config->loadFromArgs(extraArgc, extraArgv);
+        
+        // Clean up
+        for (int i = 0; i < extraArgc; ++i) {
+            delete[] extraArgv[i];
+        }
+        delete[] extraArgv;
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Set test-specific defaults (can be overridden by config file or CLI)
+    config->set("neuron_count", config->getOr<int64_t>("neuron_count_test", 500), ConfigSource::Default);
+    config->set("region_count", config->getOr<int64_t>("region_count_test", 1), ConfigSource::Default);
+    config->set("connection_probability", config->getOr<float>("connection_probability_test", 0.15f), ConfigSource::Default);
+    config->set("stdp_ltp_weight", config->getOr<float>("stdp_ltp_weight_test", 0.02f), ConfigSource::Default);
+    config->set("stdp_ltd_weight", config->getOr<float>("stdp_ltd_weight_test", 0.015f), ConfigSource::Default);
+    config->set("stdp_tau", config->getOr<float>("stdp_tau_test", 20.0f), ConfigSource::Default);
+    config->set("synaptogenesis_rate", config->getOr<float>("synaptogenesis_rate_test", 0.0001f), ConfigSource::Default);
+    config->set("pruning_rate", config->getOr<float>("pruning_rate_test", 0.00001f), ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 1000)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 2)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.1f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.01f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.012f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.0001f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

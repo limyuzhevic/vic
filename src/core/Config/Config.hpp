@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <limits>
+#include <unordered_map>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -23,7 +27,17 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
+// Configuration parameter metadata for validation and documentation
+struct ConfigParameter {
+    std::string key;
+    ConfigValue defaultValue;
+    std::string description;
+    bool required = false;
+    std::string validation;  // Simple validation pattern (regex)
+    double minValue = std::numeric_limits<double>::lowest();
+    double maxValue = std::numeric_limits<double>::max();
+    std::vector<std::string> allowedValues;
+};
 enum class ConfigSource {
     Default,
     File,
@@ -93,13 +107,26 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and metadata management
+    void registerParameter(const ConfigParameter& param);
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    std::vector<ConfigParameter> getRegisteredParameters() const;
+    bool isValidValue(const std::string& key, const ConfigValue& value) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Configuration parameter registry
+    std::vector<ConfigParameter> registeredParameters;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool validateValue(const ConfigParameter& param, const ConfigValue& value);
 };
 
 } // namespace nlm
