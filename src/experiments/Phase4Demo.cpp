@@ -4,6 +4,7 @@
 #include <sstream>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
+#include "core/Logger/ConsoleLogger.hpp"
 #include "brain/Brain.hpp"
 #include "agent/AgentBrain.hpp"
 #include "world/SimpleWorld.hpp"
@@ -45,6 +46,12 @@ int main(int argc, char* argv[]) {
     if (argc > 1) {
         numTrials = std::stoi(argv[1]);
     }
+    
+    // Initialize logging
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
     
     // Create configuration
     auto config = std::make_shared<Config>();

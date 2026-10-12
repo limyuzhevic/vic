@@ -5,6 +5,7 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Logger/ConsoleLogger.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -253,6 +254,12 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         stepsPerEpisode = std::atoi(argv[2]);
     }
+    
+    // Initialize logging
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
     
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);

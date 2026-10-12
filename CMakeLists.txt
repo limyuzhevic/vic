@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# Find nlohmann_json library
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -29,6 +32,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/JsonConfig/JsonConfigParser.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -92,6 +96,13 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -125,7 +136,43 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_commandline)
+
+# Command line parser library
+add_library(nlm_commandline
+    src/core/CommandLine/CommandLineParser.cpp
+)
+
+target_include_directories(nlm_commandline PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/CommandLine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+)
+
+target_link_libraries(nlm_commandline PUBLIC nlm_core)
+
+# Json Config Parser library
+add_library(nlm_jsonconfig
+    src/core/JsonConfig/JsonConfigParser.cpp
+)
+
+target_include_directories(nlm_jsonconfig PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/JsonConfig
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+)
+
+target_link_libraries(nlm_jsonconfig PUBLIC nlm_core)
+
+# Debug Tools library
+add_library(nlm_debugtools
+    src/core/DebugTools/DebugTools.cpp
+)
+
+target_include_directories(nlm_debugtools PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/DebugTools
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+)
+
+target_link_libraries(nlm_debugtools PUBLIC nlm_core nlm_jsonconfig)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
