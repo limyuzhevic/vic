@@ -1,5 +1,21 @@
 #pragma once
 
+/**
+ * Brain.hpp - Main brain class header
+ * 
+ * This file contains the Brain class definition, which is the central coordinator
+ * of the neural system. It implements real spiking neural computation with
+ * event-driven dynamics and integrates multiple systems:
+ * - Memory systems (Working, Episodic, Associative)
+ * - Neuromodulation (Dopamine, Curiosity, Novelty, Reward)
+ * - Prediction system
+ * - Cognition (Neural planner, concept formation, attention)
+ * - Development system
+ * - Sensory and motor systems
+ * 
+ * The brain uses a Pimpl idiom (pointer to implementation) for encapsulation.
+ */
+
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"

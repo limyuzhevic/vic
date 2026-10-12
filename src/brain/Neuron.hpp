@@ -1,5 +1,22 @@
 #pragma once
 
+/**
+ * Neuron.hpp - Leaky Integrate-and-Fire (LIF) neuron implementation
+ * 
+ * This file contains the Neuron class implementing the Leaky Integrate-and-Fire
+ * neuron model, which is the fundamental computational unit of the NLM brain.
+ * 
+ * Key features:
+ * - Membrane potential dynamics with leak conductance
+ * - Spike detection and refractory period
+ * - Synaptic input processing (excitatory, inhibitory, modulatory)
+ * - Spike history recording for STDP learning
+ * - Plasticity flag management for Hebbian and STDP learning
+ * 
+ * The neuron uses a Pimpl idiom (pointer to implementation) for efficient
+ * memory management and encapsulation of internal state.
+ */
+
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>

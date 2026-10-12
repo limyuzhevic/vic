@@ -1,5 +1,13 @@
 #pragma once
 
+/**
+ * AgentBrain.hpp - Header file for AgentBrain class
+ * 
+ * This file contains the AgentBrain class definition which connects the NLM brain
+ * to the world by handling sensory transduction and motor decoding. It acts as
+ * the interface between the neural computation and the external environment.
+ */
+
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
