@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <ostream>
 
 namespace nlm {
 
@@ -55,8 +60,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& filepath, std::map<std::string, std::string>& outEntries);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -93,6 +107,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    static bool validateConfigKey(const std::string& key);
+    static bool validateConfigValue(const std::string& key, const std::string& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +118,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getCurrentTimeString();
+    static void writeConfigValueToStream(std::ostream& stream, const ConfigValue& value);
 };
 
 } // namespace nlm

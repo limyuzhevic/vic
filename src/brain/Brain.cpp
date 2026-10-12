@@ -66,8 +66,8 @@ struct Brain::Impl {
     size_t totalSpikesTotal;
     
     // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    std::vector<std::reference_wrapper<Neuron>> sensoryNeurons;
+    std::vector<std::reference_wrapper<Neuron>> motorNeurons;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -106,12 +106,24 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
+        // Check if plasticity systems were created successfully
+        if (!spikeSystem || !stdp || !hebbian || !structuralPlasticity) {
+            NLM_LOG_ERROR("Failed to initialize plasticity systems");
+            return false;
+        }
+        
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Check if memory systems were created successfully
+        if (!workingMemory || !episodicMemory || !associativeMemory) {
+            NLM_LOG_ERROR("Failed to initialize memory systems");
+            return false;
+        }
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -129,6 +141,13 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Check if cognition and neuromodulation systems were created successfully
+        if (!predictionSystem || !planner || !conceptFormation || !attention || !developmentSystem || 
+            !dopamine || !curiosity || !predictionError || !novelty) {
+            NLM_LOG_ERROR("Failed to initialize integrated systems");
+            return false;
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -205,12 +224,12 @@ bool Brain::initialize() {
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                    pImpl->sensoryNeurons.push_back(*neuron);
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                    pImpl->motorNeurons.push_back(*neuron);
                 }
             }
             
@@ -232,32 +251,57 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
+    if (!pImpl->workingMemory->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize working memory");
+        return false;
+    }
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
+    if (!pImpl->episodicMemory->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize episodic memory");
+        return false;
+    }
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (!pImpl->associativeMemory->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize associative memory");
+        return false;
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
+    if (!pImpl->planner->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize neural planner");
+        return false;
+    }
     pImpl->planner->setPlanningDepth(5);
     
-    pImpl->conceptFormation->initialize(this);
+    if (!pImpl->conceptFormation->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize concept formation");
+        return false;
+    }
     
-    pImpl->attention->initialize(this);
+    if (!pImpl->attention->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize attentional selection");
+        return false;
+    }
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (!pImpl->novelty->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize novelty detection");
+        return false;
+    }
+    
+    if (!pImpl->curiosity->initialize(this)) {
+        NLM_LOG_ERROR("Failed to initialize curiosity system");
+        return false;
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -607,11 +651,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        pImpl->sensoryNeurons[i].get()->injectCurrent(normalizedValue);
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i].get()->getId(), normalizedValue / 10.0f);
         }
     }
 }
@@ -699,7 +743,8 @@ std::unique_ptr<class Action> Brain::produceAction() {
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
+    for (const auto& neuronRef : pImpl->motorNeurons) {
+        Neuron* neuron = neuronRef.get();
         if (neuron->isFiring()) {
             ++firingMotor;
         }

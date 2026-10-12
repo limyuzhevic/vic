@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <map>
+#include <chrono>
+#include <iomanip>
+#include "../Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -19,36 +23,125 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to detect file format based on extension
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return loadFromJSON(filepath);
+    } else if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yaml") {
+        return loadFromYAML(filepath);
+    } else {
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Try to parse as JSON using rapidjson if available
+    // This is a placeholder implementation - would need rapidjson/yaml-cpp integration
+    NLM_LOG_WARNING("JSON config loading not yet implemented - falling back to simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // Try to parse as YAML using yaml-cpp if available  
+    // This is a placeholder implementation - would need yaml-cpp integration
+    NLM_LOG_WARNING("YAML config loading not yet implemented - falling back to simple format");
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath, std::map<std::string, std::string>& outEntries) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Config line " + std::to_string(lineNumber) + 
+                           " has no '=' separator: " + line);
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty() || value.empty()) {
+            NLM_LOG_WARNING("Config line " + std::to_string(lineNumber) + 
+                           " has empty key or value");
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Basic type validation and conversion
+        if (!validateConfigKey(key) || !validateConfigValue(key, value)) {
+            NLM_LOG_WARNING("Config line " + std::to_string(lineNumber) + 
+                           " has invalid key or value: " + key + " = " + value);
+            continue;
+        }
+        
+        outEntries[key] = value;
+    }
+    
+    if (outEntries.empty()) {
+        NLM_LOG_WARNING("Config file " + filepath + " contains no valid entries");
+    }
+    
+    return true;
+}
+
+bool Config::validateConfigKey(const std::string& key) {
+    // Valid config keys should not contain special characters (except underscore)
+    // Should be reasonable length
+    if (key.empty() || key.length() > 100) {
+        return false;
+    }
+    
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validateConfigValue(const std::string& key, const std::string& value) {
+    // Basic validation based on expected key types
+    std::string lowerKey = toLower(key);
+    
+    // For numeric keys, validate numeric format
+    if (lowerKey.find("seed") != std::string::npos || 
+        lowerKey.find("count") != std::string::npos ||
+        lowerKey.find("rate") != std::string::npos ||
+        lowerKey.find("timestep") != std::string::npos ||
+        lowerKey.find("weight") != std::string::npos) {
+        // Try to parse as double
+        try {
+            size_t pos;
+            double val = std::stod(value, &pos);
+            if (pos != value.length()) {
+                return false; // Not a complete number
             }
-            
-            set(key, value, ConfigSource::File);
+        } catch (const std::exception&) {
+            return false;
         }
     }
     
@@ -81,15 +174,63 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot save config to file: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM on " << getCurrentTimeString() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write value with appropriate formatting based on type
+        file << entry.key << " = ";
+        writeConfigValueToStream(file, entry.value);
+        file << "\n\n";
     }
     
     return true;
+}
+
+std::string Config::getCurrentTimeString() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+void Config::writeConfigValueToStream(std::ostream& stream, const ConfigValue& value) const {
+    std::visit([&stream](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            stream << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            stream << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) stream << ", ";
+                stream << arg[i];
+            }
+            stream << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            stream << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) stream << ", ";
+                stream << arg[i];
+            }
+            stream << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            stream << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) stream << ", ";
+                stream << "\"" << arg[i] << "\"";
+            }
+            stream << "]";
+        } else {
+            stream << arg;
+        }
+    }, value);
 }
 
 template<typename T>

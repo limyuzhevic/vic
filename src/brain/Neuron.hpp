@@ -3,12 +3,15 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
 
 namespace nlm {
 
 // Forward declarations
 class Synapse;
 class RandomGenerator;
+class HodgkinHuxleyNeuron;
+class AEIFNeuron;
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -25,6 +28,13 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // HH neuron state variables
+    float sodiumActivation;                // m gate (HH)
+    float sodiumInactivation;              // h gate (HH)
+    float potassiumActivation;              // n gate (HH)
+    float adaptationCurrent;               // w variable (AEIF)
+    float adaptationVariable2;             // u variable (AEIF)
+    
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -37,115 +47,115 @@ struct NeuronState {
         , refractoryRemaining(0)
         , refractoryPeriod(5)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(-1.0f)
+        , sodiumActivation(0.0f)
+        , sodiumInactivation(0.0f)
+        , potassiumActivation(0.0f)
+        , adaptationCurrent(0.0f)
+        , adaptationVariable2(0.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Base neuron interface - abstract class for all neuron types
 class Neuron {
 public:
-    // Create neuron with ID
-    explicit Neuron(NeuronId id);
+    virtual ~Neuron() = default;
     
-    ~Neuron();
-    
-    // Disable copying, enable moving
-    Neuron(const Neuron&) = delete;
-    Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    // Create neuron with ID and type
+    static std::unique_ptr<Neuron> createNeuron(NeuronId id, NeuronType type = NeuronType::Internal);
     
     // Identity
-    NeuronId getId() const;
+    virtual NeuronId getId() const = 0;
     
     // Type
-    NeuronType getType() const;
-    void setType(NeuronType type);
+    virtual NeuronType getType() const = 0;
+    virtual void setType(NeuronType type) = 0;
     
     // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
+    virtual const NeuronState& getState() const = 0;
+    virtual NeuronState& getState() = 0;
     
     // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
+    virtual MembranePotential getMembranePotential() const = 0;
+    virtual void setMembranePotential(MembranePotential potential) = 0;
+    virtual void addToMembranePotential(MembranePotential delta) = 0;
     
     // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
+    virtual MembranePotential getThreshold() const = 0;
+    virtual void setThreshold(MembranePotential threshold) = 0;
     
     // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
-    void setFiringState(FiringState state);
-    void setRefractoryPeriod(uint32_t steps);
-    void decrementRefractory();
+    virtual bool isFiring() const = 0;
+    virtual bool isRefractory() const = 0;
+    virtual void setFiringState(FiringState state) = 0;
+    virtual void setRefractoryPeriod(uint32_t steps) = 0;
+    virtual void decrementRefractory() = 0;
     
     // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
+    virtual FiringRate getFiringRate() const = 0;
+    virtual void setFiringRate(FiringRate rate) = 0;
     
     // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
-    void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
-    void setResetPotential(MembranePotential potential);
+    virtual void setLeakConductance(MembranePotential conductance) = 0;
+    virtual MembranePotential getLeakConductance() const = 0;
+    virtual uint32_t getRefractoryPeriod() const = 0;
+    virtual void setRestingPotential(MembranePotential potential) = 0;
+    virtual MembranePotential getRestingPotential() const = 0;
+    virtual void setResetPotential(MembranePotential potential) = 0;
     
     // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
+    virtual bool checkThreshold() const = 0;
+    virtual float getLastSpikeTime() const = 0;
     
     // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    virtual bool stepLIF(Timestamp currentTime, TimestepDuration dt) = 0;
+    
+    // HH step function - Hodgkin-Huxley dynamics
+    virtual bool stepHH(Timestamp currentTime, TimestepDuration dt) = 0;
+    
+    // AEIF step function - Adaptive Exponential Integrate-and-Fire
+    virtual bool stepAEIF(Timestamp currentTime, TimestepDuration dt) = 0;
+    
+    // Advanced step function - automatically selects appropriate model
+    virtual bool step(Timestamp currentTime) = 0;
     
     // Incoming signals (post-synaptic potentials)
-    void receiveExcitatoryInput(MembranePotential amplitude);
-    void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
+    virtual void receiveExcitatoryInput(MembranePotential amplitude) = 0;
+    virtual void receiveInhibitoryInput(MembranePotential amplitude) = 0;
+    virtual void receiveModulatoryInput(MembranePotential amplitude) = 0;
     
     // Current injection (from external sources)
-    void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
+    virtual void injectCurrent(MembranePotential current) = 0;
+    virtual MembranePotential getTotalCurrent() const = 0;
+    virtual void clearTotalCurrent() = 0;
     
     // Spike history (recent spikes for STDP)
-    void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
-    void clearSpikeHistory();
+    virtual void recordSpike(Timestamp timestamp) = 0;
+    virtual const std::vector<Timestamp>& getSpikeHistory() const = 0;
+    virtual void clearSpikeHistory() = 0;
     
     // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
+    virtual void addIncomingSynapse(SynapseHandle handle) = 0;
+    virtual void addOutgoingSynapse(SynapseHandle handle) = 0;
+    virtual const std::vector<SynapseHandle>& getIncomingSynapses() const = 0;
+    virtual const std::vector<SynapseHandle>& getOutgoingSynapses() const = 0;
     
     // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    virtual const PlasticityFlags& getPlasticityFlags() const = 0;
+    virtual PlasticityFlags& getPlasticityFlags() = 0;
+    virtual void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) = 0;
     
     // Region/population membership
-    void setRegionId(RegionId region);
-    RegionId getRegionId() const;
-    void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
-    
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    virtual void setRegionId(RegionId region) = 0;
+    virtual RegionId getRegionId() const = 0;
+    virtual void setPopulationId(PopulationId population) = 0;
+    virtual PopulationId getPopulationId() const = 0;
     
     // Reset to initial state
-    void reset();
+    virtual void reset() = 0;
     
     // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    virtual void initializeRandom(RandomGenerator& rng) = 0;
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Get neuron model name
+    virtual const char* getModelName() const = 0;
 };
-
-} // namespace nlm
