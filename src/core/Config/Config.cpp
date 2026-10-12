@@ -18,41 +18,203 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Enhanced configuration validation and error handling
+
+struct ConfigValidationResult {
+    bool valid = true;
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    std::string getSummary() const {
+        std::ostringstream oss;
+        oss << "Validation Result: ";
+        if (valid) {
+            oss << "VALID";
+        } else {
+            oss << "INVALID";
+        }
+        oss << " (" << errors.size() << " errors, " << warnings.size() << " warnings)";
+        return oss.str();
+    }
+};
+
+ConfigValidationResult Config::validate() const {
+    ConfigValidationResult result;
+    
+    // Validate each entry
+    for (const auto& entry : pImpl->entries) {
+        // Validate key format
+        if (entry.key.empty()) {
+            result.errors.push_back("Empty configuration key found");
+        } else if (entry.key.find('=') != std::string::npos) {
+            result.errors.push_back("Configuration key contains '=' character: " + entry.key);
+        } else if (entry.key.find(' ') != std::string::npos) {
+            result.warnings.push_back("Configuration key contains spaces: " + entry.key);
+        }
+        
+        // Validate value format based on key
+        validateEntryValue(entry, result);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+    return result;
+}
+
+void Config::validateEntryValue(const ConfigEntry& entry, ConfigValidationResult& result) const {
+    // Key-specific validation rules
+    if (entry.key == "random_seed") {
+        if (!std::holds_alternative<int64_t>(entry.value)) {
+            result.errors.push_back("random_seed must be an integer");
+        } else {
+            int64_t seed = std::get<int64_t>(entry.value);
+            if (seed < 0) {
+                result.warnings.push_back("random_seed should be non-negative");
+            }
+        }
+    }
+    else if (entry.key == "simulation_timestep") {
+        if (!std::holds_alternative<double>(entry.value)) {
+            result.errors.push_back("simulation_timestep must be a floating-point number");
+        } else {
+            double timestep = std::get<double>(entry.value);
+            if (timestep <= 0.0) {
+                result.errors.push_back("simulation_timestep must be positive");
+            } else if (timestep > 1.0) {
+                result.warnings.push_back("simulation_timestep > 1.0 may impact simulation accuracy");
+            }
+        }
+    }
+    else if (entry.key == "neuron_count") {
+        if (!std::holds_alternative<int64_t>(entry.value)) {
+            result.errors.push_back("neuron_count must be an integer");
+        } else {
+            int64_t neuronCount = std::get<int64_t>(entry.value);
+            if (neuronCount <= 0) {
+                result.errors.push_back("neuron_count must be positive");
+            } else if (neuronCount > 1000000) {
+                result.warnings.push_back("neuron_count is very large - may impact performance");
+            }
+        }
+    }
+    else if (entry.key == "region_count") {
+        if (!std::holds_alternative<int64_t>(entry.value)) {
+            result.errors.push_back("region_count must be an integer");
+        } else {
+            int64_t regionCount = std::get<int64_t>(entry.value);
+            if (regionCount <= 0) {
+                result.errors.push_back("region_count must be positive");
+            }
+        }
+    }
+    else if (entry.key == "connection_probability") {
+        if (!std::holds_alternative<float>(entry.value)) {
+            result.errors.push_back("connection_probability must be a floating-point number");
+        } else {
+            float prob = std::get<float>(entry.value);
+            if (prob < 0.0f || prob > 1.0f) {
+                result.errors.push_back("connection_probability must be between 0.0 and 1.0");
+            }
+        }
+    }
+    else if (entry.key == "stdp_ltp_weight" || entry.key == "stdp_ltd_weight") {
+        if (!std::holds_alternative<float>(entry.value)) {
+            result.errors.push_back(entry.key + " must be a floating-point number");
+        } else {
+            float weight = std::get<float>(entry.value);
+            if (weight < 0.0f) {
+                result.warnings.push_back(entry.key + " is negative - may cause instability");
+            }
+        }
+    }
+    else if (entry.key == "synaptogenesis_rate" || entry.key == "pruning_rate") {
+        if (!std::holds_alternative<float>(entry.value)) {
+            result.errors.push_back(entry.key + " must be a floating-point number");
+        } else {
+            float rate = std::get<float>(entry.value);
+            if (rate < 0.0f) {
+                result.errors.push_back(entry.key + " must be non-negative");
+            } else if (rate > 0.1f) {
+                result.warnings.push_back(entry.key + " is high - may cause rapid structural changes");
+            }
+        }
+    }
+}
+
+std::string Config::validateAndReport() const {
+    auto result = validate();
+    
+    std::ostringstream oss;
+    oss << "Configuration Validation Report:" << std::endl;
+    oss << "Total entries: " << pImpl->entries.size() << std::endl;
+    oss << result.getSummary() << std::endl;
+    
+    if (!result.errors.empty()) {
+        oss << std::endl << "ERRORS:" << std::endl;
+        for (size_t i = 0; i < result.errors.size(); ++i) {
+            oss << "  " << (i + 1) << ". " << result.errors[i] << std::endl;
+        }
+    }
+    
+    if (!result.warnings.empty()) {
+        oss << std::endl << "WARNINGS:" << std::endl;
+        for (size_t i = 0; i < result.warnings.size(); ++i) {
+            oss << "  " << (i + 1) << ". " << result.warnings[i] << std::endl;
+        }
+    }
+    
+    return oss.str();
+}
+
+bool Config::validate(const std::vector<std::pair<std::string, std::string>>& validationRules) const {
+    ConfigValidationResult result;
+    
+    for (const auto& rule : validationRules) {
+        const std::string& key = rule.first;
+        const std::string& ruleType = rule.second;
+        
+        if (!has(key)) {
+            result.errors.push_back("Missing required configuration key: " + key);
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        validateKeyRule(key, ruleType, result);
     }
     
-    return true;
+    return result.valid;
+}
+
+void Config::validateKeyRule(const std::string& key, const std::string& ruleType, ConfigValidationResult& result) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });n    
+    if (it == pImpl->entries.end()) {
+        return; // Key not found (should have been caught earlier)
+    }
+    
+    if (ruleType == "required") {
+        // Key is already required (exists)
+    }
+    else if (ruleType == "non_empty") {
+        if (std::holds_alternative<std::string>(it->value) && std::get<std::string>(it->value).empty()) {
+            result.errors.push_back("Configuration key '" + key + "' cannot be empty");
+        }
+    }
+    else if (ruleType == "positive") {
+        if (std::holds_alternative<int64_t>(it->value)) {
+            int64_t val = std::get<int64_t>(it->value);
+            if (val <= 0) {
+                result.errors.push_back("Configuration key '" + key + "' must be positive");
+            }
+        } else if (std::holds_alternative<double>(it->value)) {
+            double val = std::get<double>(it->value);
+            if (val <= 0.0) {
+                result.errors.push_back("Configuration key '" + key + "' must be positive");
+            }
+        }
+    }
+    else if (ruleType == "range") {
+        // For range validation, we'd need to parse min/max from the rule
+        // This is a placeholder for future enhancement
+        result.warnings.push_back("Range validation for key '" + key + "' not yet implemented");
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

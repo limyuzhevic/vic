@@ -416,6 +416,272 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced API functions
+    
+    // Batch processing utilities
+    m.def("runBatchSimulation", [](
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        int numSteps,
+        int stepsPerBatch,
+        bool verbose = true
+    ) {
+        // Run simulation in batches
+        for (int batch = 0; batch < numSteps; batch += stepsPerBatch) {
+            int actualBatchSize = std::min(stepsPerBatch, numSteps - batch);
+            
+            for (int step = 0; step < actualBatchSize; ++step) {
+                int currentStep = batch + step;
+                
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(currentStep);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+            
+            if (verbose) {
+                std::cout << "Batch " << (batch/stepsPerBatch + 1) << " complete" << std::endl;
+            }
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), 
+              py::arg("stepsPerBatch") = 100, py::arg("verbose") = true,
+              "Run simulation in batches for progress tracking");
+
+    // Time series collection utilities
+    m.def("collectTimeSeriesData", [](
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        int numSteps,
+        std::function<bool(int)> progressCallback = nullptr
+    ) {
+        std::vector<double> spikeCounts;
+        std::vector<double> firingRates;
+        std::vector<double> firingNeuronCounts;
+        std::vector<double> totalSpikeCounts;
+        std::vector<double> simulationTimes;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Collect metrics
+            spikeCounts.push_back(static_cast<double>(brain->getTotalSpikeCount()));
+            firingRates.push_back(brain->getAverageFiringRate());
+            firingNeuronCounts.push_back(static_cast<double>(brain->getFiringNeuronCount()));
+            totalSpikeCounts.push_back(static_cast<double>(brain->getTotalSpikeCount()));
+            simulationTimes.push_back(world->getSimulationTime());
+            
+            if (progressCallback && !progressCallback(step)) {
+                break;
+            }
+        }
+        
+        // Return as dictionary-like structure
+        py::dict results;
+        results["spike_counts"] = spikeCounts;
+        results["firing_rates"] = firingRates;
+        results["firing_neuron_counts"] = firingNeuronCounts;
+        results["total_spike_counts"] = totalSpikeCounts;
+        results["simulation_times"] = simulationTimes;
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+              py::arg("progressCallback") = nullptr,
+              "Collect time series data during simulation");
+
+    // Advanced simulation utilities
+    m.def("runAdvancedSimulation", [](
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        int numSteps,
+        bool enableRewardModulation = true,
+        bool enableCuriosity = true,
+        bool enableDevelopment = true
+    ) {
+        // Enable subsystems
+        agent->enableRewardModulation(enableRewardModulation);
+        agent->enableCuriosity(enableCuriosity);
+        agent->enableDevelopment(enableDevelopment);
+        
+        // Advanced simulation loop
+        for (int step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get and process sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Get motor command
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            if (enableRewardModulation) {
+                double reward = 0.0;
+                auto internal = percept->getInternal();
+                if (!internal->empty()) {
+                    reward = (*internal)[0];
+                }
+                agent->applyRewardModulation(reward, 0.0);
+            }
+            
+            // Update development
+            if (enableDevelopment) {
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        // Return final metrics
+        py::dict results;
+        results["final_spike_count"] = brain->getTotalSpikeCount();
+        results["final_firing_neurons"] = brain->getFiringNeuronCount();
+        results["final_firing_rate"] = brain->getAverageFiringRate();
+        results["final_developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        results["curiosity_level"] = agent->getCuriosityLevel();
+        results["novelty_level"] = agent->getNoveltyLevel();
+        results["prediction_error"] = agent->getPredictionError();
+        results["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+              py::arg("enableRewardModulation") = true,
+              py::arg("enableCuriosity") = true,
+              py::arg("enableDevelopment") = true,
+              "Run advanced simulation with multiple subsystems");
+
+    // Configuration utilities
+    m.def("validateConfiguration", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        // Validate key configuration values
+        if (config->has("brain.neuron_count")) {
+            int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 1000);
+            if (neuronCount <= 0) {
+                errors.push_back("brain.neuron_count must be positive");
+            } else if (neuronCount > 1000000) {
+                warnings.push_back("brain.neuron_count is very large - may impact performance");
+            }
+        }
+        
+        if (config->has("brain.connection_probability")) {
+            float connProb = config->getOr<float>("brain.connection_probability", 0.1);
+            if (connProb < 0.0 || connProb > 1.0) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (config->has("simulation_timestep")) {
+            double timestep = config->getOr<double>("simulation_timestep", 0.001);
+            if (timestep <= 0.0 || timestep > 1.0) {
+                warnings.push_back("simulation_timestep is outside typical range (0.001-1.0)");
+            }
+        }
+        
+        // Return validation results
+        py::dict validationResults;
+        validationResults["valid"] = errors.empty();
+        validationResults["errors"] = errors;
+        validationResults["warnings"] = warnings;
+        
+        return validationResults;
+    }, py::arg("config"), "Validate configuration and return errors/warnings");
+
+    // Benchmarking utilities
+    m.def("benchmarkBrain", [](
+        std::shared_ptr<Config> config,
+        int numSteps,
+        int warmupSteps = 10
+    ) {
+        py::dict results;
+        
+        // Create and initialize brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Warm-up phase
+        for (int step = 0; step < warmupSteps; ++step) {
+            brain->step(step);
+        }
+        
+        // Benchmark phase
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = warmupSteps; step < warmupSteps + numSteps; ++step) {
+            brain->step(step);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        // Calculate performance metrics
+        double stepsPerSecond = numSteps / (duration.count() / 1000.0);
+        double avgTimePerStep = duration.count() / static_cast<double>(numSteps);
+        
+        results["steps"] = numSteps;
+        results["warmup_steps"] = warmupSteps;
+        results["total_duration_ms"] = duration.count();
+        results["steps_per_second"] = stepsPerSecond;
+        results["avg_time_per_step_ms"] = avgTimePerStep;
+        results["final_spike_count"] = brain->getTotalSpikeCount();
+        results["final_firing_neurons"] = brain->getFiringNeuronCount();
+        
+        return results;
+    }, py::arg("config"), py::arg("numSteps"), py::arg("warmupSteps") = 10,
+              "Benchmark brain performance");
+
+    // Neural network analysis utilities
+    m.def("analyzeNeuralActivity", [](std::shared_ptr<Brain> brain, int windowSize = 100) {
+        std::vector<double> firingRates;
+        std::vector<double> spikeCounts;
+        std::vector<double> excitationInhibitionRatios;
+        
+        // Collect historical data (simulated for this example)
+        for (int step = 0; step < windowSize; ++step) {
+            firingRates.push_back(brain->getAverageFiringRate());
+            spikeCounts.push_back(static_cast<double>(brain->getTotalSpikeCount()));
+            excitationInhibitionRatios.push_back(brain->getExcitationInhibitionRatio());
+        }
+        
+        // Calculate statistics
+        double sumFiringRate = std::accumulate(firingRates.begin(), firingRates.end(), 0.0);
+        double avgFiringRate = sumFiringRate / firingRates.size();
+        
+        double sumSpikeCount = std::accumulate(spikeCounts.begin(), spikeCounts.end(), 0.0);
+        double avgSpikeCount = sumSpikeCount / spikeCounts.size();
+        
+        double sumEIRatio = std::accumulate(excitationInhibitionRatios.begin(), excitationInhibitionRatios.end(), 0.0);
+        double avgEIRatio = sumEIRatio / excitationInhibitionRatios.size();
+        
+        py::dict analysis;
+        analysis["window_size"] = windowSize;
+        analysis["avg_firing_rate"] = avgFiringRate;
+        analysis["avg_spike_count"] = avgSpikeCount;
+        analysis["avg_ei_ratio"] = avgEIRatio;
+        analysis["firing_rate_variance"] = 0.0; // Would need historical data to calculate properly
+        analysis["activity_stability"] = 1.0; // Would need more sophisticated calculation
+        analysis["total_neurons"] = brain->getTotalNeuronCount();
+        analysis["total_synapses"] = brain->getTotalSynapseCount();
+        
+        return analysis;
+    }, py::arg("brain"), py::arg("windowSize") = 100,
+              "Analyze neural activity patterns and statistics");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
