@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <array>
 
 namespace nlm {
 
@@ -13,6 +14,14 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Configuration constants for advanced users
+    static constexpr size_t NUM_MOTOR_ACTIONS = 6;
+    static constexpr size_t NUM_SENSORY_MODALITIES = 4;
+    static constexpr float DEFAULT_NOVELTY_DECAY = 0.99f;
+    static constexpr float CURIOUS_THRESHOLD = 0.3f;
+    static constexpr float HIGH_CURIOUS_THRESHOLD = 0.5f;
+    static constexpr float EXPLORATION_MAX_CHANCE = 0.3f;
+    
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
@@ -63,11 +72,43 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void setSensoryNoveltyDecay(float decay) { sensoryNoveltyDecay_ = decay; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Advanced configuration methods
+    void setMotorNeuronDistribution(const std::array<size_t, NUM_MOTOR_ACTIONS>& distribution);
+    void setSensoryNeuronDistribution(const std::array<size_t, NUM_SENSORY_MODALITIES>& distribution);
+    
+    // Utility methods for advanced users
+    const std::vector<Neuron*>& getMotorNeurons(MotorCommand action) const;
+    const std::vector<Neuron*>& getSensoryNeurons(size_t modality) const;
+    size_t getMotorNeuronCount() const;
+    size_t getSensoryNeuronCount() const;
+    
+    // Get access to individual motor neuron groups (for advanced users)
+    const std::vector<Neuron*>& getMotorGroup(MotorCommand action) const {
+        size_t idx = 0;
+        for (; idx < NUM_MOTOR_ACTIONS; ++idx) {
+            if (MOTOR_ACTIONS[idx] == action) {
+                break;
+            }
+        }
+        return motorGroups_[idx];
+    }
+    
+    // Get all sensory neuron groups (for advanced users)
+    const std::array<std::vector<Neuron*>, NUM_SENSORY_MODALITIES>& getAllSensoryGroups() const {
+        return sensoryGroups_;
+    }
+    
+    // Get all motor neuron groups (for advanced users)
+    const std::array<std::vector<Neuron*>, NUM_MOTOR_ACTIONS>& getAllMotorGroups() const {
+        return motorGroups_;
+    }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -76,21 +117,26 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Helper methods for improved code organization
+    void distributeMotorNeurons();
+    void distributeSensoryNeurons();
+    float calculateAverageActivity(const std::vector<Neuron*>& neurons) const;
+    MotorCommand findCommandWithMaxActivity(const std::array<MotorCommand, NUM_MOTOR_ACTIONS>& commands, 
+                                           const std::array<float, NUM_MOTOR_ACTIONS>& activities) const;
+    float computeNovelty(const std::vector<float>& currentVision) const;
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups (using array for better organization)
+    std::array<std::vector<Neuron*>, NUM_MOTOR_ACTIONS> motorGroups_;
+    static constexpr std::array<MotorCommand, NUM_MOTOR_ACTIONS> MOTOR_ACTIONS = {
+        MotorCommand::MoveForward, MotorCommand::MoveBackward, MotorCommand::TurnLeft,
+        MotorCommand::TurnRight, MotorCommand::Interact, MotorCommand::Wait
+    };
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron groups (using array for better organization)
+    std::array<std::vector<Neuron*>, NUM_SENSORY_MODALITIES> sensoryGroups_;
+    static constexpr std::array<size_t, NUM_SENSORY_MODALITIES> SENSORY_MODALITIES = {0, 1, 2, 3}; // Vision, Touch, Internal, Proprioception
     
     // Neuromodulation state
     float dopamineLevel_;
