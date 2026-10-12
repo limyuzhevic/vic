@@ -142,24 +142,108 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(
+        Configuration class for NLM system
+        
+        The Config class provides a unified interface for configuration management
+        using JSON format. It supports loading from JSON files, command-line arguments,
+        and runtime settings with type-safe value access.
+        
+        Configuration values can be integers, floating-point numbers, booleans, strings,
+        or arrays of these types. Values are automatically converted based on the target type.
+        
+        Example usage:
+        
+        ```python
+        import pynlm
+        
+        # Create default configuration
+        config = pynlm.createDefaultConfig()
+        
+        # Load from JSON file
+        config.loadFromFile("config.json")
+        
+        # Set values
+        config.set("random_seed", 42)
+        config.set("simulation_timestep", 0.001)
+        config.set("neuron_count", 500)
+        
+        # Get values with type safety
+        seed = config.getOr("random_seed", 0)
+        timestep = config.getOr("simulation_timestep", 0.001)
+        neurons = config.getOr("neuron_count", 100)
+        
+        # Save back to file
+        config.saveToFile("output_config.json")
+        ```
+    )pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             R"pbdoc(
+             Load configuration from a JSON file.
+             
+             Args:
+                 filepath: Path to the JSON configuration file
+                 
+             Returns:
+                 True if the file was successfully loaded, False otherwise
+             )pbdoc")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            R"pbdoc(
+            Load configuration from command-line arguments.
+            
+            Supports both --key=value and -key value formats.
+            
+            Args:
+                argc: Argument count
+                argv: Argument values
+                
+            Returns:
+                True if arguments were successfully parsed, False otherwise
+            )pbdoc")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             R"pbdoc(
+             Save configuration to a JSON file.
+             
+             Args:
+                 filepath: Path where the JSON configuration will be saved
+                 
+             Returns:
+                 True if the file was successfully saved, False otherwise
+             )pbdoc")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             R"pbdoc(
+             Check if a configuration key exists.
+             
+             Args:
+                 key: Configuration key to check
+                 
+             Returns:
+                 True if the key exists, False otherwise
+             )pbdoc")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             R"pbdoc(
+             Get all configuration keys.
+             
+             Returns:
+                 List of all configuration keys
+             )pbdoc")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             R"pbdoc(
+             Clear all configuration entries.
+             
+             This removes all configuration keys and resets to empty state.
+             )pbdoc")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             R"pbdoc(
+             Get a summary string of the configuration.
+             
+             Returns:
+                 A formatted string showing all configuration entries
+                 with their values and sources
+             )pbdoc")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -289,69 +373,275 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+        Central neural simulation brain class
+        
+        The Brain class represents the core neural processing system in NLM.
+        It implements a closed-loop spiking neural network with:
+        - Leaky Integrate-and-Fire (LIF) neuron dynamics
+        - Event-driven spike propagation with synaptic delays
+        - Multiple plasticity rules (STDP, Hebbian, reward-modulated)
+        - Working memory, episodic memory, and sensory processing
+        - Motor output generation and action selection
+        
+        The brain operates in a continuous loop:
+        1. WORLD -> SENSORY INPUT
+        2. SENSORY INPUT -> NEURAL PROCESSING
+        3. NEURAL PROCESSING -> INTERNAL STATE
+        4. INTERNAL STATE -> MEMORY / PREDICTION
+        5. MEMORY / PREDICTION -> MOTIVATION / NEUROMODULATION
+        6. MOTIVATION / NEUROMODULATION -> ACTION SELECTION
+        7. ACTION SELECTION -> MOTOR OUTPUT
+        8. MOTOR OUTPUT -> WORLD CONSEQUENCE
+        9. WORLD CONSEQUENCE -> REWARD / SURPRISE / ERROR
+        10. REWARD / SURPRISE / ERROR -> PLASTICITY
+        11. PLASTICITY -> MEMORY / DEVELOPMENT
+        12. CHANGED BRAIN -> CHANGED FUTURE BEHAVIOR
+        
+        The brain can be initialized with a configuration, reset to initial state,
+        and advanced in time steps. It supports injecting external currents,
+        receiving sensory input, and producing motor actions.
+    )pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             R"pbdoc(
+             Create a brain with the given configuration.
+             
+             Args:
+                 config: Configuration object for neural parameters
+             )pbdoc")
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             R"pbdoc(
+             Initialize the brain with configuration.
+             
+             This method sets up the neural network architecture based on the
+             configuration, including neuron types, regions, connections, and
+             initial states. Must be called before simulation.
+             
+             Returns:
+                 True if initialization succeeded, False otherwise
+             )pbdoc")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
+             R"pbdoc(
+             Perform a simulation step with the given step number.
+             
+             This advances the brain state by one simulation timestep using the
+             configured timestep duration.
+             
+             Args:
+                 currentStep: Current simulation step number
+             )pbdoc")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             R"pbdoc(
+             Perform a simulation step with the given step number and timestamp.
+             
+             This advances the brain state by one simulation timestep with
+             precise timing information.
+             
+             Args:
+                 currentStep: Current simulation step number
+                 currentTime: Current simulation time in seconds
+             )pbdoc")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
-             "Inject sensory input into the brain")
+             R"pbdoc(
+             Inject sensory input into the brain.
+             
+             This processes external sensory information and injects it as
+             neural currents into appropriate neuron populations.
+             
+             Args:
+                 input: Sensory input data object
+             )pbdoc")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
+             R"pbdoc(
+             Inject current into a specific neuron.
+             
+             Args:
+                 neuron: Neuron identifier
+                 current: Current value to inject (in nA)
+             )pbdoc")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+             R"pbdoc(
+             Inject current into all neurons of a specific type.
+             
+             Args:
+                 type: Neuron type (e.g., Sensory, Motor, Internal)
+                 current: Current value to inject (in nA)
+             )pbdoc")
         .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
+             R"pbdoc(
+             Produce motor action based on neural activity.
+             
+             This method analyzes the current neural state and produces
+             the most appropriate motor action based on learned policies
+             and current environmental demands.
+             
+             Returns:
+                 Action object representing the selected motor action
+             )pbdoc")
         .def("reset", &Brain::reset,
-             "Reset brain state")
+             R"pbdoc(
+             Reset brain state to initial conditions.
+             
+             This clears all neural states, resets membrane potentials,
+             clears spike history, and reinitializes internal structures.
+             The brain can be re-initialized after reset to continue
+             simulation.
+             )pbdoc")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             R"pbdoc(
+             Save brain state to file.
+             
+             This serializes the complete brain state including neuron states,
+             synaptic weights, memory contents, and other internal structures.
+             The brain can be restored from a saved state using the load method.
+             
+             Args:
+                 filepath: Path where the brain state will be saved
+                 
+             Returns:
+                 True if the state was successfully saved, False otherwise
+             )pbdoc")
         .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+             R"pbdoc(
+             Load brain state from file.
+             
+             This restores the complete brain state from a previously saved
+             file. The brain will be in the same state as when it was saved.
+             
+             Args:
+                 filepath: Path to the saved brain state file
+                 
+             Returns:
+                 True if the state was successfully loaded, False otherwise
+             )pbdoc")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
+             R"pbdoc(
+             Add a new neural region to the brain.
+             
+             Args:
+                 name: Optional name for the new region
+                 
+             Returns:
+                 Region identifier for the newly created region
+             )pbdoc")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
              py::return_value_policy::reference_internal,
-             "Get a region by ID")
+             R"pbdoc(
+             Get a region by ID.
+             
+             Args:
+                 id: Region identifier
+                 
+             Returns:
+                 Region object if found, None otherwise
+             )pbdoc")
         .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
+             R"pbdoc(
+             Get the number of regions in the brain.
+             
+             Returns:
+                 Number of regions
+             )pbdoc")
         .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
+             R"pbdoc(
+             Get all region IDs.
+             
+             Returns:
+                 List of all region identifiers
+             )pbdoc")
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
-             "Get all regions")
+             R"pbdoc(
+             Get all regions.
+             
+             Returns:
+                 List of all region objects
+             )pbdoc")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
+             R"pbdoc(
+             Get total neuron count across all regions.
+             
+             Returns:
+                 Total number of neurons in the brain
+             )pbdoc")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
+             R"pbdoc(
+             Get total synapse count across all regions.
+             
+             Returns:
+                 Total number of synapses in the brain
+             )pbdoc")
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
+             R"pbdoc(
+             Get count of active neurons.
+             
+             Returns:
+                 Number of neurons currently in active state
+             )pbdoc")
         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
+             R"pbdoc(
+             Get count of currently firing neurons.
+             
+             Returns:
+                 Number of neurons currently firing action potentials
+             )pbdoc")
         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
+             R"pbdoc(
+             Get average firing rate across all neurons.
+             
+             Returns:
+                 Average firing rate in Hz
+             )pbdoc")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
+             R"pbdoc(
+             Get excitation/inhibition balance ratio.
+             
+             Returns:
+                 Ratio of excitatory to inhibitory activity
+             )pbdoc")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+             R"pbdoc(
+             Get total spike count.
+             
+             Returns:
+                 Total number of action potentials generated
+             )pbdoc")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
+             R"pbdoc(
+             Get current developmental stage.
+             
+             Returns:
+                 Current developmental stage
+             )pbdoc")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
-             "Set developmental stage")
+             R"pbdoc(
+             Set developmental stage.
+             
+             Args:
+                 stage: New developmental stage
+             )pbdoc")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
-             "Get the configuration")
+             R"pbdoc(
+             Get the configuration.
+             
+             Returns:
+                 Configuration object used by this brain
+             )pbdoc")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             R"pbdoc(
+             Log brain status.
+             
+             This outputs detailed information about the current brain state,
+             including neuron counts, activity levels, memory contents, and
+             other relevant statistics for debugging and monitoring.
+             )pbdoc");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,63 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Parse JSON file
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        clear();
+        
+        // Process JSON entries
+        for (const auto& [key, value] : j.items()) {
+            ConfigSource source = ConfigSource::File;
+            std::string description = "";
+            
+            // Handle different value types
+            if (value.is_string()) {
+                set(key, value.get<std::string>(), source, description);
+            } else if (value.is_boolean()) {
+                set(key, value.get<bool>(), source, description);
+            } else if (value.is_number_integer()) {
+                // Check if it fits in int64_t
+                set(key, value.get<int64_t>(), source, description);
+            } else if (value.is_number_float()) {
+                set(key, value.get<double>(), source, description);
+            } else if (value.is_array()) {
+                // Handle array types
+                if (!value.empty() && value.front().is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : value) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    set(key, intArray, source, description);
+                } else if (!value.empty() && value.front().is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : value) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    set(key, doubleArray, source, description);
+                } else if (!value.empty() && value.front().is_string()) {
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : value) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    set(key, stringArray, source, description);
+                }
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON config file " + filepath + ": " + e.what());
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +108,47 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json j;
+        
+        // Add configuration entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            std::string description = entry.description.empty() ? 
+                "Configuration parameter" : entry.description;
+            
+            // Convert value based on type
+            std::visit([&j, &entry, &description](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                
+                if constexpr (std::is_same_v<T, std::string>) {
+                    j[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    j[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, int> || 
+                                   std::is_same_v<T, int64_t>) {
+                    j[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    j[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                    j[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    j[entry.key] = val;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    j[entry.key] = val;
+                }
+            }, entry.value);
+            
+            // Add metadata comment (JSON doesn't support inline comments)
+            // Instead, we could create a separate metadata section or use a different format
+        }
+        
+        // Write JSON with pretty formatting
+        file << j.dump(2);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to write JSON config file " + filepath + ": " + e.what());
+        return false;
     }
-    
-    return true;
 }
 
 template<typename T>
@@ -114,32 +173,35 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        if (!description.empty()) {
+            it->description = description;
+        }
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, value, source, description);
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, const std::string& value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, int value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, double value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, bool value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
 bool Config::has(const std::string& key) const {
