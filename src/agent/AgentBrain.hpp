@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -115,3 +116,14 @@ private:
 };
 
 } // namespace nlm
+
+// Helper exception classes
+class AgentBrainException : public std::runtime_error {
+public:
+    explicit AgentBrainException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class AgentBrainValidationException : public AgentBrainException {
+public:
+    explicit AgentBrainValidationException(const std::string& msg) : AgentBrainException(msg) {}
+};

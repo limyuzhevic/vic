@@ -19,6 +19,63 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <stdexcept>
+#include <limits>
+
+namespace nlm {
+
+// Brain implementation constants
+namespace BrainConfig {
+    // Default simulation parameters
+    constexpr TimestepDuration DEFAULT_TIMESTEP = 0.001;
+    constexpr SimulationStep DEFAULT_REPLAY_INTERVAL = 100;
+    constexpr SimulationStep DEFAULT_CONSOLIDATION_INTERVAL = 1000;
+    
+    // Default plasticity parameters
+    constexpr float DEFAULT_STDP_TAU = 20.0f;
+    constexpr float DEFAULT_SYNAPSE_WEIGHT_MIN = -1.0f;
+    constexpr float DEFAULT_SYNAPSE_WEIGHT_MAX = 1.0f;
+    constexpr float DEFAULT_EQUILIBRIUM_WEIGHT = 0.0f;
+    
+    // Default neuron parameters
+    constexpr size_t DEFAULT_POPULATION_SIZE_DIVISOR = 4;
+    constexpr float DEFAULT_PROBABILITY_THRESHOLD = 0.2f;
+    constexpr float DEFAULT_WEIGHT_INITIAL_MAX = 0.2f;
+    constexpr float DEFAULT_WEIGHT_INITIAL_MIN = 0.1f;
+    
+    // Default memory system parameters
+    constexpr size_t DEFAULT_WORKING_MEMORY_CAPACITY_DIVISOR = 10;
+    constexpr size_t DEFAULT_EPISODIC_MEMORY_MAX_EPISODES = 1000;
+    
+    // Default neuromodulation parameters
+    constexpr float DEFAULT_DOPAMINE_SCALE = 1.0f;
+    constexpr float DEFAULT_DOPAMINE_EFFECT = 0.5f;
+    constexpr float DEFAULT_NOVELTY_THRESHOLD = 0.5f;
+    constexpr float DEFAULT_CURIOUSITY_WEIGHT = 2.0f;
+    constexpr float DEFAULT_PREDICTION_ERROR_CLAMP = 1.0f;
+    
+    // Default cognition parameters
+    constexpr size_t DEFAULT_PLANNING_DEPTH = 5;
+    constexpr float DEFAULT_ATTENTION_INHIBITION_STRENGTH = 0.5f;
+    constexpr float DEFAULT_ATTENTION_EXCITATION_STRENGTH = 1.5f;
+    
+    // Default development parameters
+    constexpr SimulationStep DEFAULT_DEVELOPMENT_INTERVAL = 1000;
+    constexpr float DEFAULT_DEVELOPMENT_PLASTICITY_MODIFIER_INITIAL = 1.0f;
+    constexpr float DEFAULT_DEVELOPMENT_PLASTICITY_MODIFIER_CRITICAL = 0.8f;
+    constexpr float DEFAULT_DEVELOPMENT_PLASTICITY_MODIFIER_MATURATION = 0.5f;
+    constexpr float DEFAULT_DEVELOPMENT_PLASTICITY_MODIFIER_ADULT = 0.2f;
+    
+    // Default checkpoint parameters
+    constexpr size_t DEFAULT_CHECKPOINT_MAX_COUNT = 10000;
+    constexpr size_t DEFAULT_CHECKPOINT_MAX_SIZE_MB = 5;
+    
+    // Default safety and validation parameters
+    constexpr size_t MIN_NEURON_COUNT = 10;
+    constexpr size_t MIN_REGION_COUNT = 1;
+    constexpr float MAX_CONNECTION_PROBABILITY = 1.0f;
+    constexpr double MAX_SIMULATION_TIME = 3600.0;
+}
 
 namespace nlm {
 
@@ -83,16 +140,23 @@ struct Brain::Impl {
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(BrainConfig::DEFAULT_TIMESTEP)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(BrainConfig::DEFAULT_REPLAY_INTERVAL)
+        , consolidationInterval(BrainConfig::DEFAULT_CONSOLIDATION_INTERVAL)
     {
+        // Validate config pointer
+        if (!cfg) {
+            throw std::invalid_argument("Brain::Impl: Configuration pointer is null");
+        }
+        
+        validateConfig(cfg);
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -130,27 +194,114 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        // Configure STDP parameters with validation
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", BrainConfig::DEFAULT_STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", BrainConfig::DEFAULT_STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", BrainConfig::DEFAULT_STDP_TAU);
+        
+        if (!validatePlasticityWeights(ltpWeight, ltdWeight, tau)) {
+            NLM_LOG_WARNING("Brain::Impl: Invalid STDP parameters, using defaults");
+            ltpWeight = BrainConfig::DEFAULT_STDP_LTP_WEIGHT;
+            ltdWeight = BrainConfig::DEFAULT_STDP_LTD_WEIGHT;
+            tau = BrainConfig::DEFAULT_STDP_TAU;
+        }
+        
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", BrainConfig::DEFAULT_SYNAPTOGENESIS_RATE);
+        float pruningRate = config->getOr<float>("pruning_rate", BrainConfig::DEFAULT_PRUNING_RATE);
+        
+        if (!validatePlasticityRates(synaptogenesisRate, pruningRate)) {
+            NLM_LOG_WARNING("Brain::Impl: Invalid plasticity rates, using defaults");
+            synaptogenesisRate = BrainConfig::DEFAULT_SYNAPTOGENESIS_RATE;
+            pruningRate = BrainConfig::DEFAULT_PRUNING_RATE;
+        }
+        
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Get timestep with validation
+        timestep = config->getOr<double>("simulation_timestep", BrainConfig::DEFAULT_TIMESTEP);
+        if (timestep <= 0.0 || timestep >= 1.0) {
+            NLM_LOG_WARNING("Brain::Impl: Invalid timestep, using default");
+            timestep = BrainConfig::DEFAULT_TIMESTEP;
+        }
         
         // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        replayInterval = config->getOr<size_t>("replay_interval", BrainConfig::DEFAULT_REPLAY_INTERVAL);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", BrainConfig::DEFAULT_CONSOLIDATION_INTERVAL);
+        
+        // Validate integration intervals
+        if (replayInterval == 0 || consolidationInterval == 0) {
+            NLM_LOG_WARNING("Brain::Impl: Invalid integration intervals, using defaults");
+            replayInterval = BrainConfig::DEFAULT_REPLAY_INTERVAL;
+            consolidationInterval = BrainConfig::DEFAULT_CONSOLIDATION_INTERVAL;
+        }
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+    }
+    
+    // Helper validation methods
+    static bool validatePlasticityWeights(float ltpWeight, float ltdWeight, float tau) {
+        return ltpWeight > 0.0f && ltdWeight > 0.0f && tau > 0.0f && tau < 1000.0f;
+    }
+    
+    static bool validatePlasticityRates(float synaptogenesisRate, float pruningRate) {
+        return synaptogenesisRate >= 0.0f && synaptogenesisRate <= 0.1f &&
+               pruningRate >= 0.0f && pruningRate <= 0.1f;
+    }
+    
+    static void validateConfig(const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::invalid_argument("Brain::Impl: Configuration pointer is null");
+        }
+        
+        // Check required keys
+        if (!config->has("brain.neuron_count")) {
+            NLM_LOG_WARNING("Brain::Impl: Missing required key 'brain.neuron_count', using default");
+        }
+        
+        if (!config->has("brain.region_count")) {
+            NLM_LOG_WARNING("Brain::Impl: Missing required key 'brain.region_count', using default");
+        }
+        
+        // Validate neuron count
+        auto neuronCountOpt = config->get<size_t>("brain.neuron_count");
+        if (neuronCountOpt.has_value()) {
+            if (*neuronCountOpt < BrainConfig::MIN_NEURON_COUNT) {
+                NLM_LOG_ERROR("Brain::Impl: Neuron count too small: " + std::to_string(*neuronCountOpt));
+                throw std::invalid_argument("Brain::Impl: Neuron count too small");
+            }
+        }
+        
+        // Validate region count
+        auto regionCountOpt = config->get<size_t>("brain.region_count");
+        if (regionCountOpt.has_value()) {
+            if (*regionCountOpt < BrainConfig::MIN_REGION_COUNT) {
+                NLM_LOG_ERROR("Brain::Impl: Region count too small: " + std::to_string(*regionCountOpt));
+                throw std::invalid_argument("Brain::Impl: Region count too small");
+            }
+        }
+        
+        // Validate connection probability
+        auto connProbOpt = config->get<float>("brain.connection_probability");
+        if (connProbOpt.has_value()) {
+            if (*connProbOpt < 0.0f || *connProbOpt > BrainConfig::MAX_CONNECTION_PROBABILITY) {
+                NLM_LOG_ERROR("Brain::Impl: Invalid connection probability: " + std::to_string(*connProbOpt));
+                throw std::invalid_argument("Brain::Impl: Invalid connection probability");
+            }
+        }
+        
+        // Validate simulation timestep
+        auto timestepOpt = config->get<double>("simulation_timestep");
+        if (timestepOpt.has_value()) {
+            if (*timestepOpt <= 0.0 || *timestepOpt >= BrainConfig::MAX_SIMULATION_TIME) {
+                NLM_LOG_ERROR("Brain::Impl: Invalid simulation timestep: " + std::to_string(*timestepOpt));
+                throw std::invalid_argument("Brain::Impl: Invalid simulation timestep");
+            }
+        }
     }
     
     DevelopmentalStage developmentalStage;
@@ -177,13 +328,30 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Get configuration values with validation
+    size_t neuronCount = pImpl->config->getOr<size_t>("brain.neuron_count", 1000);
+    size_t regionCount = pImpl->config->getOr<size_t>("brain.region_count", 1);
+    float connectionProbability = pImpl->config->getOr<float>("brain.connection_probability", 0.1f);
+    
+    // Validate configuration values
+    if (neuronCount < BrainConfig::MIN_NEURON_COUNT) {
+        NLM_LOG_ERROR("Brain::initialize: Neuron count too small: " + std::to_string(neuronCount));
+        return false;
+    }
+    
+    if (regionCount < BrainConfig::MIN_REGION_COUNT) {
+        NLM_LOG_ERROR("Brain::initialize: Region count too small: " + std::to_string(regionCount));
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > BrainConfig::MAX_CONNECTION_PROBABILITY) {
+        NLM_LOG_ERROR("Brain::initialize: Invalid connection probability: " + std::to_string(connectionProbability));
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, " +
+                 std::to_string(connectionProbability) + " connection probability");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -225,7 +393,9 @@ bool Brain::initialize() {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 
+                                                 BrainConfig::DEFAULT_WEIGHT_INITIAL_MAX, 
+                                                 BrainConfig::DEFAULT_WEIGHT_INITIAL_MIN);
         }
     }
     
@@ -233,11 +403,11 @@ bool Brain::initialize() {
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setCapacity(neuronCount / BrainConfig::DEFAULT_WORKING_MEMORY_CAPACITY_DIVISOR);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(BrainConfig::DEFAULT_EPISODIC_MEMORY_MAX_EPISODES);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -247,13 +417,13 @@ bool Brain::initialize() {
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPlanningDepth(BrainConfig::DEFAULT_PLANNING_DEPTH);
     
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(BrainConfig::DEFAULT_ATTENTION_INHIBITION_STRENGTH);
+    pImpl->attention->setExcitationStrength(BrainConfig::DEFAULT_ATTENTION_EXCITATION_STRENGTH);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -288,7 +458,10 @@ bool Brain::initialize() {
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    pImpl->checkpointManager->configure(checkpointDir, 
+                                        BrainConfig::DEFAULT_CHECKPOINT_MAX_COUNT,
+                                        BrainConfig::DEFAULT_CHECKPOINT_MAX_SIZE_MB,
+                                        true);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -589,27 +762,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    // Validate input
+    if (input.getData().empty()) {
+        NLM_LOG_WARNING("Brain::receiveSensoryInput: Empty sensory input data");
+        return;
+    }
     
     const auto& values = input.getData();
     if (values.empty()) return;
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_WARNING("Brain::receiveSensoryInput: No sensory neurons available");
+        return;
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            // Validate and clamp input value
+            float rawValue = static_cast<float>(values[i]);
+            if (rawValue < 0.0f) rawValue = 0.0f;
+            if (rawValue > 1.0f) rawValue = 1.0f;
+            normalizedValue = rawValue * 10.0f;
         }
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory (only if value is significant)
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }

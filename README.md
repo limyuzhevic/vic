@@ -18,6 +18,18 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+## Enhanced Python API
+
+NLM now includes a comprehensive high-level Python API that makes it easy to:
+
+- Create and train neural networks
+- Simulate complex brain-environment interactions
+- Analyze neural activity patterns
+- Visualize results
+- Export models for analysis
+
+**For detailed documentation and examples, see `README_ENHANCED.md`**
+
 ## Current Phase
 
 **PHASE 6: FINAL INTEGRATION**
