@@ -27,12 +27,29 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+# Core dependencies - minimal for functionality
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",  # Core for array operations
+    "scipy>=1.6.0",  # For advanced mathematical operations
+]
 
 [project.optional-dependencies]
+# Development dependencies for testing and development
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov>=2.12",
+    "black>=21.0",  # Code formatting
+    "flake8>=3.9",  # Code linting
+    "mypy>=0.910",  # Type checking
+]
+
+# Advanced usage dependencies
+advanced = [
+    "torch>=1.9",  # PyTorch integration for advanced learning
+    "matplotlib>=3.4",  # Visualization
+    "jupyter>=1.0",  # Interactive notebooks
+    "ipython>=7.16",  # Enhanced REPL
 ]
 
 [project.urls]
@@ -55,3 +72,45 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.nox
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = [
+    '\.eggs',
+    '\.git',
+    '\.hg',
+    '\.mypy_cache',
+    '\.nox',
+    '\.tox',
+    '\.venv',
+    '_build',
+    'buck-out',
+    'build',
+    'dist',
+]
