@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "src/core/Types/Types.hpp"
 
 namespace nlm {
 

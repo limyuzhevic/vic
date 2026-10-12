@@ -2,6 +2,9 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <ostream>
+#include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -17,6 +20,9 @@ struct NeuronId {
     constexpr bool operator==(const NeuronId& other) const = default;
     constexpr bool operator!=(const NeuronId& other) const = default;
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
+    constexpr bool operator<=(const NeuronId& other) const { return value <= other.value; }
+    constexpr bool operator>(const NeuronId& other) const { return value > other.value; }
+    constexpr bool operator>=(const NeuronId& other) const { return value >= other.value; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -31,6 +37,9 @@ struct SynapseId {
     constexpr bool operator==(const SynapseId& other) const = default;
     constexpr bool operator!=(const SynapseId& other) const = default;
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
+    constexpr bool operator<=(const SynapseId& other) const { return value <= other.value; }
+    constexpr bool operator>(const SynapseId& other) const { return value > other.value; }
+    constexpr bool operator>=(const SynapseId& other) const { return value >= other.value; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -45,6 +54,9 @@ struct RegionId {
     constexpr bool operator==(const RegionId& other) const = default;
     constexpr bool operator!=(const RegionId& other) const = default;
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
+    constexpr bool operator<=(const RegionId& other) const { return value <= other.value; }
+    constexpr bool operator>(const RegionId& other) const { return value > other.value; }
+    constexpr bool operator>=(const RegionId& other) const { return value >= other.value; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -59,6 +71,9 @@ struct PopulationId {
     constexpr bool operator==(const PopulationId& other) const = default;
     constexpr bool operator!=(const PopulationId& other) const = default;
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
+    constexpr bool operator<=(const PopulationId& other) const { return value <= other.value; }
+    constexpr bool operator>(const PopulationId& other) const { return value > other.value; }
+    constexpr bool operator>=(const PopulationId& other) const { return value >= other.value; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -188,5 +203,37 @@ constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+
+// Stream operators for common types
+
+std::ostream& operator<<(std::ostream& os, const std::vector<int>& vec) {
+    os << "[";
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) os << ", ";
+        os << vec[i];
+    }
+    os << "]";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const std::vector<double>& vec) {
+    os << "[";
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) os << ", ";
+        os << vec[i];
+    }
+    os << "]";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& vec) {
+    os << "[";
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) os << ", ";
+        os << "\"" << vec[i] << "\"";
+    }
+    os << "]";
+    return os;
+}
 
 } // namespace nlm
