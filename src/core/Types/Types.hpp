@@ -17,9 +17,43 @@ struct NeuronId {
     constexpr bool operator==(const NeuronId& other) const = default;
     constexpr bool operator!=(const NeuronId& other) const = default;
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
+    constexpr NeuronId& operator++() { value++; return *this; }
+    constexpr NeuronId operator++(int) { NeuronId temp = *this; ++value; return temp; }
     
     constexpr uint64_t index() const { return value; }
 };
+
+// Hash function for NeuronId
+namespace std {
+    template<>
+    struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const { return std::hash<uint64_t>()(id.value); }
+    };
+}
+
+// Hash function for SynapseId
+namespace std {
+    template<>
+    struct hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const { return std::hash<uint64_t>()(id.value); }
+    };
+}
+
+// Hash function for RegionId
+namespace std {
+    template<>
+    struct hash<nlm::RegionId> {
+        size_t operator()(const nlm::RegionId& id) const { return std::hash<uint64_t>()(id.value); }
+    };
+}
+
+// Hash function for PopulationId
+namespace std {
+    template<>
+    struct hash<nlm::PopulationId> {
+        size_t operator()(const nlm::PopulationId& id) const { return std::hash<uint64_t>()(id.value); }
+    };
+}
 
 // Synapse identifier
 struct SynapseId {
@@ -31,6 +65,8 @@ struct SynapseId {
     constexpr bool operator==(const SynapseId& other) const = default;
     constexpr bool operator!=(const SynapseId& other) const = default;
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
+    constexpr SynapseId& operator++() { value++; return *this; }
+    constexpr SynapseId operator++(int) { SynapseId temp = *this; ++value; return temp; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -45,6 +81,8 @@ struct RegionId {
     constexpr bool operator==(const RegionId& other) const = default;
     constexpr bool operator!=(const RegionId& other) const = default;
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
+    constexpr RegionId& operator++() { value++; return *this; }
+    constexpr RegionId operator++(int) { RegionId temp = *this; ++value; return temp; }
     
     constexpr uint64_t index() const { return value; }
 };

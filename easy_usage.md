@@ -188,7 +188,10 @@ Reads the brain's motor neurons to decide what action to take.
 ```python
 import pynlm
 
+# One line to create a virtual brain
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize it
 brain.initialize()
 
 for i in range(10):
@@ -254,6 +257,69 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Phase 6 Integration Demo
+
+```python
+import pynlm
+
+# Phase 6 Integration Demo - Shows all brain systems working together
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=16, height=16, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all Phase 6 features for integration
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)  # Growth & pruning
+agent.enableDevelopment(True)           # Brain maturation
+agent.enableCuriosity(True)             # Exploration
+
+# Run the integration demo
+for step in range(200):
+    # Update world
+    world.update(0.1)
+    
+    # Get observation
+    percept = world.getSensoryPercept()
+    
+    # Process sensory input
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get action
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Learn from results
+    reward = world.computeReward()
+    agent.applyRewardModulation(reward, 0.0)
+    
+    if step % 50 == 0:
+        print(f"Step {step}: "
+              f"Firing {brain.getFiringNeuronCount()} neurons, "
+              f"{brain.getTotalSpikeCount()} total spikes, "
+              f"Working memory: {brain.getWorkingMemory().getActiveTraces()}")
+
+print("Phase 6 Integration Demo Complete!")
+print("All systems working together as a coherent brain.")
+```
+
+**Phase 6 Integration Features:**
+- **Memory Systems**: Working memory stores experiences, episodic memory saves episodes
+- **Neuromodulation**: Dopamine, curiosity, and reward systems coordinate learning
+- **Development**: Brain matures through developmental stages
+- **Prediction**: Brain predicts outcomes based on sensory input
+- **Cognition**: Planning, attention, and concept formation
+- **Persistence**: Checkpoint system saves brain state
+- **Replay**: Important memories are replayed for consolidation
+
 ---
 
 ## Quick Reference
@@ -269,21 +335,56 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
----
+## Build Instructions
 
-## Troubleshooting
+### Building from Source
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+```bash
+# Create build directory
+mkdir build
+cd build
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+# Configure CMake
+cmake .. -DCMAKE_BUILD_TYPE=Release
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+# Build everything (4 parallel jobs for speed)
+make -j4
+```
+
+### Running Available Executables
+
+#### Phase 2: Basic Neural Computation (DEFAULT)
+
+```bash
+./nlm
+```
+
+**What you see:**
+- Basic neural network simulation
+- Demonstrates LIF neuron dynamics
+- Shows spike propagation and plasticity
+- Includes learning experiments
+
+#### Phase 6: Integration Demo (REQUIRES COMPILATION)
+
+```bash
+./nlm_phase6_demo
+```
+
+**What you see:**
+- Complete artificial brain with all systems integrated
+- Working memory stores experiences
+- Episodic memory saves and replays episodes
+- Neuromodulation (dopamine, curiosity) coordinates learning
+- Development affects brain maturation
+- Prediction system anticipates outcomes
+- Planning and cognition systems work together
+- Checkpoint save/load functionality
+
+**If ./nlm_phase6_demo doesn't exist:**
+1. Make sure you built with CMake
+2. Run: `mkdir build && cd build && cmake .. && make`
+3. The executable will be created in the build directory
 
 ---
 

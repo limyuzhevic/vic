@@ -1,4 +1,6 @@
+#include <stdexcept>
 #pragma once
+#include <stdexcept>
 
 #include <cstdint>
 #include <random>
@@ -108,3 +110,7 @@ auto RandomGenerator::pickRandom(const Container& container) -> typename Contain
 }
 
 } // namespace nlm
+
+#include <stdexcept>
+
+#include <stdexcept>

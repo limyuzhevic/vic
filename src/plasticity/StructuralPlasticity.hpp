@@ -8,6 +8,8 @@ namespace nlm {
 // Structural plasticity: creation and removal of synapses and neurons
 // PLACEHOLDER - Phase 2 will implement real structural plasticity
 
+class Brain;
+
 class StructuralPlasticity {
 public:
     StructuralPlasticity();
