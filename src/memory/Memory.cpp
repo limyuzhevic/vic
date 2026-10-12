@@ -16,15 +16,24 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
-    for (auto& item : pImpl->items) {
-        if (item.first == neuron) {
-            item.second = value;
-            return;
+    // PHASE 2: Implement real storage with capacity limits and LRU eviction
+    auto it = std::find_if(pImpl->items.begin(), pImpl->items.end(),
+                           [&neuron](const auto& item) { return item.first == neuron; });
+    
+    if (it != pImpl->items.end()) {
+        // Update existing value and move to front (LRU)
+        it->second = value;
+        // Remove and reinsert at front for LRU behavior
+        auto value = *it;
+        pImpl->items.erase(it);
+        pImpl->items.insert(pImpl->items.begin(), value);
+    } else {
+        // Add new item with capacity management
+        if (pImpl->items.size() >= pImpl->capacity) {
+            // Evict least recently used item (last element)
+            pImpl->items.pop_back();
         }
-    }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+        pImpl->items.insert(pImpl->items.begin(), std::make_pair(neuron, value));
     }
 }
 
@@ -108,7 +117,45 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // PHASE 2: Implement real consolidation with relevance scoring
+    if (pImpl->episodes.empty()) {
+        return;
+    }
+    
+    // Calculate relevance based on importance and recency
+    std::vector<std::pair<size_t, float>> relevanceScores;
+    size_t currentTime = static_cast<size_t>(std::time(nullptr));
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        float recencyScore = 1.0f - (static_cast<float>(currentTime - episode.timestamp) / 3600.0f); // Decay over 1 hour
+        float importanceScore = episode.relevance;
+        float combinedRelevance = (recencyScore * 0.6f) + (importanceScore * 0.4f);
+        
+        relevanceScores.emplace_back(i, combinedRelevance);
+    }
+    
+    // Sort by relevance score (descending)
+    std::sort(relevanceScores.begin(), relevanceScores.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Keep only high-relevance episodes (maintain 80% of current capacity)
+    size_t targetSize = static_cast<size_t>(pImpl->maxEpisodes * 0.8f);
+    if (targetSize > 0 && relevanceScores.size() > targetSize) {
+        std::vector<size_t> indicesToKeep;
+        for (size_t i = 0; i < targetSize; ++i) {
+            indicesToKeep.push_back(relevanceScores[i].first);
+        }
+        
+        // Rebuild episode list with only kept items
+        std::vector<EpisodicMemoryItem> consolidated;
+        for (size_t idx : indicesToKeep) {
+            if (idx < pImpl->episodes.size()) {
+                consolidated.push_back(pImpl->episodes[idx]);
+            }
+        }
+        pImpl->episodes = std::move(consolidated);
+    }
 }
 
 // Semantic Memory Implementation

@@ -19,9 +19,28 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser with format detection
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Determine file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to key=value format for backward compatibility
+        return loadFromKeyValue(filepath);
+    }
+}
+
+// Helper methods for Phase 2
+bool Config::loadFromKeyValue(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +62,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -55,7 +74,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// TODO: Implement JSON and YAML parsing methods
+// bool Config::loadFromJSON(const std::string& filepath)
+// bool Config::loadFromYAML(const std::string& filepath)
+// bool Config::saveToJSON(const std::string& filepath) const
+// bool Config::saveToYAML(const std::string& filepath) const
+
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Enhanced command-line parsing with support for --file, --help, --version
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +92,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle --config-file=value
+                if (arg.find("config-file") == 0) {
+                    std::string value = arg.substr(pos + 1);
+                    loadFromFile(value);
+                }
             }
         }
         // Handle -key value format

@@ -21,7 +21,10 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Create CLI directory
+file(GLOB CLI_SOURCES "src/cli/*.cpp")
+
+# Enhanced core library with modern C++ features
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -87,10 +90,48 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+# Modern C++ compilation flags
+target_compile_features(nlm_core PUBLIC cxx_std_20 cxx_var_templates cxx_aligned_new_delete)
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wdouble-promotion -Wconversion -Wnull-dereference>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive->
+)
+
+# Modern C++ patterns: add logging macros and utilities
+add_library(nlm_utils STATIC
+    src/core/LoggingUtilities.cpp
+)
+
+# Enable more warnings and modern C++ features
+add_custom_command(
+    OUTPUT src/core/LoggingUtilities.cpp
+    COMMAND cmake -P src/core/CMakeLists.txt
+    DEPENDS src/core/CMakeLists.txt
+    COMMENT "Generating logging utilities"
+)
+
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Agent system (body, sensory percept, agent-brain interface)
+add_library(nlm_agent STATIC
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+)
+target_include_directories(nlm_agent PUBLIC src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+# World system (environment, objects, simple world)
+add_library(nlm_world STATIC
+    src/world/SimpleWorld.cpp
+)
+target_include_directories(nlm_world PUBLIC src)
+target_link_libraries(nlm_world PUBLIC nlm_core)
+
+# Create CLI directory
+file(GLOB CLI_SOURCES "src/cli/*.cpp")
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -121,6 +162,13 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -139,13 +187,75 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Phase 5 demo executable
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Phase 6 integration demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Testing suite
 enable_testing()
-add_subdirectory(tests)
+
+# Add test executable
+add_executable(nlm_test
+    src/cli/TestRunnerMain.cpp
+)
+
+target_link_libraries(nlm_test
+    PUBLIC
+        nlm_core
+        nlm_agent
+        nlm_world
+        nlm_modern_utils
+)
+
+# Install test executable
+install(TARGETS nlm_test DESTINATION bin)
+
+# Add tests to CTest
+add_test(NAME nlm_unit_tests
+    COMMAND nlm_test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Add benchmark executable
+add_executable(nlm_benchmark
+    src/benchmarking/BenchmarkRunner.cpp
+)
+
+target_link_libraries(nlm_benchmark
+    PUBLIC
+        nlm_core
+        nlm_agent
+        nlm_world
+        nlm_modern_utils
+)
+
+# Install benchmark executable
+install(TARGETS nlm_benchmark DESTINATION bin)
+
+# Add benchmark to CTest
+add_test(NAME nlm_benchmark
+    COMMAND nlm_benchmark
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Create a development mode target for easier debugging
+add_custom_target(dev
+    COMMAND echo "Building NLM in development mode..."
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Switch to development build type"
 )
