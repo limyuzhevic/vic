@@ -28,12 +28,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                        // Distribute motor neurons to different action groups using a safe modulo approach
+                        // Calculate distribution index based on current group sizes to ensure even distribution
+                        size_t totalDistributed = motorForward_.size() + motorBackward_.size() + 
+                                                 motorTurnLeft_.size() + motorTurnRight_.size() +
+                                                 motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        size_t idx = totalDistributed % 6;  // Safe modulo operation
+                        
+                        switch (idx) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -44,11 +47,13 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                        // Distribute sensory neurons safely
+                        size_t totalDistributed = sensoryVision_.size() + sensoryTouch_.size() +
+                                                 sensoryInternal_.size() + sensoryProprioception_.size();
                         
-                        switch (idx % 4) {
+                        size_t idx = totalDistributed % 4;  // Safe modulo operation
+                        
+                        switch (idx) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -218,16 +223,15 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 6);  // Fixed: 0-6 instead of 0-7
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 4: return MotorCommand::Interact;
+                case 5: return MotorCommand::LookLeft;  // Added LookLeft command
+                case 6: return MotorCommand::LookRight; // Added LookRight command
             }
         }
     }
