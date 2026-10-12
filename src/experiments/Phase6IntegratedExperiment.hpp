@@ -37,8 +37,9 @@ struct Phase6IntegrationResult {
     bool developmentIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
+    bool stressTestPassed;
     
-    // Metrics
+    // Basic metrics
     float totalReward;
     float avgFiringRate;
     float avgSynapticWeight;
@@ -46,6 +47,15 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    
+    // Advanced metrics for expert users
+    float avgDopamineLevel;
+    float avgCuriosityLevel;
+    float avgNoveltyLevel;
+    float memoryEfficiency;
+    float developmentalStability;
+    float neuralStability;
+    float integrationScore;
     
     // Timestamps
     time_t startTime;
@@ -60,6 +70,7 @@ struct Phase6IntegrationResult {
         , developmentIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , stressTestPassed(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
@@ -67,6 +78,13 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , avgDopamineLevel(0.0f)
+        , avgCuriosityLevel(0.0f)
+        , avgNoveltyLevel(0.0f)
+        , memoryEfficiency(0.0f)
+        , developmentalStability(0.0f)
+        , neuralStability(0.0f)
+        , integrationScore(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -80,20 +98,42 @@ struct Phase6Config {
     size_t neuronCount;
     size_t regionCount;
     float connectionProbability;
+    float stdpLtpWeight;
+    float stdpLtdWeight;
+    float synaptogenesisRate;
+    float pruningRate;
     bool enableCheckpointing;
     bool enableReplay;
     bool enableDevelopment;
+    bool enableCuriosity;
     std::string checkpointPath;
+    
+    // Advanced configuration options for expert users
+    size_t workingMemoryCapacity;
+    size_t episodicMemoryLimit;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    float developmentRate;
     
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
         , regionCount(1)
         , connectionProbability(0.1f)
+        , stdpLtpWeight(0.01f)
+        , stdpLtdWeight(0.012f)
+        , synaptogenesisRate(0.0001f)
+        , pruningRate(0.00001f)
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , enableCuriosity(true)
+        , checkpointPath("./checkpoint_test.bin")
+        , workingMemoryCapacity(100)
+        , episodicMemoryLimit(1000)
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , developmentRate(1.0f) {}
 };
 
 /**
@@ -108,6 +148,16 @@ public:
      * Run the complete integration test
      */
     Phase6IntegrationResult run(const Phase6Config& config);
+    
+    /**
+     * Compute integration quality score for expert analysis
+     */
+    float computeIntegrationScore(const Phase6Config& config, const Brain& brain, const AgentBrain& agent);
+    
+    /**
+     * Test system stability under stress conditions
+     */
+    bool testSystemStability(const Brain& brain, const AgentBrain& agent, uint64_t steps);
     
     /**
      * Run a simple integration verification

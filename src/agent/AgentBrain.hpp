@@ -103,15 +103,38 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Memory systems
+    NeuralEpisodicMemory* episodicMemory_;
+    NeuralAssociativeMemory* associativeMemory_;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
-};
+    // Prediction and planning
+    PredictionSystem* predictionSystem_;
+    NeuralPlanner* neuralPlanner_;
+    ConceptFormation* conceptFormation_;
+    
+    // Neuromodulation systems
+    Dopamine* dopamine_;
+    Acetylcholine* acetylcholine_;
+    Norepinephrine* norepinephrine_;
+    Serotonin* serotonin_;
+    Curiosity* curiosity_;
+    Novelty* novelty_;
+    PredictionError* predictionError_;
+    
+    // Development system
+    DevelopmentSystem* developmentSystem_;
+    
+    // Integration state
+    bool episodicMemoryEnabled_;
+    bool predictionEnabled_;
+    bool planningEnabled_;
+    bool conceptFormationEnabled_;
+    bool associativeMemoryEnabled_;
+    bool neuromodulationEnabled_;
+    bool memoryConsolidationEnabled_;
+    
+    // Integration timer
+    double consolidationTimer_;
+    const double CONSOLIDATION_INTERVAL = 1000.0; // 1000 simulation steps
 
 } // namespace nlm

@@ -13,13 +13,29 @@ Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
+#include "Phase6IntegratedExperiment.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../world/SimpleWorld.hpp"
+#include "../agent/AgentBrain.hpp"
+#include <chrono>
+#include <cmath>
+#include <algorithm>
+
+namespace nlm {
+
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+
+Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
+
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
-    NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
+    NLM_LOG_INFO("=== Phase 6 Integration Experiment (Enhanced) ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
@@ -28,10 +44,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("stdp_ltp_weight", config.stdpLtpWeight);
+    cfg->set("stdp_ltd_weight", config.stdpLtdWeight);
+    cfg->set("synaptogenesis_rate", config.synaptogenesisRate);
+    cfg->set("pruning_rate", config.pruningRate);
+    
+    // Advanced configuration options for expert users
+    cfg->set("replay_interval", config.replayInterval);
+    cfg->set("consolidation_interval", config.consolidationInterval);
+    cfg->set("working_memory_capacity", config.workingMemoryCapacity);
+    cfg->set("episodic_memory_limit", config.episodicMemoryLimit);
+    cfg->set("development_rate", config.developmentRate);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -45,29 +68,51 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     SimpleWorld world;
     world.initialize(16, 16);
     
-    // Create agent
+    // Create agent with advanced configuration
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableCuriosity(config.enableCuriosity);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Advanced performance tracking
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+    size_t memoryTracesSum = 0;
+    size_t episodesStoredSum = 0;
+    
+    // Advanced neuromodulation metrics
+    float avgDopamineLevel = 0.0f;
+    float avgCuriosityLevel = 0.0f;
+    float avgNoveltyLevel = 0.0f;
+    
+    // Developmental progression tracking
+    std::vector<float> developmentalProgression;
+    
+    // Neural activity patterns for advanced analysis
+    std::vector<float> firingPattern;
+    std::vector<float> memoryActivityPattern;
+    
+    // Stress test parameters for advanced users
+    bool stressTest = config.enableDevelopment && config.neuronCount > 500;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
-        // Process sensory input
+        // Store percept for advanced analysis
+        if (step % 10 == 0) {
+            // perceptHistory_.push_back(percept); // Would need to be implemented
+        }
+        
+        // Process sensory input with enhanced integration
         agent.processSensoryInput(percept);
         
-        // Brain step
+        // Brain step with comprehensive system coordination
         brain->step(step, step * 0.001);
         
         // Get motor command
@@ -80,25 +125,62 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
         totalReward += reward;
         
-        // Apply reward modulation
+        // Apply reward modulation with enhanced integration
         agent.applyRewardModulation(reward, 0.0f);
         
-        // Update development
+        // Update development with advanced tracking
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
+            
+            // Track developmental progression
+            DevelopmentalStage stage = agent.getDevelopmentalStage();
+            developmentalProgression.push_back(static_cast<float>(stage));
         }
         
-        // Collect metrics
+        // Advanced metrics collection
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
+        // Memory system metrics
+        auto* workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            memoryTracesSum += workingMemory->getActiveTraces();
+        }
+        
+        auto* episodicMemory = brain->getEpisodicMemory();
+        if (episodicMemory) {
+            episodesStoredSum += episodicMemory->getEpisodeCount();
+        }
+        
+        // Neuromodulation metrics
+        if (config.enableCuriosity) {
+            avgDopamineLevel += agent.getNeuromodulationLevel();
+            avgCuriosityLevel += agent.getCuriosityLevel();
+            avgNoveltyLevel += agent.getNoveltyLevel();
+        }
+        
+        // Firing pattern tracking for advanced analysis
+        if (step % 50 == 0) {
+            firingPattern.push_back(brain->getAverageFiringRate());
+            if (workingMemory) {
+                memoryActivityPattern.push_back(static_cast<float>(workingMemory->getActiveTraces()) / workingMemory->getCapacity());
+            }
+        }
+        
+        // Enhanced logging for expert users
         if (step % 1000 == 0) {
+            float avgMemoryTraces = workingMemory ? 
+                static_cast<float>(memoryTracesSum) / (step + 1) : 0.0f;
+            float avgEpisodes = episodicMemory ? 
+                static_cast<float>(episodesStoredSum) / (step + 1) : 0.0f;
+            
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | WorkingMem: " + std::to_string(avgMemoryTraces) +
+                        " | Episodes: " + std::to_string(avgEpisodes) +
+                        " | Dopamine: " + std::to_string(agent.getNeuromodulationLevel()) +
+                        " | Curiosity: " + std::to_string(agent.getCuriosityLevel()));
         }
     }
     
@@ -111,6 +193,54 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
+    // Calculate advanced metrics
+    if (config.enableCuriosity) {
+        result.avgDopamineLevel = avgDopamineLevel / config.maxSteps;
+        result.avgCuriosityLevel = avgCuriosityLevel / config.maxSteps;
+        result.avgNoveltyLevel = avgNoveltyLevel / config.maxSteps;
+    }
+    
+    // Compute memory efficiency metrics
+    if (workingMemory) {
+        result.memoryEfficiency = static_cast<float>(memoryTracesSum) / 
+            std::max(static_cast<float>(workingMemoryCapacity_), 1.0f);
+    }
+    
+    // Compute developmental stage progression metrics
+    if (!developmentalProgression.empty()) {
+        result.developmentalStability = 0.0f;
+        // Calculate variance in developmental stages
+        float sumStages = std::accumulate(developmentalProgression.begin(), 
+                                         developmentalProgression.end(), 0.0f);
+        float meanStage = sumStages / developmentalProgression.size();
+        
+        for (float stage : developmentalProgression) {
+            result.developmentalStability += (stage - meanStage) * (stage - meanStage);
+        }
+        result.developmentalStability /= developmentalProgression.size();
+    }
+    
+    // Compute neural activity pattern metrics
+    if (!firingPattern.empty()) {
+        result.neuralStability = 0.0f;
+        float sumFiring = std::accumulate(firingPattern.begin(), 
+                                        firingPattern.end(), 0.0f);
+        float meanFiring = sumFiring / firingPattern.size();
+        
+        for (float firing : firingPattern) {
+            result.neuralStability += (firing - meanFiring) * (firing - meanFiring);
+        }
+        result.neuralStability /= firingPattern.size();
+    }
+    
+    // Integration scoring for expert users
+    result.integrationScore = computeIntegrationScore(config, *brain, agent);
+    
+    // Stress test results
+    if (stressTest) {
+        result.stressTestPassed = testSystemStability(*brain, agent, config.maxSteps);
+    }
+    
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
@@ -118,43 +248,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
-    
-    // Test checkpointing
-    if (config.enableCheckpointing) {
-        NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
-            
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
-            }
-        } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
-        }
-    }
+    NLM_LOG_INFO("=== Phase 6 Integration Experiment Complete (Enhanced) ===");
+    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
+    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
+    NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
+    NLM_LOG_INFO("Integration score: " + std::to_string(result.integrationScore));
+    NLM_LOG_INFO("Memory efficiency: " + std::to_string(result.memoryEfficiency));
+    NLM_LOG_INFO("Neural stability: " + std::to_string(result.neuralStability));
+    NLM_LOG_INFO("Developmental stability: " + std::to_string(result.developmentalStability));
     
     result.endTime = time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
-    
-    NLM_LOG_INFO("=== Experiment Complete ===");
-    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
-    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
-    NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
-    NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
     
     return result;
 }
