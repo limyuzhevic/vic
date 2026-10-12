@@ -19,40 +19,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 6: Enhanced configuration loading with improved parsing
+    // Supports both simple key=value format and JSON/YAML format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARN("Could not open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
+    // Try to detect file format and parse accordingly
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
     
-    return true;
+    // Check if it's JSON format (starts with {)
+    if (firstLine.find('{') != std::string::npos || firstLine.find('[') != std::string::npos) {
+        NLM_LOG_INFO("Loading JSON config file: " + filepath);
+        return loadFromJSON(filepath);
+    }
+    // Check if it's YAML format (contains key: value patterns)
+    else if (firstLine.find(":") != std::string::npos) {
+        NLM_LOG_INFO("Loading YAML config file: " + filepath);
+        return loadFromYAML(filepath);
+    }
+    // Default: simple key=value format
+    else {
+        NLM_LOG_INFO("Loading simple format config file: " + filepath);
+        return loadFromSimpleFormat(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
