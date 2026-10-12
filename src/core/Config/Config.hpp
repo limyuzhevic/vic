@@ -55,43 +55,66 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
     
-    // Save to file
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from simple key=value format (Phase 1)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Save to file (JSON or YAML format)
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Save to JSON file
+    bool saveToJSON(const std::string& filepath) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Save to YAML file
+    bool saveToYAML(const std::string& filepath) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Load from dictionary
+    bool loadFromDict(const py::dict& config_dict);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Save to dictionary
+    py::dict saveToDict() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Merge with another configuration
+    bool merge(const Config& other);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Get configuration statistics
+    py::dict getStats() const;
     
-    // Clear all
-    void clear();
+    // Validate configuration
+    bool validate() const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Get configuration template
+    std::shared_ptr<Config> getTemplate(const std::string& template_name) const;
+    
+    // Apply configuration template
+    bool applyTemplate(const std::string& template_name);
+    
+    // Get configuration documentation
+    std::string getDocumentation() const;
+    
+    // Set configuration with validation
+    void setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void setValidated(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    void setValidated(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setValidated(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setValidated(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validate configuration key
+    bool isValidKey(const std::string& key) const;
+    
+    // Get configuration type
+    std::string getType(const std::string& key) const;
+    
+    // Check if configuration value is within specified range
+    bool isInRange(const std::string& key, double min_val, double max_val) const;
     
 private:
     struct Impl;

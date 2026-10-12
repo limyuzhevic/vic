@@ -19,9 +19,80 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
     
+    // Try YAML
+    if (loadFromYAML(filepath)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format (Phase 1)
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Use nlohmann::json if available
+        // For now, implement a simple JSON parser
+        nlohmann::json json_data;
+        file >> json_data;
+        
+        for (auto it = json_data.begin(); it != json_data.end(); ++it) {
+            std::string key = it.key();
+            const nlohmann::json& value = it.value();
+            
+            // Convert JSON value to string representation
+            std::string str_value;
+            if (value.is_string()) {
+                str_value = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                str_value = std::to_string(value.get<int64_t>());
+            } else if (value.is_number_float()) {
+                str_value = std::to_string(value.get<double>());
+            } else if (value.is_boolean()) {
+                str_value = value.get<bool>() ? "true" : "false";
+            } else if (value.is_array()) {
+                // Convert array to JSON string representation
+                str_value = value.dump();
+            } else {
+                // Skip null values
+                continue;
+            }
+            
+            set(key, str_value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Use YAML parser if available
+        // For now, implement a simple YAML parser
+        // YAML parsing would go here
+        return false; // Not implemented yet
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +114,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -78,18 +149,97 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+bool Config::saveToJSON(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json json_data;
+        
+        for (const auto& entry : pImpl->entries) {
+            json_data[entry.key] = std::visit([](auto&& arg) -> nlohmann::json {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    return arg;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    return arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    return arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    return arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                    return nlohmann::json(arg);
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    return nlohmann::json(arg);
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    return nlohmann::json(arg);
+                } else {
+                    return std::to_string(arg);
+                }
+            }, entry.value);
+        }
+        
+        file << json_data.dump(4);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::saveToYAML(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
     
-    return true;
+    try {
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << ": ";
+            
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, int64_t> || 
+                                   std::is_same_v<T, double> || 
+                                   std::is_same_v<T, bool>) {
+                    file << arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        file << arg[i];
+                        if (i < arg.size() - 1) file << ", ";
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        file << arg[i];
+                        if (i < arg.size() - 1) file << ", ";
+                    }
+                    file << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        file << "\"" << arg[i] << "\"";
+                        if (i < arg.size() - 1) file << ", ";
+                    }
+                    file << "]";
+                } else {
+                    file << std::to_string(arg);
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 template<typename T>
