@@ -199,7 +199,251 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+// Factory method implementations
+Config Config::createDefaultConfig() {
+    Config config;
+    config.set("agent.type", std::string("default"));
+    config.set("agent.learning.enabled", true);
+    config.set("agent.exploration.enabled", true);
+    config.set("brain.plasticity.enabled", true);
+    config.set("memory.working.capacity", size_t(1000));
+    config.set("memory.episodic.enabled", true);
+    
+    return config;
+}
+
+Config Config::createMinimalConfig() {
+    Config config;
+    config.set("agent.type", std::string("minimal"));
+    
+    return config;
+}
+
+Config Config::createProductionConfig() {
+    Config config;
+    config.set("agent.type", std::string("production"));
+    config.set("agent.performance.optimization", true);
+    config.set("agent.memory.management.enabled", true);
+    config.set("brain.plasticity.enabled", false);
+    config.set("brain.development.enabled", false);
+    config.set("agent.validation.strict", true);
+    
+    return config;
+}
+
+Config Config::createDevelopmentConfig() {
+    Config config;
+    config.set("agent.type", std::string("development"));
+    config.set("agent.learning.enabled", true);
+    config.set("agent.exploration.enabled", true);
+    config.set("agent.debug.mode", true);
+    config.set("agent.logging.level", std::string("debug"));
+    config.set("brain.plasticity.enabled", true);
+    config.set("brain.development.enabled", true);
+    
+    return config;
+}
+
+// Preset application
+void Config::applyPreset(const std::string& presetName) {
+    if (presetName == "default") {
+        *this = createDefaultConfig();
+    } else if (presetName == "minimal") {
+        *this = createMinimalConfig();
+    } else if (presetName == "production") {
+        *this = createProductionConfig();
+    } else if (presetName == "development") {
+        *this = createDevelopmentConfig();
+    }
+}
+
+// Clone implementation
+Config Config::clone() const {
+    Config cloned;
+    cloned.pImpl->entries = pImpl->entries;
+    return cloned;
+}
+
+// Hash implementation
+std::hash<std::string> hasher;
+size_t Config::getHash() const {
+    size_t hash = 0;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::string entryStr = entry.key;
+        std::visit([&entryStr](auto&& arg) {
+            std::ostringstream oss;
+            oss << arg;
+            entryStr += "=" + oss.str();
+        }, entry.value);
+        
+        hash ^= hasher(entryStr);
+    }
+    
+    return hash;
+}
+
+// Equality implementation
+bool Config::equals(const Config& other) const {
+    return pImpl->entries == other.pImpl->entries;
+}
+
+// Filter implementation
+Config Config::filter(const std::string& pattern) const {
+    Config filtered;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (toLower(entry.key).find(toLower(pattern)) != std::string::npos) {
+            filtered.pImpl->entries.push_back(entry);
+        }
+    }
+    
+    return filtered;
+}
+
+// Validation implementation
+std::vector<std::string> Config::validate(const std::string& schema) const {
+    std::vector<std::string> errors;
+    
+    // TODO: Implement schema validation
+    // For now, return empty list (no errors)
+    
+    return errors;
+}
+
+// Statistics implementation
+std::map<std::string, double> Config::getStatistics() const {
+    std::map<std::string, double> stats;
+    
+    stats["entry_count"] = static_cast<double>(pImpl->entries.size());
+    
+    // Count by source type
+    int defaultCount = 0, fileCount = 0, commandLineCount = 0, runtimeCount = 0;
+    
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default: defaultCount++; break;
+            case ConfigSource::File: fileCount++; break;
+            case ConfigSource::CommandLine: commandLineCount++; break;
+            case ConfigSource::Runtime: runtimeCount++; break;
+        }
+    }
+    
+    stats["default_count"] = static_cast<double>(defaultCount);
+    stats["file_count"] = static_cast<double>(fileCount);
+    stats["command_line_count"] = static_cast<double>(commandLineCount);
+    stats["runtime_count"] = static_cast<double>(runtimeCount);
+    
+    return stats;
+}
+
+// Metadata implementation
+std::map<std::string, std::string> Config::getMetadata() const {
+    std::map<std::string, std::string> metadata;
+    
+    // TODO: Implement metadata storage
+    // For now, return empty map
+    
+    return metadata;
+}
+
+void Config::setMetadata(const std::string& key, const std::string& value) {
+    // TODO: Implement metadata storage
+    // For now, placeholder
+}
+
+void Config::addTag(const std::string& tag) {
+    // TODO: Implement tag storage
+    // For now, placeholder
+}
+
+std::vector<std::string> Config::getTags() const {
+    std::vector<std::string> tags;
+    
+    // TODO: Implement tag retrieval
+    // For now, return empty vector
+    
+    return tags;
+}
+
+bool Config::hasTag(const std::string& tag) const {
+    // TODO: Implement tag checking
+    // For now, return false
+    
+    return false;
+}
+
+// Merge implementation
+void Config::merge(const Config& other, bool overwrite) {
+    for (const auto& entry : other.pImpl->entries) {
+        if (overwrite || !has(entry.key)) {
+            set(entry.key, entry.value, entry.source);
+        }
+    }
+}
+
+// Group operations
+std::vector<std::string> Config::getKeysInGroup(const std::string& groupName) const {
+    std::vector<std::string> keys;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (toLower(entry.key).find(toLower(groupName)) != std::string::npos) {
+            keys.push_back(entry.key);
+        }
+    }
+    
+    return keys;
+}
+
+void Config::setGroup(const std::string& groupName, const std::map<std::string, ConfigValue>& values) {
+    for (const auto& pair : values) {
+        std::string key = groupName + "." + pair.first;
+        set(key, pair.second);
+    }
+}
+
+std::map<std::string, std::optional<ConfigValue>> Config::getGroup(const std::string& groupName) const {
+    std::map<std::string, std::optional<ConfigValue>> groupValues;
+    std::string prefix = groupName + ".";
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.find(prefix) == 0) {
+            std::string key = entry.key.substr(prefix.size());
+            groupValues[key] = entry.value;
+        }
+    }
+    
+    return groupValues;
+}
+
+// Batch operations
+void Config::setValues(const std::map<std::string, ConfigValue>& values) {
+    for (const auto& pair : values) {
+        set(pair.first, pair.second);
+    }
+}
+
+std::map<std::string, std::optional<ConfigValue>> Config::getValues(const std::vector<std::string>& keys) const {
+    std::map<std::string, std::optional<ConfigValue>> result;
+    
+    for (const auto& key : keys) {
+        result[key] = get<ConfigValue>(key);
+    }
+    
+    return result;
+}
+
+std::map<std::string, bool> Config::hasKeys(const std::vector<std::string>& keys) const {
+    std::map<std::string, bool> result;
+    
+    for (const auto& key : keys) {
+        result[key] = has(key);
+    }
+    
+    return result;
+}
+
+// Explicit template instantiations for existing methods
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
@@ -211,5 +455,9 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Explicit template instantiations for new methods
+template std::optional<ConfigValue> Config::get<ConfigValue>(const std::string&) const;
+template ConfigValue Config::getOr<ConfigValue>(const std::string&, const ConfigValue&) const;
 
 } // namespace nlm

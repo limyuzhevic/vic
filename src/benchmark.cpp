@@ -2,6 +2,7 @@
 // Measures simulation performance for different network sizes
 
 #include "core/Config/Config.hpp"
+#include "core/Config/ConfigBuilder.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -32,13 +33,11 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
     
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.1f, ConfigSource::Default);
-    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    // Create configuration using ConfigBuilder
+    auto config = ConfigBuilder::minimalConfig()
+                   .setPhase6NeuronCount(neuronCount)
+                   .setPhase6MaxSteps(steps)
+                   .build();
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);

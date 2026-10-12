@@ -6,7 +6,7 @@
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "core/Config/ConfigBuilder.hpp"
 #include <iostream>
 
 using namespace nlm;
@@ -36,31 +36,44 @@ int main(int argc, char* argv[]) {
     
     // Test individual systems
     std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    if (!experiment.testMemoryIntegration()) {
+        std::cerr << "ERROR: Memory integration test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    if (!experiment.testNeuromodulationIntegration()) {
+        std::cerr << "ERROR: Neuromodulation integration test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
+    if (!experiment.testCheckpointing()) {
+        std::cerr << "ERROR: Checkpoint test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    if (!experiment.testReplay()) {
+        std::cerr << "ERROR: Replay test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    auto phase6Config = ConfigBuilder::defaultPhase6()
+                           .setPhase6NeuronCount(500)
+                           .setPhase6MaxSteps(2000)
+                           .setPhase6EnableCheckpointing(true)
+                           .setPhase6EnableReplay(true)
+                           .setPhase6EnableDevelopment(true)
+                           .buildPhase6Config();
     
-    auto result = experiment.run(config);
+    auto result = experiment.run(phase6Config);
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

@@ -18,21 +18,35 @@ public:
     // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    // Batch store multiple items
+    void storeBatch(const std::vector<std::pair<NeuronId, float>>& items);
     
-    // Check if item exists
-    bool contains(NeuronId neuron) const;
+    // Store item with validation
+    bool storeSafe(NeuronId neuron, float value);
     
-    // Clear all
-    void clear();
+    // Get comprehensive memory statistics
+    std::map<std::string, double> getStatistics() const;
     
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    // Get memory health status
+    bool isHealthy() const;
     
-    // Decay all items
-    void decay(float decayRate);
+    // Get memory utilization
+    double getMemoryUtilization() const;
+    
+    // Check multiple neurons at once
+    std::map<NeuronId, bool> containsBatch(const std::vector<NeuronId>& neurons) const;
+    
+    // Retrieve multiple items
+    std::vector<float> retrieveBatch(const std::vector<NeuronId>& neurons) const;
+    
+    // Get memory activity level
+    float getMemoryActivity() const;
+    
+    // Reset with cleanup
+    void resetWithCleanup();
+    
+    // Get memory contents for debugging
+    std::vector<std::pair<NeuronId, float>> getContents() const;
     
 private:
     struct Impl;
@@ -59,20 +73,38 @@ public:
     // Store episode
     void storeEpisode(const EpisodicMemoryItem& episode);
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Store multiple episodes
+    void storeEpisodes(const std::vector<EpisodicMemoryItem>& episodes);
+    
+    // Get episodes by time range
+    std::vector<EpisodicMemoryItem> getEpisodesByTime(SimulationStep startTime, SimulationStep endTime) const;
+    
+    // Get most recent episode
+    EpisodicMemoryItem getLatestEpisode() const;
+    
+    // Get recent episodes with count
+    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    
+    // Get episodes by metadata
+    std::vector<EpisodicMemoryItem> getEpisodesByMetadata(const std::string& metadata) const;
+    
+    // Get episode indices by neuron
+    std::vector<size_t> getEpisodeIndicesForNeuron(NeuronId neuron) const;
+    
+    // Get statistics
+    std::map<std::string, double> getStatistics() const;
+    
+    // Get memory health status
+    bool isHealthy() const;
+    
+    // Get consolidation status
+    bool needsConsolidation(float threshold) const;
+    
+    // Search episodes by pattern
+    std::vector<size_t> searchEpisodes(const std::vector<NeuronId>& pattern) const;
     
     // Get episode count
     size_t getEpisodeCount() const;
-    
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
-    
-    // Clear all
-    void clear();
-    
-    // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
     
 private:
     struct Impl;
@@ -90,17 +122,32 @@ public:
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
     
-    // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
+    // Store multiple facts
+    void storeFacts(const std::map<std::string, std::string>& facts);
     
-    // Check if fact exists
-    bool hasFact(const std::string& key) const;
+    // Get fact with default
+    std::string getFactOrDefault(const std::string& key, const std::string& defaultValue) const;
     
-    // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
+    // Get all facts as map
+    std::map<std::string, std::string> getFactsAsMap() const;
     
-    // Clear all
-    void clear();
+    // Search facts by pattern
+    std::vector<std::pair<std::string, std::string>> searchFacts(const std::string& pattern) const;
+    
+    // Get facts by prefix
+    std::map<std::string, std::string> getFactsByPrefix(const std::string& prefix) const;
+    
+    // Get fact statistics
+    std::map<std::string, double> getStatistics() const;
+    
+    // Check if fact exists (alias for hasFact)
+    bool containsFact(const std::string& key) const;
+    
+    // Get all fact keys
+    std::vector<std::string> getAllKeys() const;
+    
+    // Get memory utilization
+    double getMemoryUtilization() const;
     
 private:
     struct Impl;
@@ -126,17 +173,32 @@ public:
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
     
-    // Retrieve skill
-    Skill* getSkill(const std::string& name);
+    // Get skill with default
+    const Skill* getSkillOrDefault(const std::string& name, const Skill& defaultSkill) const;
     
-    // Get all skills
-    std::vector<Skill*> getAllSkills();
+    // Get all skills as vector
+    std::vector<Skill> getSkillsCopy() const;
     
     // Update proficiency
     void updateProficiency(const std::string& name, float delta);
     
-    // Clear all
-    void clear();
+    // Get proficiency
+    float getProficiency(const std::string& name) const;
+    
+    // Search skills by pattern
+    std::vector<const Skill*> findSkillsByPattern(const std::vector<NeuronId>& pattern) const;
+    
+    // Get skill statistics
+    std::map<std::string, double> getStatistics() const;
+    
+    // Check if skill exists
+    bool hasSkill(const std::string& name) const;
+    
+    // Get all skill names
+    std::vector<std::string> getAllSkillNames() const;
+    
+    // Get total skill count
+    size_t getSkillCount() const;
     
 private:
     struct Impl;
@@ -154,17 +216,29 @@ public:
     // Create association
     void associate(NeuronId a, NeuronId b, float strength);
     
-    // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+    // Get association strength with default
+    float getAssociationStrengthOrDefault(NeuronId a, NeuronId b, float defaultValue) const;
     
-    // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
+    // Get all associations for neuron
+    std::vector<std::pair<NeuronId, float>> getAssociationsWithStrength(NeuronId neuron) const;
+    
+    // Get all associations
+    std::map<NeuronId, std::map<NeuronId, float>> getAllAssociations() const;
     
     // Update association
     void updateAssociation(NeuronId a, NeuronId b, float delta);
     
-    // Clear all
-    void clear();
+    // Get strongest associations
+    std::vector<std::pair<NeuronId, std::pair<NeuronId, float>>> getStrongestAssociations(size_t count = 10) const;
+    
+    // Get association statistics
+    std::map<std::string, double> getStatistics() const;
+    
+    // Check if association exists
+    bool hasAssociation(NeuronId a, NeuronId b) const;
+    
+    // Get association count
+    size_t getAssociationCount() const;
     
 private:
     struct Impl;

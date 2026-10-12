@@ -4,6 +4,7 @@
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigBuilder.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <iostream>
 #include <fstream>
@@ -24,10 +25,11 @@ public:
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
-        // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        // Create configuration using ConfigBuilder
+        auto config = ConfigBuilder::minimalConfig()
+                       .setPhase6NeuronCount(500)
+                       .setPhase6MaxSteps(1000)
+                       .build();
         
         // Create world
         SimpleWorld world;
@@ -191,27 +193,6 @@ public:
         std::cout << "\nPhase 3 demonstration complete.\n";
         std::cout << "The brain received sensory input, produced actions,\n";
         std::cout << "experienced consequences, and modified its synapses.\n";
-    }
-    
-private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
-    }
-    
-    void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
-        config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
-        config->set("random_seed", 42u);
-        config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
     }
     
     const char* motorCommandToString(MotorCommand cmd) {

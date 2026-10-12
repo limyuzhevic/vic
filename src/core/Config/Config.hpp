@@ -71,27 +71,78 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // ========== CONVENIENCE CONSTRUCTORS ==========
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Factory methods for common configurations
+    static Config createDefaultConfig();
+    static Config createMinimalConfig();
+    static Config createProductionConfig();
+    static Config createDevelopmentConfig();
     
-    // Remove key
-    void remove(const std::string& key);
+    // Apply preset configurations
+    void applyPreset(const std::string& presetName);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // ========== BATCH OPERATIONS ==========
     
-    // Clear all
-    void clear();
+    // Set multiple values at once
+    void setValues(const std::map<std::string, ConfigValue>& values);
     
-    // Get configuration summary
-    std::string summary() const;
+    // Get multiple values
+    std::map<std::string, std::optional<ConfigValue>> getValues(const std::vector<std::string>& keys) const;
+    
+    // Check multiple keys at once
+    std::map<std::string, bool> hasKeys(const std::vector<std::string>& keys) const;
+    
+    // ========== CONFIGURATION GROUPS ==========
+    
+    // Get all keys in a group
+    std::vector<std::string> getKeysInGroup(const std::string& groupName) const;
+    
+    // Set configuration group
+    void setGroup(const std::string& groupName, const std::map<std::string, ConfigValue>& values);
+    
+    // Get configuration group
+    std::map<std::string, std::optional<ConfigValue>> getGroup(const std::string& groupName) const;
+    
+    // ========== ADVANCED OPERATIONS ==========
+    
+    // Merge with another config
+    void merge(const Config& other, bool overwrite = true);
+    
+    // Clone configuration
+    Config clone() const;
+    
+    // Compare configurations
+    bool equals(const Config& other) const;
+    
+    // Get configuration hash for quick comparison
+    size_t getHash() const;
+    
+    // Get filtered configuration (only keys matching pattern)
+    Config filter(const std::string& pattern) const;
+    
+    // Validate configuration against schema
+    std::vector<std::string> validate(const std::string& schema) const;
+    
+    // ========== STATISTICS AND METADATA ==========
+    
+    // Get configuration statistics
+    std::map<std::string, double> getStatistics() const;
+    
+    // Get configuration metadata
+    std::map<std::string, std::string> getMetadata() const;
+    
+    // Set metadata
+    void setMetadata(const std::string& key, const std::string& value);
+    
+    // Add tag to configuration
+    void addTag(const std::string& tag);
+    
+    // Get all tags
+    std::vector<std::string> getTags() const;
+    
+    // Check if configuration has tag
+    bool hasTag(const std::string& tag) const;
     
 private:
     struct Impl;

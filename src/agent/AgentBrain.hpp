@@ -52,6 +52,45 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // ========== CONVENIENCE METHODS ==========
+    
+    // Process complete sensory cycle: percept -> brain input -> motor output
+    MotorCommand processSensoryToMotor(const SensoryPercept& percept);
+    
+    // Batch process multiple sensory inputs and get consolidated motor response
+    MotorCommand processSensorSequence(const std::vector<SensoryPercept>& percepts);
+    
+    // Check if agent should explore based on curiosity and novelty
+    bool shouldExplore(float curiosityThreshold = 0.5f, float noveltyThreshold = 0.3f) const;
+    
+    // Get comprehensive agent state summary
+    std::string getStateSummary() const;
+    
+    // Enable/disable all learning systems
+    void enableAllLearning(bool enable);
+    void disableAllLearning();
+    
+    // Get effective neuromodulation (considering enabled status)
+    float getEffectiveNeuromodulation() const;
+    
+    // Process sensory input and return if novel
+    bool processInputAndCheckNovelty(const SensoryPercept& percept);
+    
+    // Get action with curiosity-driven exploration
+    MotorCommand getActionWithExploration();
+    
+    // Batch update for multiple timesteps
+    void batchUpdate(double timestep, int count = 1);
+    
+    // Reset and initialize for new episode with custom settings
+    void resetForEpisode(const SimpleWorld& world, bool resetMemory = true);
+    
+    // Get agent readiness status
+    bool isAgentReady() const;
+    
+    // Get current agent status as string
+    std::string getStatus() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -112,6 +151,20 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
-};
+    
+    // State tracking
+    mutable bool isProcessing_;
+    mutable SimulationStep lastProcessedStep_;
+    
+    // ========== PRIVATE IMPLEMENTATION HELPERS ==========
+    
+    // Check novelty using stored previous state
+    bool checkNovelty(const std::vector<float>& currentVision) const;
+    
+    // Update previous state
+    void updatePreviousState(const std::vector<float>& vision);
+    
+    // Reset internal processing state
+    void resetProcessingState();
 
 } // namespace nlm

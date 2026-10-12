@@ -184,7 +184,7 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
+    // Get the current configuration
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
@@ -192,6 +192,61 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== COMPOSITE OPERATIONS ==========
+    
+    // Process complete sensory cycle: input -> brain -> action
+    std::unique_ptr<class Action> processSensoryInputAndProduceAction(const class SensoryInput& input);
+    
+    // Process multiple sensory inputs and produce best action
+    std::unique_ptr<class Action> processSensorSequence(const std::vector<class SensoryInput>& inputs);
+    
+    // Get comprehensive brain state summary
+    std::string getStateSummary() const;
+    
+    // Get all system statistics as a map
+    std::map<std::string, double> getStatistics() const;
+    
+    // Get system status with detailed information
+    std::string getSystemStatus() const;
+    
+    // Check if all required systems are available and healthy
+    bool isSystemHealthy() const;
+    
+    // Get brain performance metrics
+    std::map<std::string, float> getPerformanceMetrics() const;
+    
+    // ========== CONVENIENCE METHODS ==========
+    
+    // Get working memory content
+    std::vector<float> getWorkingMemoryContent() const;
+    
+    // Get episodic memory count
+    size_t getEpisodicMemoryCount() const;
+    
+    // Get recent episodes
+    std::vector<class EpisodicMemoryItem> getRecentEpisodes(size_t count = 10) const;
+    
+    // Get attentional focus
+    std::vector<RegionId> getAttentionalFocus() const;
+    
+    // Get developmental progress
+    std::string getDevelopmentalProgress() const;
+    
+    // Check if development is complete
+    bool isDevelopmentComplete() const;
+    
+    // Reset brain and all attached systems
+    void resetAllSystems();
+    
+    // Save and reload for cleanup
+    bool refreshAndSave(const std::string& checkpointPath = "");
+    
+    // Get brain's active status
+    bool isActive() const;
+    
+    // Get core system initialization status
+    bool isInitialized() const;
     
 private:
     struct Impl;
